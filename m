@@ -1,13 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 29 Oct 2018 15:31:55 +1100
-Subject: [lustre-devel] [PATCH] lustre: lu_object: fix possible hang
- waiting for LCS_LEAVING
-In-Reply-To: <alpine.LFD.2.21.1810290329550.6811@casper.infradead.org>
-References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <878t2q8unf.fsf@notabene.neil.brown.name>
- <87d0s070nq.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1810290329550.6811@casper.infradead.org>
-Message-ID: <87muqx2x1g.fsf@notabene.neil.brown.name>
+Date: Mon, 29 Oct 2018 15:34:15 +1100
+Subject: [lustre-devel] [PATCH] lustre: initialize libcfs_debug_file_path
+In-Reply-To: <alpine.LFD.2.21.1810290331490.6811@casper.infradead.org>
+References: <87y3al4hb9.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1810290331490.6811@casper.infradead.org>
+Message-ID: <87k1m12wxk.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,75 +13,40 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, Oct 29 2018, James Simmons wrote:
 
->> As lu_context_key_quiesce() spins waiting for LCS_LEAVING to
->> change, it is important the we set and then clear in within a
->> non-preemptible region.  If the thread that spins pre-empty the
->> thread that sets-and-clears the state while the state is LCS_LEAVING,
->> then it can spin indefinitely, particularly on a single-CPU machine.
+>> This variable is assumed by the code to either
+>> be "NONE" or a file name - it shouldn't be NULL.
 >> 
->> Also update the comment to explain this dependency.
+>> So initialise to the compiled default.
 >> 
->> Fixes: ac3f8fd6e61b ("staging: lustre: remove locking from lu_context_exit()")
+>> Signed-off-by: NeilBrown <neilb@suse.com>
 >> ---
 >> 
->> This is the cause of the "something" that went wrong in my recent
->> testing that I mentioned.  I wonder if preempt_enable() has recently
->> been enhanced to encourage a preempt, to make this sort of bug easier to
->> see.
->> 
->
-> Reduced my cpu load :-)
+>> I'm going though failed tests, looking for things to fix.
+>> This fixes 77c.
 >
 > Reviewed-by: James Simmons <jsimmons@infradead.org>
 
-Thanks,
+Thanks for these two reviews.
+
 NeilBrown
 
-
 >  
->>  drivers/staging/lustre/lustre/obdclass/lu_object.c | 15 +++++++++------
->>  1 file changed, 9 insertions(+), 6 deletions(-)
+>>  drivers/staging/lustre/lnet/libcfs/debug.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> index cb57abf03644..51497c144dd6 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> @@ -1654,17 +1654,20 @@ void lu_context_exit(struct lu_context *ctx)
->>  	unsigned int i;
+>> diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+>> index 90d756c83520..f9544367389d 100644
+>> --- a/drivers/staging/lustre/lnet/libcfs/debug.c
+>> +++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+>> @@ -224,7 +224,7 @@ char libcfs_debug_file_path_arr[PATH_MAX] = LIBCFS_DEBUG_FILE_PATH_DEFAULT;
+>>  EXPORT_SYMBOL(libcfs_debug_file_path_arr);
 >>  
->>  	LINVRNT(ctx->lc_state == LCS_ENTERED);
->> -	/*
->> -	 * Ensure lu_context_key_quiesce() sees LCS_LEAVING
->> -	 * or we see LCT_QUIESCENT
->> -	 */
->> -	smp_store_mb(ctx->lc_state, LCS_LEAVING);
->>  	/*
->>  	 * Disable preempt to ensure we get a warning if
->>  	 * any lct_exit ever tries to sleep.  That would hurt
->>  	 * lu_context_key_quiesce() which spins waiting for us.
->> +	 * This also ensure we aren't preempted while the state
->> +	 * is LCS_LEAVING, as that too would cause problems for
->> +	 * lu_context_key_quiesce().
->>  	 */
->>  	preempt_disable();
->> +	/*
->> +	 * Ensure lu_context_key_quiesce() sees LCS_LEAVING
->> +	 * or we see LCT_QUIESCENT
->> +	 */
->> +	smp_store_mb(ctx->lc_state, LCS_LEAVING);
->>  	if (ctx->lc_tags & LCT_HAS_EXIT && ctx->lc_value) {
->>  		for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
->>  			struct lu_context_key *key;
->> @@ -1677,8 +1680,8 @@ void lu_context_exit(struct lu_context *ctx)
->>  		}
->>  	}
->>  
->> -	preempt_enable();
->>  	smp_store_release(&ctx->lc_state, LCS_LEFT);
->> +	preempt_enable();
->>  }
->>  EXPORT_SYMBOL(lu_context_exit);
->>  
+>>  /* We need to pass a pointer here, but elsewhere this must be a const */
+>> -static char *libcfs_debug_file_path;
+>> +static char *libcfs_debug_file_path = LIBCFS_DEBUG_FILE_PATH_DEFAULT;
+>>  module_param(libcfs_debug_file_path, charp, 0644);
+>>  MODULE_PARM_DESC(libcfs_debug_file_path,
+>>  		 "Path for dumping debug logs, set 'NONE' to prevent log dumping");
 >> -- 
 >> 2.14.0.rc0.dirty
 >> 
@@ -95,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181029/530ea6cb/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181029/65b8ff0c/attachment.sig>
