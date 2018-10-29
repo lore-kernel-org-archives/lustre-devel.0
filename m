@@ -1,60 +1,28 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 29 Oct 2018 15:34:15 +1100
-Subject: [lustre-devel] [PATCH] lustre: initialize libcfs_debug_file_path
-In-Reply-To: <alpine.LFD.2.21.1810290331490.6811@casper.infradead.org>
-References: <87y3al4hb9.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1810290331490.6811@casper.infradead.org>
-Message-ID: <87k1m12wxk.fsf@notabene.neil.brown.name>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Mon, 29 Oct 2018 09:23:04 +0000
+Subject: [lustre-devel] Using loff_t or u64 for PFL port
+In-Reply-To: <alpine.LFD.2.21.1810290345010.6811@casper.infradead.org>
+References: <alpine.LFD.2.21.1810290345010.6811@casper.infradead.org>
+Message-ID: <8C539D08-D7F6-4B17-8A8D-01FEFF03BD2E@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Oct 29 2018, James Simmons wrote:
+On Oct 28, 2018, at 21:49, James Simmons <jsimmons@infradead.org> wrote:
+> 
+> 
+> While doing the PFL port I noticed a inconsistent use of loff_t and u64.
+> While in Greg's branch several patches landed to make the prototypes
+> match the function with changing any unmatching loff_t/u64 to use u64.
+> I don't know if using u64 solely as the proper solution. What is the
+> proper unit to use?
 
->> This variable is assumed by the code to either
->> be "NONE" or a file name - it shouldn't be NULL.
->> 
->> So initialise to the compiled default.
->> 
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->> 
->> I'm going though failed tests, looking for things to fix.
->> This fixes 77c.
->
-> Reviewed-by: James Simmons <jsimmons@infradead.org>
+James, could you please clarify what part of the code you are referencing?
 
-Thanks for these two reviews.
-
-NeilBrown
-
->  
->>  drivers/staging/lustre/lnet/libcfs/debug.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
->> index 90d756c83520..f9544367389d 100644
->> --- a/drivers/staging/lustre/lnet/libcfs/debug.c
->> +++ b/drivers/staging/lustre/lnet/libcfs/debug.c
->> @@ -224,7 +224,7 @@ char libcfs_debug_file_path_arr[PATH_MAX] = LIBCFS_DEBUG_FILE_PATH_DEFAULT;
->>  EXPORT_SYMBOL(libcfs_debug_file_path_arr);
->>  
->>  /* We need to pass a pointer here, but elsewhere this must be a const */
->> -static char *libcfs_debug_file_path;
->> +static char *libcfs_debug_file_path = LIBCFS_DEBUG_FILE_PATH_DEFAULT;
->>  module_param(libcfs_debug_file_path, charp, 0644);
->>  MODULE_PARM_DESC(libcfs_debug_file_path,
->>  		 "Path for dumping debug logs, set 'NONE' to prevent log dumping");
->> -- 
->> 2.14.0.rc0.dirty
->> 
->> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181029/65b8ff0c/attachment.sig>
+Cheers, Andreas
+---
+Andreas Dilger
+Principal Lustre Architect
+Whamcloud
