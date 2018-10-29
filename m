@@ -1,16 +1,31 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 29 Oct 2018 11:03:02 +1100
+From: Patrick Farrell <paf@cray.com>
+Date: Mon, 29 Oct 2018 01:35:46 +0000
 Subject: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup
  every second
-In-Reply-To: <1539543498-29105-13-git-send-email-jsimmons@infradead.org>
+In-Reply-To: <87va5l39hl.fsf@notabene.neil.brown.name>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <1539543498-29105-13-git-send-email-jsimmons@infradead.org>
-Message-ID: <87va5l39hl.fsf@notabene.neil.brown.name>
+ <1539543498-29105-13-git-send-email-jsimmons@infradead.org>,
+ <87va5l39hl.fsf@notabene.neil.brown.name>
+Message-ID: <MWHPR11MB148802D76D49E06343462260CBF30@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Neil,
+
+Does your statement imply this would spin?  It definitely doesn?t just spin (that behavior in a main ?wait for work? spot of a (depending on settings) ~per-CPU daemon would render systems unusable and this patch has been in testing for a while).  So what is the detailed behavior of a ?timeout that expires immediately??
+
+- Patrick
+
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Sunday, October 28, 2018 7:03:02 PM
+To: James Simmons; Andreas Dilger; Oleg Drokin
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup every second
 
 On Sun, Oct 14 2018, James Simmons wrote:
 
@@ -37,21 +52,21 @@ On Sun, Oct 14 2018, James Simmons wrote:
 > --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
 > +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
 > @@ -371,7 +371,7 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
->  		}
->  	}
->  
-> -	return rc;
-> +	return rc || test_bit(LIOD_STOP, &pc->pc_flags);
+>                }
+>        }
+>
+> -     return rc;
+> +     return rc || test_bit(LIOD_STOP, &pc->pc_flags);
 >  }
->  
+>
 >  /**
 > @@ -441,7 +441,7 @@ static int ptlrpcd(void *arg)
->  		lu_context_enter(env.le_ses);
->  		if (wait_event_idle_timeout(set->set_waitq,
->  					    ptlrpcd_check(&env, pc),
-> -					    (timeout ? timeout : 1) * HZ) == 0)
-> +					    timeout * HZ) == 0)
->  			ptlrpc_expired_set(set);
+>                lu_context_enter(env.le_ses);
+>                if (wait_event_idle_timeout(set->set_waitq,
+>                                            ptlrpcd_check(&env, pc),
+> -                                         (timeout ? timeout : 1) * HZ) == 0)
+> +                                         timeout * HZ) == 0)
+>                        ptlrpc_expired_set(set);
 
 This is incorrect.
 A timeout of zero means the timeout happens after zero jiffies
@@ -67,14 +82,10 @@ I've updated the patch accordingly.
 Thanks,
 NeilBrown
 
->  
->  		lu_context_exit(&env.le_ctx);
-> -- 
+>
+>                lu_context_exit(&env.le_ctx);
+> --
 > 1.8.3.1
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181029/afd7267b/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181029/516d370d/attachment.html>
