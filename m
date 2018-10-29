@@ -1,10 +1,7 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 29 Oct 2018 15:18:14 +0000 (GMT)
-Subject: [lustre-devel] Using loff_t or u64 for PFL port
-In-Reply-To: <8C539D08-D7F6-4B17-8A8D-01FEFF03BD2E@whamcloud.com>
-References: <alpine.LFD.2.21.1810290345010.6811@casper.infradead.org>
- <8C539D08-D7F6-4B17-8A8D-01FEFF03BD2E@whamcloud.com>
-Message-ID: <alpine.LFD.2.21.1810291456390.21751@casper.infradead.org>
+Date: Mon, 29 Oct 2018 17:06:11 +0000 (GMT)
+Subject: [lustre-devel] Limitations of kernel read ahead
+Message-ID: <alpine.LFD.2.21.1810291532100.21751@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,32 +9,25 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> On Oct 28, 2018, at 21:49, James Simmons <jsimmons@infradead.org> wrote:
-> > 
-> > 
-> > While doing the PFL port I noticed a inconsistent use of loff_t and u64.
-> > While in Greg's branch several patches landed to make the prototypes
-> > match the function with changing any unmatching loff_t/u64 to use u64.
-> > I don't know if using u64 solely as the proper solution. What is the
-> > proper unit to use?
-> 
-> James, could you please clarify what part of the code you are referencing?
+Currently the lustre client has its own read ahead handling in the CLIO 
+layer. The reason for this is due to some limitations in the read ahead
+code for the linux kernel. Some work to use the kernel's read ahead was 
+attempted for the LU-8964 work but the general work for LU-8964 had other
+issues. Alternative work to LU-8964 has emerged under ticket
 
-I see where the divergence happened. The linux client commit 
+https://jira.whamcloud.com/browse/LU-8709
 
-21aef7d9d6544 (staging/lustre: get rid of obd_* typedefs)
+with early code at:
 
-Changed the old obd_off to u64 while in the OpenSFS branch some were
-changed to loff_t. A good example is 
+https://review.whamcloud.com/#/c/23552
 
-int lov_stripe_offset(struct lov_stripe_md *lsm, int index,
-		      loff_t lov_off, int stripeno, loff_t *obd_off);
+Also I have included a link to a presentation of this work and it gives
+insight on how lustre does its own read ahead.
 
-For upstream client its:
+https://www.eofs.eu/_media/events/lad16/19_parallel_readahead_framework_li_xi.pdf
 
-int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
-                      int stripeno, u64 *u64);
-
-The big difference between the two is that loff_t can be a negative
-value. I can compile a list of the difference so an audit cna be done.
-Then we can go over what should be loff_t and what should be u64.
+Now that this seems to be the targeted work for read ahead the discussion
+has come up about why this new work doesn't use the kernel read ahead 
+again. I wasn't involved in the discussion about the limitations but I 
+have included the people interested in this work so progress can be done
+to imporve the linux kernels version of read ahead.
