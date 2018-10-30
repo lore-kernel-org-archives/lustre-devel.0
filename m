@@ -1,58 +1,56 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 30 Oct 2018 07:16:45 +0000
-Subject: [lustre-devel] Limitations of kernel read ahead
-In-Reply-To: <62D5855B-8FE1-4157-858C-01B182D759AD@ddn.com>
-References: <alpine.LFD.2.21.1810291532100.21751@casper.infradead.org>
- <62D5855B-8FE1-4157-858C-01B182D759AD@ddn.com>
-Message-ID: <E8183EB7-961B-4FC0-B223-7671E9502F87@whamcloud.com>
+From: Patrick Farrell <paf@cray.com>
+Date: Tue, 30 Oct 2018 14:55:25 +0000
+Subject: [lustre-devel] Using loff_t or u64 for PFL port
+In-Reply-To: <alpine.LFD.2.21.1810291456390.21751@casper.infradead.org>
+References: <alpine.LFD.2.21.1810290345010.6811@casper.infradead.org>
+ <8C539D08-D7F6-4B17-8A8D-01FEFF03BD2E@whamcloud.com>
+ <alpine.LFD.2.21.1810291456390.21751@casper.infradead.org>
+Message-ID: <004DC75C-D5DA-4875-B090-AEB23B1AE267@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-One other enhancement that would be good to make for the readahead is to add opportunistic readahead for random access of smaller files (as determined by file size and client RAM) as discussed in LU-11416.  This has shown significant improvement for random access (about 40x speedup when doing random read IOPS on a 1GB file).
+This would be good to clean up - A few subtle bugs related to loff_t/u64 usage in interfaces have come up over time (and been addressed each time), but I've never found time to try to clean it all up.
 
-On Oct 29, 2018, at 20:00, Li Xi <lixi@ddn.com> wrote:
-> 
-> Thank you for summarize this, James!
-> 
-> I think everyone agrees that the current readahead algorithm of Lustre needs to be improved. And evidences show that the readahead algorithm of Linux kernel would not suitable for Lustre either. There are several reasons for this. In general, the readahead algorithm of kernel is designed for local file system with small readahead window. It is single thread, synchronous readahead, only usable for sequential read. Because the read operation of Lustre is has longer latency than local file system, while its bandwidth is typically higher than local file system, we need totally different algorithm for Lustre readahead. The readahead algorithm needs to be 1) asynchronous to hide latency for application 2) multiple threaded to utilize the high bandwidth 3) use big readahead window to align with the big RPC size 4) work for sequential read, stride read and potentially small & random read.
-> 
-> The work of LU-8709 was started with these targets and got pretty good numbers even without detailed tuning. We (the Whamcloud team) would like to rework on it with a goal of merging it in the next releases of Lustre.
-> 
-> Regards,
-> Li Xi
-> 
-> ?? 2018/10/30 ??2:06??James Simmons?<jsimmons@infradead.org> ??:
->> 
->> 
->>    Currently the lustre client has its own read ahead handling in the CLIO 
->>    layer. The reason for this is due to some limitations in the read ahead
->>    code for the linux kernel. Some work to use the kernel's read ahead was 
->>    attempted for the LU-8964 work but the general work for LU-8964 had other
->>    issues. Alternative work to LU-8964 has emerged under ticket
->> 
->>    https://jira.whamcloud.com/browse/LU-8709
->> 
->>    with early code at:
->> 
->>    https://review.whamcloud.com/#/c/23552
->> 
->>    Also I have included a link to a presentation of this work and it gives
->>    insight on how lustre does its own read ahead.
->> 
->>    https://www.eofs.eu/_media/events/lad16/19_parallel_readahead_framework_li_xi.pdf
->> 
->>    Now that this seems to be the targeted work for read ahead the discussion
->>    has come up about why this new work doesn't use the kernel read ahead 
->>    again. I wasn't involved in the discussion about the limitations but I 
->>    have included the people interested in this work so progress can be done
->>    to imporve the linux kernels version of read ahead.
->> 
->> 
+- Patrick
 
-Cheers, Andreas
----
-Andreas Dilger
-CTO Whamcloud
+?On 10/29/18, 10:18 AM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+
+    
+    > On Oct 28, 2018, at 21:49, James Simmons <jsimmons@infradead.org> wrote:
+    > > 
+    > > 
+    > > While doing the PFL port I noticed a inconsistent use of loff_t and u64.
+    > > While in Greg's branch several patches landed to make the prototypes
+    > > match the function with changing any unmatching loff_t/u64 to use u64.
+    > > I don't know if using u64 solely as the proper solution. What is the
+    > > proper unit to use?
+    > 
+    > James, could you please clarify what part of the code you are referencing?
+    
+    I see where the divergence happened. The linux client commit 
+    
+    21aef7d9d6544 (staging/lustre: get rid of obd_* typedefs)
+    
+    Changed the old obd_off to u64 while in the OpenSFS branch some were
+    changed to loff_t. A good example is 
+    
+    int lov_stripe_offset(struct lov_stripe_md *lsm, int index,
+    		      loff_t lov_off, int stripeno, loff_t *obd_off);
+    
+    For upstream client its:
+    
+    int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
+                          int stripeno, u64 *u64);
+    
+    The big difference between the two is that loff_t can be a negative
+    value. I can compile a list of the difference so an audit cna be done.
+    Then we can go over what should be loff_t and what should be u64.
+    
+    _______________________________________________
+    lustre-devel mailing list
+    lustre-devel at lists.lustre.org
+    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+    
