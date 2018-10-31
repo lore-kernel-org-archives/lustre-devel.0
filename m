@@ -1,82 +1,134 @@
-From: Siyao Lai <lai.siyao@whamcloud.com>
-Date: Thu, 29 Nov 2018 12:06:12 +0000
-Subject: [lustre-devel] [PATCH 06/12] lustre: mdc: don't add to page
- cache upon failure
-In-Reply-To: <875zwjql4l.fsf@notabene.neil.brown.name>
-References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
- <1543200508-6838-7-git-send-email-jsimmons@infradead.org>
- <875zwjql4l.fsf@notabene.neil.brown.name>
-Message-ID: <DFD6BB83-222B-42E1-98DA-9DF41C8F5755@ddn.com>
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 01 Nov 2018 07:56:59 +1100
+Subject: [lustre-devel] [PATCH] lustre: mdc: fix possible deadlock in
+ chlg_open()
+In-Reply-To: <7db27e7d-e685-af8f-80d8-891a0d8db4d5@cea.fr>
+References: <87bm7a3nue.fsf@notabene.neil.brown.name>
+ <7db27e7d-e685-af8f-80d8-891a0d8db4d5@cea.fr>
+Message-ID: <878t2d3kdg.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-You're right, I'll fix it later.
+On Wed, Oct 31 2018, quentin.bouget at cea.fr wrote:
+
+> Le 31/10/2018 ? 02:29, NeilBrown a ?crit?:
+>> Lockdep reports a possible deadlock between chlg_open() and
+>> mdc_changelog_cdev_init()
+>>
+>> mdc_changelog_cdev_init() takes chlg_registered_dev_lock and then
+>> calls misc_register() which takes misc_mtx.
+>> chlg_open() is called while misc_mtx is held, and tries to take
+>> chlg_registered_dev_lock.
+>> If these two functions race, a deadlock can occur as each thread will
+>> hold one of the locks while trying to take the other.
+>>
+>> chlg_open() does not need to take a lock.  It only uses the
+>> lock to stablize a list while looking for the matching
+>> chlg_registered_dev, and this can be found directly by examining
+>> file->private_data.
+>>
+>> So remove chlg_obd_get(), and use file->private_Data to find the
+>> obd_device.
+>>
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>
+>> Note that this bug exists in upstream (OpenSFS) lustre as well.
+> I think you need to modify mdc_changelog_cdev_init() as well so that 
+> misc_register() comes after the two list_add_tail() statements.
+
+Yes, definitely.  Thanks for that.  I'll change the patch.
+
+>
+> If someone opens the device a bit a too fast after it becomes visible, 
+> they might find an empty list at `dev->ced_obds'.
+> Previously, holding `chlg_registered_dev_loc' implicitely prevented that.
+>
+> Is it possible that maybe the kernel shouldn't hold `misc_mtx' while 
+> calling chlg_open()?
+
+No, it really should.  It protects against races between chlg_open and
+misc_unregister().
 
 Thanks,
-Lai
+NeilBrown
 
-?On 2018/11/27, 11:01 AM, "NeilBrown" <neilb@suse.com> wrote:
 
-    On Sun, Nov 25 2018, James Simmons wrote:
-    
-    > From: Lai Siyao <lai.siyao@whamcloud.com>
-    >
-    > Reading directory pages may fail on MDS, in this case client should
-    > not cache a non-up-to-date directory page, because it will cause
-    > a later read on the same page fail.
-    >
-    > Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-    > WC-bug-id: https://jira.whamcloud.com/browse/LU-5461
-    > Reviewed-on: http://review.whamcloud.com/11450
-    > Reviewed-by: Fan Yong <fan.yong@intel.com>
-    > Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-    > Reviewed-by: Oleg Drokin <green@whamcloud.com>
-    > Signed-off-by: James Simmons <jsimmons@infradead.org>
-    > ---
-    >  drivers/staging/lustre/lustre/mdc/mdc_request.c | 5 ++++-
-    >  1 file changed, 4 insertions(+), 1 deletion(-)
-    >
-    > diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-    > index 1072b66..09b30ef 100644
-    > --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-    > +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-    > @@ -1212,7 +1212,10 @@ static int mdc_read_page_remote(void *data, struct page *page0)
-    >  	}
-    >  
-    >  	rc = mdc_getpage(rp->rp_exp, fid, rp->rp_off, page_pool, npages, &req);
-    > -	if (!rc) {
-    > +	if (rc < 0) {
-    > +		/* page0 is special, which was added into page cache early */
-    > +		delete_from_page_cache(page0);
-    
-    This looks wrong to me.  We shouldn't need to delete the page from the
-    page-cache.
-    It won't be marked up-to-date, so why will that cause an error on a
-    later read???
-    
-    Well, because mdc_page_locate() finds a page and if it isn't up-to-date,
-    it returns -EIO.  Why does it do that?  If it found a PageError() page,
-    then it might be reasonable to return -EIO.
-    
-    Why not just return the page that was found, and let the caller check if
-    it is Uptodate?
-    
-    Well, because mdc_read_page() handles a successful page return from
-    mdc_page_locate() as a hash collision.
-    
-    I guess I need to understand how lustre maps a hash to a directory
-    block, and then how it handles collisions...
-    
-    The reason this jumped out at me is that it looks like it might be
-    racy.  Adding a page and then removing it might leave a window where
-    some other thread can find the page.  That is not a problem is a
-    non-up-to-date page just means we should wait for it.  But if it can
-    cause an error, then maybe the race is a real problem.
-    
-    But maybe there is some higher level locking...
-    
-    NeilBrown
-    
+>
+> Quentin Bouget
+>>
+>>   drivers/staging/lustre/lustre/mdc/mdc_changelog.c | 35 +++++------------------
+>>   1 file changed, 7 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> index d83507cbf95c..645e7f24a859 100644
+>> --- a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> +++ b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> @@ -444,31 +444,6 @@ static ssize_t chlg_write(struct file *file, const char __user *buff,
+>>   	return rc < 0 ? rc : count;
+>>   }
+>>   
+>> -/**
+>> - * Find the OBD device associated to a changelog character device.
+>> - * @param[in]  cdev  character device instance descriptor
+>> - * @return corresponding OBD device or NULL if none was found.
+>> - */
+>> -static struct obd_device *chlg_obd_get(dev_t cdev)
+>> -{
+>> -	int minor = MINOR(cdev);
+>> -	struct obd_device *obd = NULL;
+>> -	struct chlg_registered_dev *curr;
+>> -
+>> -	mutex_lock(&chlg_registered_dev_lock);
+>> -	list_for_each_entry(curr, &chlg_registered_devices, ced_link) {
+>> -		if (curr->ced_misc.minor == minor) {
+>> -			/* take the first available OBD device attached */
+>> -			obd = list_first_entry(&curr->ced_obds,
+>> -					       struct obd_device,
+>> -					       u.cli.cl_chg_dev_linkage);
+>> -			break;
+>> -		}
+>> -	}
+>> -	mutex_unlock(&chlg_registered_dev_lock);
+>> -	return obd;
+>> -}
+>> -
+>>   /**
+>>    * Open handler, initialize internal CRS state and spawn prefetch thread if
+>>    * needed.
+>> @@ -479,12 +454,16 @@ static struct obd_device *chlg_obd_get(dev_t cdev)
+>>   static int chlg_open(struct inode *inode, struct file *file)
+>>   {
+>>   	struct chlg_reader_state *crs;
+>> -	struct obd_device *obd = chlg_obd_get(inode->i_rdev);
+>> +	struct miscdevice *misc = file->private_data;
+>> +	struct chlg_registered_dev *dev;
+>> +	struct obd_device *obd;
+>>   	struct task_struct *task;
+>>   	int rc;
+>>   
+>> -	if (!obd)
+>> -		return -ENODEV;
+>> +	dev = container_of(misc, struct chlg_registered_dev, ced_misc);
+>> +	obd = list_first_entry(&dev->ced_obds,
+>> +			       struct obd_device,
+>> +			       u.cli.cl_chg_dev_linkage);
+>>   
+>>   	crs = kzalloc(sizeof(*crs), GFP_KERNEL);
+>>   	if (!crs)
+>>
+>>
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181101/ad861667/attachment.sig>
