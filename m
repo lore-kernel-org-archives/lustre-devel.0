@@ -1,56 +1,104 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Tue, 30 Oct 2018 14:55:25 +0000
-Subject: [lustre-devel] Using loff_t or u64 for PFL port
-In-Reply-To: <alpine.LFD.2.21.1810291456390.21751@casper.infradead.org>
-References: <alpine.LFD.2.21.1810290345010.6811@casper.infradead.org>
- <8C539D08-D7F6-4B17-8A8D-01FEFF03BD2E@whamcloud.com>
- <alpine.LFD.2.21.1810291456390.21751@casper.infradead.org>
-Message-ID: <004DC75C-D5DA-4875-B090-AEB23B1AE267@cray.com>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 31 Oct 2018 12:29:45 +1100
+Subject: [lustre-devel] [PATCH] lustre: mdc: fix possible deadlock in
+ chlg_open()
+Message-ID: <87bm7a3nue.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This would be good to clean up - A few subtle bugs related to loff_t/u64 usage in interfaces have come up over time (and been addressed each time), but I've never found time to try to clean it all up.
 
-- Patrick
+Lockdep reports a possible deadlock between chlg_open() and
+mdc_changelog_cdev_init()
 
-?On 10/29/18, 10:18 AM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+mdc_changelog_cdev_init() takes chlg_registered_dev_lock and then
+calls misc_register() which takes misc_mtx.
+chlg_open() is called while misc_mtx is held, and tries to take
+chlg_registered_dev_lock.
+If these two functions race, a deadlock can occur as each thread will
+hold one of the locks while trying to take the other.
 
-    
-    > On Oct 28, 2018, at 21:49, James Simmons <jsimmons@infradead.org> wrote:
-    > > 
-    > > 
-    > > While doing the PFL port I noticed a inconsistent use of loff_t and u64.
-    > > While in Greg's branch several patches landed to make the prototypes
-    > > match the function with changing any unmatching loff_t/u64 to use u64.
-    > > I don't know if using u64 solely as the proper solution. What is the
-    > > proper unit to use?
-    > 
-    > James, could you please clarify what part of the code you are referencing?
-    
-    I see where the divergence happened. The linux client commit 
-    
-    21aef7d9d6544 (staging/lustre: get rid of obd_* typedefs)
-    
-    Changed the old obd_off to u64 while in the OpenSFS branch some were
-    changed to loff_t. A good example is 
-    
-    int lov_stripe_offset(struct lov_stripe_md *lsm, int index,
-    		      loff_t lov_off, int stripeno, loff_t *obd_off);
-    
-    For upstream client its:
-    
-    int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
-                          int stripeno, u64 *u64);
-    
-    The big difference between the two is that loff_t can be a negative
-    value. I can compile a list of the difference so an audit cna be done.
-    Then we can go over what should be loff_t and what should be u64.
-    
-    _______________________________________________
-    lustre-devel mailing list
-    lustre-devel at lists.lustre.org
-    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-    
+chlg_open() does not need to take a lock.  It only uses the
+lock to stablize a list while looking for the matching
+chlg_registered_dev, and this can be found directly by examining
+file->private_data.
+
+So remove chlg_obd_get(), and use file->private_Data to find the
+obd_device.
+
+Signed-off-by: NeilBrown <neilb@suse.com>
+---
+
+Note that this bug exists in upstream (OpenSFS) lustre as well.
+
+ drivers/staging/lustre/lustre/mdc/mdc_changelog.c | 35 +++++------------------
+ 1 file changed, 7 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+index d83507cbf95c..645e7f24a859 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+@@ -444,31 +444,6 @@ static ssize_t chlg_write(struct file *file, const char __user *buff,
+ 	return rc < 0 ? rc : count;
+ }
+ 
+-/**
+- * Find the OBD device associated to a changelog character device.
+- * @param[in]  cdev  character device instance descriptor
+- * @return corresponding OBD device or NULL if none was found.
+- */
+-static struct obd_device *chlg_obd_get(dev_t cdev)
+-{
+-	int minor = MINOR(cdev);
+-	struct obd_device *obd = NULL;
+-	struct chlg_registered_dev *curr;
+-
+-	mutex_lock(&chlg_registered_dev_lock);
+-	list_for_each_entry(curr, &chlg_registered_devices, ced_link) {
+-		if (curr->ced_misc.minor == minor) {
+-			/* take the first available OBD device attached */
+-			obd = list_first_entry(&curr->ced_obds,
+-					       struct obd_device,
+-					       u.cli.cl_chg_dev_linkage);
+-			break;
+-		}
+-	}
+-	mutex_unlock(&chlg_registered_dev_lock);
+-	return obd;
+-}
+-
+ /**
+  * Open handler, initialize internal CRS state and spawn prefetch thread if
+  * needed.
+@@ -479,12 +454,16 @@ static struct obd_device *chlg_obd_get(dev_t cdev)
+ static int chlg_open(struct inode *inode, struct file *file)
+ {
+ 	struct chlg_reader_state *crs;
+-	struct obd_device *obd = chlg_obd_get(inode->i_rdev);
++	struct miscdevice *misc = file->private_data;
++	struct chlg_registered_dev *dev;
++	struct obd_device *obd;
+ 	struct task_struct *task;
+ 	int rc;
+ 
+-	if (!obd)
+-		return -ENODEV;
++	dev = container_of(misc, struct chlg_registered_dev, ced_misc);
++	obd = list_first_entry(&dev->ced_obds,
++			       struct obd_device,
++			       u.cli.cl_chg_dev_linkage);
+ 
+ 	crs = kzalloc(sizeof(*crs), GFP_KERNEL);
+ 	if (!crs)
+-- 
+2.14.0.rc0.dirty
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181031/c037145f/attachment.sig>
