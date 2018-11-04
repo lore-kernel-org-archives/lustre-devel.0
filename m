@@ -1,14 +1,14 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 4 Nov 2018 20:52:17 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 16/28] lustre: statahead: missing barrier
- before wake_up
-In-Reply-To: <87efci8w4q.fsf@notabene.neil.brown.name>
+Date: Sun, 4 Nov 2018 20:53:35 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup
+ every second
+In-Reply-To: <87pnvt325a.fsf@notabene.neil.brown.name>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <1539543498-29105-17-git-send-email-jsimmons@infradead.org>
- <87d0s8c8tp.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1810212348370.6249@casper.infradead.org>
- <87efci8w4q.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1811042048170.27308@casper.infradead.org>
+ <1539543498-29105-13-git-send-email-jsimmons@infradead.org>
+ <87va5l39hl.fsf@notabene.neil.brown.name>
+ <MWHPR11MB148802D76D49E06343462260CBF30@MWHPR11MB1488.namprd11.prod.outlook.com>
+ <87pnvt325a.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1811042052360.27308@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,124 +16,96 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> On Sun, Oct 21 2018, James Simmons wrote:
-> 
-> >> On Sun, Oct 14 2018, James Simmons wrote:
-> >> 
-> >> > From: Lai Siyao <lai.siyao@whamcloud.com>
-> >> >
-> >> > A barrier is missing before wake_up() in ll_statahead_interpret(),
-> >> > which may cause 'ls' hang. Under the right conditions a basic 'ls'
-> >> > can fail. The debug logs show:
-> >> >
-> >> > statahead.c:683:ll_statahead_interpret()) sa_entry software rc -13
-> >> > statahead.c:1666:ll_statahead()) revalidate statahead software: -11.
-> >> >
-> >> > Obviously statahead failure didn't notify 'ls' process in time.
-> >> > The mi_cbdata can be stale so add a barrier before calling
-> >> > wake_up().
-> >> >
-> >> > Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-> >> > Signed-off-by: Bob Glossman <bob.glossman@intel.com>
-> >> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9210
-> >> > Reviewed-on: https://review.whamcloud.com/27330
-> >> > Reviewed-by: Nathaniel Clark <nclark@whamcloud.com>
-> >> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
-> >> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> >> > ---
-> >> >  drivers/staging/lustre/lustre/llite/statahead.c | 8 +++++++-
-> >> >  1 file changed, 7 insertions(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-> >> > index 1ad308c..0174a4c 100644
-> >> > --- a/drivers/staging/lustre/lustre/llite/statahead.c
-> >> > +++ b/drivers/staging/lustre/lustre/llite/statahead.c
-> >> > @@ -680,8 +680,14 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
-> >> >  
-> >> >  	spin_lock(&lli->lli_sa_lock);
-> >> >  	if (rc) {
-> >> > -		if (__sa_make_ready(sai, entry, rc))
-> >> > +		if (__sa_make_ready(sai, entry, rc)) {
-> >> > +			/* LU-9210 : Under the right conditions even 'ls'
-> >> > +			 * can cause the statahead to fail. Using a memory
-> >> > +			 * barrier resolves this issue.
-> >> > +			 */
-> >> > +			smp_mb();
-> >> >  			wake_up(&sai->sai_waitq);
-> >> > +		}
-> >> >  	} else {
-> >> >  		int first = 0;
-> >> >  		entry->se_minfo = minfo;
-> >> > -- 
-> >> > 1.8.3.1
-> >> 
-> >> Again, this is a fairly lame comment to justify the smp_mb().
-> >> It appears to me that the issue is most likely the value of
-> >> entry->se_state.
-> >> __sa_make_ready() sets this and revalidate_statahead_dentry tests it
-> >> after waiting on sai_waitq.
-> >> So I think it would be best if we changed __sa_make_ready() to
-> >> 
-> >> 	smp_store_release(&entry->se_state, ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC)
-> >> 
-> >> and in ll_statahead_interpret() have
-> >> 
-> >> 	if (smp_load_acquire(&entry->se_state) == SA_ENTRY_SUCC &&
-> >>             entry->se_inode) {
-> >> 
-> >> This would make it obvious which variable was important, and would show
-> >> the paired synchronization points.
+> > Neil,
 > >
-> > If you think this is lame you should be the JIRA ticket and the original 
-> > patch. It had zero info so I attempted to extract what I could out of the
-> > ticket. Hopefully Lai can fill in the details. I have no problems fixing 
-> > this another way. I don't see a way in the ticket to easily reproduce this
-> > problem to see the new approach would fix it :-(
+> > Does your statement imply this would spin?  It definitely doesn?t just
+> > spin (that behavior in a main ?wait for work? spot of a (depending on
+> > settings) ~per-CPU daemon would render systems unusable and this patch
+> > has been in testing for a while).  So what is the detailed behavior of
+> > a ?timeout that expires immediately??
 > 
-> I have imposed the version that I think is correct.  See below.
-
-I opened a ticket - https://jira.whamcloud.com/browse/LU-11616 and pushed 
-this to the OpenSFS branch for full testing. The patch is at:
-
-https://review.whamcloud.com/#/c/33571
-
-BTW I did not know about (total store order) TSO platforms and how some 
-architectures don't support this property. An audit of the smp barriers
-might be a good idea for Lustre. For people not aware of TSO a good
-article on this is at:
-
-https://lwn.net/Articles/576486
- 
+> Hi Patrick,
+>  it definitely spins for me.
+> 
+>  I should have clarified that the SFS patch
+> 
+>    e81847bd0651 LU-9660 ptlrpc: do not wakeup every second
+> 
+>  is correct, as __l_wait_event() treats a timeout value of 0 as meaning an
+>  indefinite timeout.
+>  The error was in the conversion to wait_event_idle_timeout().  The
+>  various wait_event*timeout() functions treat 0 as 1 less than 1.
+>  If you want to not have a timeout, you need to not use the *_timeout()
+>  version.
+>  If a timeout is undesirable rather than fatal, then
+>  MAX_SCHEDULE_TIMEOUT can be used.  In this case, that seemed best.
+> 
 > Thanks,
 > NeilBrown
 > 
-> --- a/drivers/staging/lustre/lustre/llite/statahead.c
-> +++ b/drivers/staging/lustre/lustre/llite/statahead.c
-> @@ -322,7 +322,11 @@ __sa_make_ready(struct ll_statahead_info *sai, struct sa_entry *entry, int ret)
->  		}
->  	}
->  	list_add(&entry->se_list, pos);
-> -	entry->se_state = ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC;
-> +	/*
-> +	 * LU-9210: ll_statahead_interpet must be able to see this before
-> +	 * we wake it up
-> +	 */
-> +	smp_store_release(&entry->se_state, ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC);
->  
->  	return (index == sai->sai_index_wait);
->  }
-> @@ -1390,7 +1394,12 @@ static int revalidate_statahead_dentry(struct inode *dir,
->  		}
->  	}
->  
-> -	if (entry->se_state == SA_ENTRY_SUCC && entry->se_inode) {
-> +	/*
-> +	 * We need to see the value that was set immediately before we
-> +	 * were woken up.
-> +	 */
-> +	if (smp_load_acquire(&entry->se_state) == SA_ENTRY_SUCC &&
-> +	    entry->se_inode) {
->  		struct inode *inode = entry->se_inode;
->  		struct lookup_intent it = { .it_op = IT_GETATTR,
->  					    .it_lock_handle = entry->se_handle };
 > 
+> >
+> > - Patrick
+> >
+> >
+> > ________________________________
+> > From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+> > Sent: Sunday, October 28, 2018 7:03:02 PM
+> > To: James Simmons; Andreas Dilger; Oleg Drokin
+> > Cc: Lustre Development List
+> > Subject: Re: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup every second
+> >
+> > On Sun, Oct 14 2018, James Simmons wrote:
+> >
+> >> From: Alex Zhuravlev <bzzz@whamcloud.com>
+> >>
+> >> Even if there are no RPC requests on the set, there is no need to
+> >> wake up every second. The thread is woken up when a request is added
+> >> to the set or when the STOP bit is set, so it is sufficient to only
+> >> wake up when there are requests on the set to worry about.
+> >>
+> >> Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+> >> WC-bug-id: https://jira.whamcloud.com/browse/LU-9660
+> >> Reviewed-on: https://review.whamcloud.com/28776
+> >> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> >> Reviewed-by: Patrick Farrell <paf@cray.com>
+> >> Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> >> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> >> ---
+> >>  drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> >> index c201a88..5b4977b 100644
+> >> --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> >> +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> >> @@ -371,7 +371,7 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+> >>                }
+> >>        }
+> >>
+> >> -     return rc;
+> >> +     return rc || test_bit(LIOD_STOP, &pc->pc_flags);
+> >>  }
+> >>
+> >>  /**
+> >> @@ -441,7 +441,7 @@ static int ptlrpcd(void *arg)
+> >>                lu_context_enter(env.le_ses);
+> >>                if (wait_event_idle_timeout(set->set_waitq,
+> >>                                            ptlrpcd_check(&env, pc),
+> >> -                                         (timeout ? timeout : 1) * HZ) == 0)
+> >> +                                         timeout * HZ) == 0)
+> >>                        ptlrpc_expired_set(set);
+> >
+> > This is incorrect.
+> > A timeout of zero means the timeout happens after zero jiffies
+> > (immediately), it doesn't mean there is no timeout.
+> > If we want a "timeout" of zero to mean "Wait forever", we need something
+> > like:
+> >
+> >   wait_event_idle_timeout(.....,
+> >                           timeout ? (timeout * HZ) : MAX_SCHEDULE_TIMEOUT) == 0
+> >
+> > I've updated the patch accordingly.
+
+I did that change locally as well and my CPU load problem went away. 
+Thanks for figuring it out. Will be more careful in the future.
