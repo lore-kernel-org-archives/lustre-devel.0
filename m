@@ -1,100 +1,138 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 05 Nov 2018 16:52:53 +1100
-Subject: [lustre-devel] drivers/staging updated to 4.20-rc1
-Message-ID: <87k1lsyssq.fsf@notabene.neil.brown.name>
+From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
+Date: Mon, 5 Nov 2018 14:37:33 +0100
+Subject: [lustre-devel] [PATCH v2] lustre: mdc: fix possible deadlock in
+ chlg_open()
+In-Reply-To: <alpine.LFD.2.21.1811042131490.27308@casper.infradead.org>
+References: <87bm7a3nue.fsf@notabene.neil.brown.name>
+ <7db27e7d-e685-af8f-80d8-891a0d8db4d5@cea.fr>
+ <875zxh3elu.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1811042131490.27308@casper.infradead.org>
+Message-ID: <88ccd141-4778-e3ab-3ce0-e7cbd5c290fc@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Le 04/11/2018 ? 22:34, James Simmons a ?crit?:
+>> Lockdep reports a possible deadlock between chlg_open() and
+>> mdc_changelog_cdev_init()
+>>
+>> mdc_changelog_cdev_init() takes chlg_registered_dev_lock and then
+>> calls misc_register() which takes misc_mtx.
+>> chlg_open() is called while misc_mtx is held, and tries to take
+>> chlg_registered_dev_lock.
+>> If these two functions race, a deadlock can occur as each thread will
+>> hold one of the locks while trying to take the other.
+>>
+>> chlg_open() does not need to take a lock.  It only uses the
+>> lock to stablize a list while looking for the matching
+>> chlg_registered_dev, and this can be found directly by examining
+>> file->private_data.
+>>
+>> So remove chlg_obd_get(), and use file->private_data to find the
+>> obd_device.
+>> Also ensure the device is fully initialized before calling
+>> misc_register().  This means setting up some list linkage before the
+>> call, and tearing it down if there is an error.
+> I have been testing this but I'm no HSM expert. I pushed this patch
+> to OpenSFS branch as well.
+>
+> https://jira.whamcloud.com/browse/LU-11617
+> https://review.whamcloud.com/#/c/33572/
+>
+> Reviewed-by: James Simmons <jsimmons@infradead.org>
 
-Hi,
- I've just pushed out new lustre/lustre, lustre/lustre-testing, lustre/lustre-wip
- to github.com:neilbrown/linux.git
+Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
 
- lustre is updated to 4.20-rc1 and doesn't compile because of some
- changes.
- The patch below makes it compile and (probably) work.
-
- I'd appreciate a review, especially of the iov_for_each change.
-
-Thanks,
-NeilBrown
-
-
-Subject: [PATCH] lustre: fixes for 4.20-rc1
-
-Most are trivial.
-iov_for_each() is broken upstream and there are no users in mainline,
-so it seem to make sense to just open-code it in the one place
-we use it.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h | 4 ++--
- drivers/staging/lustre/lustre/llite/vvp_io.c        | 5 ++++-
- drivers/staging/lustre/lustre/mdc/mdc_request.c     | 2 +-
- 3 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index c882345226e1..7f81fe24c5eb 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -478,7 +478,7 @@ struct kib_rx {					/* receive message */
- 	enum ib_wc_status      rx_status;     /* completion status */
- 	struct kib_msg		*rx_msg;	/* message buffer (host vaddr) */
- 	__u64                  rx_msgaddr;    /* message buffer (I/O addr) */
--	DECLARE_PCI_UNMAP_ADDR(rx_msgunmap);  /* for dma_unmap_single() */
-+	DEFINE_DMA_UNMAP_ADDR(rx_msgunmap);  /* for dma_unmap_single() */
- 	struct ib_recv_wr      rx_wrq;        /* receive work item... */
- 	struct ib_sge          rx_sge;        /* ...and its memory */
- };
-@@ -501,7 +501,7 @@ struct kib_tx {					/* transmit message */
- 	struct lnet_msg		*tx_lntmsg[2];	/* lnet msgs to finalize on completion */
- 	struct kib_msg	      *tx_msg;        /* message buffer (host vaddr) */
- 	__u64                 tx_msgaddr;     /* message buffer (I/O addr) */
--	DECLARE_PCI_UNMAP_ADDR(tx_msgunmap);  /* for dma_unmap_single() */
-+	DEFINE_DMA_UNMAP_ADDR(tx_msgunmap);  /* for dma_unmap_single() */
- 	/** sge for tx_msgaddr */
- 	struct ib_sge		tx_msgsge;
- 	int                   tx_nwrq;        /* # send work items */
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 70d23874b674..524f3f4feec8 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -388,7 +388,10 @@ static int vvp_mmap_locks(const struct lu_env *env,
- 	if (!mm)
- 		return 0;
- 
--	iov_for_each(iov, i, *vio->vui_iter) {
-+	for (i = *vio->vui_iter;
-+	     i.count;
-+	     iov_iter_advance(&i, iov.iov_len)) {
-+		iov = iov_iter_iovec(&i);
- 		addr = (unsigned long)iov.iov_base;
- 		count = iov.iov_len;
- 		if (count == 0)
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 8f8e3d220dc8..2242204f3c9e 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -993,7 +993,7 @@ static struct page *mdc_page_locate(struct address_space *mapping, __u64 *hash,
- 	xa_lock_irq(&mapping->i_pages);
- 	found = radix_tree_gang_lookup(&mapping->i_pages,
- 				       (void **)&page, offset, 1);
--	if (found > 0 && !radix_tree_exceptional_entry(page)) {
-+	if (found > 0 && !xa_is_value(page)) {
- 		struct lu_dirpage *dp;
- 
- 		get_page(page);
--- 
-2.14.0.rc0.dirty
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181105/0932c5fa/attachment.sig>
+>
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>
+>> This is the revised version with the problem identified by Quentin
+>> fixed.
+>>
+>>   drivers/staging/lustre/lustre/mdc/mdc_changelog.c | 46 +++++++----------------
+>>   1 file changed, 14 insertions(+), 32 deletions(-)
+>>
+>> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> index d83507cbf95c..af29ea73c48a 100644
+>> --- a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> +++ b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+>> @@ -444,31 +444,6 @@ static ssize_t chlg_write(struct file *file, const char __user *buff,
+>>   	return rc < 0 ? rc : count;
+>>   }
+>>   
+>> -/**
+>> - * Find the OBD device associated to a changelog character device.
+>> - * @param[in]  cdev  character device instance descriptor
+>> - * @return corresponding OBD device or NULL if none was found.
+>> - */
+>> -static struct obd_device *chlg_obd_get(dev_t cdev)
+>> -{
+>> -	int minor = MINOR(cdev);
+>> -	struct obd_device *obd = NULL;
+>> -	struct chlg_registered_dev *curr;
+>> -
+>> -	mutex_lock(&chlg_registered_dev_lock);
+>> -	list_for_each_entry(curr, &chlg_registered_devices, ced_link) {
+>> -		if (curr->ced_misc.minor == minor) {
+>> -			/* take the first available OBD device attached */
+>> -			obd = list_first_entry(&curr->ced_obds,
+>> -					       struct obd_device,
+>> -					       u.cli.cl_chg_dev_linkage);
+>> -			break;
+>> -		}
+>> -	}
+>> -	mutex_unlock(&chlg_registered_dev_lock);
+>> -	return obd;
+>> -}
+>> -
+>>   /**
+>>    * Open handler, initialize internal CRS state and spawn prefetch thread if
+>>    * needed.
+>> @@ -479,12 +454,16 @@ static struct obd_device *chlg_obd_get(dev_t cdev)
+>>   static int chlg_open(struct inode *inode, struct file *file)
+>>   {
+>>   	struct chlg_reader_state *crs;
+>> -	struct obd_device *obd = chlg_obd_get(inode->i_rdev);
+>> +	struct miscdevice *misc = file->private_data;
+>> +	struct chlg_registered_dev *dev;
+>> +	struct obd_device *obd;
+>>   	struct task_struct *task;
+>>   	int rc;
+>>   
+>> -	if (!obd)
+>> -		return -ENODEV;
+>> +	dev = container_of(misc, struct chlg_registered_dev, ced_misc);
+>> +	obd = list_first_entry(&dev->ced_obds,
+>> +			       struct obd_device,
+>> +			       u.cli.cl_chg_dev_linkage);
+>>   
+>>   	crs = kzalloc(sizeof(*crs), GFP_KERNEL);
+>>   	if (!crs)
+>> @@ -669,13 +648,16 @@ int mdc_changelog_cdev_init(struct obd_device *obd)
+>>   		goto out_unlock;
+>>   	}
+>>   
+>> +	list_add_tail(&obd->u.cli.cl_chg_dev_linkage, &entry->ced_obds);
+>> +	list_add_tail(&entry->ced_link, &chlg_registered_devices);
+>> +
+>>   	/* Register new character device */
+>>   	rc = misc_register(&entry->ced_misc);
+>> -	if (rc != 0)
+>> +	if (rc != 0) {
+>> +		list_del_init(&obd->u.cli.cl_chg_dev_linkage);
+>> +		list_del(&entry->ced_link);
+>>   		goto out_unlock;
+>> -
+>> -	list_add_tail(&obd->u.cli.cl_chg_dev_linkage, &entry->ced_obds);
+>> -	list_add_tail(&entry->ced_link, &chlg_registered_devices);
+>> +	}
+>>   
+>>   	entry = NULL;	/* prevent it from being freed below */
+>>   
+>> -- 
+>> 2.14.0.rc0.dirty
+>>
+>>
