@@ -1,138 +1,148 @@
-From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
-Date: Mon, 5 Nov 2018 14:37:33 +0100
-Subject: [lustre-devel] [PATCH v2] lustre: mdc: fix possible deadlock in
- chlg_open()
-In-Reply-To: <alpine.LFD.2.21.1811042131490.27308@casper.infradead.org>
-References: <87bm7a3nue.fsf@notabene.neil.brown.name>
- <7db27e7d-e685-af8f-80d8-891a0d8db4d5@cea.fr>
- <875zxh3elu.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1811042131490.27308@casper.infradead.org>
-Message-ID: <88ccd141-4778-e3ab-3ce0-e7cbd5c290fc@cea.fr>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon,  5 Nov 2018 13:18:07 -0500
+Subject: [lustre-devel] [PATCH] lustre: remove iter type from
+ iov_iter_[b|k]vec()
+Message-ID: <1541441887-15064-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Le 04/11/2018 ? 22:34, James Simmons a ?crit?:
->> Lockdep reports a possible deadlock between chlg_open() and
->> mdc_changelog_cdev_init()
->>
->> mdc_changelog_cdev_init() takes chlg_registered_dev_lock and then
->> calls misc_register() which takes misc_mtx.
->> chlg_open() is called while misc_mtx is held, and tries to take
->> chlg_registered_dev_lock.
->> If these two functions race, a deadlock can occur as each thread will
->> hold one of the locks while trying to take the other.
->>
->> chlg_open() does not need to take a lock.  It only uses the
->> lock to stablize a list while looking for the matching
->> chlg_registered_dev, and this can be found directly by examining
->> file->private_data.
->>
->> So remove chlg_obd_get(), and use file->private_data to find the
->> obd_device.
->> Also ensure the device is fully initialized before calling
->> misc_register().  This means setting up some list linkage before the
->> call, and tearing it down if there is an error.
-> I have been testing this but I'm no HSM expert. I pushed this patch
-> to OpenSFS branch as well.
->
-> https://jira.whamcloud.com/browse/LU-11617
-> https://review.whamcloud.com/#/c/33572/
->
-> Reviewed-by: James Simmons <jsimmons@infradead.org>
+The linux commit aa563d7bca6e ("iov_iter: Separate type from
+direction and use accessor functions) removed the iter type
+from both iov_iter_bvec() and iov_iter_kvec(). Update lustre
+to this change. Without it we see in testing:
 
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
+WARNING: CPU: 2 PID: 3088 at lib/iov_iter.c:1082 iov_iter_kvec+0x25/0x30
 
->
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>
->> This is the revised version with the problem identified by Quentin
->> fixed.
->>
->>   drivers/staging/lustre/lustre/mdc/mdc_changelog.c | 46 +++++++----------------
->>   1 file changed, 14 insertions(+), 32 deletions(-)
->>
->> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
->> index d83507cbf95c..af29ea73c48a 100644
->> --- a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
->> +++ b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
->> @@ -444,31 +444,6 @@ static ssize_t chlg_write(struct file *file, const char __user *buff,
->>   	return rc < 0 ? rc : count;
->>   }
->>   
->> -/**
->> - * Find the OBD device associated to a changelog character device.
->> - * @param[in]  cdev  character device instance descriptor
->> - * @return corresponding OBD device or NULL if none was found.
->> - */
->> -static struct obd_device *chlg_obd_get(dev_t cdev)
->> -{
->> -	int minor = MINOR(cdev);
->> -	struct obd_device *obd = NULL;
->> -	struct chlg_registered_dev *curr;
->> -
->> -	mutex_lock(&chlg_registered_dev_lock);
->> -	list_for_each_entry(curr, &chlg_registered_devices, ced_link) {
->> -		if (curr->ced_misc.minor == minor) {
->> -			/* take the first available OBD device attached */
->> -			obd = list_first_entry(&curr->ced_obds,
->> -					       struct obd_device,
->> -					       u.cli.cl_chg_dev_linkage);
->> -			break;
->> -		}
->> -	}
->> -	mutex_unlock(&chlg_registered_dev_lock);
->> -	return obd;
->> -}
->> -
->>   /**
->>    * Open handler, initialize internal CRS state and spawn prefetch thread if
->>    * needed.
->> @@ -479,12 +454,16 @@ static struct obd_device *chlg_obd_get(dev_t cdev)
->>   static int chlg_open(struct inode *inode, struct file *file)
->>   {
->>   	struct chlg_reader_state *crs;
->> -	struct obd_device *obd = chlg_obd_get(inode->i_rdev);
->> +	struct miscdevice *misc = file->private_data;
->> +	struct chlg_registered_dev *dev;
->> +	struct obd_device *obd;
->>   	struct task_struct *task;
->>   	int rc;
->>   
->> -	if (!obd)
->> -		return -ENODEV;
->> +	dev = container_of(misc, struct chlg_registered_dev, ced_misc);
->> +	obd = list_first_entry(&dev->ced_obds,
->> +			       struct obd_device,
->> +			       u.cli.cl_chg_dev_linkage);
->>   
->>   	crs = kzalloc(sizeof(*crs), GFP_KERNEL);
->>   	if (!crs)
->> @@ -669,13 +648,16 @@ int mdc_changelog_cdev_init(struct obd_device *obd)
->>   		goto out_unlock;
->>   	}
->>   
->> +	list_add_tail(&obd->u.cli.cl_chg_dev_linkage, &entry->ced_obds);
->> +	list_add_tail(&entry->ced_link, &chlg_registered_devices);
->> +
->>   	/* Register new character device */
->>   	rc = misc_register(&entry->ced_misc);
->> -	if (rc != 0)
->> +	if (rc != 0) {
->> +		list_del_init(&obd->u.cli.cl_chg_dev_linkage);
->> +		list_del(&entry->ced_link);
->>   		goto out_unlock;
->> -
->> -	list_add_tail(&obd->u.cli.cl_chg_dev_linkage, &entry->ced_obds);
->> -	list_add_tail(&entry->ced_link, &chlg_registered_devices);
->> +	}
->>   
->>   	entry = NULL;	/* prevent it from being freed below */
->>   
->> -- 
->> 2.14.0.rc0.dirty
->>
->>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c  | 4 ++--
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c  | 8 ++++----
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c | 4 ++--
+ drivers/staging/lustre/lnet/lnet/lib-move.c             | 4 ++--
+ drivers/staging/lustre/lnet/lnet/lib-socket.c           | 4 ++--
+ 5 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 23ce59e..57fe037 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1548,11 +1548,11 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	LASSERT(!(payload_kiov && payload_iov));
+ 
+ 	if (payload_kiov)
+-		iov_iter_bvec(&from, ITER_BVEC | WRITE,
++		iov_iter_bvec(&from, WRITE,
+ 			      payload_kiov, payload_niov,
+ 			      payload_nob + payload_offset);
+ 	else
+-		iov_iter_kvec(&from, ITER_KVEC | WRITE,
++		iov_iter_kvec(&from, WRITE,
+ 			      payload_iov, payload_niov,
+ 			      payload_nob + payload_offset);
+ 
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index c401896..4abf0eb 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -1001,7 +1001,7 @@ struct ksock_route *
+ 			kvec->iov_base = &conn->ksnc_msg;
+ 			kvec->iov_len = offsetof(struct ksock_msg, ksm_u);
+ 			conn->ksnc_rx_nob_left = offsetof(struct ksock_msg, ksm_u);
+-			iov_iter_kvec(&conn->ksnc_rx_to, READ|ITER_KVEC, kvec,
++			iov_iter_kvec(&conn->ksnc_rx_to, READ, kvec,
+ 					1, offsetof(struct ksock_msg, ksm_u));
+ 			break;
+ 
+@@ -1011,7 +1011,7 @@ struct ksock_route *
+ 			kvec->iov_base = &conn->ksnc_msg.ksm_u.lnetmsg;
+ 			kvec->iov_len = sizeof(struct lnet_hdr);
+ 			conn->ksnc_rx_nob_left = sizeof(struct lnet_hdr);
+-			iov_iter_kvec(&conn->ksnc_rx_to, READ|ITER_KVEC, kvec,
++			iov_iter_kvec(&conn->ksnc_rx_to, READ, kvec,
+ 					1, sizeof(struct lnet_hdr));
+ 			break;
+ 
+@@ -1043,7 +1043,7 @@ struct ksock_route *
+ 	} while (nob_to_skip &&    /* mustn't overflow conn's rx iov */
+ 		 niov < sizeof(conn->ksnc_rx_iov_space) / sizeof(struct iovec));
+ 
+-	iov_iter_kvec(&conn->ksnc_rx_to, READ|ITER_KVEC, kvec, niov, skipped);
++	iov_iter_kvec(&conn->ksnc_rx_to, READ, kvec, niov, skipped);
+ 	return 0;
+ }
+ 
+@@ -1157,7 +1157,7 @@ struct ksock_route *
+ 		kvec->iov_base = &conn->ksnc_msg.ksm_u.lnetmsg;
+ 		kvec->iov_len = sizeof(struct ksock_lnet_msg);
+ 
+-		iov_iter_kvec(&conn->ksnc_rx_to, READ|ITER_KVEC, kvec,
++		iov_iter_kvec(&conn->ksnc_rx_to, READ, kvec,
+ 				1, sizeof(struct ksock_lnet_msg));
+ 
+ 		goto again;     /* read lnet header now */
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
+index 33847b9..686c2d3 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
+@@ -92,7 +92,7 @@
+ 	    nob < tx->tx_resid)
+ 		msg.msg_flags |= MSG_MORE;
+ 
+-	iov_iter_kvec(&msg.msg_iter, WRITE | ITER_KVEC,
++	iov_iter_kvec(&msg.msg_iter, WRITE,
+ 		      tx->tx_iov, tx->tx_niov, nob);
+ 	return sock_sendmsg(sock, &msg);
+ }
+@@ -140,7 +140,7 @@
+ 		    nob < tx->tx_resid)
+ 			msg.msg_flags |= MSG_MORE;
+ 
+-		iov_iter_bvec(&msg.msg_iter, WRITE | ITER_BVEC,
++		iov_iter_bvec(&msg.msg_iter, WRITE,
+ 			      kiov, tx->tx_nkiov, nob);
+ 		rc = sock_sendmsg(sock, &msg);
+ 	}
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 5694d85..eaa1dfa 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -498,10 +498,10 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	}
+ 
+ 	if (iov) {
+-		iov_iter_kvec(&to, ITER_KVEC | READ, iov, niov, mlen + offset);
++		iov_iter_kvec(&to, READ, iov, niov, mlen + offset);
+ 		iov_iter_advance(&to, offset);
+ 	} else {
+-		iov_iter_bvec(&to, ITER_BVEC | READ, kiov, niov, mlen + offset);
++		iov_iter_bvec(&to, READ, kiov, niov, mlen + offset);
+ 		iov_iter_advance(&to, offset);
+ 	}
+ 	rc = ni->ni_net->net_lnd->lnd_recv(ni, private, msg, delayed, &to, rlen);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+index d9c62d3..62a742e 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+@@ -58,7 +58,7 @@
+ 	 * Caller may pass a zero timeout if she thinks the socket buffer is
+ 	 * empty enough to take the whole message immediately
+ 	 */
+-	iov_iter_kvec(&msg.msg_iter, WRITE | ITER_KVEC, &iov, 1, nob);
++	iov_iter_kvec(&msg.msg_iter, WRITE, &iov, 1, nob);
+ 	for (;;) {
+ 		msg.msg_flags = !timeout ? MSG_DONTWAIT : 0;
+ 		if (timeout) {
+@@ -113,7 +113,7 @@
+ 	LASSERT(nob > 0);
+ 	LASSERT(jiffies_left > 0);
+ 
+-	iov_iter_kvec(&msg.msg_iter, READ | ITER_KVEC, &iov, 1, nob);
++	iov_iter_kvec(&msg.msg_iter, READ, &iov, 1, nob);
+ 
+ 	for (;;) {
+ 		/* Set receive timeout to remaining time */
+-- 
+1.8.3.1
