@@ -1,17 +1,32 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Thu, 22 Nov 2018 02:41:37 +0000
+Date: Thu, 22 Nov 2018 02:53:48 +0000
 Subject: [lustre-devel] Compact layouts
-In-Reply-To: <F5BAE559-E5F9-47C5-BB8C-8D2553F7BD43@gmail.com>
+In-Reply-To: <MWHPR11MB148817404AF6C0B690EEB770CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>
 References: <3600968B-94D3-4C3F-857A-D00A5C3BC601@cray.com>
  <E2B38E8A-55A5-481D-AF44-FF0B4CD8472E@whamcloud.com>
  <MWHPR11MB1488BCF770411CE094423321CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>,
- <F5BAE559-E5F9-47C5-BB8C-8D2553F7BD43@gmail.com>
-Message-ID: <MWHPR11MB148817404AF6C0B690EEB770CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>
+ <F5BAE559-E5F9-47C5-BB8C-8D2553F7BD43@gmail.com>,
+ <MWHPR11MB148817404AF6C0B690EEB770CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>
+Message-ID: <MWHPR11MB1488F239E19293AED1B35882CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+By the way, an update:
+
+The 1 MiB xattr limit I mentioned is incorrect.  If you raise the arbitrary stripe count limit in the code, the limit does appear to be 65532 (which was documented as the theoretical max when wide striping was implemented).  However, my VM started getting soft lockups around 30,000 stripes, so I'm not 100% sure.  Nothing is exactly broken, but some areas of the code (understandably) do not scale well to 15x the current upper limit.  Especially not on a single node VM.
+
+
+- Patrick
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Patrick Farrell <paf@cray.com>
+Sent: Wednesday, November 21, 2018 8:41:37 PM
+To: John Bent
+Cc: Lustre Developement
+Subject: Re: [lustre-devel] Compact layouts
 
 It's an issue, certainly, but as an interim solution, a little bit of compression (which could be limited to layouts over a certain size) is a lot better than sending around large globs of data.  (Which in the case of layout are A) highly compressible [we suspect], and B) must be sent to every client.)
 
@@ -107,4 +122,4 @@ lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181122/bb683788/attachment.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181122/bf331f61/attachment-0001.html>
