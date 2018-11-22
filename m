@@ -1,28 +1,62 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 21 Nov 2018 23:53:03 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Thu, 22 Nov 2018 02:27:42 +0000
 Subject: [lustre-devel] Compact layouts
-In-Reply-To: <3600968B-94D3-4C3F-857A-D00A5C3BC601@cray.com>
-References: <3600968B-94D3-4C3F-857A-D00A5C3BC601@cray.com>
-Message-ID: <E2B38E8A-55A5-481D-AF44-FF0B4CD8472E@whamcloud.com>
+In-Reply-To: <E2B38E8A-55A5-481D-AF44-FF0B4CD8472E@whamcloud.com>
+References: <3600968B-94D3-4C3F-857A-D00A5C3BC601@cray.com>,
+ <E2B38E8A-55A5-481D-AF44-FF0B4CD8472E@whamcloud.com>
+Message-ID: <MWHPR11MB1488BCF770411CE094423321CBDB0@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Andreas,
+
+
+Thanks for the informative reply.
+
+
+You raise an interesting and nasty point about breaking the compact layout with movement.  It's not possible today to move an individual OST object/stripe, though it's certainly something I've heard people ask for.  So it wouldn't be an issue if all such operations must address whole components, as is required today.
+
+
+If we did add the ability to switch out an individual OST object/stripe (which would be pretty easy to implement - data copy, layout swap, rm now-unused object), we could add those modifications as additional "traditional" layout info "atop" the compact layout.  So just the usual layout format, with OST IDs, and where present, it supersedes the relevant part of the compact layout.  This implicitly assumes we don't do a ton of this to a particular layout.
+
+
+But as to reasons, it's a few things.
+
+
+The primary concern is improving the open performance of very widely striped files, which means your second case - reduce the xattr and rpc size.
+
+
+The same things that motivate this would also motivate raising the count limit, but my understanding from comments in the code is that 2000 is arbitrary, and the actual max could be quite a bit higher.  The first limit I'm aware of - I'm not sure if this is right? - is 1 MiB of extended attribute.  That's a little over 5000 stripes.  (Obviously, 1 MiB of layout is probably a non-starter...)
+
+
+Your suggestion of gzip is very intriguing.  Ideally, I'd pick something available in kernel and with good performance.  A bit of experimentation is probably in order if we go that route.  Thanks for the pointer there.  I'd probably start with extracting the binary xattr and seeing how it compresses.
+
+
+- Patrick
+
+________________________________
+From: Andreas Dilger <adilger@whamcloud.com>
+Sent: Wednesday, November 21, 2018 5:53:03 PM
+To: Patrick Farrell
+Cc: Lustre Developement
+Subject: Re: [lustre-devel] Compact layouts
+
 On Nov 16, 2018, at 11:06, Patrick Farrell <paf@cray.com> wrote:
-> 
+>
 > All,
->  
+>
 > There is an old idea for reducing the data required to describe file striping by using a bitmap to record which OSTs are in use.  As best I can tell, this was most recently described here:
 > http://wiki.lustre.org/Layout_Enhancement_Solution_Architecture#Compact_Layouts_2
->  
+>
 > I?m curious if this has been pursued any further, if there?s a JIRA or other place that might have more info or be tracking the idea.  I poked around and didn?t find anything.
->  
+>
 > In particular, this comment:
 > ?with enough data that for each OST index set in the bitmap, a corresponding OST object FID may be computed?
 > Points at the difficult part of implementing this.
->  
+>
 > So, before I get too far considering this problem - Is there more out there somewhere?  Hoping to avoid duplicating work!
 
 Patrick,
@@ -41,3 +75,13 @@ Cheers, Andreas
 Andreas Dilger
 Principal Lustre Architect
 Whamcloud
+
+
+
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181122/16669351/attachment.html>
