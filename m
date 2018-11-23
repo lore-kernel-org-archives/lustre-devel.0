@@ -1,52 +1,59 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 23 Nov 2018 18:15:28 +1100
-Subject: [lustre-devel] [PATCH 7/9] lustre: lnet: Stop MLX5 triggering a
- dump_cqe
+Subject: [lustre-devel] [PATCH 8/9] lustre: statahead: skip agl for the file
+ in restoring
 In-Reply-To: <154295730810.2850.961218355189474016.stgit@noble>
 References: <154295730810.2850.961218355189474016.stgit@noble>
-Message-ID: <154295732806.2850.603181458106225374.stgit@noble>
+Message-ID: <154295732808.2850.16445000176556176904.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Doug Oucharek <doug.s.oucharek@intel.com>
+From: Fan Yong <fan.yong@intel.com>
 
-We have found that MLX5 will trigger a dump_cqe if we don't
-invalidate the rkey on a newly allocated MR for FastReg usage.
+In case of restore, the MDT has the right size and has already sent
+it back without granting the layout lock, inode is up-to-date. Then
+AGL (async glimpse lock) is useless.
 
-This fix just tags the MR as invalid on its creation if we are
-using FastReg and that will force it to do an invalidate of the
-rkey on first usage.
+Also to glimpse we need the layout, in case of a running restore the
+MDT holds the layout lock so the glimpse will block up to the end of
+restore (statahead/agl will block).
 
-Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8752
-Reviewed-on: https://review.whamcloud.com/24306
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Amir Shehata <amir.shehata@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Signed-off-by: Fan Yong <fan.yong@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9319
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-on: https://review.whamcloud.com/26501
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/llite/statahead.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index ecdf4dee533d..a5eada8ee354 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1483,7 +1483,12 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps,
- 			goto out_middle;
- 		}
+diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+index 28e85bfb9b82..3d71322aa1c7 100644
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -504,6 +504,19 @@ static void ll_agl_trigger(struct inode *inode, struct ll_statahead_info *sai)
+ 		return;
+ 	}
  
--		frd->frd_valid = true;
-+		/*
-+		 * There appears to be a bug in MLX5 code where you must
-+		 * invalidate the rkey of a new FastReg pool before first
-+		 * using it. Thus, I am marking the FRD invalid here.
-+		 */
-+		frd->frd_valid = false;
- 
- 		list_add_tail(&frd->frd_list, &fpo->fast_reg.fpo_pool_list);
- 		fpo->fast_reg.fpo_pool_size++;
++	/* In case of restore, the MDT has the right size and has already
++	 * sent it back without granting the layout lock, inode is up-to-date.
++	 * Then AGL (async glimpse lock) is useless.
++	 * Also to glimpse we need the layout, in case of a runninh restore
++	 * the MDT holds the layout lock so the glimpse will block up to the
++	 * end of restore (statahead/agl will block)
++	 */
++	if (test_bit(LLIF_FILE_RESTORING, &lli->lli_flags)) {
++		lli->lli_agl_index = 0;
++		iput(inode);
++		return;
++	}
++
+ 	/* Someone is in glimpse (sync or async), do nothing. */
+ 	rc = down_write_trylock(&lli->lli_glimpse_sem);
+ 	if (rc == 0) {
