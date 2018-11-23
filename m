@@ -1,44 +1,48 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 23 Nov 2018 18:15:28 +1100
-Subject: [lustre-devel] [PATCH 4/9] lustre: rename: DNE2 should return
- -EXDEV upon remote rename
+Subject: [lustre-devel] [PATCH 5/9] lustre: llite: clear LLIF_FILE_RESTORING
+ when done
 In-Reply-To: <154295730810.2850.961218355189474016.stgit@noble>
 References: <154295730810.2850.961218355189474016.stgit@noble>
-Message-ID: <154295732797.2850.16990175697450002727.stgit@noble>
+Message-ID: <154295732800.2850.8303806531168774380.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@intel.com>
+From: Bruno Faccini <bruno.faccini@intel.com>
 
-DNE2 MDS should return -EXDEV upon remote rename, so that old
-client can do rename with copy and delete, instead of fail
-with -EREMOTE.
+Clear LLIF_FILE_RESTORING if restore done to ensure to start again
+to glimpse new attrs.
 
-Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-Change-Id: I68e8e99259065922f31bee5343be309380715674
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6660
-Reviewed-on: http://review.whamcloud.com/15323
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: wangdi <di.wang@intel.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6560
+Reviewed-on: http://review.whamcloud.com/14609
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 32bb9fca88c9..7e4ffeb15a63 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1945,7 +1945,7 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index fac65845526a..b8693049f3b6 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1905,8 +1905,14 @@ int ll_update_inode(struct inode *inode, struct lustre_md *md)
  	}
  
- 	rc = md_rename(target_exp, op_data, old, oldlen, new, newlen, request);
--	if (rc && rc != -EREMOTE)
-+	if (rc && rc != -EXDEV)
- 		return rc;
+ 	if (body->mbo_valid & OBD_MD_TSTATE) {
++		/* Set LLIF_FILE_RESTORING if restore ongoing and
++		 * clear it when done to ensure to start again
++		 * glimpsing updated attrs
++		 */
+ 		if (body->mbo_t_state & MS_RESTORE)
+ 			set_bit(LLIF_FILE_RESTORING, &lli->lli_flags);
++		else
++			clear_bit(LLIF_FILE_RESTORING, &lli->lli_flags);
+ 	}
  
- 	body = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_BODY);
+ 	return 0;
