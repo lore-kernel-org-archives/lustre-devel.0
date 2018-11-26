@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 26 Nov 2018 01:46:10 +0000 (GMT)
+Date: Mon, 26 Nov 2018 01:46:42 +0000 (GMT)
 Subject: [lustre-devel] [PATCH 6/9] lustre: obdclass: health_check to
  report unhealthy upon LBUG
 In-Reply-To: <154295732803.2850.16198081335816276527.stgit@noble>
 References: <154295730810.2850.961218355189474016.stgit@noble>
  <154295732803.2850.16198081335816276527.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1811260134310.32255@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1811260146120.32255@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -30,7 +30,9 @@ but it needs to be updated. I do like Andreas idea of a sysfs and debugfs
 file since lctl get_param will return the results from both together.
 We could land it as is and update the sysfs handling at a latter date 
 (shouldn't be too far down the road). Here is my review in case you want
-to land it.y
+to land it.
+
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 
 > Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
 > WC-bug-id: https://jira.whamcloud.com/browse/LU-7486
