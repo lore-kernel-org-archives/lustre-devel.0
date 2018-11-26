@@ -1,73 +1,69 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 26 Nov 2018 02:10:26 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 9/9] lustre: statahead: add smp_mb() to
- serialize ops
-In-Reply-To: <154295732811.2850.6059970126126914084.stgit@noble>
-References: <154295730810.2850.961218355189474016.stgit@noble>
- <154295732811.2850.6059970126126914084.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1811260210170.32255@casper.infradead.org>
+Date: Sun, 25 Nov 2018 21:48:16 -0500
+Subject: [lustre-devel] [PATCH 00/12] lustre: new patches to address
+ previous reviews
+Message-ID: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+New patches from myself to address issues with the last batch I sent.
+Found a bug in the llite debugfs stats registeration code while
+testing. Updated the TODO since many of the task have been done.
+The patch for LU-5461 has been ported which makes sanity test 244 to
+pass. The patch ported from LU-10218 now makes it possible to run
+the sanity 160 changelog test without locking up the client node.
+Several patches independent of PFL have been ported from lustre
+2.10 LTS release.
 
-> From: Lai Siyao <lai.siyao@intel.com>
-> 
-> In ll_deauthorize_statahead(), it set thread stop flag, and then
-> wake up thread, however wakeup is called inside spinlock in case
-> ll_statahead_info is released, then we need to call smp_mb() to
-> serialize setting and wakeup.
+Alexander Boyko (1):
+  lustre: obdclass: obd_device improvement
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
-> Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-7994
-> Reviewed-on: https://review.whamcloud.com/23040
-> Reviewed-by: Fan Yong <fan.yong@intel.com>
-> Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/llite/statahead.c |   15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-> index 3d71322aa1c7..24c2335c70a7 100644
-> --- a/drivers/staging/lustre/lustre/llite/statahead.c
-> +++ b/drivers/staging/lustre/lustre/llite/statahead.c
-> @@ -1110,8 +1110,9 @@ static int ll_statahead_thread(void *arg)
->  		sa_handle_callback(sai);
->  
->  		set_current_state(TASK_IDLE);
-> +		/* ensure we see the NULL stored by ll_deauthorize_statahead() */
->  		if (!sa_has_callback(sai) &&
-> -		    sai->sai_task)
-> +		    smp_load_acquire(&sai->sai_task))
->  			schedule();
->  		__set_current_state(TASK_RUNNING);
->  	}
-> @@ -1191,9 +1192,17 @@ void ll_deauthorize_statahead(struct inode *dir, void *key)
->  		/*
->  		 * statahead thread may not quit yet because it needs to cache
->  		 * entries, now it's time to tell it to quit.
-> +		 *
-> +		 * In case sai is released, wake_up() is called inside spinlock,
-> +		 * so we use smp_store_release() to serialize ops.
->  		 */
-> -		wake_up_process(sai->sai_task);
-> -		sai->sai_task = NULL;
-> +		struct task_struct *task = sai->sai_task;
-> +
-> +		/* ensure ll_statahead_thread sees the NULL before
-> +		 * calling schedule() again.
-> +		 */
-> +		smp_store_release(&sai->sai_task, NULL);
-> +		wake_up_process(task);
->  	}
->  	spin_unlock(&lli->lli_sa_lock);
->  }
-> 
-> 
-> 
+Dmitry Eremin (1):
+  lustre: clio: Introduce parallel tasks framework
+
+James Simmons (6):
+  lustre: llite: move CONFIG_SECURITY handling to llite_internal.h
+  lustre: lnd: create enum kib_dev_caps
+  lustre: lnd: test fpo_fmr_pool pointer instead of special bool
+  lustre: llite: remove llite_loop left overs
+  lustre: llite: avoid duplicate stats debugfs registration
+  lustre: update TODO lustre list
+
+John L. Hammond (2):
+  lustre: mdc: propagate changelog errors to readers
+  lustre: mdc: use large xattr buffers for old servers
+
+Lai Siyao (1):
+  lustre: mdc: don't add to page cache upon failure
+
+Patrick Farrell (1):
+  lustre: ldlm: No -EINVAL for canceled != unused
+
+ drivers/staging/lustre/TODO                        |  85 ----
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  17 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  13 +-
+ drivers/staging/lustre/lustre/include/cl_ptask.h   | 145 ++++++
+ drivers/staging/lustre/lustre/include/obd_class.h  |   9 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  16 +-
+ drivers/staging/lustre/lustre/llite/file.c         | 107 +----
+ .../staging/lustre/lustre/llite/llite_internal.h   |  81 +---
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  11 +-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |   2 +-
+ drivers/staging/lustre/lustre/llite/rw26.c         |  51 +--
+ drivers/staging/lustre/lustre/mdc/mdc_changelog.c  |  45 +-
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |  14 +
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |   5 +-
+ drivers/staging/lustre/lustre/obdclass/Makefile    |   3 +-
+ drivers/staging/lustre/lustre/obdclass/cl_ptask.c  | 501 +++++++++++++++++++++
+ drivers/staging/lustre/lustre/obdclass/genops.c    | 284 ++++++++----
+ .../staging/lustre/lustre/obdclass/obd_config.c    | 143 ++----
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   6 +-
+ 19 files changed, 1007 insertions(+), 531 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/cl_ptask.h
+ create mode 100644 drivers/staging/lustre/lustre/obdclass/cl_ptask.c
+
+-- 
+1.8.3.1
