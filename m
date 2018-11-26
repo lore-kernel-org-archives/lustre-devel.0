@@ -1,7 +1,7 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 26 Nov 2018 03:54:26 +0000 (GMT)
-Subject: [lustre-devel] lustre migration bug
-Message-ID: <alpine.LFD.2.21.1811260347400.32255@casper.infradead.org>
+Date: Mon, 26 Nov 2018 04:52:34 +0000 (GMT)
+Subject: [lustre-devel] Do we need LOOKUP_CONTINUE in ll_revalidate_dentry()
+Message-ID: <alpine.LFD.2.21.1811260404040.32255@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -9,9 +9,21 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-Most of the major bugs outstanding are for migration functionality.
-I did some tracing in the code (ll_migrate -> lmv_rename -> mdc_rename)
-and found the failures is due to errors returned from after_reply() in
-the ptlrpc layer. From that I see that the server is reporting that
-the RPC packets are invalid. So far I don't see why exactly this is
-the case. I will need to debug on the server side to figure it out.
+Doing a compare to the OpenSFS branch I noticed this difference:
+
+diff --git a/drivers/staging/lustre/lustre/llite/dcache.c 
+b/drivers/staging/lustre/lustre/llite/dcache.c
+index 11b82c63..6ee0ec9 100644
+--- a/drivers/staging/lustre/lustre/llite/dcache.c
++++ b/drivers/staging/lustre/lustre/llite/dcache.c
+@@ -254,7 +254,7 @@ static int ll_revalidate_dentry(struct dentry *dentry,
+         * to this dentry, then its lock has not been revoked and the
+         * path component is valid.
+         */
+-       if (lookup_flags & LOOKUP_PARENT)
++       if (lookup_flags & (LOOKUP_CONTINUE | LOOKUP_PARENT))
+                return 1;
+
+        /* Symlink - always valid as long as the dentry was found */
+
+Is that needed for newer kernels?
