@@ -1,60 +1,73 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 25 Nov 2018 21:48:27 -0500
-Subject: [lustre-devel] [PATCH 11/12] lustre: mdc: use large xattr buffers
- for old servers
-In-Reply-To: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
-References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1543200508-6838-12-git-send-email-jsimmons@infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 26 Nov 2018 14:00:59 +1100
+Subject: [lustre-devel] [PATCH 4/9] lustre: rename: DNE2 should return
+ -EXDEV upon remote rename
+In-Reply-To: <alpine.LFD.2.21.1811260130360.32255@casper.infradead.org>
+References: <154295730810.2850.961218355189474016.stgit@noble>
+ <154295732797.2850.16990175697450002727.stgit@noble>
+ <alpine.LFD.2.21.1811260130360.32255@casper.infradead.org>
+Message-ID: <87sgzor190.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+On Mon, Nov 26 2018, James Simmons wrote:
 
-Pre 2.10.1 MDTs will crash when they receive a listxattr (MDS_GETXATTR
-with OBD_MD_FLXATTRLS) RPC for an orphan or dead object. So for
-clients connected to these older MDTs, try to avoid sending listxattr
-RPCs by making the bulk getxattr (MDS_GETXATTR with OBD_MD_FLXATTRALL)
-more likely to succeed and thereby reducing the chances of falling
-ack to listxattr.
+> On Fri, 23 Nov 2018, NeilBrown wrote:
+>
+>> From: Lai Siyao <lai.siyao@intel.com>
+>> 
+>> DNE2 MDS should return -EXDEV upon remote rename, so that old
+>> client can do rename with copy and delete, instead of fail
+>> with -EREMOTE.
+>
+> Let me guess you were debugging the migration failures and fould this :-)
+> I was doing the same thing.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10912
-Reviewed-on: https://review.whamcloud.com/31990
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/mdc/mdc_locks.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Nope - I was just looking though all the missing patches to see if
+anything was relevant. :-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 2cc2378..7d4ba9c 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -352,6 +352,20 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
- 	lit = req_capsule_client_get(&req->rq_pill, &RMF_LDLM_INTENT);
- 	lit->opc = IT_GETXATTR;
- 
-+	/* If the supplied buffer is too small then the server will
-+	 * return -ERANGE and llite will fallback to using non cached
-+	 * xattr operations. On servers before 2.10.1 a (non-cached)
-+	 * listxattr RPC for an orphan or dead file causes an oops. So
-+	 * let's try to avoid sending too small a buffer to too old a
-+	 * server. This is effectively undoing the memory conservation
-+	 * of LU-9417 when it would be *more* likely to crash the
-+	 * server. See LU-9856.
-+	 */
-+	BUILD_BUG_ON(OBD_OCD_VERSION(3, 0, 53, 0) <= LUSTRE_VERSION_CODE);
-+	if (exp->exp_connect_data.ocd_version < OBD_OCD_VERSION(2, 10, 1, 0))
-+		ea_vals_buf_size = max_t(u32, ea_vals_buf_size,
-+					 exp->exp_connect_data.ocd_max_easize);
-+
- 	/* pack the intended request */
- 	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid,
- 		      ea_vals_buf_size, -1, 0);
--- 
-1.8.3.1
+Thanks for all the "Reviewed-by"s !
+
+NeilBrown
+
+>
+> Reviewed-by: James Simmons <jsimmons@infradead.org>
+>  
+>> Signed-off-by: Lai Siyao <lai.siyao@intel.com>
+>> Change-Id: I68e8e99259065922f31bee5343be309380715674
+>> WC-bug-id: https://jira.whamcloud.com/browse/LU-6660
+>> Reviewed-on: http://review.whamcloud.com/15323
+>> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+>> Reviewed-by: wangdi <di.wang@intel.com>
+>> Reviewed-by: Fan Yong <fan.yong@intel.com>
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>  drivers/staging/lustre/lustre/lmv/lmv_obd.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> index 32bb9fca88c9..7e4ffeb15a63 100644
+>> --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> @@ -1945,7 +1945,7 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+>>  	}
+>>  
+>>  	rc = md_rename(target_exp, op_data, old, oldlen, new, newlen, request);
+>> -	if (rc && rc != -EREMOTE)
+>> +	if (rc && rc != -EXDEV)
+>>  		return rc;
+>>  
+>>  	body = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_BODY);
+>> 
+>> 
+>> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181126/7da77410/attachment.sig>
