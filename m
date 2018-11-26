@@ -1,39 +1,89 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 25 Nov 2018 21:48:21 -0500
-Subject: [lustre-devel] [PATCH 05/12] lustre: llite: avoid duplicate stats
- debugfs registration
+Date: Sun, 25 Nov 2018 21:48:17 -0500
+Subject: [lustre-devel] [PATCH 01/12] lustre: llite: move CONFIG_SECURITY
+ handling to llite_internal.h
 In-Reply-To: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
 References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1543200508-6838-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1543200508-6838-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The unwinding of debugfs handling in llite introduced a bug. Two
-different debugfs files are currently being registered with the
-same name "stats". Change the registration of the ll_ra_stats
-debugfs file to its proper name "read_ahead_stats".
+For the linux kernel its recommended to keep CONFIG_* wrapped code
+in a header file instead of the source files to avoid making the
+code more difficulty to read. Move CONFIG_SECURITY wrapped code
+to llite_internal.h in this case.
 
-Fixes: cd514eac8029 ("staging: lustre: remove ldebugfs_register_stats() wrapper function")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Reviewed-on: https://review.whamcloud.com/33410
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/lproc_llite.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/llite/llite_internal.h | 17 +++++++++++++++++
+ drivers/staging/lustre/lustre/llite/llite_lib.c      | 11 ++---------
+ 2 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 10dc7a8..8139f84 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -1381,7 +1381,7 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
- 		lprocfs_counter_init(sbi->ll_ra_stats, id, 0,
- 				     ra_stat_string[id], "pages");
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index a55b568..8c703e6 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -269,6 +269,23 @@ static inline void ll_layout_version_set(struct ll_inode_info *lli, __u32 gen)
+ int ll_xattr_cache_get(struct inode *inode, const char *name,
+ 		       char *buffer, size_t size, __u64 valid);
  
--	debugfs_create_file("stats", 0644, sbi->ll_debugfs_entry,
-+	debugfs_create_file("read_ahead_stats", 0644, sbi->ll_debugfs_entry,
- 			    sbi->ll_ra_stats, &lprocfs_stats_seq_fops);
- out_ll_kset:
- 	/* Yes we also register sysfs mount kset here as well */
++static inline bool obd_connect_has_secctx(struct obd_connect_data *data)
++{
++#ifdef CONFIG_SECURITY
++	return data->ocd_connect_flags & OBD_CONNECT_FLAGS2 &&
++	       data->ocd_connect_flags2 & OBD_CONNECT2_FILE_SECCTX;
++#else
++       return false;
++#endif
++}
++
++static inline void obd_connect_set_secctx(struct obd_connect_data *data)
++{
++#ifdef CONFIG_SECURITY
++	data->ocd_connect_flags2 |= OBD_CONNECT2_FILE_SECCTX;
++#endif
++}
++
+ int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
+ 			    const char **secctx_name, void **secctx,
+ 			    u32 *secctx_size);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index fac6584..2dfeab4 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -148,12 +148,6 @@ static void ll_free_sbi(struct super_block *sb)
+ 	kfree(sbi);
+ }
+ 
+-static inline int obd_connect_has_secctx(struct obd_connect_data *data)
+-{
+-	return data->ocd_connect_flags & OBD_CONNECT_FLAGS2 &&
+-	       data->ocd_connect_flags2 & OBD_CONNECT2_FILE_SECCTX;
+-}
+-
+ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ {
+ 	struct inode *root = NULL;
+@@ -244,9 +238,8 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 	if (sbi->ll_flags & LL_SBI_ALWAYS_PING)
+ 		data->ocd_connect_flags &= ~OBD_CONNECT_PINGLESS;
+ 
+-#ifdef CONFIG_SECURITY
+-	data->ocd_connect_flags2 |= OBD_CONNECT2_FILE_SECCTX;
+-#endif
++	obd_connect_set_secctx(data);
++
+ 	data->ocd_brw_size = MD_MAX_BRW_SIZE;
+ 
+ 	err = obd_connect(NULL, &sbi->ll_md_exp, sbi->ll_md_obd,
 -- 
 1.8.3.1
