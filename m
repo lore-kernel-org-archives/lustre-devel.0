@@ -1,749 +1,740 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 25 Nov 2018 21:48:25 -0500
-Subject: [lustre-devel] [PATCH 09/12] lustre: obdclass: obd_device
- improvement
+Date: Sun, 25 Nov 2018 21:48:26 -0500
+Subject: [lustre-devel] [PATCH 10/12] lustre: clio: Introduce parallel tasks
+ framework
 In-Reply-To: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
 References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1543200508-6838-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1543200508-6838-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexander Boyko <c17825@cray.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-The patch removes self exports from obd's reference counting which
-allows to avoid freeing of self exports by zombie thread.
-A pair of functions class_register_device()/class_unregister_device()
-is to make sure that an obd can not be referenced again once its
-refcount reached 0.
+In this patch new API for parallel tasks execution is introduced.
+This API based on Linux kernel padata API which is used to perform
+encryption and decryption on large numbers of packets without
+reordering those packets.
 
-Signed-off-by: Vladimir Saveliev Vladimir Saveliev <c17830@cray.com>
-Signed-off-by: Alexey Lyashkov <c17817@cray.com>
-Signed-off-by: Alexander Boyko <c17825@cray.com>
-Signed-off-by: Yang Sheng <ys@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-4134
-Seagate-bug-id: MRP-2139 MRP-3267
-Reviewed-on: https://review.whamcloud.com/8045
-Reviewed-on: https://review.whamcloud.com/29967
+It was adopted for general use in Lustre for parallelization of
+various functionality. The first place of its usage is parallel I/O
+implementation.
+
+The first step in using it is to set up a cl_ptask structure to
+control of how this task are to be run:
+
+    #include <cl_ptask.h>
+
+    int cl_ptask_init(struct cl_ptask *ptask, cl_ptask_cb_t cbfunc,
+                      void *cbdata, unsigned int flags, int cpu);
+
+The cbfunc function with cbdata argument will be called in the process
+of getting the task done. The cpu specifies which CPU will be used for
+the final callback when the task is done.
+
+The submission of task is done with:
+
+    int cl_ptask_submit(struct cl_ptask *ptask,
+                        struct cl_ptask_engine *engine);
+
+The task is submitted to the engine for execution.
+
+In order to wait for result of task execution you should call:
+
+   int cl_ptask_wait_for(struct cl_ptask *ptask);
+
+The tasks with flag PTF_ORDERED are executed in parallel but complete
+into submission order. So, waiting for last ordered task you can be sure
+that all previous tasks were done before this task complete.
+
+This patch differs from the OpenSFS tree by adding this functional
+to the clio layer instead of libcfs.
+
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8964
+Reviewed-on: https://review.whamcloud.com/24474
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd_class.h  |   9 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    | 284 +++++++++++++++------
- .../staging/lustre/lustre/obdclass/obd_config.c    | 143 ++++-------
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   6 +-
- 4 files changed, 261 insertions(+), 181 deletions(-)
+ drivers/staging/lustre/lustre/include/cl_ptask.h  | 145 +++++++
+ drivers/staging/lustre/lustre/obdclass/Makefile   |   3 +-
+ drivers/staging/lustre/lustre/obdclass/cl_ptask.c | 501 ++++++++++++++++++++++
+ 3 files changed, 648 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/cl_ptask.h
+ create mode 100644 drivers/staging/lustre/lustre/obdclass/cl_ptask.c
 
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 567189c..cc00915 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -65,8 +65,11 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 			const char *name, struct lu_device_type *ldt);
- int class_unregister_type(const char *name);
- 
--struct obd_device *class_newdev(const char *type_name, const char *name);
--void class_release_dev(struct obd_device *obd);
-+struct obd_device *class_newdev(const char *type_name, const char *name,
-+				const char *uuid);
-+int class_register_device(struct obd_device *obd);
-+void class_unregister_device(struct obd_device *obd);
-+void class_free_dev(struct obd_device *obd);
- 
- int class_name2dev(const char *name);
- struct obd_device *class_name2obd(const char *name);
-@@ -230,6 +233,8 @@ void __class_export_del_lock_ref(struct obd_export *exp,
- void class_export_put(struct obd_export *exp);
- struct obd_export *class_new_export(struct obd_device *obddev,
- 				    struct obd_uuid *cluuid);
-+struct obd_export *class_new_export_self(struct obd_device *obd,
-+					 struct obd_uuid *uuid);
- void class_unlink_export(struct obd_export *exp);
- 
- struct obd_import *class_import_get(struct obd_import *imp);
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 59891a8..cdd44f7 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -38,6 +38,7 @@
- 
- #define DEBUG_SUBSYSTEM S_CLASS
- #include <obd_class.h>
-+#include <lustre_log.h>
- #include <lprocfs_status.h>
- #include <lustre_kernelcomm.h>
- 
-@@ -273,21 +274,20 @@ int class_unregister_type(const char *name)
- /**
-  * Create a new obd device.
-  *
-- * Find an empty slot in ::obd_devs[], create a new obd device in it.
-+ * Allocate the new obd_device and initialize it.
-  *
-  * \param[in] type_name obd device type string.
-  * \param[in] name      obd device name.
-+ * @uuid		obd device UUID.
-  *
-- * \retval NULL if create fails, otherwise return the obd device
-- *	 pointer created.
-+ * RETURN newdev	 pointer to created obd_device
-+ * RETURN ERR_PTR(errno) on error
-  */
--struct obd_device *class_newdev(const char *type_name, const char *name)
-+struct obd_device *class_newdev(const char *type_name, const char *name,
-+				const char *uuid)
- {
--	struct obd_device *result = NULL;
- 	struct obd_device *newdev;
- 	struct obd_type *type = NULL;
--	int i;
--	int new_obd_minor = 0;
- 
- 	if (strlen(name) >= MAX_OBD_NAME) {
- 		CERROR("name/uuid must be < %u bytes long\n", MAX_OBD_NAME);
-@@ -302,87 +302,167 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
- 
- 	newdev = obd_device_alloc();
- 	if (!newdev) {
--		result = ERR_PTR(-ENOMEM);
--		goto out_type;
-+		class_put_type(type);
-+		return ERR_PTR(-ENOMEM);
- 	}
- 
- 	LASSERT(newdev->obd_magic == OBD_DEVICE_MAGIC);
-+	strncpy(newdev->obd_name, name, sizeof(newdev->obd_name) - 1);
-+	newdev->obd_type = type;
-+	newdev->obd_minor = -1;
-+
-+	rwlock_init(&newdev->obd_pool_lock);
-+	newdev->obd_pool_limit = 0;
-+	newdev->obd_pool_slv = 0;
-+
-+	INIT_LIST_HEAD(&newdev->obd_exports);
-+	INIT_LIST_HEAD(&newdev->obd_unlinked_exports);
-+	INIT_LIST_HEAD(&newdev->obd_delayed_exports);
-+	spin_lock_init(&newdev->obd_nid_lock);
-+	spin_lock_init(&newdev->obd_dev_lock);
-+	mutex_init(&newdev->obd_dev_mutex);
-+	spin_lock_init(&newdev->obd_osfs_lock);
-+	/* newdev->obd_osfs_age must be set to a value in the distant
-+	 * past to guarantee a fresh statfs is fetched on mount.
-+	 */
-+	newdev->obd_osfs_age = get_jiffies_64() - 1000 * HZ;
- 
--	write_lock(&obd_dev_lock);
--	for (i = 0; i < class_devno_max(); i++) {
--		struct obd_device *obd = class_num2obd(i);
-+	/* XXX belongs in setup not attach  */
-+	init_rwsem(&newdev->obd_observer_link_sem);
-+	/* recovery data */
-+	init_waitqueue_head(&newdev->obd_evict_inprogress_waitq);
- 
--		if (obd && (strcmp(name, obd->obd_name) == 0)) {
--			CERROR("Device %s already exists at %d, won't add\n",
--			       name, i);
--			if (result) {
--				LASSERTF(result->obd_magic == OBD_DEVICE_MAGIC,
--					 "%p obd_magic %08x != %08x\n", result,
--					 result->obd_magic, OBD_DEVICE_MAGIC);
--				LASSERTF(result->obd_minor == new_obd_minor,
--					 "%p obd_minor %d != %d\n", result,
--					 result->obd_minor, new_obd_minor);
--
--				obd_devs[result->obd_minor] = NULL;
--				result->obd_name[0] = '\0';
--			 }
--			result = ERR_PTR(-EEXIST);
--			break;
--		}
--		if (!result && !obd) {
--			result = newdev;
--			result->obd_minor = i;
--			new_obd_minor = i;
--			result->obd_type = type;
--			strncpy(result->obd_name, name,
--				sizeof(result->obd_name) - 1);
--			obd_devs[i] = result;
--		}
--	}
--	write_unlock(&obd_dev_lock);
-+	llog_group_init(&newdev->obd_olg);
-+	/* Detach drops this */
-+        atomic_set(&newdev->obd_refcount, 1);
-+        lu_ref_init(&newdev->obd_reference);
-+        lu_ref_add(&newdev->obd_reference, "newdev", newdev);
- 
--	if (!result && i >= class_devno_max()) {
--		CERROR("all %u OBD devices used, increase MAX_OBD_DEVICES\n",
--		       class_devno_max());
--		result = ERR_PTR(-EOVERFLOW);
--		goto out;
--	}
-+	newdev->obd_conn_inprogress = 0;
- 
--	if (IS_ERR(result))
--		goto out;
-+	strncpy(newdev->obd_uuid.uuid, uuid, strlen(uuid));
- 
--	CDEBUG(D_IOCTL, "Adding new device %s (%p)\n",
--	       result->obd_name, result);
-+	CDEBUG(D_IOCTL, "Allocate new device %s (%p)\n",
-+	       newdev->obd_name, newdev);
- 
--	return result;
--out:
--	obd_device_free(newdev);
--out_type:
--	class_put_type(type);
--	return result;
-+	return newdev;
- }
- 
--void class_release_dev(struct obd_device *obd)
-+/**
-+ * Free obd device.
+diff --git a/drivers/staging/lustre/lustre/include/cl_ptask.h b/drivers/staging/lustre/lustre/include/cl_ptask.h
+new file mode 100644
+index 0000000..02abd69
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/include/cl_ptask.h
+@@ -0,0 +1,145 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
 + *
-+ * @obd obd_device to be freed
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 + *
-+ * RETURN none
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
 + */
-+void class_free_dev(struct obd_device *obd)
- {
- 	struct obd_type *obd_type = obd->obd_type;
- 
- 	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC, "%p obd_magic %08x != %08x\n",
- 		 obd, obd->obd_magic, OBD_DEVICE_MAGIC);
--	LASSERTF(obd == obd_devs[obd->obd_minor], "obd %p != obd_devs[%d] %p\n",
-+	LASSERTF(obd->obd_minor == -1 || obd == obd_devs[obd->obd_minor],
-+		 "obd %p != obd_devs[%d] %p\n",
- 		 obd, obd->obd_minor, obd_devs[obd->obd_minor]);
-+	LASSERTF(atomic_read(&obd->obd_refcount) == 0,
-+		 "obd_refcount should be 0, not %d\n",
-+		 atomic_read(&obd->obd_refcount));
- 	LASSERT(obd_type);
- 
--	CDEBUG(D_INFO, "Release obd device %s at %d obd_type name =%s\n",
--	       obd->obd_name, obd->obd_minor, obd->obd_type->typ_name);
-+	CDEBUG(D_INFO, "Release obd device %s obd_type name =%s\n",
-+	       obd->obd_name, obd->obd_type->typ_name);
-+
-+	CDEBUG(D_CONFIG, "finishing cleanup of obd %s (%s)\n",
-+	       obd->obd_name, obd->obd_uuid.uuid);
-+	if (obd->obd_stopping) {
-+		int err;
-+
-+		/* If we're not stopping, we were never set up */
-+		err = obd_cleanup(obd);
-+		if (err)
-+			CERROR("Cleanup %s returned %d\n",
-+			       obd->obd_name, err);
-+	}
- 
--	write_lock(&obd_dev_lock);
--	obd_devs[obd->obd_minor] = NULL;
--	write_unlock(&obd_dev_lock);
- 	obd_device_free(obd);
- 
- 	class_put_type(obd_type);
- }
- 
-+/**
-+ * Unregister obd device.
-+ *
-+ * Free slot in obd_dev[] used by \a obd.
-+ *
-+ * @new_obd	obd_device to be unregistered
-+ *
-+ * RETURN	none
++/*
++ * Copyright (c) 2017, Intel Corporation.
++ * Use is subject to license terms.
 + */
-+void class_unregister_device(struct obd_device *obd)
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ *
++ * parallel task interface
++ */
++#ifndef __CL_LUSTRE_PTASK_H__
++#define __CL_LUSTRE_PTASK_H__
++
++#include <linux/types.h>
++#include <linux/bitops.h>
++#include <linux/kernel.h>
++#include <linux/cpumask.h>
++#include <linux/uaccess.h>
++#include <linux/notifier.h>
++#include <linux/workqueue.h>
++#include <linux/completion.h>
++#ifdef CONFIG_PADATA
++#include <linux/padata.h>
++#else
++struct padata_priv {};
++struct padata_instance {};
++#endif
++
++#define PTF_COMPLETE	BIT(0)
++#define PTF_AUTOFREE	BIT(1)
++#define PTF_ORDERED	BIT(2)
++#define PTF_USER_MM	BIT(3)
++#define PTF_ATOMIC	BIT(4)
++#define PTF_RETRY	BIT(5)
++
++struct cl_ptask_engine {
++	struct padata_instance	*pte_pinst;
++	struct workqueue_struct	*pte_wq;
++	struct notifier_block	 pte_notifier;
++	int			 pte_weight;
++};
++
++struct cl_ptask;
++typedef int (*cl_ptask_cb_t)(struct cl_ptask *);
++
++struct cl_ptask {
++	struct padata_priv	 pt_padata;
++	struct completion	 pt_completion;
++	mm_segment_t		 pt_fs;
++	struct mm_struct	*pt_mm;
++	unsigned int		 pt_flags;
++	int			 pt_cbcpu;
++	cl_ptask_cb_t		 pt_cbfunc;
++	void			*pt_cbdata;
++	int			 pt_result;
++};
++
++static inline
++struct padata_priv *cl_ptask2padata(struct cl_ptask *ptask)
 +{
-+	write_lock(&obd_dev_lock);
-+	if (obd->obd_minor >= 0) {
-+		LASSERT(obd_devs[obd->obd_minor] == obd);
-+		obd_devs[obd->obd_minor] = NULL;
-+		obd->obd_minor = -1;
-+	}
-+	write_unlock(&obd_dev_lock);
++	return &ptask->pt_padata;
 +}
++
++static inline
++struct cl_ptask *cl_padata2ptask(struct padata_priv *padata)
++{
++	return container_of(padata, struct cl_ptask, pt_padata);
++}
++
++static inline
++bool cl_ptask_need_complete(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_COMPLETE;
++}
++
++static inline
++bool cl_ptask_is_autofree(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_AUTOFREE;
++}
++
++static inline
++bool cl_ptask_is_ordered(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_ORDERED;
++}
++
++static inline
++bool cl_ptask_use_user_mm(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_USER_MM;
++}
++
++static inline
++bool cl_ptask_is_atomic(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_ATOMIC;
++}
++
++static inline
++bool cl_ptask_is_retry(struct cl_ptask *ptask)
++{
++	return ptask->pt_flags & PTF_RETRY;
++}
++
++static inline
++int cl_ptask_result(struct cl_ptask *ptask)
++{
++	return ptask->pt_result;
++}
++
++struct cl_ptask_engine *cl_ptengine_init(const char *name,
++					 const struct cpumask *cpumask);
++void cl_ptengine_fini(struct cl_ptask_engine *engine);
++int cl_ptengine_set_cpumask(struct cl_ptask_engine *engine,
++			    const struct cpumask *cpumask);
++int cl_ptengine_weight(struct cl_ptask_engine *engine);
++
++int cl_ptask_submit(struct cl_ptask *ptask,  struct cl_ptask_engine *engine);
++int cl_ptask_wait_for(struct cl_ptask *ptask);
++int cl_ptask_init(struct cl_ptask *ptask, cl_ptask_cb_t cbfunc, void *cbdata,
++		  unsigned int flags, int cpu);
++
++#endif /* __CL_LUSTRE_PTASK_H__ */
+diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
+index b1fac48..a705aa0 100644
+--- a/drivers/staging/lustre/lustre/obdclass/Makefile
++++ b/drivers/staging/lustre/lustre/obdclass/Makefile
+@@ -8,4 +8,5 @@ obdclass-y := llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
+ 	      genops.o obd_sysfs.o lprocfs_status.o lprocfs_counters.o \
+ 	      lustre_handles.o lustre_peer.o statfs_pack.o linkea.o \
+ 	      obdo.o obd_config.o obd_mount.o lu_object.o lu_ref.o \
+-	      cl_object.o cl_page.o cl_lock.o cl_io.o kernelcomm.o
++	      cl_object.o cl_page.o cl_lock.o cl_io.o cl_ptask.o \
++	      kernelcomm.o
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_ptask.c b/drivers/staging/lustre/lustre/obdclass/cl_ptask.c
+new file mode 100644
+index 0000000..b0df3c4
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/obdclass/cl_ptask.c
+@@ -0,0 +1,501 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2017, Intel Corporation.
++ * Use is subject to license terms.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ *
++ * parallel task interface
++ */
++#include <linux/errno.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/cpumask.h>
++#include <linux/cpu.h>
++#include <linux/slab.h>
++#include <linux/sched.h>
++#include <linux/sched/signal.h>
++#include <linux/sched/mm.h>
++#include <linux/moduleparam.h>
++#include <linux/mmu_context.h>
++
++#define DEBUG_SUBSYSTEM S_UNDEFINED
++
++#include <linux/libcfs/libcfs.h>
++#include <cl_ptask.h>
 +
 +/**
-+ * Register obd device.
++ * This API based on Linux kernel padada API which is used to perform
++ * encryption and decryption on large numbers of packets without
++ * reordering those packets.
 + *
-+ * Find free slot in obd_devs[], fills it with \a new_obd.
++ * It was adopted for general use in Lustre for parallelization of
++ * various functionality.
 + *
-+ * @new_obd	obd_device to be registered
++ * The first step in using it is to set up a cl_ptask structure to
++ * control of how this task are to be run:
 + *
-+ * RETURN	0		success
-+ *		-EEXIST		device with this name is registered
-+ *		-EOVERFLOW	obd_devs[] is full
++ * #include <cl_ptask.h>
++ *
++ * int cl_ptask_init(struct cl_ptask *ptask, cl_ptask_cb_t cbfunc,
++ *                    void *cbdata, unsigned int flags, int cpu);
++ *
++ * The cbfunc function with cbdata argument will be called in the process
++ * of getting the task done. The cpu specifies which CPU will be used for
++ * the final callback when the task is done.
++ *
++ * The submission of task is done with:
++ *
++ * int cl_ptask_submit(struct cl_ptask *ptask, struct cl_ptask_engine *engine);
++ *
++ * The task is submitted to the engine for execution.
++ *
++ * In order to wait for result of task execution you should call:
++ *
++ * int cl_ptask_wait_for(struct cl_ptask *ptask);
++ *
++ * The tasks with flag PTF_ORDERED are executed in parallel but complete
++ * into submission order. So, waiting for last ordered task you can be sure
++ * that all previous tasks were done before this task complete.
 + */
-+int class_register_device(struct obd_device *new_obd)
++#ifdef CONFIG_PADATA
++static void cl_ptask_complete(struct padata_priv *padata)
 +{
-+	int new_obd_minor = 0;
-+	bool minor_assign = false;
-+	int ret = 0;
-+	int i;
++	struct cl_ptask *ptask = cl_padata2ptask(padata);
 +
-+	write_lock(&obd_dev_lock);
-+	for (i = 0; i < class_devno_max(); i++) {
-+		struct obd_device *obd = class_num2obd(i);
-+
-+		if (obd && (strcmp(new_obd->obd_name, obd->obd_name) == 0)) {
-+			CERROR("%s: already exists, won't add\n",
-+			       obd->obd_name);
-+			/* in case we found a free slot before duplicate */
-+			minor_assign = false;
-+			ret = -EEXIST;
-+			break;
-+		}
-+		if (!minor_assign && !obd) {
-+			new_obd_minor = i;
-+			minor_assign = true;
-+		}
++	if (cl_ptask_need_complete(ptask)) {
++		if (cl_ptask_is_ordered(ptask))
++			complete(&ptask->pt_completion);
++	} else if (cl_ptask_is_autofree(ptask)) {
++		kfree(ptask);
 +	}
-+
-+	if (minor_assign) {
-+		new_obd->obd_minor = new_obd_minor;
-+		LASSERTF(!obd_devs[new_obd_minor], "obd_devs[%d] %p\n",
-+			 new_obd_minor, obd_devs[new_obd_minor]);
-+		obd_devs[new_obd_minor] = new_obd;
-+	} else {
-+		if (ret == 0) {
-+			ret = -EOVERFLOW;
-+			CERROR("%s: all %u/%u devices used, increase MAX_OBD_DEVICES: rc = %d\n",
-+			       new_obd->obd_name, i, class_devno_max(), ret);
-+		}
-+	}
-+	write_unlock(&obd_dev_lock);
-+
-+	return ret;
 +}
 +
++static void cl_ptask_execute(struct padata_priv *padata)
++{
++	struct cl_ptask *ptask = cl_padata2ptask(padata);
++	mm_segment_t old_fs = get_fs();
++	bool bh_enabled = false;
 +
- int class_name2dev(const char *name)
- {
- 	int i;
-@@ -677,7 +757,11 @@ static void class_export_destroy(struct obd_export *exp)
- 	LASSERT(list_empty(&exp->exp_req_replay_queue));
- 	LASSERT(list_empty(&exp->exp_hp_rpcs));
- 	obd_destroy_export(exp);
--	class_decref(obd, "export", exp);
-+	/* self export doesn't hold a reference to an obd, although it
-+	 * exists until freeing of the obd
-+	 */
-+	if (exp != obd->obd_self_export)
-+		class_decref(obd, "export", exp);
- 
- 	OBD_FREE_RCU(exp, sizeof(*exp), &exp->exp_handle);
- }
-@@ -708,11 +792,27 @@ void class_export_put(struct obd_export *exp)
- 	       atomic_read(&exp->exp_refcount) - 1);
- 
- 	if (atomic_dec_and_test(&exp->exp_refcount)) {
--		LASSERT(!list_empty(&exp->exp_obd_chain));
-+		struct obd_device *obd = exp->exp_obd;
-+
- 		CDEBUG(D_IOCTL, "final put %p/%s\n",
- 		       exp, exp->exp_client_uuid.uuid);
- 
--		obd_zombie_export_add(exp);
-+		if (exp == obd->obd_self_export) {
-+			/* self export should be destroyed without
-+			 * zombie thread as it doesn't hold a
-+			 * reference to obd and doesn't hold any
-+			 * resources
-+			 */
-+			class_export_destroy(exp);
-+			/* self export is destroyed, no class
-+			 * references exist and it is safe to free
-+			 * obd
-+			 */
-+			class_free_dev(obd);
-+		} else {
-+			LASSERT(!list_empty(&exp->exp_obd_chain));
-+			obd_zombie_export_add(exp);
-+		}
- 	}
- }
- EXPORT_SYMBOL(class_export_put);
-@@ -728,8 +828,9 @@ static void obd_zombie_exp_cull(struct work_struct *ws)
-  * pointer to it. The refcount is 2: one for the hash reference, and
-  * one for the pointer returned by this function.
-  */
--struct obd_export *class_new_export(struct obd_device *obd,
--				    struct obd_uuid *cluuid)
-+static struct obd_export *__class_new_export(struct obd_device *obd,
-+					     struct obd_uuid *cluuid,
-+					     bool is_self)
- {
- 	struct obd_export *export;
- 	int rc = 0;
-@@ -739,6 +840,7 @@ struct obd_export *class_new_export(struct obd_device *obd,
- 		return ERR_PTR(-ENOMEM);
- 
- 	export->exp_conn_cnt = 0;
-+	/* 2 = class_handle_hash + last */
- 	atomic_set(&export->exp_refcount, 2);
- 	atomic_set(&export->exp_rpc_count, 0);
- 	atomic_set(&export->exp_cb_count, 0);
-@@ -767,41 +869,65 @@ struct obd_export *class_new_export(struct obd_device *obd,
- 	export->exp_client_uuid = *cluuid;
- 	obd_init_export(export);
- 
--	spin_lock(&obd->obd_dev_lock);
--	/* shouldn't happen, but might race */
--	if (obd->obd_stopping) {
--		rc = -ENODEV;
--		goto exit_unlock;
--	}
--
- 	if (!obd_uuid_equals(cluuid, &obd->obd_uuid)) {
-+		spin_lock(&obd->obd_dev_lock);
-+		/* shouldn't happen, but might race */
-+		if (obd->obd_stopping) {
-+			rc = -ENODEV;
-+			goto exit_unlock;
-+		}
-+		spin_unlock(&obd->obd_dev_lock);
-+
- 		rc = obd_uuid_add(obd, export);
- 		if (rc) {
- 			LCONSOLE_WARN("%s: denying duplicate export for %s, %d\n",
- 				      obd->obd_name, cluuid->uuid, rc);
--			goto exit_unlock;
-+			goto exit_err;
- 		}
- 	}
- 
--	class_incref(obd, "export", export);
--	list_add(&export->exp_obd_chain, &export->exp_obd->obd_exports);
--	export->exp_obd->obd_num_exports++;
-+	spin_lock(&obd->obd_dev_lock);
-+	if (!is_self) {
-+		class_incref(obd, "export", export);
-+		list_add(&export->exp_obd_chain, &export->exp_obd->obd_exports);
-+		obd->obd_num_exports++;
-+	} else {
-+		INIT_LIST_HEAD(&export->exp_obd_chain);
++	if (!cl_ptask_is_atomic(ptask)) {
++		local_bh_enable();
++		bh_enabled = true;
 +	}
- 	spin_unlock(&obd->obd_dev_lock);
- 	return export;
- 
- exit_unlock:
- 	spin_unlock(&obd->obd_dev_lock);
-+exit_err:
- 	class_handle_unhash(&export->exp_handle);
- 	obd_destroy_export(export);
- 	kfree(export);
- 	return ERR_PTR(rc);
- }
 +
-+struct obd_export *class_new_export(struct obd_device *obd,
-+				    struct obd_uuid *uuid)
-+{
-+	return __class_new_export(obd, uuid, false);
-+}
- EXPORT_SYMBOL(class_new_export);
- 
-+struct obd_export *class_new_export_self(struct obd_device *obd,
-+					 struct obd_uuid *uuid)
-+{
-+	return __class_new_export(obd, uuid, true);
++	if (cl_ptask_use_user_mm(ptask) && ptask->pt_mm) {
++		use_mm(ptask->pt_mm);
++		set_fs(ptask->pt_fs);
++	}
++
++	if (ptask->pt_cbfunc)
++		ptask->pt_result = ptask->pt_cbfunc(ptask);
++	else
++		ptask->pt_result = -ENXIO;
++
++	if (cl_ptask_use_user_mm(ptask) && ptask->pt_mm) {
++		set_fs(old_fs);
++		unuse_mm(ptask->pt_mm);
++		mmput(ptask->pt_mm);
++		ptask->pt_mm = NULL;
++	}
++
++	if (cl_ptask_need_complete(ptask) && !cl_ptask_is_ordered(ptask))
++		complete(&ptask->pt_completion);
++
++	if (bh_enabled)
++		local_bh_disable();
++
++	padata_do_serial(padata);
 +}
 +
- void class_unlink_export(struct obd_export *exp)
- {
- 	class_handle_unhash(&exp->exp_handle);
- 
-+	if (exp->exp_obd->obd_self_export == exp) {
-+		class_export_put(exp);
-+		return;
++static int cl_do_parallel(struct cl_ptask_engine *engine,
++			  struct padata_priv *padata)
++{
++	struct cl_ptask *ptask = cl_padata2ptask(padata);
++	int rc;
++
++	if (cl_ptask_need_complete(ptask))
++		reinit_completion(&ptask->pt_completion);
++
++	if (cl_ptask_use_user_mm(ptask)) {
++		ptask->pt_mm = get_task_mm(current);
++		ptask->pt_fs = get_fs();
++	}
++	ptask->pt_result = -EINPROGRESS;
++
++retry:
++	rc = padata_do_parallel(engine->pte_pinst, padata, ptask->pt_cbcpu);
++	if (rc == -EBUSY && cl_ptask_is_retry(ptask)) {
++		/* too many tasks already in queue */
++		schedule_timeout_uninterruptible(1);
++		goto retry;
 +	}
 +
- 	spin_lock(&exp->exp_obd->obd_dev_lock);
- 	/* delete an uuid-export hashitem from hashtables */
- 	if (exp != exp->exp_obd->obd_self_export)
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 9e46eb2..8be8751 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -280,6 +280,7 @@ static int class_attach(struct lustre_cfg *lcfg)
- {
- 	struct obd_device *obd = NULL;
- 	char *typename, *name, *uuid;
-+	struct obd_export *exp;
- 	int rc, len;
- 
- 	if (!LUSTRE_CFG_BUFLEN(lcfg, 1)) {
-@@ -298,78 +299,50 @@ static int class_attach(struct lustre_cfg *lcfg)
- 		CERROR("No UUID passed!\n");
- 		return -EINVAL;
- 	}
--	uuid = lustre_cfg_string(lcfg, 2);
- 
--	CDEBUG(D_IOCTL, "attach type %s name: %s uuid: %s\n",
--	       typename, name, uuid);
-+	uuid = lustre_cfg_string(lcfg, 2);
-+	len = strlen(uuid);
-+	if (len >= sizeof(obd->obd_uuid)) {
-+		CERROR("uuid must be < %d bytes long\n",
-+		       (int)sizeof(obd->obd_uuid));
-+		return -EINVAL;
-+	}
- 
--	obd = class_newdev(typename, name);
-+	obd = class_newdev(typename, name, uuid);
- 	if (IS_ERR(obd)) {
- 		/* Already exists or out of obds */
- 		rc = PTR_ERR(obd);
--		obd = NULL;
- 		CERROR("Cannot create device %s of type %s : %d\n",
- 		       name, typename, rc);
--		goto out;
-+		return rc;
- 	}
--	LASSERTF(obd, "Cannot get obd device %s of type %s\n",
--		 name, typename);
- 	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC,
- 		 "obd %p obd_magic %08X != %08X\n",
- 		 obd, obd->obd_magic, OBD_DEVICE_MAGIC);
- 	LASSERTF(strncmp(obd->obd_name, name, strlen(name)) == 0,
- 		 "%p obd_name %s != %s\n", obd, obd->obd_name, name);
- 
--	rwlock_init(&obd->obd_pool_lock);
--	obd->obd_pool_limit = 0;
--	obd->obd_pool_slv = 0;
--
--	INIT_LIST_HEAD(&obd->obd_exports);
--	INIT_LIST_HEAD(&obd->obd_unlinked_exports);
--	INIT_LIST_HEAD(&obd->obd_delayed_exports);
--	spin_lock_init(&obd->obd_nid_lock);
--	spin_lock_init(&obd->obd_dev_lock);
--	mutex_init(&obd->obd_dev_mutex);
--	spin_lock_init(&obd->obd_osfs_lock);
--	/* obd->obd_osfs_age must be set to a value in the distant
--	 * past to guarantee a fresh statfs is fetched on mount.
--	 */
--	obd->obd_osfs_age = get_jiffies_64() - 1000 * HZ;
--
--	/* XXX belongs in setup not attach  */
--	init_rwsem(&obd->obd_observer_link_sem);
--	/* recovery data */
--	init_waitqueue_head(&obd->obd_evict_inprogress_waitq);
--
--	llog_group_init(&obd->obd_olg);
-+	exp = class_new_export_self(obd, &obd->obd_uuid);
-+	if (IS_ERR(exp)) {
-+		rc = PTR_ERR(exp);
-+		class_free_dev(obd);
-+		return rc;
-+	}
- 
--	obd->obd_conn_inprogress = 0;
-+	obd->obd_self_export = exp;
-+	class_export_put(exp);
- 
--	len = strlen(uuid);
--	if (len >= sizeof(obd->obd_uuid)) {
--		CERROR("uuid must be < %d bytes long\n",
--		       (int)sizeof(obd->obd_uuid));
--		rc = -EINVAL;
--		goto out;
-+	rc = class_register_device(obd);
 +	if (rc) {
-+		class_decref(obd, "newdev", obd);
-+		return rc;
- 	}
--	memcpy(obd->obd_uuid.uuid, uuid, len);
--
--	/* Detach drops this */
--	spin_lock(&obd->obd_dev_lock);
--	atomic_set(&obd->obd_refcount, 1);
--	spin_unlock(&obd->obd_dev_lock);
--	lu_ref_init(&obd->obd_reference);
--	lu_ref_add(&obd->obd_reference, "attach", obd);
- 
- 	obd->obd_attached = 1;
- 	CDEBUG(D_IOCTL, "OBD: dev %d attached type %s with refcount %d\n",
- 	       obd->obd_minor, typename, atomic_read(&obd->obd_refcount));
--	return 0;
-- out:
--	if (obd)
--		class_release_dev(obd);
- 
--	return rc;
++		if (cl_ptask_use_user_mm(ptask) && ptask->pt_mm) {
++			mmput(ptask->pt_mm);
++			ptask->pt_mm = NULL;
++		}
++		ptask->pt_result = rc;
++	}
++
++	return rc;
++}
++
++/**
++ * This function submit initialized task for async execution
++ * in engine with specified id.
++ */
++int cl_ptask_submit(struct cl_ptask *ptask, struct cl_ptask_engine *engine)
++{
++	struct padata_priv *padata = cl_ptask2padata(ptask);
++
++	if (IS_ERR_OR_NULL(engine))
++		return -EINVAL;
++
++	memset(padata, 0, sizeof(*padata));
++
++	padata->parallel = cl_ptask_execute;
++	padata->serial   = cl_ptask_complete;
++
++	return cl_do_parallel(engine, padata);
++}
++
++#else  /* !CONFIG_PADATA */
++
++/**
++ * If CONFIG_PADATA is not defined this function just execute
++ * the initialized task in current thread. (emulate async execution)
++ */
++int cl_ptask_submit(struct cl_ptask *ptask, struct cl_ptask_engine *engine)
++{
++	if (IS_ERR_OR_NULL(engine))
++		return -EINVAL;
++
++	if (ptask->pt_cbfunc)
++		ptask->pt_result = ptask->pt_cbfunc(ptask);
++	else
++		ptask->pt_result = -ENXIO;
++
++	if (cl_ptask_need_complete(ptask))
++		complete(&ptask->pt_completion);
++	else if (cl_ptask_is_autofree(ptask))
++		kfree(ptask);
++
 +	return 0;
- }
- 
- /** Create hashes, self-export, and call type-specific setup.
-@@ -378,7 +351,6 @@ static int class_attach(struct lustre_cfg *lcfg)
- static int class_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- {
- 	int err = 0;
--	struct obd_export *exp;
- 
- 	LASSERT(obd);
- 	LASSERTF(obd == class_num2obd(obd->obd_minor),
-@@ -420,18 +392,9 @@ static int class_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	if (err)
- 		goto err_hash;
- 
--	exp = class_new_export(obd, &obd->obd_uuid);
--	if (IS_ERR(exp)) {
--		err = PTR_ERR(exp);
--		goto err_new;
--	}
--
--	obd->obd_self_export = exp;
--	class_export_put(exp);
--
- 	err = obd_setup(obd, lcfg);
- 	if (err)
--		goto err_exp;
-+		goto err_setup;
- 
- 	obd->obd_set_up = 1;
- 
-@@ -444,12 +407,7 @@ static int class_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	       obd->obd_name, obd->obd_uuid.uuid);
- 
- 	return 0;
--err_exp:
--	if (obd->obd_self_export) {
--		class_unlink_export(obd->obd_self_export);
--		obd->obd_self_export = NULL;
--	}
--err_new:
-+err_setup:
- 	rhashtable_destroy(&obd->obd_uuid_hash);
- err_hash:
- 	obd->obd_starting = 0;
-@@ -476,10 +434,13 @@ static int class_detach(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	obd->obd_attached = 0;
- 	spin_unlock(&obd->obd_dev_lock);
- 
-+	/* cleanup in progress. we don't like to find this device after now */
-+	class_unregister_device(obd);
++}
++#endif /* CONFIG_PADATA */
++EXPORT_SYMBOL(cl_ptask_submit);
 +
- 	CDEBUG(D_IOCTL, "detach on obd %s (uuid %s)\n",
- 	       obd->obd_name, obd->obd_uuid.uuid);
- 
--	class_decref(obd, "attach", obd);
-+	class_decref(obd, "newdev", obd);
- 	return 0;
- }
- 
-@@ -507,6 +468,10 @@ static int class_cleanup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	}
- 	/* Leave this on forever */
- 	obd->obd_stopping = 1;
-+	/* function can't return error after that point, so clear setup flag
-+	 * as early as possible to avoid finding via obd_devs / hash
-+	 */
-+	obd->obd_set_up = 0;
- 	spin_unlock(&obd->obd_dev_lock);
- 
- 	while (obd->obd_conn_inprogress > 0)
-@@ -567,43 +532,27 @@ struct obd_device *class_incref(struct obd_device *obd,
- 
- void class_decref(struct obd_device *obd, const char *scope, const void *source)
- {
--	int err;
--	int refs;
-+	int last;
- 
--	spin_lock(&obd->obd_dev_lock);
--	atomic_dec(&obd->obd_refcount);
--	refs = atomic_read(&obd->obd_refcount);
--	spin_unlock(&obd->obd_dev_lock);
-+	CDEBUG(D_INFO, "Decref %s (%p) now %d - %s\n", obd->obd_name, obd,
-+	       atomic_read(&obd->obd_refcount), scope);
++/**
++ * This function waits when task complete async execution.
++ * The tasks with flag PTF_ORDERED are executed in parallel but completes
++ * into submission order. So, waiting for last ordered task you can be sure
++ * that all previous tasks were done before this task complete.
++ */
++int cl_ptask_wait_for(struct cl_ptask *ptask)
++{
++	if (!cl_ptask_need_complete(ptask))
++		return -EINVAL;
 +
-+	LASSERT(obd->obd_num_exports >= 0);
-+	last = atomic_dec_and_test(&obd->obd_refcount);
- 	lu_ref_del(&obd->obd_reference, scope, source);
- 
--	CDEBUG(D_INFO, "Decref %s (%p) now %d\n", obd->obd_name, obd, refs);
-+	if (last) {
-+		struct obd_export *exp;
- 
--	if ((refs == 1) && obd->obd_stopping) {
-+		LASSERT(!obd->obd_attached);
- 		/* All exports have been destroyed; there should
- 		 * be no more in-progress ops by this point.
- 		 */
--
--		spin_lock(&obd->obd_self_export->exp_lock);
--		obd->obd_self_export->exp_flags |= exp_flags_from_obd(obd);
--		spin_unlock(&obd->obd_self_export->exp_lock);
--
--		/* note that we'll recurse into class_decref again */
--		class_unlink_export(obd->obd_self_export);
--		return;
--	}
--
--	if (refs == 0) {
--		CDEBUG(D_CONFIG, "finishing cleanup of obd %s (%s)\n",
--		       obd->obd_name, obd->obd_uuid.uuid);
--		LASSERT(!obd->obd_attached);
--		if (obd->obd_stopping) {
--			/* If we're not stopping, we were never set up */
--			err = obd_cleanup(obd);
--			if (err)
--				CERROR("Cleanup %s returned %d\n",
--				       obd->obd_name, err);
-+		exp = obd->obd_self_export;
-+		if (exp) {
-+			exp->exp_flags |= exp_flags_from_obd(obd);
-+			class_unlink_export(exp);
- 		}
--		class_release_dev(obd);
- 	}
- }
- EXPORT_SYMBOL(class_decref);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 5ed1758..db5e1b5 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -214,7 +214,7 @@ int lustre_start_mgc(struct super_block *sb)
- 	struct lustre_sb_info *lsi = s2lsi(sb);
- 	struct obd_device *obd;
- 	struct obd_export *exp;
--	struct obd_uuid *uuid;
-+	struct obd_uuid *uuid = NULL;
- 	class_uuid_t uuidc;
- 	lnet_nid_t nid;
- 	char nidstr[LNET_NIDSTR_SIZE];
-@@ -342,7 +342,6 @@ int lustre_start_mgc(struct super_block *sb)
- 	rc = lustre_start_simple(mgcname, LUSTRE_MGC_NAME,
- 				 (char *)uuid->uuid, LUSTRE_MGS_OBDNAME,
- 				 niduuid, NULL, NULL);
--	kfree(uuid);
- 	if (rc)
- 		goto out_free;
- 
-@@ -404,7 +403,7 @@ int lustre_start_mgc(struct super_block *sb)
- 	    lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)
- 		data->ocd_connect_flags &= ~OBD_CONNECT_IMP_RECOV;
- 	data->ocd_version = LUSTRE_VERSION_CODE;
--	rc = obd_connect(NULL, &exp, obd, &obd->obd_uuid, data, NULL);
-+	rc = obd_connect(NULL, &exp, obd, uuid, data, NULL);
- 	if (rc) {
- 		CERROR("connect failed %d\n", rc);
- 		goto out;
-@@ -420,6 +419,7 @@ int lustre_start_mgc(struct super_block *sb)
- out_free:
- 	mutex_unlock(&mgc_start_lock);
- 
-+	kfree(uuid);
- 	kfree(data);
- 	kfree(mgcname);
- 	kfree(niduuid);
++	wait_for_completion(&ptask->pt_completion);
++
++	return 0;
++}
++EXPORT_SYMBOL(cl_ptask_wait_for);
++
++/**
++ * This function initialize internal members of task and prepare it for
++ * async execution.
++ */
++int cl_ptask_init(struct cl_ptask *ptask, cl_ptask_cb_t cbfunc, void *cbdata,
++		  unsigned int flags, int cpu)
++{
++	memset(ptask, 0, sizeof(*ptask));
++
++	ptask->pt_flags  = flags;
++	ptask->pt_cbcpu  = cpu;
++	ptask->pt_mm     = NULL; /* will be set in cl_do_parallel() */
++	ptask->pt_fs     = get_fs();
++	ptask->pt_cbfunc = cbfunc;
++	ptask->pt_cbdata = cbdata;
++	ptask->pt_result = -EAGAIN;
++
++	if (cl_ptask_need_complete(ptask)) {
++		if (cl_ptask_is_autofree(ptask))
++			return -EINVAL;
++
++		init_completion(&ptask->pt_completion);
++	}
++
++	if (cl_ptask_is_atomic(ptask) && cl_ptask_use_user_mm(ptask))
++		return -EINVAL;
++
++	return 0;
++}
++EXPORT_SYMBOL(cl_ptask_init);
++
++/**
++ * This function set the mask of allowed CPUs for parallel execution
++ * for engine with specified id.
++ */
++int cl_ptengine_set_cpumask(struct cl_ptask_engine *engine,
++			    const struct cpumask *cpumask)
++{
++	int rc = 0;
++
++#ifdef CONFIG_PADATA
++	cpumask_var_t serial_mask;
++	cpumask_var_t parallel_mask;
++
++	if (IS_ERR_OR_NULL(engine))
++		return -EINVAL;
++
++	if (!alloc_cpumask_var(&serial_mask, GFP_KERNEL))
++		return -ENOMEM;
++
++	if (!alloc_cpumask_var(&parallel_mask, GFP_KERNEL)) {
++		free_cpumask_var(serial_mask);
++		return -ENOMEM;
++	}
++
++	cpumask_copy(parallel_mask, cpumask);
++	cpumask_copy(serial_mask, cpu_online_mask);
++
++	rc = padata_set_cpumask(engine->pte_pinst, PADATA_CPU_PARALLEL,
++				parallel_mask);
++	free_cpumask_var(parallel_mask);
++	if (rc)
++		goto out_failed_mask;
++
++	rc = padata_set_cpumask(engine->pte_pinst, PADATA_CPU_SERIAL,
++				serial_mask);
++out_failed_mask:
++	free_cpumask_var(serial_mask);
++#endif /* CONFIG_PADATA */
++
++	return rc;
++}
++EXPORT_SYMBOL(cl_ptengine_set_cpumask);
++
++/**
++ * This function returns the count of allowed CPUs for parallel execution
++ * for engine with specified id.
++ */
++int cl_ptengine_weight(struct cl_ptask_engine *engine)
++{
++	if (IS_ERR_OR_NULL(engine))
++		return -EINVAL;
++
++	return engine->pte_weight;
++}
++EXPORT_SYMBOL(cl_ptengine_weight);
++
++#ifdef CONFIG_PADATA
++static int cl_ptask_cpumask_change_notify(struct notifier_block *self,
++					  unsigned long val, void *data)
++{
++	struct padata_cpumask *padata_cpumask = data;
++	struct cl_ptask_engine *engine;
++
++	engine = container_of(self, struct cl_ptask_engine, pte_notifier);
++
++	if (val & PADATA_CPU_PARALLEL)
++		engine->pte_weight = cpumask_weight(padata_cpumask->pcpu);
++
++	return 0;
++}
++
++static int cl_ptengine_padata_init(struct cl_ptask_engine *engine,
++				   const char *name,
++				   const struct cpumask *cpumask)
++{
++	unsigned int wq_flags = WQ_MEM_RECLAIM | WQ_CPU_INTENSIVE;
++	char *pa_mask_buff, *cb_mask_buff;
++	cpumask_var_t all_mask;
++	cpumask_var_t par_mask;
++	int rc;
++
++	get_online_cpus();
++
++	engine->pte_wq = alloc_workqueue(name, wq_flags, 1);
++	if (!engine->pte_wq) {
++		rc = -ENOMEM;
++		goto err;
++	}
++
++	if (!alloc_cpumask_var(&all_mask, GFP_KERNEL)) {
++		rc = -ENOMEM;
++		goto err_destroy_workqueue;
++	}
++
++	if (!alloc_cpumask_var(&par_mask, GFP_KERNEL)) {
++		rc = -ENOMEM;
++		goto err_free_all_mask;
++	}
++
++	cpumask_copy(par_mask, cpumask);
++	if (cpumask_empty(par_mask) ||
++	    cpumask_equal(par_mask, cpu_online_mask)) {
++		cpumask_copy(all_mask, cpu_online_mask);
++		cpumask_clear(par_mask);
++		while (!cpumask_empty(all_mask)) {
++			int cpu = cpumask_first(all_mask);
++
++			cpumask_set_cpu(cpu, par_mask);
++			cpumask_andnot(all_mask, all_mask,
++				       topology_sibling_cpumask(cpu));
++		}
++	}
++
++	cpumask_copy(all_mask, cpu_online_mask);
++
++	pa_mask_buff = (char *)__get_free_page(GFP_KERNEL);
++	if (!pa_mask_buff) {
++		rc = -ENOMEM;
++		goto err_free_par_mask;
++	}
++
++	cb_mask_buff = (char *)__get_free_page(GFP_KERNEL);
++	if (!cb_mask_buff) {
++		free_page((unsigned long)pa_mask_buff);
++		rc = -ENOMEM;
++		goto err_free_par_mask;
++	}
++
++	cpumap_print_to_pagebuf(true, pa_mask_buff, par_mask);
++	pa_mask_buff[PAGE_SIZE - 1] = '\0';
++	cpumap_print_to_pagebuf(true, cb_mask_buff, all_mask);
++	cb_mask_buff[PAGE_SIZE - 1] = '\0';
++
++	CDEBUG(D_INFO, "%s weight=%u plist='%s' cblist='%s'\n",
++	       name, cpumask_weight(par_mask),
++	       pa_mask_buff, cb_mask_buff);
++
++	free_page((unsigned long)cb_mask_buff);
++	free_page((unsigned long)pa_mask_buff);
++
++	engine->pte_weight = cpumask_weight(par_mask);
++	engine->pte_pinst  = padata_alloc_possible(engine->pte_wq);
++	if (!engine->pte_pinst) {
++		rc = -ENOMEM;
++		goto err_free_par_mask;
++	}
++
++	engine->pte_notifier.notifier_call = cl_ptask_cpumask_change_notify;
++	rc = padata_register_cpumask_notifier(engine->pte_pinst,
++					      &engine->pte_notifier);
++	if (rc)
++		goto err_free_padata;
++
++	rc = cl_ptengine_set_cpumask(engine, par_mask);
++	if (rc)
++		goto err_unregister;
++
++	rc = padata_start(engine->pte_pinst);
++	if (rc)
++		goto err_unregister;
++
++	free_cpumask_var(par_mask);
++	free_cpumask_var(all_mask);
++
++	put_online_cpus();
++	return 0;
++
++err_unregister:
++	padata_unregister_cpumask_notifier(engine->pte_pinst,
++					   &engine->pte_notifier);
++err_free_padata:
++	padata_free(engine->pte_pinst);
++err_free_par_mask:
++	free_cpumask_var(par_mask);
++err_free_all_mask:
++	free_cpumask_var(all_mask);
++err_destroy_workqueue:
++	destroy_workqueue(engine->pte_wq);
++err:
++	put_online_cpus();
++	return rc;
++}
++
++static void cl_ptengine_padata_fini(struct cl_ptask_engine *engine)
++{
++	padata_stop(engine->pte_pinst);
++	padata_unregister_cpumask_notifier(engine->pte_pinst,
++					   &engine->pte_notifier);
++	padata_free(engine->pte_pinst);
++	destroy_workqueue(engine->pte_wq);
++}
++
++#else  /* !CONFIG_PADATA */
++
++static int cl_ptengine_padata_init(struct cl_ptask_engine *engine,
++				   const char *name,
++				   const struct cpumask *cpumask)
++{
++	engine->pte_weight = 1;
++
++	return 0;
++}
++
++static void cl_ptengine_padata_fini(struct cl_ptask_engine *engine)
++{
++}
++#endif /* CONFIG_PADATA */
++
++struct cl_ptask_engine *cl_ptengine_init(const char *name,
++					 const struct cpumask *cpumask)
++{
++	struct cl_ptask_engine *engine;
++	int rc;
++
++	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
++	if (!engine) {
++		rc = -ENOMEM;
++		goto err;
++	}
++
++	rc = cl_ptengine_padata_init(engine, name, cpumask);
++	if (rc)
++		goto err_free_engine;
++
++	return engine;
++
++err_free_engine:
++	kfree(engine);
++err:
++	return ERR_PTR(rc);
++}
++EXPORT_SYMBOL(cl_ptengine_init);
++
++void cl_ptengine_fini(struct cl_ptask_engine *engine)
++{
++	if (IS_ERR_OR_NULL(engine))
++		return;
++
++	cl_ptengine_padata_fini(engine);
++	kfree(engine);
++}
++EXPORT_SYMBOL(cl_ptengine_fini);
 -- 
 1.8.3.1
