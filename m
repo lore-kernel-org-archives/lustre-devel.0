@@ -1,118 +1,89 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 25 Nov 2018 21:48:28 -0500
-Subject: [lustre-devel] [PATCH 12/12] lustre: update TODO lustre list
+Date: Sun, 25 Nov 2018 21:48:18 -0500
+Subject: [lustre-devel] [PATCH 02/12] lustre: lnd: create enum kib_dev_caps
 In-Reply-To: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
 References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1543200508-6838-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1543200508-6838-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Many of the items in TODO have been completed so remove them from
-the list.
+Cleanup IBLND_DEV_CAPS_* by creating enum kib_dev_caps and using
+the BIT() macros.
 
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Reviewed-on: https://review.whamcloud.com/33409
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/TODO | 85 ---------------------------------------------
- 1 file changed, 85 deletions(-)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c |  5 +++--
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h | 12 +++++++-----
+ 2 files changed, 10 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/TODO b/drivers/staging/lustre/TODO
-index 942280b..1df7697 100644
---- a/drivers/staging/lustre/TODO
-+++ b/drivers/staging/lustre/TODO
-@@ -35,91 +35,6 @@ So move to time64_t and ktime_t as much as possible.
- ******************************************************************************
- * Proper IB support for ko2iblnd
- ******************************************************************************
--https://jira.hpdd.intel.com/browse/LU-9179
--
--Poor performance for the ko2iblnd driver. This is related to many of the
--patches below that are missing from the linux client.
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10394 / LU-10526 / LU-10089
--
--Default to using MEM_REG
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10459
--
--throttle tx based on queue depth
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9943
--
--correct WR fast reg accounting
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10291
--
--remove concurrent_sends tunable
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10213
--
--calculate qp max_send_wrs properly
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9810
--
--use less CQ entries for each connection
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10129 / LU-9180
--
--rework map_on_demand behavior
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-10129
--
--query device capabilities
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9983
--
--allow for discontiguous fragments
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9500
--
--Don't Page Align remote_addr with FastReg
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9448
--
--handle empty CPTs
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9507
--
--Don't Assert On Reconnect with MultiQP
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9425
--
--Turn on 2 sges by default
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-5718
--
--multiple sges for work request
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9094
--
--kill timedout txs from ibp_tx_queue
--------------------------------------------------------------------------------
--
--https://jira.hpdd.intel.com/browse/LU-9094
--
--reconnect peer for REJ_INVALID_SERVICE_ID
--------------------------------------------------------------------------------
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index ecdf4de..281004a 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -656,7 +656,7 @@ static unsigned int kiblnd_send_wrs(struct kib_conn *conn)
+ 	 * One WR for the LNet message
+ 	 * And ibc_max_frags for the transfer WRs
+ 	 */
+-	u32 dev_caps = conn->ibc_hdev->ibh_dev->ibd_dev_caps;
++	enum kib_dev_caps dev_caps = conn->ibc_hdev->ibh_dev->ibd_dev_caps;
+ 	unsigned int ret = 1 + conn->ibc_max_frags;
  
- https://jira.hpdd.intel.com/browse/LU-8752
+ 	/* FastReg needs two extra WRs for map and invalidate */
+@@ -1441,7 +1441,8 @@ static int kiblnd_alloc_fmr_pool(struct kib_fmr_poolset *fps, struct kib_fmr_poo
+ }
  
+ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps,
+-				  struct kib_fmr_pool *fpo, u32 dev_caps)
++				  struct kib_fmr_pool *fpo,
++				  enum kib_dev_caps dev_caps)
+ {
+ 	struct kib_fast_reg_descriptor *frd;
+ 	int i, rc;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index 7f81fe2..0994fae 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -73,10 +73,6 @@
+ #define IBLND_N_SCHED			2
+ #define IBLND_N_SCHED_HIGH		4
+ 
+-#define IBLND_DEV_CAPS_FASTREG_ENABLED		0x1
+-#define IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT	0x2
+-#define IBLND_DEV_CAPS_FMR_ENABLED		0x4
+-
+ struct kib_tunables {
+ 	int *kib_dev_failover;           /* HCA failover */
+ 	unsigned int *kib_service;       /* IB service number */
+@@ -152,6 +148,12 @@ struct kib_tunables {
+ #define KIB_IFNAME_SIZE	      256
+ #endif
+ 
++enum kib_dev_caps {
++	IBLND_DEV_CAPS_FASTREG_ENABLED		= BIT(0),
++	IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT	= BIT(1),
++	IBLND_DEV_CAPS_FMR_ENABLED		= BIT(2),
++};
++
+ struct kib_dev {
+ 	struct list_head   ibd_list;            /* chain on kib_devs */
+ 	struct list_head   ibd_fail_list;       /* chain on kib_failed_devs */
+@@ -167,7 +169,7 @@ struct kib_dev {
+ 	unsigned int ibd_can_failover; /* IPoIB interface is a bonding master */
+ 	struct list_head   ibd_nets;
+ 	struct kib_hca_dev *ibd_hdev;
+-	u32			ibd_dev_caps;
++	enum kib_dev_caps	ibd_dev_caps;
+ };
+ 
+ struct kib_hca_dev {
 -- 
 1.8.3.1
