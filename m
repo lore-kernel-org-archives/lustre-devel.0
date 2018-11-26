@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 26 Nov 2018 01:31:32 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 4/9] lustre: rename: DNE2 should return
- -EXDEV upon remote rename
-In-Reply-To: <154295732797.2850.16990175697450002727.stgit@noble>
+Date: Mon, 26 Nov 2018 01:32:53 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 3/9] lustre: ptlrpc: use smp unsafe
+ at_init only for initialization
+In-Reply-To: <154295732794.2850.5519811101627910956.stgit@noble>
 References: <154295730810.2850.961218355189474016.stgit@noble>
- <154295732797.2850.16990175697450002727.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1811260130360.32255@casper.infradead.org>
+ <154295732794.2850.5519811101627910956.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1811260132240.32255@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,45 +13,79 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-
-On Fri, 23 Nov 2018, NeilBrown wrote:
-
-> From: Lai Siyao <lai.siyao@intel.com>
+> From: Vladimir Saveliev <vladimir.saveliev@seagate.com>
 > 
-> DNE2 MDS should return -EXDEV upon remote rename, so that old
-> client can do rename with copy and delete, instead of fail
-> with -EREMOTE.
-
-Let me guess you were debugging the migration failures and fould this :-)
-I was doing the same thing.
+> at_init() is not smp safe, so it is not supposed to be used anywhere
+> but in at initialization.
+> Add at_reinit() - safe version of at_init().
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-> Change-Id: I68e8e99259065922f31bee5343be309380715674
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-6660
-> Reviewed-on: http://review.whamcloud.com/15323
+> Signed-off-by: Vladimir Saveliev <vladimir.saveliev@seagate.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-6805
+> Reviewed-on: http://review.whamcloud.com/15522
 > Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> Reviewed-by: wangdi <di.wang@intel.com>
-> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: Chris Horn <hornc@cray.com>
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lustre/lmv/lmv_obd.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../staging/lustre/lustre/include/lustre_import.h  |   19 +++++++++++++++++--
+>  drivers/staging/lustre/lustre/ptlrpc/import.c      |    2 +-
+>  2 files changed, 18 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> index 32bb9fca88c9..7e4ffeb15a63 100644
-> --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> @@ -1945,7 +1945,7 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
->  	}
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_import.h b/drivers/staging/lustre/lustre/include/lustre_import.h
+> index a629f6bba814..8a8a125bd130 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_import.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_import.h
+> @@ -331,12 +331,17 @@ static inline unsigned int at_timeout2est(unsigned int val)
+>  	return (max((val << 2) / 5, 5U) - 4);
+>  }
 >  
->  	rc = md_rename(target_exp, op_data, old, oldlen, new, newlen, request);
-> -	if (rc && rc != -EREMOTE)
-> +	if (rc && rc != -EXDEV)
->  		return rc;
+> -static inline void at_reset(struct adaptive_timeout *at, int val)
+> +static inline void at_reset_nolock(struct adaptive_timeout *at, int val)
+>  {
+> -	spin_lock(&at->at_lock);
+>  	at->at_current = val;
+>  	at->at_worst_ever = val;
+>  	at->at_worst_time = ktime_get_real_seconds();
+> +}
+> +
+> +static inline void at_reset(struct adaptive_timeout *at, int val)
+> +{
+> +	spin_lock(&at->at_lock);
+> +	at_reset_nolock(at, val);
+>  	spin_unlock(&at->at_lock);
+>  }
 >  
->  	body = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_BODY);
+> @@ -348,6 +353,16 @@ static inline void at_init(struct adaptive_timeout *at, int val, int flags)
+>  	at_reset(at, val);
+>  }
+>  
+> +static inline void at_reinit(struct adaptive_timeout *at, int val, int flags)
+> +{
+> +	spin_lock(&at->at_lock);
+> +	at->at_binstart = 0;
+> +	memset(at->at_hist, 0, sizeof(at->at_hist));
+> +	at->at_flags = flags;
+> +	at_reset_nolock(at, val);
+> +	spin_unlock(&at->at_lock);
+> +}
+> +
+>  extern unsigned int at_min;
+>  static inline int at_get(struct adaptive_timeout *at)
+>  {
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> index 07dc87d9513e..480c860d066e 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> @@ -1036,7 +1036,7 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+>  	 * The net statistics after (re-)connect is not valid anymore,
+>  	 * because may reflect other routing, etc.
+>  	 */
+> -	at_init(&imp->imp_at.iat_net_latency, 0, 0);
+> +	at_reinit(&imp->imp_at.iat_net_latency, 0, 0);
+>  	ptlrpc_at_adj_net_latency(request,
+>  				  lustre_msg_get_service_time(request->rq_repmsg));
+>  
 > 
 > 
 > 
