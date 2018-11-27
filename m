@@ -1,18 +1,35 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Tue, 27 Nov 2018 13:51:02 +0000
+Date: Tue, 27 Nov 2018 14:01:53 +0000
 Subject: [lustre-devel] [PATCH 10/12] lustre: clio: Introduce parallel
  tasks framework
-In-Reply-To: <7ED31E7C-2657-4FB8-B083-E451504EE62F@whamcloud.com>
+In-Reply-To: <MWHPR11MB1488A82DFA620A251C2EEC70CBD00@MWHPR11MB1488.namprd11.prod.outlook.com>
 References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
  <1543200508-6838-11-git-send-email-jsimmons@infradead.org>
  <87woozp2ws.fsf@notabene.neil.brown.name>,
- <7ED31E7C-2657-4FB8-B083-E451504EE62F@whamcloud.com>
-Message-ID: <MWHPR11MB1488A82DFA620A251C2EEC70CBD00@MWHPR11MB1488.namprd11.prod.outlook.com>
+ <7ED31E7C-2657-4FB8-B083-E451504EE62F@whamcloud.com>,
+ <MWHPR11MB1488A82DFA620A251C2EEC70CBD00@MWHPR11MB1488.namprd11.prod.outlook.com>
+Message-ID: <MWHPR11MB148834CE6B90A81CE7D63D91CBD00@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+Second, about pio.
+
+I believe that long term it?s headed out of Lustre.  It only improves performance in a limited way in certain circumstances, and harms it in various others.  So it?s off by default, and, I suspect, remains completely unused.  A while back I noticed its test framework test didn?t activate it correctly, and once fixed, it sometimes deadlocks (race with truncate). There?s a patch to fix that, but a problem was found in it and it has since languished.
+
+I would still suggest you take it, Neil, as othewise you?ll complicate a bunch of potentially nasty porting working in the CLIO stack, as you apply the years of patches written with it there.  Instead, I?d suggest we pull it in the open sfs branch (Sorry!  It was a promising idea but it hasn?t panned out, and the current parallel readahead work isn?t going to use it.) and then eventually you could pick that up.
+
+Curious how folks feel about this.  I?d be willing to take a stab at writing a removal patch for 2.13.  It pains me a bit to suggest giving up on it, but Jinshan and I want to do write container type work to improve writes, and there?s the older/new again DDN parallel readahead work for reads.
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Patrick Farrell <paf@cray.com>
+Sent: Tuesday, November 27, 2018 7:51:02 AM
+To: Andreas Dilger; NeilBrown
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 10/12] lustre: clio: Introduce parallel tasks framework
 
 Two notes coming, first about padata.
 
@@ -104,4 +121,4 @@ lustre-devel at lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181127/06cc8d7e/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181127/c7df3662/attachment.html>
