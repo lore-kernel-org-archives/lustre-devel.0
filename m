@@ -1,86 +1,80 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 27 Nov 2018 13:32:48 +1100
-Subject: [lustre-devel] [PATCH 6/9] lustre: obdclass: health_check to
- report unhealthy upon LBUG
-In-Reply-To: <alpine.LFD.2.21.1811260146120.32255@casper.infradead.org>
-References: <154295730810.2850.961218355189474016.stgit@noble>
- <154295732803.2850.16198081335816276527.stgit@noble>
- <alpine.LFD.2.21.1811260146120.32255@casper.infradead.org>
-Message-ID: <878t1fqmgf.fsf@notabene.neil.brown.name>
+Date: Tue, 27 Nov 2018 14:01:30 +1100
+Subject: [lustre-devel] [PATCH 06/12] lustre: mdc: don't add to page
+ cache upon failure
+In-Reply-To: <1543200508-6838-7-git-send-email-jsimmons@infradead.org>
+References: <1543200508-6838-1-git-send-email-jsimmons@infradead.org>
+ <1543200508-6838-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <875zwjql4l.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Nov 26 2018, James Simmons wrote:
+On Sun, Nov 25 2018, James Simmons wrote:
 
->> From: Bruno Faccini <bruno.faccini@intel.com>
->> 
->> When a LBUG has occurred, without panic_on_lbug being set, health_check
->> /proc file must return an unhealthy state.
+> From: Lai Siyao <lai.siyao@whamcloud.com>
 >
-> I pushed this one to Greg which was disliked since it breaks the one item 
-> per sysfs rule. See 
+> Reading directory pages may fail on MDS, in this case client should
+> not cache a non-up-to-date directory page, because it will cause
+> a later read on the same page fail.
 >
-> https://lore.kernel.org/patchwork/patch/755571
+> Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-5461
+> Reviewed-on: http://review.whamcloud.com/11450
+> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+> Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  drivers/staging/lustre/lustre/mdc/mdc_request.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 >
-> I did start a proper port to sysfs at 
-> https://review.whamcloud.com/#/c/25631
->
-> but it needs to be updated. I do like Andreas idea of a sysfs and debugfs
-> file since lctl get_param will return the results from both together.
-> We could land it as is and update the sysfs handling at a latter date 
-> (shouldn't be too far down the road). Here is my review in case you want
-> to land it.
->
-> Reviewed-by: James Simmons <jsimmons@infradead.org>
->
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index 1072b66..09b30ef 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -1212,7 +1212,10 @@ static int mdc_read_page_remote(void *data, struct page *page0)
+>  	}
+>  
+>  	rc = mdc_getpage(rp->rp_exp, fid, rp->rp_off, page_pool, npages, &req);
+> -	if (!rc) {
+> +	if (rc < 0) {
+> +		/* page0 is special, which was added into page cache early */
+> +		delete_from_page_cache(page0);
 
-Thanks, but the patch as it stands it totally broken - I add code
-immediately after a 'return'. :-(
+This looks wrong to me.  We shouldn't need to delete the page from the
+page-cache.
+It won't be marked up-to-date, so why will that cause an error on a
+later read???
 
-I'll just discard this patch.
+Well, because mdc_page_locate() finds a page and if it isn't up-to-date,
+it returns -EIO.  Why does it do that?  If it found a PageError() page,
+then it might be reasonable to return -EIO.
 
-Thanks,
+Why not just return the page that was found, and let the caller check if
+it is Uptodate?
+
+Well, because mdc_read_page() handles a successful page return from
+mdc_page_locate() as a hash collision.
+
+I guess I need to understand how lustre maps a hash to a directory
+block, and then how it handles collisions...
+
+The reason this jumped out at me is that it looks like it might be
+racy.  Adding a page and then removing it might leave a window where
+some other thread can find the page.  That is not a problem is a
+non-up-to-date page just means we should wait for it.  But if it can
+cause an error, then maybe the race is a real problem.
+
+But maybe there is some higher level locking...
+
 NeilBrown
-
-
->> Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
->> WC-bug-id: https://jira.whamcloud.com/browse/LU-7486
->> Reviewed-on: http://review.whamcloud.com/17981
->> Reviewed-by: Bobi Jam <bobijam@hotmail.com>
->> Reviewed-by: Niu Yawei <yawei.niu@intel.com>
->> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
->> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>  drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |    4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
->> index 6669c235dd51..5fd30a8e2b44 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
->> @@ -173,8 +173,10 @@ health_check_show(struct kobject *kobj, struct attribute *attr, char *buf)
->>  	int i;
->>  	size_t len = 0;
->>  
->> -	if (libcfs_catastrophe)
->> +	if (libcfs_catastrophe) {
->>  		return sprintf(buf, "LBUG\n");
->> +		healthy = false;
->> +	}
->>  
->>  	read_lock(&obd_dev_lock);
->>  	for (i = 0; i < class_devno_max(); i++) {
->> 
->> 
->> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181127/a713a21f/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181127/5e6433ff/attachment.sig>
