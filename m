@@ -1,120 +1,29 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 28 Nov 2018 12:34:14 +1100
-Subject: [lustre-devel] drivers/staging updated to 4.20-rc1
-In-Reply-To: <alpine.LFD.2.21.1811052058590.11915@casper.infradead.org>
-References: <87k1lsyssq.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1811052058590.11915@casper.infradead.org>
-Message-ID: <87h8g2oui1.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 30 Nov 2018 02:59:51 +0000 (GMT)
+Subject: [lustre-devel] reviving whamcloud linux lustre client
+Message-ID: <alpine.LFD.2.21.1811300245590.16646@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Nov 05 2018, James Simmons wrote:
 
->> 
->> Hi,
->>  I've just pushed out new lustre/lustre, lustre/lustre-testing, lustre/lustre-wip
->>  to github.com:neilbrown/linux.git
->> 
->>  lustre is updated to 4.20-rc1 and doesn't compile because of some
->>  changes.
->>  The patch below makes it compile and (probably) work.
->> 
->>  I'd appreciate a review, especially of the iov_for_each change.
->
-> Almost. I see the following errors while testing.
->
-> [ 7111.002667] RIP: 0010:sanity+0xb2/0xb9
-> [ 7111.002668] Code: 63 c5 48 c7 c7 a1 7c e8 81 ff c5 48 6b c0 28 48 03 43 
-> 78 8b 48 08 48 8b 70 10 44 8b 40 0c 48 8b 10 31 c0 e8 4c 67 d6 ff  c
-> [ 7111.002669] RSP: 0018:ffffc900072d3a60 EFLAGS: 00010246
-> [ 7111.002670] RAX: 000000000000002a RBX: ffff8808502126c0 RCX: 
-> 0000000000000006
-> [ 7111.002671] RDX: 0000000000000000 RSI: ffffffff81e770e3 RDI: 
-> 00000000ffffffff
-> [ 7111.002672] RBP: 0000000000000010 R08: 0000000000000004 R09: 
-> ffffffff82683e8e
-> [ 7111.002673] R10: 00000000000015a9 R11: 0000000000000000 R12: 
-> ffffea003f9523c0
-> [ 7111.002674] R13: ffff8808502126c0 R14: ffffea003f9523c0 R15: 
-> 0000000000001000
-> [ 7111.002676] FS:  00007f140a193740(0000) GS:ffff88107fd80000(0000) 
-> knlGS:0000000000000000
-> [ 7111.002677] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> [ 7111.002678] CR2: 000000000067a198 CR3: 00000008305dc001 CR4: 
-> 00000000000606e0
-> [ 7111.002679] Call Trace:
-> [ 7111.002682]  copy_page_to_iter+0x245/0x2f0
-> [ 7111.002686]  generic_file_buffered_read+0x345/0x7c0
-> [ 7111.002689]  ? touch_atime+0x33/0xd0
-> [ 7111.002701]  vvp_io_read_start+0x22a/0x3a0 [lustre]
-> [ 7111.002715]  cl_io_start+0x6d/0x130 [obdclass]
-> [ 7111.002727]  cl_io_loop+0xae/0x220 [obdclass]
-> [ 7111.002736]  ll_file_io_generic+0x4ee/0x880 [lustre]
-> [ 7111.002740]  ? generic_file_buffered_read+0x591/0x7c0
-> [ 7111.002749]  ll_file_read_iter+0x13e/0x1b0 [lustre]
-> [ 7111.002751]  generic_file_splice_read+0xe1/0x190
-> [ 7111.002755]  splice_direct_to_actor+0xea/0x200
-> [ 7111.002757]  ? generic_pipe_buf_nosteal+0x10/0x10
-> [ 7111.002759]  do_splice_direct+0x87/0xd0
-> [ 7111.002762]  do_sendfile+0x1c6/0x3c0
-> [ 7111.002765]  __x64_sys_sendfile64+0x5c/0xb0
-> [ 7111.002768]  do_syscall_64+0x68/0x38f
-> [ 7111.002770]  ? do_page_fault+0x2d/0x130
-> [ 7111.002773]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> [ 7111.002775] RIP: 0033:0x7f1409ca71ca
->
+Hello :-)
 
-Thanks for testing, and sorry that I didn't respond at the time - I
-managed to lose track of it somehow.
-Anyway, I hit testing problems that were quite different but in
-a generally similar area.
-This fixes them, and might fix yours too.  It'll appear in
-lustre-testing shortly.
+    With the linux lustre client getting into shape its time to revive
+the whamcloud linux tree for testing. Currently 
 
-Thanks,
-NeilBrown
+ssh://user at review.whamcloud.com:29418/fs/linux-staging
 
-From 77e9a84550bce7a77c0bc2e24455f11c72d1cc26 Mon Sep 17 00:00:00 2001
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 28 Nov 2018 12:28:34 +1100
-Subject: [PATCH] lustre: fix iov_for_each() replaced in vvp_mmap_locks()
+points to an outdated staging tree hosted by Greg. Can you migrate
+the tree hosting to the following:
 
-iov_for_each() only makes sense of ITER_IOVEC and ITER_KVEC, not - for
-exmaple - on ITER_PIPE.
-When I replaced the call with an open-coded version I incorrectly left
-that check out - resulting in problems when testing.
-So add it back.
+https://github.com/neilbrown/linux
+    branches:
+	remotes/origin/lustre/lustre
+        remotes/origin/lustre/lustre-testing
+        remotes/origin/lustre/lustre-wip
 
-Fixes: 85bdcd0ea139 ("lustre: fixes for 4.20-rc1")
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/llite/vvp_io.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 524f3f4feec8..d6b27bae8226 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -388,6 +388,9 @@ static int vvp_mmap_locks(const struct lu_env *env,
- 	if (!mm)
- 		return 0;
- 
-+	if (iov_iter_type(vio->vui_iter) != ITER_IOVEC &&
-+	    iov_iter_type(vio->vui_iter) != ITER_KVEC)
-+		return 0;
- 	for (i = *vio->vui_iter;
- 	     i.count;
- 	     iov_iter_advance(&i, iov.iov_len)) {
--- 
-2.14.0.rc0.dirty
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181128/04aa99cd/attachment.sig>
+Can you use the current lustre 2.10 LTS test suite for testing and enabled
+all the test!!!
