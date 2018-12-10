@@ -1,17 +1,33 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 10 Dec 2018 12:26:23 +1100
+From: Patrick Farrell <paf@cray.com>
+Date: Mon, 10 Dec 2018 04:09:02 +0000
 Subject: [lustre-devel] [PATCH 3/4] lustre: use bit-locking in
  echo_client.
-In-Reply-To: <MWHPR11MB14888CB144E203DFE229518BCBA50@MWHPR11MB1488.namprd11.prod.outlook.com>
+In-Reply-To: <87a7lecgu8.fsf@notabene.neil.brown.name>
 References: <154440246926.29887.1667505755325904791.stgit@noble>
  <154440277667.29887.4836855598151465010.stgit@noble>
- <MWHPR11MB14888CB144E203DFE229518BCBA50@MWHPR11MB1488.namprd11.prod.outlook.com>
-Message-ID: <87a7lecgu8.fsf@notabene.neil.brown.name>
+ <MWHPR11MB14888CB144E203DFE229518BCBA50@MWHPR11MB1488.namprd11.prod.outlook.com>,
+ <87a7lecgu8.fsf@notabene.neil.brown.name>
+Message-ID: <MWHPR11MB148875027EC1D8AE72E02901CBA50@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Understood, thanks.  The fact that it's used for page locking elsewhere in Linux is plenty for me, was just curious.
+
+
+Thanks,
+
+- Patrick
+
+
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Sunday, December 9, 2018 7:26 PM
+To: Patrick Farrell; James Simmons; Oleg Drokin; Andreas Dilger
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 3/4] lustre: use bit-locking in echo_client.
 
 On Mon, Dec 10 2018, Patrick Farrell wrote:
 
@@ -147,10 +163,12 @@ NeilBrown
 > lustre-devel mailing list
 > lustre-devel at lists.lustre.org
 > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+lustre-devel Info Page<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>
+lists.lustre.org
+To see the collection of prior postings to the list, visit the lustre-devel Archives.. Using lustre-devel: To post a message to all the list members, send email to lustre-devel at lists.lustre.org. You can subscribe to the list, or change your existing subscription, in the sections below.
+
+
+
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181210/0975b6c1/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181210/0ed6f394/attachment-0001.html>
