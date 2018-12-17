@@ -1,9 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:29:36 -0500
-Subject: [lustre-devel] [PATCH 02/28] lustre: lov: move code for PFL work
+Date: Mon, 17 Dec 2018 11:29:54 -0500
+Subject: [lustre-devel] [PATCH 20/28] lustre: lov: keep minimum LOVEA size
 In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1545064202-22483-21-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,167 +12,57 @@ To: lustre-devel@lists.lustre.org
 
 From: Bobi Jam <bobijam@hotmail.com>
 
-Move lov_tgt_maxbytes() and lsm_free_plain() toward the top of
-lov_ea.c for upcoming PFL work.
+For a PFL file, some of its component could be un-instantiated, and
+their lov_ost_data_v1 array is not needed, we should keep its LOVEA
+as small as possible.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+An unstantiated component's stripe offset should be set.
+
 Signed-off-by: Bobi Jam <bobijam@hotmail.com>
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24849
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9489
+Reviewed-on: https://review.whamcloud.com/27089
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9941
+Reviewed-on: https://review.whamcloud.com/28845
 Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_ea.c       | 87 ++++++++++++++----------
- drivers/staging/lustre/lustre/lov/lov_internal.h | 16 +----
- 2 files changed, 51 insertions(+), 52 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_internal.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index c80320a..6931ffd 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -44,6 +44,33 @@
- 
- #include "lov_internal.h"
- 
-+/*
-+ * Find minimum stripe maxbytes value.  For inactive or
-+ * reconnecting targets use LUSTRE_EXT3_STRIPE_MAXBYTES.
-+ */
-+static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
-+{
-+	loff_t maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
-+	struct obd_import *imp;
-+
-+	if (!tgt->ltd_active)
-+		return maxbytes;
-+
-+	imp = tgt->ltd_obd->u.cli.cl_import;
-+	if (!imp)
-+		return maxbytes;
-+
-+	spin_lock(&imp->imp_lock);
-+	if (imp->imp_state == LUSTRE_IMP_FULL &&
-+	    (imp->imp_connect_data.ocd_connect_flags & OBD_CONNECT_MAXBYTES) &&
-+	     imp->imp_connect_data.ocd_maxbytes > 0)
-+		maxbytes = imp->imp_connect_data.ocd_maxbytes;
-+
-+	spin_unlock(&imp->imp_lock);
-+
-+	return maxbytes;
-+}
-+
- static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
- 				 __u16 stripe_count)
- {
-@@ -76,6 +103,16 @@ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
- 	return 0;
- }
- 
-+void lsm_free_plain(struct lov_stripe_md *lsm)
-+{
-+	__u16 stripe_count = lsm->lsm_stripe_count;
-+	int i;
-+
-+	for (i = 0; i < stripe_count; i++)
-+		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
-+	kvfree(lsm);
-+}
-+
- struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
- {
- 	size_t oinfo_ptrs_size, lsm_size;
-@@ -108,43 +145,6 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
- 	return NULL;
- }
- 
--void lsm_free_plain(struct lov_stripe_md *lsm)
--{
--	__u16 stripe_count = lsm->lsm_stripe_count;
--	int i;
--
--	for (i = 0; i < stripe_count; i++)
--		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
--	kvfree(lsm);
--}
--
--/*
-- * Find minimum stripe maxbytes value.  For inactive or
-- * reconnecting targets use LUSTRE_EXT3_STRIPE_MAXBYTES.
-- */
--static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
--{
--	loff_t maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
--	struct obd_import *imp;
--
--	if (!tgt->ltd_active)
--		return maxbytes;
--
--	imp = tgt->ltd_obd->u.cli.cl_import;
--	if (!imp)
--		return maxbytes;
--
--	spin_lock(&imp->imp_lock);
--	if (imp->imp_state == LUSTRE_IMP_FULL &&
--	    (imp->imp_connect_data.ocd_connect_flags & OBD_CONNECT_MAXBYTES) &&
--	     imp->imp_connect_data.ocd_maxbytes > 0)
--		maxbytes = imp->imp_connect_data.ocd_maxbytes;
--
--	spin_unlock(&imp->imp_lock);
--
--	return maxbytes;
--}
--
- static int lsm_unpackmd_common(struct lov_obd *lov,
- 			       struct lov_stripe_md *lsm,
- 			       struct lov_mds_md *lmm,
-@@ -320,6 +320,19 @@ static int lsm_unpackmd_v3(struct lov_obd *lov, struct lov_stripe_md *lsm,
- 	.lsm_unpackmd	   = lsm_unpackmd_v3,
- };
- 
-+const struct lsm_operations *lsm_op_find(int magic)
-+{
-+	switch (magic) {
-+	case LOV_MAGIC_V1:
-+		return &lsm_v1_ops;
-+	case LOV_MAGIC_V3:
-+		return &lsm_v3_ops;
-+	default:
-+		CERROR("unrecognized lsm_magic %08x\n", magic);
-+		return NULL;
-+	}
-+}
-+
- void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm)
- {
- 	CDEBUG(level, "lsm %p, objid " DOSTID ", maxbytes %#llx, magic 0x%08X, stripe_size %u, stripe_count %u, refc: %d, layout_gen %u, pool [" LOV_POOLNAMEF "]\n",
 diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index 44a997e..51f416e 100644
+index 5e3eae7..dd4dd24 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_internal.h
 +++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -92,21 +92,7 @@ struct lsm_operations {
- 			    struct lov_mds_md *lmm);
- };
+@@ -96,6 +96,11 @@ static inline bool lsm_entry_inited(const struct lov_stripe_md *lsm, int index)
+ 	return lsme_inited(lsm->lsm_entries[index]);
+ }
  
--extern const struct lsm_operations lsm_v1_ops;
--extern const struct lsm_operations lsm_v3_ops;
--
--static inline const struct lsm_operations *lsm_op_find(int magic)
--{
--	switch (magic) {
--	case LOV_MAGIC_V1:
--		return &lsm_v1_ops;
--	case LOV_MAGIC_V3:
--		return &lsm_v3_ops;
--	default:
--		CERROR("unrecognized lsm_magic %08x\n", magic);
--		return NULL;
--	}
--}
-+const struct lsm_operations *lsm_op_find(int magic);
++static inline bool lsm_is_composite(u32 magic)
++{
++	return magic == LOV_MAGIC_COMP_V1;
++}
++
+ static inline size_t lov_comp_md_size(const struct lov_stripe_md *lsm)
+ {
+ 	struct lov_stripe_md_entry *lsme;
+@@ -110,8 +115,15 @@ static inline size_t lov_comp_md_size(const struct lov_stripe_md *lsm)
  
- /* lov_do_div64(a, b) returns a % b, and a = a / b.
-  * The 32-bit code is LOV-specific due to knowing about stripe limits in
+ 	size = sizeof(struct lov_comp_md_v1);
+ 	for (entry = 0; entry < lsm->lsm_entry_count; entry++) {
++		u16 stripe_count;
++
+ 		lsme = lsm->lsm_entries[entry];
+ 
++		if (lsme_inited(lsme))
++			stripe_count = lsme->lsme_stripe_count;
++		else
++			stripe_count = 0;
++
+ 		size += sizeof(*lsme);
+ 		size += lov_mds_md_size(lsme->lsme_stripe_count,
+ 					lsme->lsme_magic);
 -- 
 1.8.3.1
