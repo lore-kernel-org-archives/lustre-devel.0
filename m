@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:30:01 -0500
-Subject: [lustre-devel] [PATCH 27/28] lustre: llite: restore
- ll_file_getstripe in ll_lov_setstripe
+Date: Mon, 17 Dec 2018 11:29:45 -0500
+Subject: [lustre-devel] [PATCH 11/28] lustre: lov: move around PFL code and
+ cleanups
 In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-28-git-send-email-jsimmons@infradead.org>
+Message-ID: <1545064202-22483-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,313 +13,411 @@ To: lustre-devel@lists.lustre.org
 
 From: Bobi Jam <bobijam@hotmail.com>
 
-Commit fafe6b4d4a6fa63cedff3bd44e6578009578b3d7 has get rid of
-the call to ll_file_getstripe in ll_lov_setstripe.
+No code changes expect for sub_subio_index that changed type.
+Move some code around and some style cleanups. This makes it
+clear the real code changes from style updates.
 
-Add a @size parameter for series of xxx_getstripe interfaces,
-indicating the max buffer size that user provides to hold the
-stripe information. It is mainly for the ll_lov_setstripe, which
-will call ll_file_getstripe to fetch basic stripe inforation.
-
-Add LL_IOC_LOV_SETSTRIPE_NEW/LL_IOC_LOV_GETSTRIPE_NEW ioctl interface
-which defines the interface correctly, which could be used in later
-Lustre versions.
-
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Signed-off-by: Bobi Jam <bobijam@hotmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9367
-Reviewed-on: https://review.whamcloud.com/26915
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
+Reviewed-on: https://review.whamcloud.com/24850
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_user.h |  2 ++
- drivers/staging/lustre/lustre/include/cl_object.h  |  4 +--
- drivers/staging/lustre/lustre/llite/dir.c          |  5 ++-
- drivers/staging/lustre/lustre/llite/file.c         | 36 +++++++++++++++-------
- .../staging/lustre/lustre/lov/lov_cl_internal.h    |  5 +--
- drivers/staging/lustre/lustre/lov/lov_object.c     |  4 +--
- drivers/staging/lustre/lustre/lov/lov_pack.c       | 33 ++++++++++++++------
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  5 +--
- 8 files changed, 64 insertions(+), 30 deletions(-)
+ .../staging/lustre/lustre/lov/lov_cl_internal.h    |  45 ++---
+ drivers/staging/lustre/lustre/lov/lov_ea.c         |   3 +-
+ drivers/staging/lustre/lustre/lov/lov_io.c         | 181 ++++++++++-----------
+ drivers/staging/lustre/lustre/lov/lov_object.c     |  25 +--
+ 4 files changed, 128 insertions(+), 126 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index 833a57a..e9451a5 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -227,7 +227,9 @@ struct ost_id {
- #define LL_IOC_SETFLAGS		 _IOW('f', 152, long)
- #define LL_IOC_CLRFLAGS		 _IOW('f', 153, long)
- #define LL_IOC_LOV_SETSTRIPE	    _IOW('f', 154, long)
-+#define LL_IOC_LOV_SETSTRIPE_NEW	_IOWR('f', 154, struct lov_user_md)
- #define LL_IOC_LOV_GETSTRIPE	    _IOW('f', 155, long)
-+#define LL_IOC_LOV_GETSTRIPE_NEW	_IOR('f', 155, struct lov_user_md)
- #define LL_IOC_LOV_SETEA		_IOW('f', 156, long)
- /*	LL_IOC_RECREATE_OBJ		157 obsolete */
- /*	LL_IOC_RECREATE_FID		158 obsolete */
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index ee71f1c..4f0e8e2 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -390,7 +390,7 @@ struct cl_object_operations {
- 	 * Object getstripe method.
- 	 */
- 	int (*coo_getstripe)(const struct lu_env *env, struct cl_object *obj,
--			     struct lov_user_md __user *lum);
-+			     struct lov_user_md __user *lum, size_t size);
- 	/**
- 	 * Get FIEMAP mapping from the object.
- 	 */
-@@ -2057,7 +2057,7 @@ int  cl_conf_set(const struct lu_env *env, struct cl_object *obj,
- int cl_object_prune(const struct lu_env *env, struct cl_object *obj);
- void cl_object_kill(const struct lu_env *env, struct cl_object *obj);
- int  cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
--			 struct lov_user_md __user *lum);
-+			 struct lov_user_md __user *lum, size_t size);
- int cl_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 		     struct ll_fiemap_info_key *fmkey, struct fiemap *fiemap,
- 		     size_t *buflen);
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 8fbce96..25cd42ee 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -1224,6 +1224,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 
- 		return rc;
- 	}
-+	case LL_IOC_LOV_SETSTRIPE_NEW:
- 	case LL_IOC_LOV_SETSTRIPE: {
- 		struct lov_user_md_v3 lumv3;
- 		struct lov_user_md_v1 *lumv1 = (struct lov_user_md_v1 *)&lumv3;
-@@ -1362,6 +1363,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 	case IOC_OBD_STATFS:
- 		return ll_obd_statfs(inode, (void __user *)arg);
- 	case LL_IOC_LOV_GETSTRIPE:
-+	case LL_IOC_LOV_GETSTRIPE_NEW:
- 	case LL_IOC_MDC_GETINFO:
- 	case IOC_MDC_GETFILEINFO:
- 	case IOC_MDC_GETFILESTRIPE: {
-@@ -1404,7 +1406,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		}
- 
- 		if (cmd == IOC_MDC_GETFILESTRIPE ||
--		    cmd == LL_IOC_LOV_GETSTRIPE) {
-+		    cmd == LL_IOC_LOV_GETSTRIPE ||
-+		    cmd == LL_IOC_LOV_GETSTRIPE_NEW) {
- 			lump = (struct lov_user_md __user *)arg;
- 		} else {
- 			struct lov_user_mds_data __user *lmdp;
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 5f6695f..1980c79 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -1481,7 +1481,7 @@ int ll_lov_getstripe_ea_info(struct inode *inode, const char *filename,
- }
- 
- static int ll_lov_setea(struct inode *inode, struct file *file,
--			unsigned long arg)
-+			void __user *arg)
- {
- 	__u64			 flags = MDS_OPEN_HAS_OBJS | FMODE_WRITE;
- 	struct lov_user_md	*lump;
-@@ -1496,7 +1496,7 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
- 	if (!lump)
- 		return -ENOMEM;
- 
--	if (copy_from_user(lump, (struct lov_user_md __user *)arg, lum_size)) {
-+	if (copy_from_user(lump, arg, lum_size)) {
- 		kvfree(lump);
- 		return -EFAULT;
- 	}
-@@ -1509,8 +1509,7 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
- 	return rc;
- }
- 
--static int ll_file_getstripe(struct inode *inode,
--			     struct lov_user_md __user *lum)
-+static int ll_file_getstripe(struct inode *inode, void __user *lum, size_t size)
- {
- 	struct lu_env *env;
- 	u16 refcheck;
-@@ -1520,13 +1519,13 @@ static int ll_file_getstripe(struct inode *inode,
- 	if (IS_ERR(env))
- 		return PTR_ERR(env);
- 
--	rc = cl_object_getstripe(env, ll_i2info(inode)->lli_clob, lum);
-+	rc = cl_object_getstripe(env, ll_i2info(inode)->lli_clob, lum, size);
- 	cl_env_put(env, &refcheck);
- 	return rc;
- }
- 
- static int ll_lov_setstripe(struct inode *inode, struct file *file,
--			    unsigned long arg)
-+			    void __user *arg)
- {
- 	struct lov_user_md __user *lum = (struct lov_user_md __user *)arg;
- 	struct lov_user_md *klum;
-@@ -1540,8 +1539,22 @@ static int ll_lov_setstripe(struct inode *inode, struct file *file,
- 	lum_size = rc;
- 	rc = ll_lov_setstripe_ea_info(inode, file->f_path.dentry, flags, klum,
- 				      lum_size);
--	cl_lov_delay_create_clear(&file->f_flags);
-+	if (!rc) {
-+		u32 gen;
-+
-+		rc = put_user(0, &lum->lmm_stripe_count);
-+		if (rc)
-+			goto out;
- 
-+		rc = ll_layout_refresh(inode, &gen);
-+		if (rc)
-+			goto out;
-+
-+		rc = ll_file_getstripe(inode, arg, lum_size);
-+	}
-+
-+	cl_lov_delay_create_clear(&file->f_flags);
-+out:
- 	kfree(klum);
- 	return rc;
- }
-@@ -2293,9 +2306,10 @@ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
- 		}
- 		return 0;
- 	case LL_IOC_LOV_SETSTRIPE:
--		return ll_lov_setstripe(inode, file, arg);
-+	case LL_IOC_LOV_SETSTRIPE_NEW:
-+		return ll_lov_setstripe(inode, file, (void __user *) arg);
- 	case LL_IOC_LOV_SETEA:
--		return ll_lov_setea(inode, file, arg);
-+		return ll_lov_setea(inode, file, (void __user *) arg);
- 	case LL_IOC_LOV_SWAP_LAYOUTS: {
- 		struct file *file2;
- 		struct lustre_swap_layouts lsl;
-@@ -2348,8 +2362,8 @@ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
- 		return rc;
- 	}
- 	case LL_IOC_LOV_GETSTRIPE:
--		return ll_file_getstripe(inode,
--					 (struct lov_user_md __user *)arg);
-+	case LL_IOC_LOV_GETSTRIPE_NEW:
-+		return ll_file_getstripe(inode, (void __user *)arg, 0);
- 	case FSFILT_IOC_GETFLAGS:
- 	case FSFILT_IOC_SETFLAGS:
- 		return ll_iocontrol(inode, file, cmd, arg);
 diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-index 96e6636..5d4c83b 100644
+index 99bd1c1..ce32823 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
 +++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-@@ -651,8 +651,9 @@ static inline struct lov_stripe_md_entry *lov_lse(struct lov_object *lov, int i)
+@@ -315,12 +315,6 @@ struct lov_thread_info {
+  */
+ struct lov_io_sub {
+ 	/**
+-	 * environment's refcheck.
+-	 *
+-	 * \see cl_env_get()
+-	 */
+-	u16			 sub_refcheck;
+-	/**
+ 	 * true, iff cl_io_init() was successfully executed against
+ 	 * lov_io_sub::sub_io.
+ 	 */
+@@ -334,18 +328,24 @@ struct lov_io_sub {
+ 	 * Linkage into a list (hanging off lov_io::lis_active) of all
+ 	 * sub-io's active for the current IO iteration.
+ 	 */
+-	struct list_head	 sub_linkage;
+-	u16			sub_subio_index;
++	struct list_head	sub_linkage;
++	unsigned int		sub_subio_index;
+ 	/**
+ 	 * sub-io for a stripe. Ideally sub-io's can be stopped and resumed
+ 	 * independently, with lov acting as a scheduler to maximize overall
+ 	 * throughput.
+ 	 */
+-	struct cl_io	*sub_io;
++	struct cl_io		*sub_io;
+ 	/**
+ 	 * environment, in which sub-io executes.
+ 	 */
+-	struct lu_env *sub_env;
++	struct lu_env		*sub_env;
++	/**
++	 * environment's refcheck.
++	 *
++	 * \see cl_env_get()
++	 */
++	u16			sub_refcheck;
+ };
+ 
+ /**
+@@ -367,37 +367,38 @@ struct lov_io {
+ 	 *
+ 	 * This is used only for CIT_READ and CIT_WRITE io's.
+ 	 */
+-	loff_t	     lis_io_endpos;
++	loff_t			lis_io_endpos;
+ 
+ 	/**
+ 	 * starting position within a file, for the current io loop iteration
+ 	 * (stripe), used by ci_io_loop().
+ 	 */
+-	u64	    lis_pos;
++	u64			lis_pos;
+ 	/**
+ 	 * end position with in a file, for the current stripe io. This is
+ 	 * exclusive (i.e., next offset after last byte affected by io).
+ 	 */
+-	u64	    lis_endpos;
+-
+-	int		lis_stripe_count;
+-	int		lis_active_subios;
++	u64			lis_endpos;
++	int			lis_stripe_count;
++	int			lis_active_subios;
+ 
+ 	/**
+ 	 * the index of ls_single_subio in ls_subios array
+ 	 */
+-	int		lis_single_subio_index;
+-	struct cl_io       lis_single_subio;
++	int			lis_single_subio_index;
++	struct cl_io		lis_single_subio;
++
++	/**
++	 * List of active sub-io's. Active sub-io's are under the range
++	 * of [lis_pos, lis_endpos).
++	 */
++	struct list_head	lis_active;
+ 
+ 	/**
+ 	 * size of ls_subios array, actually the highest stripe #
+ 	 */
+ 	int		lis_nr_subios;
+ 	struct lov_io_sub *lis_subs;
+-	/**
+-	 * List of active sub-io's.
+-	 */
+-	struct list_head	 lis_active;
+ };
+ 
+ struct lov_session {
+diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
+index 7d3d691..3a8d79e 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_ea.c
++++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
+@@ -531,7 +531,8 @@ const struct lsm_operations *lsm_op_find(int magic)
+ 
+ void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm)
+ {
+-	CDEBUG(level, "lsm %p, objid " DOSTID ", maxbytes %#llx, magic 0x%08X, stripe_size %u, stripe_count %u, refc: %d, layout_gen %u, pool [" LOV_POOLNAMEF "]\n",
++	CDEBUG(level,
++	       "lsm %p, objid " DOSTID ", maxbytes %#llx, magic 0x%08X, stripe_size %u, stripe_count %u, refc: %d, layout_gen %u, pool [" LOV_POOLNAMEF "]\n",
+ 	       lsm, POSTID(&lsm->lsm_oi), lsm->lsm_maxbytes, lsm->lsm_magic,
+ 	       lsm->lsm_entries[0]->lsme_stripe_size,
+ 	       lsm->lsm_entries[0]->lsme_stripe_count,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 26d0043..ab97326 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -43,7 +43,6 @@
+ /** \addtogroup lov
+  *  @{
+  */
+-
+ static void lov_io_sub_fini(const struct lu_env *env, struct lov_io *lio,
+ 			    struct lov_io_sub *sub)
+ {
+@@ -66,76 +65,6 @@ static void lov_io_sub_fini(const struct lu_env *env, struct lov_io *lio,
+ 	}
  }
  
- /* lov_pack.c */
--int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
--		  struct lov_user_md __user *lump);
-+int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
-+		  struct lov_stripe_md *lsm, struct lov_user_md __user *lump,
-+		  size_t size);
+-static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
+-			       int stripe, loff_t start, loff_t end)
+-{
+-	struct lov_stripe_md *lsm    = lio->lis_object->lo_lsm;
+-	struct cl_io	 *parent = lio->lis_cl.cis_io;
+-
+-	switch (io->ci_type) {
+-	case CIT_SETATTR: {
+-		io->u.ci_setattr.sa_attr = parent->u.ci_setattr.sa_attr;
+-		io->u.ci_setattr.sa_attr_flags =
+-					parent->u.ci_setattr.sa_attr_flags;
+-		io->u.ci_setattr.sa_avalid = parent->u.ci_setattr.sa_avalid;
+-		io->u.ci_setattr.sa_xvalid = parent->u.ci_setattr.sa_xvalid;
+-		io->u.ci_setattr.sa_stripe_index = stripe;
+-		io->u.ci_setattr.sa_parent_fid =
+-					parent->u.ci_setattr.sa_parent_fid;
+-		if (cl_io_is_trunc(io)) {
+-			loff_t new_size = parent->u.ci_setattr.sa_attr.lvb_size;
+-
+-			new_size = lov_size_to_stripe(lsm, 0, new_size, stripe);
+-			io->u.ci_setattr.sa_attr.lvb_size = new_size;
+-		}
+-		break;
+-	}
+-	case CIT_DATA_VERSION: {
+-		io->u.ci_data_version.dv_data_version = 0;
+-		io->u.ci_data_version.dv_flags =
+-			parent->u.ci_data_version.dv_flags;
+-		break;
+-	}
+-	case CIT_FAULT: {
+-		struct cl_object *obj = parent->ci_obj;
+-		loff_t off = cl_offset(obj, parent->u.ci_fault.ft_index);
+-
+-		io->u.ci_fault = parent->u.ci_fault;
+-		off = lov_size_to_stripe(lsm, 0, off, stripe);
+-		io->u.ci_fault.ft_index = cl_index(obj, off);
+-		break;
+-	}
+-	case CIT_FSYNC: {
+-		io->u.ci_fsync.fi_start = start;
+-		io->u.ci_fsync.fi_end = end;
+-		io->u.ci_fsync.fi_fid = parent->u.ci_fsync.fi_fid;
+-		io->u.ci_fsync.fi_mode = parent->u.ci_fsync.fi_mode;
+-		break;
+-	}
+-	case CIT_READ:
+-	case CIT_WRITE: {
+-		io->u.ci_wr.wr_sync = cl_io_is_sync_write(parent);
+-		if (cl_io_is_append(parent)) {
+-			io->u.ci_wr.wr_append = 1;
+-		} else {
+-			io->u.ci_rw.crw_pos = start;
+-			io->u.ci_rw.crw_count = end - start;
+-		}
+-		break;
+-	}
+-	case CIT_LADVISE: {
+-		io->u.ci_ladvise.li_start = start;
+-		io->u.ci_ladvise.li_end = end;
+-		io->u.ci_ladvise.li_fid = parent->u.ci_ladvise.li_fid;
+-		io->u.ci_ladvise.li_advice = parent->u.ci_ladvise.li_advice;
+-		io->u.ci_ladvise.li_flags = parent->u.ci_ladvise.li_flags;
+-		break;
+-	}
+-	default:
+-		break;
+-	}
+-}
+-
+ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
+ 			   struct lov_io_sub *sub)
+ {
+@@ -228,7 +157,6 @@ struct lov_io_sub *lov_sub_get(const struct lu_env *env,
+  * Lov io operations.
+  *
+  */
+-
+ static int lov_page_index(const struct cl_page *page)
+ {
+ 	const struct cl_page_slice *slice;
+@@ -358,6 +286,76 @@ static void lov_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
+ 		wake_up_all(&lov->lo_waitq);
+ }
  
- /** @} lov */
++static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
++			       int stripe, loff_t start, loff_t end)
++{
++	struct lov_stripe_md *lsm = lio->lis_object->lo_lsm;
++	struct cl_io *parent = lio->lis_cl.cis_io;
++
++	switch (io->ci_type) {
++	case CIT_SETATTR: {
++		io->u.ci_setattr.sa_attr = parent->u.ci_setattr.sa_attr;
++		io->u.ci_setattr.sa_attr_flags =
++			parent->u.ci_setattr.sa_attr_flags;
++		io->u.ci_setattr.sa_avalid = parent->u.ci_setattr.sa_avalid;
++		io->u.ci_setattr.sa_xvalid = parent->u.ci_setattr.sa_xvalid;
++		io->u.ci_setattr.sa_stripe_index = stripe;
++		io->u.ci_setattr.sa_parent_fid =
++			parent->u.ci_setattr.sa_parent_fid;
++		if (cl_io_is_trunc(io)) {
++			loff_t new_size = parent->u.ci_setattr.sa_attr.lvb_size;
++
++			new_size = lov_size_to_stripe(lsm, 0, new_size, stripe);
++			io->u.ci_setattr.sa_attr.lvb_size = new_size;
++		}
++		break;
++	}
++	case CIT_DATA_VERSION: {
++		io->u.ci_data_version.dv_data_version = 0;
++		io->u.ci_data_version.dv_flags =
++			parent->u.ci_data_version.dv_flags;
++		break;
++	}
++	case CIT_FAULT: {
++		struct cl_object *obj = parent->ci_obj;
++		loff_t off = cl_offset(obj, parent->u.ci_fault.ft_index);
++
++		io->u.ci_fault = parent->u.ci_fault;
++		off = lov_size_to_stripe(lsm, 0, off, stripe);
++		io->u.ci_fault.ft_index = cl_index(obj, off);
++		break;
++	}
++	case CIT_FSYNC: {
++		io->u.ci_fsync.fi_start = start;
++		io->u.ci_fsync.fi_end = end;
++		io->u.ci_fsync.fi_fid = parent->u.ci_fsync.fi_fid;
++		io->u.ci_fsync.fi_mode = parent->u.ci_fsync.fi_mode;
++		break;
++	}
++	case CIT_READ:
++	case CIT_WRITE: {
++		io->u.ci_wr.wr_sync = cl_io_is_sync_write(parent);
++		if (cl_io_is_append(parent)) {
++			io->u.ci_wr.wr_append = 1;
++		} else {
++			io->u.ci_rw.crw_pos = start;
++			io->u.ci_rw.crw_count = end - start;
++		}
++		break;
++	}
++	case CIT_LADVISE: {
++		io->u.ci_ladvise.li_start = start;
++		io->u.ci_ladvise.li_end = end;
++		io->u.ci_ladvise.li_fid = parent->u.ci_ladvise.li_fid;
++		io->u.ci_ladvise.li_advice = parent->u.ci_ladvise.li_advice;
++		io->u.ci_ladvise.li_flags = parent->u.ci_ladvise.li_flags;
++		break;
++	}
++	default:
++		break;
++	}
++}
++
+ static u64 lov_offset_mod(u64 val, int delta)
+ {
+ 	if (val != OBD_OBJECT_EOF)
+@@ -491,24 +489,6 @@ static int lov_io_end_wrapper(const struct lu_env *env, struct cl_io *io)
+ 	return 0;
+ }
+ 
+-static void
+-lov_io_data_version_end(const struct lu_env *env, const struct cl_io_slice *ios)
+-{
+-	struct lov_io *lio = cl2lov_io(env, ios);
+-	struct cl_io *parent = lio->lis_cl.cis_io;
+-	struct lov_io_sub *sub;
+-
+-	list_for_each_entry(sub, &lio->lis_active, sub_linkage) {
+-		lov_io_end_wrapper(sub->sub_env, sub->sub_io);
+-
+-		parent->u.ci_data_version.dv_data_version +=
+-			sub->sub_io->u.ci_data_version.dv_data_version;
+-
+-		if (!parent->ci_result)
+-			parent->ci_result = sub->sub_io->ci_result;
+-	}
+-}
+-
+ static int lov_io_iter_fini_wrapper(const struct lu_env *env, struct cl_io *io)
+ {
+ 	cl_io_iter_fini(env, io);
+@@ -529,6 +509,24 @@ static void lov_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
+ 	LASSERT(rc == 0);
+ }
+ 
++static void
++lov_io_data_version_end(const struct lu_env *env, const struct cl_io_slice *ios)
++{
++	struct lov_io *lio = cl2lov_io(env, ios);
++	struct cl_io *parent = lio->lis_cl.cis_io;
++	struct lov_io_sub *sub;
++
++	list_for_each_entry(sub, &lio->lis_active, sub_linkage) {
++		lov_io_end_wrapper(sub->sub_env, sub->sub_io);
++
++		parent->u.ci_data_version.dv_data_version +=
++			sub->sub_io->u.ci_data_version.dv_data_version;
++
++		if (!parent->ci_result)
++			parent->ci_result = sub->sub_io->ci_result;
++	}
++}
++
+ static void lov_io_iter_fini(const struct lu_env *env,
+ 			     const struct cl_io_slice *ios)
+ {
+@@ -602,7 +600,8 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 
+ 	pps = loo->lo_lsm->lsm_entries[0]->lsme_stripe_size >> PAGE_SHIFT;
+ 
+-	CDEBUG(D_READA, DFID " max_index = %lu, pps = %u, stripe_size = %u, stripe no = %u, start index = %lu\n",
++	CDEBUG(D_READA,
++	       DFID " max_index = %lu, pps = %u, stripe_size = %u, stripe no = %u, start index = %lu\n",
+ 	       PFID(lu_object_fid(lov2lu(loo))), ra_end, pps,
+ 	       loo->lo_lsm->lsm_entries[0]->lsme_stripe_size, stripe, start);
  
 diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index ca18c1e..4696f7c 100644
+index de5e2a2..3677fac 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_object.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -1605,7 +1605,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+@@ -600,6 +600,7 @@ static int lov_attr_get_raid0(const struct lu_env *env, struct lov_object *lov,
+ 		return 0;
+ 
+ 	memset(lvb, 0, sizeof(*lvb));
++
+ 	/* XXX: timestamps can be negative by sanity:test_39m,
+ 	 * how can it be?
+ 	 */
+@@ -1200,18 +1201,18 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
  }
  
- static int lov_object_getstripe(const struct lu_env *env, struct cl_object *obj,
--				struct lov_user_md __user *lum)
-+				struct lov_user_md __user *lum, size_t size)
- {
- 	struct lov_object *lov = cl2lov(obj);
- 	struct lov_stripe_md *lsm;
-@@ -1615,7 +1615,7 @@ static int lov_object_getstripe(const struct lu_env *env, struct cl_object *obj,
- 	if (!lsm)
- 		return -ENODATA;
+ struct fiemap_state {
+-	struct fiemap	*fs_fm;
+-	u64		fs_start;
+-	u64		fs_length;
+-	u64		fs_end;
+-	u64		fs_end_offset;
+-	int		fs_cur_extent;
+-	int		fs_cnt_need;
+-	int		fs_start_stripe;
+-	int		fs_last_stripe;
+-	bool		fs_device_done;
+-	bool		fs_finish;
+-	bool		fs_enough;
++	struct fiemap		*fs_fm;
++	u64			fs_start;
++	u64			fs_length;
++	u64			fs_end;
++	u64			fs_end_offset;
++	int			fs_cur_extent;
++	int			fs_cnt_need;
++	int			fs_start_stripe;
++	int			fs_last_stripe;
++	bool			fs_device_done;
++	bool			fs_finish;
++	bool			fs_enough;
+ };
  
--	rc = lov_getstripe(env, cl2lov(obj), lsm, lum);
-+	rc = lov_getstripe(env, cl2lov(obj), lsm, lum, size);
- 	lov_lsm_put(lsm);
- 	return rc;
- }
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 10be119..ef3c040 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -314,12 +314,16 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, void *buf,
-  * @lump is a pointer to an in-core struct with lmm_ost_count indicating
-  * the maximum number of OST indices which will fit in the user buffer.
-  * lmm_magic must be LOV_USER_MAGIC.
-+ *
-+ * If @size > 0, User specified limited buffer size, usually the buffer is from
-+ * ll_lov_setstripe(), and the buffer can only hold basic layout template info.
-  */
- int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
--		  struct lov_stripe_md *lsm, struct lov_user_md __user *lump)
-+		  struct lov_stripe_md *lsm, struct lov_user_md __user *lump,
-+		  size_t size)
- {
- 	/* we use lov_user_md_v3 because it is larger than lov_user_md_v1 */
--	struct lov_mds_md *lmmk;
-+	struct lov_mds_md *lmmk, *lmm;
- 	struct lov_user_md_v1 lum;
- 	ssize_t lmm_size, lum_size = 0;
- 	static bool printed;
-@@ -410,15 +414,24 @@ int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
- 			comp_md = (struct lov_mds_md *)((char *)comp_v1 +
- 					comp_v1->lcm_entries[i].lcme_offset);
- 		}
--		if (copy_to_user(lump, comp_md, lum_size)) {
--			rc = -EFAULT;
--			goto out_free;
--		}
-+
-+		lmm = comp_md;
-+		lmm_size = lum_size;
- 	} else {
--		if (copy_to_user(lump, lmmk, lmmk_size)) {
--			rc = -EFAULT;
--			goto out_free;
--		}
-+		lmm = lmmk;
-+		lmm_size = lmmk_size;
-+	}
-+	/**
-+	 * User specified limited buffer size, usually the buffer is
-+	 * from ll_lov_setstripe(), and the buffer can only hold basic
-+	 * layout template info.
-+	 */
-+	if (size == 0 || size > lmm_size)
-+		size = lmm_size;
-+
-+	if (copy_to_user(lump, lmm, size)) {
-+		rc = -EFAULT;
-+		goto out_free;
- 	}
- 
- out_free:
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-index 09fc7e7..b2bf570 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-@@ -323,7 +323,7 @@ int cl_object_prune(const struct lu_env *env, struct cl_object *obj)
-  * Get stripe information of this object.
-  */
- int cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
--			struct lov_user_md __user *uarg)
-+			struct lov_user_md __user *uarg, size_t size)
- {
- 	struct lu_object_header *top;
- 	int result = 0;
-@@ -331,7 +331,8 @@ int cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
- 	top = obj->co_lu.lo_header;
- 	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
- 		if (obj->co_ops->coo_getstripe) {
--			result = obj->co_ops->coo_getstripe(env, obj, uarg);
-+			result = obj->co_ops->coo_getstripe(env, obj, uarg,
-+							    size);
- 			if (result)
- 				break;
- 		}
+ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
 -- 
 1.8.3.1
