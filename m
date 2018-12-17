@@ -1,62 +1,64 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:29:53 -0500
-Subject: [lustre-devel] [PATCH 19/28] lustre: pfl: calculate PFL file LOVEA
- correctly
+Date: Mon, 17 Dec 2018 11:30:02 -0500
+Subject: [lustre-devel] [PATCH 28/28] lustre: lov: do not split IO for
+ single striped file
 In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1545064202-22483-29-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bobi Jam <bobijam@hotmail.com>
+From: Jinshan Xiong <jinshan.xiong@gmail.com>
 
-PFL file could contain uninstantiated component, so it could still
-keeps the specified -1 stripe count,
-lov_mds_md_size()/lov_user_md_size() should heed this case,
-otherwise its LOVEA size could be errneous big.
+stripe size for single striped file is not reliable, it shouldn't
+be used to split I/O.
 
-Signed-off-by: Bobi Jam <bobijam@hotmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9335
-Reviewed-on: https://review.whamcloud.com/26597
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9841
+Reviewed-on: https://review.whamcloud.com/28451
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h  | 3 +++
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h | 3 +++
- 2 files changed, 6 insertions(+)
+ drivers/staging/lustre/lustre/lov/lov_io.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index d1693e3..deb0f0e 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -1036,6 +1036,9 @@ struct lov_mds_md_v3 {		/* LOV EA mds/wire data (little-endian) */
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 9a3352f..47bb618 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -466,7 +466,6 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
+ 	struct cl_io	 *io  = ios->cis_io;
+ 	u64 start = io->u.ci_rw.crw_pos;
+ 	struct lov_stripe_md_entry *lse;
+-	unsigned long ssize;
+ 	int index;
+ 	u64 next;
  
- static inline __u32 lov_mds_md_size(__u16 stripes, __u32 lmm_magic)
- {
-+	if (stripes == (__u16)-1)
-+		stripes = 0;
-+
- 	if (lmm_magic == LOV_MAGIC_V3)
- 		return sizeof(struct lov_mds_md_v3) +
- 				stripes * sizeof(struct lov_ost_data_v1);
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index 8e6d67b..b19adef 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -457,6 +457,9 @@ struct lov_comp_md_v1 {
+@@ -491,11 +490,15 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
  
- static inline __u32 lov_user_md_size(__u16 stripes, __u32 lmm_magic)
- {
-+	if (stripes == (__u16)-1)
-+		stripes = 0;
+ 	lse = lov_lse(lio->lis_object, index);
+ 
+-	ssize = lse->lsme_stripe_size;
+-	lov_do_div64(start, ssize);
+-	next = (start + 1) * ssize;
+-	if (next <= start * ssize)
+-		next = ~0ull;
++	next = MAX_LFS_FILESIZE;
++	if (lse->lsme_stripe_count > 1) {
++		unsigned long ssize = lse->lsme_stripe_size;
 +
- 	if (lmm_magic == LOV_USER_MAGIC_V1)
- 		return sizeof(struct lov_user_md_v1) +
- 				stripes * sizeof(struct lov_user_ost_data_v1);
++		lov_do_div64(start, ssize);
++		next = (start + 1) * ssize;
++		if (next <= start * ssize)
++			next = MAX_LFS_FILESIZE;
++	}
+ 
+ 	LASSERTF(io->u.ci_rw.crw_pos >= lse->lsme_extent.e_start,
+ 		 "pos %lld, [%lld, %lld]\n", io->u.ci_rw.crw_pos,
 -- 
 1.8.3.1
