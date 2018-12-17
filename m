@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:29:37 -0500
-Subject: [lustre-devel] [PATCH 03/28] lustre: lov: merge lov_mds_md_v3 and
- lov_mds_md_v1 handling
+Date: Mon, 17 Dec 2018 11:29:43 -0500
+Subject: [lustre-devel] [PATCH 09/28] lustre: lov: reduce code indentation
 In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1545064202-22483-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,252 +12,274 @@ To: lustre-devel@lists.lustre.org
 
 From: Bobi Jam <bobijam@hotmail.com>
 
-Several of the struct lsm_operations functions for both v1 and v3
-are nearly identical. Let merge them together.
+For lov_init_raid0() we check for the failure of lo_sub and return
+an error rigth away. This allows us to reduce the code indentation.
+The same can be done for lov_attr_get_raid0() with the test of
+r0->lo_attr_valid.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Signed-off-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: Niu Yawei <yawei.niu@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24849
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9315
-Reviewed-on: https://review.whamcloud.com/26503
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/24850
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_ea.c       | 66 ++++++++++++------------
- drivers/staging/lustre/lustre/lov/lov_internal.h |  3 +-
- drivers/staging/lustre/lustre/lov/lov_pack.c     | 30 ++++-------
- 3 files changed, 42 insertions(+), 57 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_io.c     |  11 +-
+ drivers/staging/lustre/lustre/lov/lov_object.c | 186 ++++++++++++-------------
+ 2 files changed, 96 insertions(+), 101 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index 6931ffd..5d9e619 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -71,8 +71,8 @@ static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
- 	return maxbytes;
- }
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 023b588..6dd5639 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -948,12 +948,13 @@ int lov_io_init_composite(const struct lu_env *env, struct cl_object *obj,
  
--static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
--				 __u16 stripe_count)
-+static int lsm_lmm_verify_v1v3(struct lov_mds_md *lmm, size_t lmm_size,
-+			       u16 stripe_count)
- {
- 	if (stripe_count > LOV_V1_INSANE_STRIPE_COUNT) {
- 		CERROR("bad stripe count %d\n", stripe_count);
-@@ -103,7 +103,7 @@ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
- 	return 0;
- }
- 
--void lsm_free_plain(struct lov_stripe_md *lsm)
-+void lsm_free(struct lov_stripe_md *lsm)
- {
- 	__u16 stripe_count = lsm->lsm_stripe_count;
- 	int i;
-@@ -145,10 +145,11 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
- 	return NULL;
- }
- 
--static int lsm_unpackmd_common(struct lov_obd *lov,
--			       struct lov_stripe_md *lsm,
--			       struct lov_mds_md *lmm,
--			       struct lov_ost_data_v1 *objects)
-+static int lsm_unpackmd_v1v3(struct lov_obd *lov,
-+			     struct lov_stripe_md *lsm,
-+			     struct lov_mds_md *lmm,
-+			     const char *pool_name,
-+			     struct lov_ost_data_v1 *objects)
- {
- 	loff_t min_stripe_maxbytes = 0;
- 	unsigned int stripe_count;
-@@ -168,6 +169,15 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
- 
- 	stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
- 
-+	if (pool_name) {
-+		size_t pool_name_len;
+ 	INIT_LIST_HEAD(&lio->lis_active);
+ 	io->ci_result = lov_io_slice_init(lio, lov, io);
++	if (io->ci_result)
++		return io->ci_result;
 +
-+		pool_name_len = strlcpy(lsm->lsm_pool_name, pool_name,
-+					sizeof(lsm->lsm_pool_name));
-+		if (pool_name_len >= sizeof(lsm->lsm_pool_name))
-+			return -E2BIG;
-+	}
++	io->ci_result = lov_io_subio_init(env, lio, io);
+ 	if (io->ci_result == 0) {
+-		io->ci_result = lov_io_subio_init(env, lio, io);
+-		if (io->ci_result == 0) {
+-			cl_io_slice_add(io, &lio->lis_cl, obj, &lov_io_ops);
+-			atomic_inc(&lov->lo_active_ios);
+-		}
++		cl_io_slice_add(io, &lio->lis_cl, obj, &lov_io_ops);
++		atomic_inc(&lov->lo_active_ios);
+ 	}
+ 	return io->ci_result;
+ }
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index f5c6da1..1ebaa23 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -228,6 +228,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
+ 	struct lov_thread_info  *lti     = lov_env_info(env);
+ 	struct cl_object_conf   *subconf = &lti->lti_stripe_conf;
+ 	struct lu_fid	   *ofid    = &lti->lti_fid;
++	int psz;
+ 
+ 	if (lsm->lsm_magic != LOV_MAGIC_V1 && lsm->lsm_magic != LOV_MAGIC_V3) {
+ 		dump_lsm(D_ERROR, lsm);
+@@ -238,73 +239,76 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
+ 	LASSERT(!lov->lo_lsm);
+ 	lov->lo_lsm = lsm_addref(lsm);
+ 	lov->lo_layout_invalid = true;
 +
- 	for (i = 0; i < stripe_count; i++) {
- 		loi = lsm->lsm_oinfo[i];
- 		ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
-@@ -248,21 +258,20 @@ static int lsm_lmm_verify_v1(struct lov_mds_md_v1 *lmm, int lmm_bytes,
- 		return -EINVAL;
++	spin_lock_init(&r0->lo_sub_lock);
+ 	r0->lo_nr  = lsm->lsm_entries[0]->lsme_stripe_count;
+ 	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
+ 
+ 	r0->lo_sub = kvzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
+ 				     GFP_NOFS);
+-	if (r0->lo_sub) {
+-		int psz = 0;
++	if (!r0->lo_sub)
++		return -ENOMEM;
+ 
+-		result = 0;
+-		subconf->coc_inode = conf->coc_inode;
+-		spin_lock_init(&r0->lo_sub_lock);
+-		/*
+-		 * Create stripe cl_objects.
++	psz = 0;
++	result = 0;
++	subconf->coc_inode = conf->coc_inode;
++	/*
++	 * Create stripe cl_objects.
++	 */
++	for (i = 0; i < r0->lo_nr; ++i) {
++		struct cl_device *subdev;
++		struct lov_oinfo *oinfo;
++		int ost_idx;
++
++		oinfo = lsm->lsm_entries[0]->lsme_oinfo[i];
++		if (lov_oinfo_is_dummy(oinfo))
++			continue;
++
++		result = ostid_to_fid(ofid, &oinfo->loi_oi,
++				      oinfo->loi_ost_idx);
++		if (result != 0)
++			goto out;
++
++		ost_idx = oinfo->loi_ost_idx;
++		if (!dev->ld_target[ost_idx]) {
++			CERROR("%s: OST %04x is not initialized\n",
++			       lov2obd(dev->ld_lov)->obd_name, ost_idx);
++			result = -EIO;
++			goto out;
++		}
++
++		subdev = lovsub2cl_dev(dev->ld_target[ost_idx]);
++		subconf->u.coc_oinfo = oinfo;
++		LASSERTF(subdev, "not init ost %d\n", ost_idx);
++		/* In the function below, .hs_keycmp resolves to
++		 * lu_obj_hop_keycmp()
+ 		 */
+-		for (i = 0; i < r0->lo_nr && result == 0; ++i) {
+-			struct cl_device *subdev;
+-			struct lov_oinfo *oinfo;
+-			int ost_idx;
+-
+-			oinfo = lsm->lsm_entries[0]->lsme_oinfo[i];
+-			if (lov_oinfo_is_dummy(oinfo))
+-				continue;
+-
+-			result = ostid_to_fid(ofid, &oinfo->loi_oi,
+-					      oinfo->loi_ost_idx);
+-			if (result != 0)
+-				goto out;
+-
+-			ost_idx = oinfo->loi_ost_idx;
+-			if (!dev->ld_target[ost_idx]) {
+-				CERROR("%s: OST %04x is not initialized\n",
+-				lov2obd(dev->ld_lov)->obd_name, ost_idx);
+-				result = -EIO;
+-				goto out;
+-			}
++		/* coverity[overrun-buffer-val] */
++		stripe = lov_sub_find(env, subdev, ofid, subconf);
++		if (IS_ERR(stripe)) {
++			result = PTR_ERR(stripe);
++			goto out;
++		}
+ 
+-			subdev = lovsub2cl_dev(dev->ld_target[ost_idx]);
+-			subconf->u.coc_oinfo = oinfo;
+-			LASSERTF(subdev, "not init ost %d\n", ost_idx);
+-			/* In the function below, .hs_keycmp resolves to
+-			 * lu_obj_hop_keycmp()
+-			 */
+-			/* coverity[overrun-buffer-val] */
+-			stripe = lov_sub_find(env, subdev, ofid, subconf);
+-			if (!IS_ERR(stripe)) {
+-				result = lov_init_sub(env, lov, stripe, r0, i);
+-				if (result == -EAGAIN) { /* try again */
+-					--i;
+-					result = 0;
+-					continue;
+-				}
+-			} else {
+-				result = PTR_ERR(stripe);
+-			}
++		result = lov_init_sub(env, lov, stripe, r0, i);
++		if (result == -EAGAIN) { /* try again */
++			--i;
++			result = 0;
++			continue;
++		}
+ 
+-			if (result == 0) {
+-				int sz = lov_page_slice_fixup(lov, stripe);
++		if (result == 0) {
++			int sz = lov_page_slice_fixup(lov, stripe);
+ 
+-				LASSERT(ergo(psz > 0, psz == sz));
+-				psz = sz;
+-			}
++			LASSERT(ergo(psz > 0, psz == sz));
++			psz = sz;
+ 		}
+-		if (result == 0)
+-			cl_object_header(&lov->lo_cl)->coh_page_bufsize += psz;
+-	} else {
+-		result = -ENOMEM;
  	}
- 
--	return lsm_lmm_verify_common(lmm, lmm_bytes, *stripe_count);
-+	return lsm_lmm_verify_v1v3(lmm, lmm_bytes, *stripe_count);
++	if (result == 0)
++		cl_object_header(&lov->lo_cl)->coh_page_bufsize += psz;
++	else
++		result = -ENOMEM;
++
+ out:
+ 	return result;
  }
- 
- static int lsm_unpackmd_v1(struct lov_obd *lov, struct lov_stripe_md *lsm,
- 			   struct lov_mds_md_v1 *lmm)
+@@ -567,53 +571,43 @@ static int lov_attr_get_empty(const struct lu_env *env, struct cl_object *obj,
+ static int lov_attr_get_raid0(const struct lu_env *env, struct lov_object *lov,
+ 			      struct cl_attr *attr, struct lov_layout_raid0 *r0)
  {
--	return lsm_unpackmd_common(lov, lsm, lmm, lmm->lmm_objects);
-+	return lsm_unpackmd_v1v3(lov, lsm, lmm, NULL, lmm->lmm_objects);
- }
++	struct lov_stripe_md *lsm = lov->lo_lsm;
++	struct ost_lvb *lvb = &lov_env_info(env)->lti_lvb;
+ 	int result = 0;
++	u64 kms = 0;
  
--const struct lsm_operations lsm_v1_ops = {
--	.lsm_free	    = lsm_free_plain,
--	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
--	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
--	.lsm_lmm_verify	 = lsm_lmm_verify_v1,
--	.lsm_unpackmd	   = lsm_unpackmd_v1,
-+const static struct lsm_operations lsm_v1_ops = {
-+	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
-+	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
-+	.lsm_lmm_verify		= lsm_lmm_verify_v1,
-+	.lsm_unpackmd		= lsm_unpackmd_v1,
- };
+-	/* this is called w/o holding type guard mutex, so it must be inside
+-	 * an on going IO otherwise lsm may be replaced.
+-	 * LU-2117: it turns out there exists one exception. For mmaped files,
+-	 * the lock of those files may be requested in the other file's IO
+-	 * context, and this function is called in ccc_lock_state(), it will
+-	 * hit this assertion.
+-	 * Anyway, it's still okay to call attr_get w/o type guard as layout
+-	 * can't go if locks exist.
+-	 */
+-	/* LASSERT(atomic_read(&lsm->lsm_refc) > 1); */
++	if (r0->lo_attr_valid)
++		return 0;
  
- static int lsm_lmm_verify_v3(struct lov_mds_md *lmmv1, int lmm_bytes,
-@@ -289,7 +298,7 @@ static int lsm_lmm_verify_v3(struct lov_mds_md *lmmv1, int lmm_bytes,
- 		return -EINVAL;
- 	}
+-	if (!r0->lo_attr_valid) {
+-		struct lov_stripe_md    *lsm = lov->lo_lsm;
+-		struct ost_lvb	  *lvb = &lov_env_info(env)->lti_lvb;
+-		__u64		    kms = 0;
++	memset(lvb, 0, sizeof(*lvb));
++	/* XXX: timestamps can be negative by sanity:test_39m,
++	 * how can it be?
++	 */
++	lvb->lvb_atime = LLONG_MIN;
++	lvb->lvb_ctime = LLONG_MIN;
++	lvb->lvb_mtime = LLONG_MIN;
  
--	return lsm_lmm_verify_common((struct lov_mds_md_v1 *)lmm, lmm_bytes,
-+	return lsm_lmm_verify_v1v3((struct lov_mds_md_v1 *)lmm, lmm_bytes,
- 				     *stripe_count);
- }
+-		memset(lvb, 0, sizeof(*lvb));
+-		/* XXX: timestamps can be negative by sanity:test_39m,
+-		 * how can it be?
+-		 */
+-		lvb->lvb_atime = LLONG_MIN;
+-		lvb->lvb_ctime = LLONG_MIN;
+-		lvb->lvb_mtime = LLONG_MIN;
++	/*
++	 * XXX that should be replaced with a loop over sub-objects,
++	 * doing cl_object_attr_get() on them. But for now, let's
++	 * reuse old lov code.
++	 */
  
-@@ -297,27 +306,16 @@ static int lsm_unpackmd_v3(struct lov_obd *lov, struct lov_stripe_md *lsm,
- 			   struct lov_mds_md *lmm)
- {
- 	struct lov_mds_md_v3 *lmm_v3 = (struct lov_mds_md_v3 *)lmm;
--	size_t cplen = 0;
--	int rc;
+-		/*
+-		 * XXX that should be replaced with a loop over sub-objects,
+-		 * doing cl_object_attr_get() on them. But for now, let's
+-		 * reuse old lov code.
+-		 */
++	/*
++	 * XXX take lsm spin-lock to keep lov_merge_lvb_kms()
++	 * happy. It's not needed, because new code uses
++	 * ->coh_attr_guard spin-lock to protect consistency of
++	 * sub-object attributes.
++	 */
++	lov_stripe_lock(lsm);
++	result = lov_merge_lvb_kms(lsm, lvb, &kms);
++	lov_stripe_unlock(lsm);
++	if (result)
++		return result;
  
--	rc = lsm_unpackmd_common(lov, lsm, lmm, lmm_v3->lmm_objects);
--	if (rc)
--		return rc;
--
--	cplen = strlcpy(lsm->lsm_pool_name, lmm_v3->lmm_pool_name,
--			sizeof(lsm->lsm_pool_name));
--	if (cplen >= sizeof(lsm->lsm_pool_name))
--		return -E2BIG;
--
--	return 0;
-+	return lsm_unpackmd_v1v3(lov, lsm, lmm, lmm_v3->lmm_pool_name,
-+				 lmm_v3->lmm_objects);
- }
- 
--const struct lsm_operations lsm_v3_ops = {
--	.lsm_free	    = lsm_free_plain,
--	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
--	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
--	.lsm_lmm_verify	 = lsm_lmm_verify_v3,
--	.lsm_unpackmd	   = lsm_unpackmd_v3,
-+const static struct lsm_operations lsm_v3_ops = {
-+	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
-+	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
-+	.lsm_lmm_verify		= lsm_lmm_verify_v3,
-+	.lsm_unpackmd		= lsm_unpackmd_v3,
- };
- 
- const struct lsm_operations *lsm_op_find(int magic)
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index 51f416e..2c416b4 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -81,7 +81,6 @@ static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
- }
- 
- struct lsm_operations {
--	void (*lsm_free)(struct lov_stripe_md *);
- 	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, loff_t *,
- 				    loff_t *);
- 	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, loff_t *,
-@@ -93,6 +92,7 @@ struct lsm_operations {
- };
- 
- const struct lsm_operations *lsm_op_find(int magic);
-+void lsm_free(struct lov_stripe_md *lsm);
- 
- /* lov_do_div64(a, b) returns a % b, and a = a / b.
-  * The 32-bit code is LOV-specific due to knowing about stripe limits in
-@@ -224,7 +224,6 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
- 
- /* lov_ea.c */
- struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count);
--void lsm_free_plain(struct lov_stripe_md *lsm);
- void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm);
- 
- /* lproc_lov.c */
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 98b114b..02936bf 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -181,22 +181,6 @@ __u16 lov_get_stripecnt(struct lov_obd *lov, __u32 magic, __u16 stripe_count)
- 	return stripe_count;
- }
- 
--static int lov_verify_lmm(void *lmm, int lmm_bytes, __u16 *stripe_count)
--{
--	int rc;
--
--	if (!lsm_op_find(le32_to_cpu(*(__u32 *)lmm))) {
--		CERROR("bad disk LOV MAGIC: 0x%08X; dumping LMM (size=%d):\n",
--		       le32_to_cpu(*(__u32 *)lmm), lmm_bytes);
--		CERROR("%*phN\n", lmm_bytes, lmm);
--		return -EINVAL;
+-		/*
+-		 * XXX take lsm spin-lock to keep lov_merge_lvb_kms()
+-		 * happy. It's not needed, because new code uses
+-		 * ->coh_attr_guard spin-lock to protect consistency of
+-		 * sub-object attributes.
+-		 */
+-		lov_stripe_lock(lsm);
+-		result = lov_merge_lvb_kms(lsm, lvb, &kms);
+-		lov_stripe_unlock(lsm);
+-		if (result == 0) {
+-			cl_lvb2attr(attr, lvb);
+-			attr->cat_kms = kms;
+-			r0->lo_attr_valid = 1;
+-		}
 -	}
--	rc = lsm_op_find(le32_to_cpu(*(__u32 *)lmm))->lsm_lmm_verify(lmm,
--								     lmm_bytes,
--								  stripe_count);
--	return rc;
--}
--
- static struct lov_stripe_md *lov_lsm_alloc(u16 stripe_count, u32 pattern,
- 					   u32 magic)
- {
-@@ -237,7 +221,7 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
- 	LASSERT(atomic_read(&lsm->lsm_refc) > 0);
- 	refc = atomic_dec_return(&lsm->lsm_refc);
- 	if (refc == 0)
--		lsm_op_find(lsm->lsm_magic)->lsm_free(lsm);
-+		lsm_free(lsm);
++	cl_lvb2attr(attr, lvb);
++	attr->cat_kms = kms;
++	r0->lo_attr_valid = 1;
  
- 	return refc;
+ 	return result;
  }
-@@ -248,25 +232,29 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
- struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
- 				   size_t lmm_size)
- {
-+	const struct lsm_operations *op;
- 	struct lov_stripe_md *lsm;
- 	u16 stripe_count;
- 	u32 pattern;
- 	u32 magic;
- 	int rc;
- 
--	rc = lov_verify_lmm(lmm, lmm_size, &stripe_count);
-+	magic = le32_to_cpu(lmm->lmm_magic);
-+	op = lsm_op_find(magic);
-+	if (!op)
-+		return ERR_PTR(-EINVAL);
-+
-+	rc = op->lsm_lmm_verify(lmm, lmm_size, &stripe_count);
- 	if (rc)
- 		return ERR_PTR(rc);
- 
--	magic = le32_to_cpu(lmm->lmm_magic);
- 	pattern = le32_to_cpu(lmm->lmm_pattern);
- 
- 	lsm = lov_lsm_alloc(stripe_count, pattern, magic);
- 	if (IS_ERR(lsm))
- 		return lsm;
- 
--	LASSERT(lsm_op_find(magic));
--	rc = lsm_op_find(magic)->lsm_unpackmd(lov, lsm, lmm);
-+	rc = op->lsm_unpackmd(lov, lsm, lmm);
- 	if (rc) {
- 		lov_free_memmd(&lsm);
- 		return ERR_PTR(rc);
 -- 
 1.8.3.1
