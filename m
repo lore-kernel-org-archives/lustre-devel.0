@@ -1,64 +1,86 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:30:02 -0500
-Subject: [lustre-devel] [PATCH 28/28] lustre: lov: do not split IO for
- single striped file
-In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Tue, 18 Dec 2018 10:54:41 +1100
+Subject: [lustre-devel] [PATCH 01/28] lustre: pfl: Basic data structures
+ for composite layout
+In-Reply-To: <1545064202-22483-2-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-29-git-send-email-jsimmons@infradead.org>
+ <1545064202-22483-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <87va3raev2.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Jinshan Xiong <jinshan.xiong@gmail.com>
+On Mon, Dec 17 2018, James Simmons wrote:
 
-stripe size for single striped file is not reliable, it shouldn't
-be used to split I/O.
+> From: Niu Yawei <yawei.niu@intel.com>
+>
+> Added basic structures and magic numbers for composite layout.
+>
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9841
-Reviewed-on: https://review.whamcloud.com/28451
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/lov/lov_io.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+This would be a great place to (brief) explain what PFL does and what it
+is going to do with this data structures.
+What are the "components" and how do they form a "composite layout" ??
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index 9a3352f..47bb618 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -466,7 +466,6 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
- 	struct cl_io	 *io  = ios->cis_io;
- 	u64 start = io->u.ci_rw.crw_pos;
- 	struct lov_stripe_md_entry *lse;
--	unsigned long ssize;
- 	int index;
- 	u64 next;
- 
-@@ -491,11 +490,15 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
- 
- 	lse = lov_lse(lio->lis_object, index);
- 
--	ssize = lse->lsme_stripe_size;
--	lov_do_div64(start, ssize);
--	next = (start + 1) * ssize;
--	if (next <= start * ssize)
--		next = ~0ull;
-+	next = MAX_LFS_FILESIZE;
-+	if (lse->lsme_stripe_count > 1) {
-+		unsigned long ssize = lse->lsme_stripe_size;
-+
-+		lov_do_div64(start, ssize);
-+		next = (start + 1) * ssize;
-+		if (next <= start * ssize)
-+			next = MAX_LFS_FILESIZE;
-+	}
- 
- 	LASSERTF(io->u.ci_rw.crw_pos >= lse->lsme_extent.e_start,
- 		 "pos %lld, [%lld, %lld]\n", io->u.ci_rw.crw_pos,
--- 
-1.8.3.1
+> +
+> +enum lov_comp_md_entry_flags {
+> +	LCME_FL_PRIMARY		= 0x00000001,   /* Not used */
+> +	LCME_FL_STALE		= 0x00000002,   /* Not used */
+> +	LCME_FL_OFFLINE		= 0x00000004,   /* Not used */
+> +	LCME_FL_PREFERRED	= 0x00000008,	/* Not used */
+> +	LCME_FL_INIT		= 0x00000010,	/* instantiated */
+> +};
+> +
+> +#define LCME_KNOWN_FLAGS	LCME_FL_INIT
+
+What is a "KNOWN" flags?  What isn't known about the other ones?
+
+> +
+> +/* lcme_id can be specified as certain flags, and the the first
+                                                     ^^^^^^^
+Too many "the"s.                                                     
+
+> + * bit of lcme_id is used to indicate that the ID is representing
+> + * certain LCME_FL_* but not a real ID. Which implies we can have
+> + * at most 31 flags (see LCME_FL_XXX).
+> + */
+> +enum lcme_id {
+> +	LCME_ID_INVAL	= 0x0,
+> +	LCME_ID_MAX	= 0x7FFFFFFF,
+> +	LCME_ID_ALL	= 0xFFFFFFFF,
+> +	LCME_ID_NONE	= 0x80000000
+> +};
+> +
+> +#define LCME_ID_MASK	LCME_ID_MAX
+
+Why is MASK a #define, but MAX an enum ??
+
+> +
+> +struct lov_comp_md_entry_v1 {
+> +	__u32			lcme_id;	/* unique id of component */
+> +	__u32			lcme_flags;	/* LCME_FL_XXX */
+> +	struct lu_extent	lcme_extent;	/* file extent for component */
+> +	__u32			lcme_offset;	/* offset of component blob,
+> +						 * start from lov_comp_md_v1
+> +						 */
+> +	__u32			lcme_size;	/* size of component blob */
+> +	__u64			lcme_padding[2];
+> +} __packed;
+> +
+> +enum lov_comp_md_flags;
+
+This enum is empty, and never used.
+
+It eventually gets some LCM_FL_* names added... maybe it should wait
+until those are added??
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181218/c1c61bb3/attachment.sig>
