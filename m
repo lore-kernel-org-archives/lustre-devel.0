@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Dec 2018 11:29:46 -0500
-Subject: [lustre-devel] [PATCH 12/28] lustre: lov: remove
- lsm_stripe_by_[index|offset]_plain
+Date: Mon, 17 Dec 2018 11:29:37 -0500
+Subject: [lustre-devel] [PATCH 03/28] lustre: lov: merge lov_mds_md_v3 and
+ lov_mds_md_v1 handling
 In-Reply-To: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
 References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1545064202-22483-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1545064202-22483-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,171 +13,252 @@ To: lustre-devel@lists.lustre.org
 
 From: Bobi Jam <bobijam@hotmail.com>
 
-Since both lsm_stripe_by_index() and lsm_stripe_by_offset() are
-the same for lsm_operations replace them with a new universal
-function stripe_width().
+Several of the struct lsm_operations functions for both v1 and v3
+are nearly identical. Let merge them together.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
 Signed-off-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: Niu Yawei <yawei.niu@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24850
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/24849
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9315
+Reviewed-on: https://review.whamcloud.com/26503
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_ea.c       | 24 ------------------------
- drivers/staging/lustre/lustre/lov/lov_internal.h |  4 ----
- drivers/staging/lustre/lustre/lov/lov_offset.c   | 23 +++++++++++++----------
- 3 files changed, 13 insertions(+), 38 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_ea.c       | 66 ++++++++++++------------
+ drivers/staging/lustre/lustre/lov/lov_internal.h |  3 +-
+ drivers/staging/lustre/lustre/lov/lov_pack.c     | 30 ++++-------
+ 3 files changed, 42 insertions(+), 57 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index 3a8d79e..f0ea895 100644
+index 6931ffd..5d9e619 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_ea.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -309,24 +309,6 @@ void lsm_free(struct lov_stripe_md *lsm)
- 	return lsm;
+@@ -71,8 +71,8 @@ static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
+ 	return maxbytes;
  }
  
--static void
--lsm_stripe_by_index_plain(struct lov_stripe_md *lsm, int *stripeno,
--			  loff_t *lov_off, loff_t *swidth)
--{
--	if (swidth)
--		*swidth = (loff_t)lsm->lsm_entries[0]->lsme_stripe_size *
--			  lsm->lsm_entries[0]->lsme_stripe_count;
--}
--
--static void
--lsm_stripe_by_offset_plain(struct lov_stripe_md *lsm, int *stripeno,
--			   loff_t *lov_off, loff_t *swidth)
--{
--	if (swidth)
--		*swidth = (loff_t)lsm->lsm_entries[0]->lsme_stripe_size *
--			  lsm->lsm_entries[0]->lsme_stripe_count;
--}
--
- static struct lov_stripe_md *
- lsm_unpackmd_v1(struct lov_obd *lov, void *buf, size_t buf_size)
+-static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+-				 __u16 stripe_count)
++static int lsm_lmm_verify_v1v3(struct lov_mds_md *lmm, size_t lmm_size,
++			       u16 stripe_count)
  {
-@@ -336,8 +318,6 @@ void lsm_free(struct lov_stripe_md *lsm)
+ 	if (stripe_count > LOV_V1_INSANE_STRIPE_COUNT) {
+ 		CERROR("bad stripe count %d\n", stripe_count);
+@@ -103,7 +103,7 @@ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+ 	return 0;
  }
  
- const static struct lsm_operations lsm_v1_ops = {
--	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
--	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
- 	.lsm_unpackmd		= lsm_unpackmd_v1,
- };
- 
-@@ -351,8 +331,6 @@ void lsm_free(struct lov_stripe_md *lsm)
+-void lsm_free_plain(struct lov_stripe_md *lsm)
++void lsm_free(struct lov_stripe_md *lsm)
+ {
+ 	__u16 stripe_count = lsm->lsm_stripe_count;
+ 	int i;
+@@ -145,10 +145,11 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
+ 	return NULL;
  }
  
- const static struct lsm_operations lsm_v3_ops = {
--	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
--	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
- 	.lsm_unpackmd		= lsm_unpackmd_v3,
- };
+-static int lsm_unpackmd_common(struct lov_obd *lov,
+-			       struct lov_stripe_md *lsm,
+-			       struct lov_mds_md *lmm,
+-			       struct lov_ost_data_v1 *objects)
++static int lsm_unpackmd_v1v3(struct lov_obd *lov,
++			     struct lov_stripe_md *lsm,
++			     struct lov_mds_md *lmm,
++			     const char *pool_name,
++			     struct lov_ost_data_v1 *objects)
+ {
+ 	loff_t min_stripe_maxbytes = 0;
+ 	unsigned int stripe_count;
+@@ -168,6 +169,15 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
  
-@@ -502,8 +480,6 @@ static int lsm_verify_comp_md_v1(struct lov_comp_md_v1 *lcm,
+ 	stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
+ 
++	if (pool_name) {
++		size_t pool_name_len;
++
++		pool_name_len = strlcpy(lsm->lsm_pool_name, pool_name,
++					sizeof(lsm->lsm_pool_name));
++		if (pool_name_len >= sizeof(lsm->lsm_pool_name))
++			return -E2BIG;
++	}
++
+ 	for (i = 0; i < stripe_count; i++) {
+ 		loi = lsm->lsm_oinfo[i];
+ 		ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
+@@ -248,21 +258,20 @@ static int lsm_lmm_verify_v1(struct lov_mds_md_v1 *lmm, int lmm_bytes,
+ 		return -EINVAL;
+ 	}
+ 
+-	return lsm_lmm_verify_common(lmm, lmm_bytes, *stripe_count);
++	return lsm_lmm_verify_v1v3(lmm, lmm_bytes, *stripe_count);
  }
  
- const static struct lsm_operations lsm_comp_md_v1_ops = {
--	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
--	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
- 	.lsm_unpackmd		= lsm_unpackmd_comp_md_v1,
+ static int lsm_unpackmd_v1(struct lov_obd *lov, struct lov_stripe_md *lsm,
+ 			   struct lov_mds_md_v1 *lmm)
+ {
+-	return lsm_unpackmd_common(lov, lsm, lmm, lmm->lmm_objects);
++	return lsm_unpackmd_v1v3(lov, lsm, lmm, NULL, lmm->lmm_objects);
+ }
+ 
+-const struct lsm_operations lsm_v1_ops = {
+-	.lsm_free	    = lsm_free_plain,
+-	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
+-	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
+-	.lsm_lmm_verify	 = lsm_lmm_verify_v1,
+-	.lsm_unpackmd	   = lsm_unpackmd_v1,
++const static struct lsm_operations lsm_v1_ops = {
++	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
++	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
++	.lsm_lmm_verify		= lsm_lmm_verify_v1,
++	.lsm_unpackmd		= lsm_unpackmd_v1,
  };
  
+ static int lsm_lmm_verify_v3(struct lov_mds_md *lmmv1, int lmm_bytes,
+@@ -289,7 +298,7 @@ static int lsm_lmm_verify_v3(struct lov_mds_md *lmmv1, int lmm_bytes,
+ 		return -EINVAL;
+ 	}
+ 
+-	return lsm_lmm_verify_common((struct lov_mds_md_v1 *)lmm, lmm_bytes,
++	return lsm_lmm_verify_v1v3((struct lov_mds_md_v1 *)lmm, lmm_bytes,
+ 				     *stripe_count);
+ }
+ 
+@@ -297,27 +306,16 @@ static int lsm_unpackmd_v3(struct lov_obd *lov, struct lov_stripe_md *lsm,
+ 			   struct lov_mds_md *lmm)
+ {
+ 	struct lov_mds_md_v3 *lmm_v3 = (struct lov_mds_md_v3 *)lmm;
+-	size_t cplen = 0;
+-	int rc;
+ 
+-	rc = lsm_unpackmd_common(lov, lsm, lmm, lmm_v3->lmm_objects);
+-	if (rc)
+-		return rc;
+-
+-	cplen = strlcpy(lsm->lsm_pool_name, lmm_v3->lmm_pool_name,
+-			sizeof(lsm->lsm_pool_name));
+-	if (cplen >= sizeof(lsm->lsm_pool_name))
+-		return -E2BIG;
+-
+-	return 0;
++	return lsm_unpackmd_v1v3(lov, lsm, lmm, lmm_v3->lmm_pool_name,
++				 lmm_v3->lmm_objects);
+ }
+ 
+-const struct lsm_operations lsm_v3_ops = {
+-	.lsm_free	    = lsm_free_plain,
+-	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
+-	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
+-	.lsm_lmm_verify	 = lsm_lmm_verify_v3,
+-	.lsm_unpackmd	   = lsm_unpackmd_v3,
++const static struct lsm_operations lsm_v3_ops = {
++	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
++	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
++	.lsm_lmm_verify		= lsm_lmm_verify_v3,
++	.lsm_unpackmd		= lsm_unpackmd_v3,
+ };
+ 
+ const struct lsm_operations *lsm_op_find(int magic)
 diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index 4c9e324..ebe5890 100644
+index 51f416e..2c416b4 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_internal.h
 +++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -80,10 +80,6 @@ static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
+@@ -81,7 +81,6 @@ static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
  }
  
  struct lsm_operations {
--	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, loff_t *,
--				    loff_t *);
--	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, loff_t *,
--				     loff_t *);
- 	struct lov_stripe_md *(*lsm_unpackmd)(struct lov_obd *obd, void *buf,
- 					      size_t buf_len);
+-	void (*lsm_free)(struct lov_stripe_md *);
+ 	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, loff_t *,
+ 				    loff_t *);
+ 	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, loff_t *,
+@@ -93,6 +92,7 @@ struct lsm_operations {
  };
-diff --git a/drivers/staging/lustre/lustre/lov/lov_offset.c b/drivers/staging/lustre/lustre/lov/lov_offset.c
-index d817aa5..513f1fd 100644
---- a/drivers/staging/lustre/lustre/lov/lov_offset.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_offset.c
-@@ -37,6 +37,15 @@
  
- #include "lov_internal.h"
+ const struct lsm_operations *lsm_op_find(int magic);
++void lsm_free(struct lov_stripe_md *lsm);
  
-+static u64 stripe_width(struct lov_stripe_md *lsm, unsigned int index)
-+{
-+	struct lov_stripe_md_entry *entry = lsm->lsm_entries[index];
-+
-+	LASSERT(index < lsm->lsm_entry_count);
-+
-+	return entry->lsme_stripe_size * entry->lsme_stripe_count;
-+}
-+
- /* compute object size given "stripeno" and the ost size */
- u64 lov_stripe_size(struct lov_stripe_md *lsm, int index, u64 ost_size,
- 		    int stripeno)
-@@ -45,12 +54,11 @@ u64 lov_stripe_size(struct lov_stripe_md *lsm, int index, u64 ost_size,
- 	unsigned long stripe_size;
- 	u64 swidth;
- 	u64 lov_size;
--	int magic = lsm->lsm_magic;
+ /* lov_do_div64(a, b) returns a % b, and a = a / b.
+  * The 32-bit code is LOV-specific due to knowing about stripe limits in
+@@ -224,7 +224,6 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
  
- 	if (ost_size == 0)
- 		return 0;
+ /* lov_ea.c */
+ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count);
+-void lsm_free_plain(struct lov_stripe_md *lsm);
+ void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm);
  
--	lsm_op_find(magic)->lsm_stripe_by_index(lsm, &stripeno, NULL, &swidth);
-+	swidth = stripe_width(lsm, index);
+ /* lproc_lov.c */
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 98b114b..02936bf 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -181,22 +181,6 @@ __u16 lov_get_stripecnt(struct lov_obd *lov, __u32 magic, __u16 stripe_count)
+ 	return stripe_count;
+ }
  
- 	/* lov_do_div64(a, b) returns a % b, and a = a / b */
- 	stripe_size = lov_do_div64(ost_size, ssize);
-@@ -129,7 +137,6 @@ int lov_stripe_offset(struct lov_stripe_md *lsm, int index, u64 lov_off,
+-static int lov_verify_lmm(void *lmm, int lmm_bytes, __u16 *stripe_count)
+-{
+-	int rc;
+-
+-	if (!lsm_op_find(le32_to_cpu(*(__u32 *)lmm))) {
+-		CERROR("bad disk LOV MAGIC: 0x%08X; dumping LMM (size=%d):\n",
+-		       le32_to_cpu(*(__u32 *)lmm), lmm_bytes);
+-		CERROR("%*phN\n", lmm_bytes, lmm);
+-		return -EINVAL;
+-	}
+-	rc = lsm_op_find(le32_to_cpu(*(__u32 *)lmm))->lsm_lmm_verify(lmm,
+-								     lmm_bytes,
+-								  stripe_count);
+-	return rc;
+-}
+-
+ static struct lov_stripe_md *lov_lsm_alloc(u16 stripe_count, u32 pattern,
+ 					   u32 magic)
  {
- 	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
- 	u64 stripe_off, this_stripe, swidth;
--	int magic = lsm->lsm_magic;
- 	int ret = 0;
+@@ -237,7 +221,7 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
+ 	LASSERT(atomic_read(&lsm->lsm_refc) > 0);
+ 	refc = atomic_dec_return(&lsm->lsm_refc);
+ 	if (refc == 0)
+-		lsm_op_find(lsm->lsm_magic)->lsm_free(lsm);
++		lsm_free(lsm);
  
- 	if (lov_off == OBD_OBJECT_EOF) {
-@@ -137,8 +144,7 @@ int lov_stripe_offset(struct lov_stripe_md *lsm, int index, u64 lov_off,
- 		return 0;
- 	}
- 
--	lsm_op_find(magic)->lsm_stripe_by_index(lsm, &stripeno, &lov_off,
--						&swidth);
-+	swidth = stripe_width(lsm, index);
- 
- 	/* lov_do_div64(a, b) returns a % b, and a = a / b */
- 	stripe_off = lov_do_div64(lov_off, swidth);
-@@ -184,13 +190,11 @@ u64 lov_size_to_stripe(struct lov_stripe_md *lsm, int index, u64 file_size,
+ 	return refc;
+ }
+@@ -248,25 +232,29 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
+ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
+ 				   size_t lmm_size)
  {
- 	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
- 	u64 stripe_off, this_stripe, swidth;
--	int magic = lsm->lsm_magic;
++	const struct lsm_operations *op;
+ 	struct lov_stripe_md *lsm;
+ 	u16 stripe_count;
+ 	u32 pattern;
+ 	u32 magic;
+ 	int rc;
  
- 	if (file_size == OBD_OBJECT_EOF)
- 		return OBD_OBJECT_EOF;
+-	rc = lov_verify_lmm(lmm, lmm_size, &stripe_count);
++	magic = le32_to_cpu(lmm->lmm_magic);
++	op = lsm_op_find(magic);
++	if (!op)
++		return ERR_PTR(-EINVAL);
++
++	rc = op->lsm_lmm_verify(lmm, lmm_size, &stripe_count);
+ 	if (rc)
+ 		return ERR_PTR(rc);
  
--	lsm_op_find(magic)->lsm_stripe_by_index(lsm, &stripeno, &file_size,
--						&swidth);
-+	swidth = stripe_width(lsm, index);
+-	magic = le32_to_cpu(lmm->lmm_magic);
+ 	pattern = le32_to_cpu(lmm->lmm_pattern);
  
- 	/* lov_do_div64(a, b) returns a % b, and a = a / b */
- 	stripe_off = lov_do_div64(file_size, swidth);
-@@ -258,9 +262,8 @@ int lov_stripe_number(struct lov_stripe_md *lsm, int index, u64 lov_off)
- {
- 	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
- 	u64 stripe_off, swidth;
--	int magic = lsm->lsm_magic;
+ 	lsm = lov_lsm_alloc(stripe_count, pattern, magic);
+ 	if (IS_ERR(lsm))
+ 		return lsm;
  
--	lsm_op_find(magic)->lsm_stripe_by_offset(lsm, NULL, &lov_off, &swidth);
-+	swidth = stripe_width(lsm, index);
- 
- 	stripe_off = lov_do_div64(lov_off, swidth);
- 
+-	LASSERT(lsm_op_find(magic));
+-	rc = lsm_op_find(magic)->lsm_unpackmd(lov, lsm, lmm);
++	rc = op->lsm_unpackmd(lov, lsm, lmm);
+ 	if (rc) {
+ 		lov_free_memmd(&lsm);
+ 		return ERR_PTR(rc);
 -- 
 1.8.3.1
