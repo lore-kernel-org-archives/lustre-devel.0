@@ -1,13 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Dec 2018 02:10:36 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 03/28] lustre: lov: merge lov_mds_md_v3
- and lov_mds_md_v1 handling
-In-Reply-To: <MWHPR11MB14884ED0EA0E7BF9AE8E0C45CBBD0@MWHPR11MB1488.namprd11.prod.outlook.com>
-References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
- <1545064202-22483-4-git-send-email-jsimmons@infradead.org>,
- <87pntzae5m.fsf@notabene.neil.brown.name>
- <MWHPR11MB14884ED0EA0E7BF9AE8E0C45CBBD0@MWHPR11MB1488.namprd11.prod.outlook.com>
-Message-ID: <alpine.LFD.2.21.1812270205420.5850@casper.infradead.org>
+Date: Thu, 27 Dec 2018 02:11:47 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 2/4] lustre: use GFP_NOFS when
+ lli_och_mutex is held - again
+In-Reply-To: <154440277646.29887.1527233404610585779.stgit@noble>
+References: <154440246926.29887.1667505755325904791.stgit@noble>
+ <154440277646.29887.1527233404610585779.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1812270210560.5850@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,50 +13,45 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> Just throwing this in, I agree with Neil very strongly here.? I?ve seen some patches recently with ~20 lines of change and 200 lines of
-> whitespace.
+> lockdep reports that lli_och_mutex is involved with fs_reclaim and is
+> held during this memory allocation - so GFP_NOFS should be used to
+> avoid a possible deadlock.
+> 
+> This is a second place where this was a problem - I don't think there
+> are more.
 
-Must be a patch for OpenSFS branch :-) Is this one of Arshad Hussain 
-patches? Those are meant to be cleanup / checkpatch fixing patches.
-Thankfully Arshad is doing this work. For a long time the policy for
-the OpenSFS branch was to do all the clean ups with real fixes. The
-reasoning was not to lose "real" fixes in the noise of cleanups. With
-Arshad that seems to be changing now.
+Famous last words :-)
 
-> ___________________________________________________________________________________________________________________________________________
-> From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
-> Sent: Monday, December 17, 2018 6:09:57 PM
-> To: James Simmons; Andreas Dilger; Oleg Drokin; Bobi Jam; Jinshan Xiong
-> Cc: Lustre Development List
-> Subject: Re: [lustre-devel] [PATCH 03/28] lustre: lov: merge lov_mds_md_v3 and lov_mds_md_v1 handling ?
-> On Mon, Dec 17 2018, James Simmons wrote:
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+ 
+> Fixes: 0b0c8c1ca0bd ("lustre: llite: replace several GFP_NOFS with GFP_KERNEL")
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/llite/file.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> > From: Bobi Jam <bobijam@hotmail.com>
-> >
-> > Several of the struct lsm_operations functions for both v1 and v3
-> > are nearly identical. Let merge them together.
-> ??????????????????????? Let's
-> ??????????????????????
-> >?
-> > -const struct lsm_operations lsm_v1_ops = {
-> > -???? .lsm_free?????????? = lsm_free_plain,
-> > -???? .lsm_stripe_by_index??? = lsm_stripe_by_index_plain,
-> > -???? .lsm_stripe_by_offset?? = lsm_stripe_by_offset_plain,
-> > -???? .lsm_lmm_verify? = lsm_lmm_verify_v1,
-> > -???? .lsm_unpackmd????? = lsm_unpackmd_v1,
-> > +const static struct lsm_operations lsm_v1_ops = {
-> > +???? .lsm_stripe_by_index??? = lsm_stripe_by_index_plain,
-> > +???? .lsm_stripe_by_offset?? = lsm_stripe_by_offset_plain,
-> > +???? .lsm_lmm_verify???????? = lsm_lmm_verify_v1,
-> > +???? .lsm_unpackmd?????????? = lsm_unpackmd_v1,
+> diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+> index 15910ff5f293..a6f149c47a7a 100644
+> --- a/drivers/staging/lustre/lustre/llite/file.c
+> +++ b/drivers/staging/lustre/lustre/llite/file.c
+> @@ -135,7 +135,7 @@ static int ll_close_inode_openhandle(struct inode *inode,
+>  		goto out;
+>  	}
+>  
+> -	op_data = kzalloc(sizeof(*op_data), GFP_KERNEL);
+> +	op_data = kzalloc(sizeof(*op_data), GFP_NOFS);
+>  	/*
+>  	 * We leak openhandle and request here on error, but not much to be
+>  	 * done in OOM case since app won't retry close on error either.
+> @@ -1652,7 +1652,7 @@ int ll_release_openhandle(struct inode *inode, struct lookup_intent *it)
+>  
+>  	LASSERT(it_open_error(DISP_OPEN_OPEN, it) == 0);
+>  
+> -	och = kzalloc(sizeof(*och), GFP_KERNEL);
+> +	och = kzalloc(sizeof(*och), GFP_NOFS);
+>  	if (!och) {
+>  		rc = -ENOMEM;
+>  		goto out;
 > 
-> I *SO* wish you would stop combining white-spaces fixes with other
-> changes in the same patch!!!
-> The above hunk should just add the 'static' and remove the 'lsm_free'.
-> The rest is just noise and makes it harder to review the patch.
-> 
-> 
-> Thanks,
-> NeilBrown
 > 
 > 
