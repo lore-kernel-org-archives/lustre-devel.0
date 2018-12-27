@@ -1,29 +1,74 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Fri, 21 Dec 2018 23:49:27 +0000
-Subject: [lustre-devel] Lustre 2.12.0 released
-Message-ID: <04C53321-3AE0-4D22-B0E4-E82A8EF2FDD1@ddn.com>
+From: Abe Asraoui <AbeA@supermicro.com>
+Date: Thu, 27 Dec 2018 00:24:32 +0000
+Subject: [lustre-devel] ldiskfs performance degradation due to kernel swap
+ hugging cpu
+Message-ID: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We are pleased to announce that the Lustre 2.12.0 Release has been declared GA and is available for download<https://downloads.whamcloud.com/public/lustre/lustre-2.12.0/> <https://downloads.hpdd.intel.com/public/lustre/lustre-2.11.0/> . You can also grab the source from git<https://git.whamcloud.com/?p=fs/lustre-release.git;a=tag;h=refs/tags/2.12.0>
 
-This major release includes new features:
+ Hi All.
+We are seeing low performance with lustre2.11 in ldiskfs configuration with obdfilter survey, not sure if this is a known issue.
 
-DNE Directory Restriping DNE Directory Restriping allows large existing directories to be migrated from a single MDT to stripe over multiple MDTs, which makes it easier to take advantage of adding new MDTs to an existing filesystem or to manually rebalance MDT usage  (LU-4684<https://jira.whamcloud.com/browse/LU-4684>)
-
-Lazy Size on MDT Provides a mechanism whereby approximate file sizes can be quickly returned when scanning the MDT directly via a policy engine when performance is more important than precision (LU-9538<https://jira.whamcloud.com/browse/LU-9538>)
-
-LNet Network Health Provides the option when using multiple LNet interfaces to retry sending RPCs via an alternative network if errors are encountered or messages are lost with the initial request (LU-9120<https://jira.whamcloud.com/browse/LU-9120>)
-
-Fuller details can be found in the 2.12 wiki page <http://wiki.lustre.org/Release_2.12.0> (including the change log <http://wiki.lustre.org/Lustre_2.12.0_Changelog> and test matrix<http://wiki.lustre.org/Release_2.12.0#Test_Matrix>)
-
-Please log any issues found in the issue tracking system<https://jira.whamcloud.com/>
-
-Thanks to all those who have contributed to the creation of this release.
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181221/750f9466/attachment.html>
+obdfilter survery under ldiskfs performance is impacted by kernel swap hugging cpu usage, current configurations is as follows:
+2 osts: ost1,ost2
+/dev/sdc on /mnt/mdt type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-MDT0000,mgs,osd=osd-ldiskfs,user_xattr,errors=remount-ro)
+/dev/sdb on /mnt/ost1 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0001,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
+/dev/sda on /mnt/ost2 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0002,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
+[root at oss100 htop-2.2.0]#
+[root at oss100 htop-2.2.0]# dkms status
+lustre-ldiskfs, 2.11.0, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
+spl, 0.7.6, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
+[root at oss100 htop-2.2.0]#
+sh ./obdsurvey-script.sh 
+Mon Dec 10 17:19:52 PST 2018 Obdfilter-survey for case=disk from oss100
+ost 2 sz 512000000K rsz 1024K obj 2 thr 2 write 134.52 [ 49.99, 101.96] rewrite 132.09 [ 49.99, 78.99] read 2566.74 [ 258.96, 2068.71] 
+ost 2 sz 512000000K rsz 1024K obj 2 thr 4 write 195.73 [ 76.99, 128.98] rewrite
+root at oss100 htop-2.2.0]# lctl dl
+0 UP osd-ldiskfs tempAA-MDT0000-osd tempAA-MDT0000-osd_UUID 9
+1 UP mgs MGS MGS 4
+2 UP mgc MGC10.10.10.168 at o2ib 65f231a0-8fd8-001d-6b0f-3e986f914178 4
+3 UP mds MDS MDS_uuid 2
+4 UP lod tempAA-MDT0000-mdtlov tempAA-MDT0000-mdtlov_UUID 3
+5 UP mdt tempAA-MDT0000 tempAA-MDT0000_UUID 8
+6 UP mdd tempAA-MDD0000 tempAA-MDD0000_UUID 3
+7 UP qmt tempAA-QMT0000 tempAA-QMT0000_UUID 3
+8 UP lwp tempAA-MDT0000-lwp-MDT0000 tempAA-MDT0000-lwp-MDT0000_UUID 4
+9 UP osd-ldiskfs tempAA-OST0001-osd tempAA-OST0001-osd_UUID 4
+10 UP ost OSS OSS_uuid 2
+11 UP obdfilter tempAA-OST0001 tempAA-OST0001_UUID 5
+12 UP lwp tempAA-MDT0000-lwp-OST0001 tempAA-MDT0000-lwp-OST0001_UUID 4
+13 UP osp tempAA-OST0001-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
+14 UP echo_client tempAA-OST0001_ecc tempAA-OST0001_ecc_UUID 2
+15 UP osd-ldiskfs tempAA-OST0002-osd tempAA-OST0002-osd_UUID 4
+16 UP obdfilter tempAA-OST0002 tempAA-OST0002_UUID 5
+17 UP lwp tempAA-MDT0000-lwp-OST0002 tempAA-MDT0000-lwp-OST0002_UUID 4
+18 UP osp tempAA-OST0002-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
+19 UP echo_client tempAA-OST0002_ecc tempAA-OST0002_ecc_UUID 2
+[root at oss100 htop-2.2.0]#
+root at oss100 htop-2.2.0]# lsblk
+NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+sda 8:0 0 152.8T 0 disk /mnt/ost2
+sdb 8:16 0 152.8T 0 disk /mnt/ost1
+sdc 8:32 0 931.5G 0 disk /mnt/mdt
+sdd 8:48 0 465.8G 0 disk 
+\u251c\u2500sdd1 8:49 0 200M 0 part /boot/efi
+\u251c\u2500sdd2 8:50 0 1G 0 part /boot
+\u2514\u2500sdd3 8:51 0 464.6G 0 part 
+\u251c\u2500centos-root 253:0 0 50G 0 lvm /
+\u251c\u2500centos-swap 253:1 0 4G 0 lvm [SWAP]
+\u2514\u2500centos-home 253:2 0 410.6G 0 lvm /home
+nvme0n1 259:2 0 372.6G 0 disk 
+\u2514\u2500md124 9:124 0 372.6G 0 raid1 
+nvme1n1 259:0 0 372.6G 0 disk 
+\u2514\u2500md124 9:124 0 372.6G 0 raid1 
+nvme2n1 259:3 0 372.6G 0 disk 
+\u2514\u2500md125 9:125 0 354G 0 raid1 
+nvme3n1 259:1 0 372.6G 0 disk 
+\u2514\u2500md125 9:125 0 354G 0 raid1
+ 
+thanks,
+Abe
