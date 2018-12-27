@@ -1,8 +1,12 @@
-From: Abe Asraoui <AbeA@supermicro.com>
-Date: Thu, 27 Dec 2018 00:24:32 +0000
-Subject: [lustre-devel] ldiskfs performance degradation due to kernel swap
- hugging cpu
-Message-ID: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 27 Dec 2018 01:53:26 +0000 (GMT)
+Subject: [lustre-devel] [PATCH RFC 00/28] lustre: PFL port to linux
+ client
+In-Reply-To: <87y38lt1qz.fsf@notabene.neil.brown.name>
+References: <1545064202-22483-1-git-send-email-jsimmons@infradead.org>
+ <87mup39wy8.fsf@notabene.neil.brown.name>
+ <87y38lt1qz.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1812270113001.5850@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,65 +14,51 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
- Hi All.
-We are seeing low performance with lustre2.11 in ldiskfs configuration with obdfilter survey, not sure if this is a known issue.
+> On Tue, Dec 18 2018, NeilBrown wrote:
+> 
+> > On Mon, Dec 17 2018, James Simmons wrote:
+> >
+> >> This is the initial PFL port to the linux lustre client. This opens
+> >> up feed back on the port so far. Currently sanity passes but the
+> >> test for sanity-pfl fail as below. I have been tracking downing
+> >> various bugs but this one remains and I haven't found out why its
+> >> failing. So far from what I can tell is lov_io_setattr_iter_init()
+> >> it returning -ENODATA due to lsm_entry_inited() is not initialized.
+> >
+> > Having that invariant in cl_io_iter_fini() seems strange.
+> > It is guaranteed to fir eif cl_io_iter_init() fails - if that is not
+> > permitted, I would expect an invariant a lot closer to the failure.
+> >
+> > What happens if you just remove the LINVRNT() ??
+> 
+> I dug through the code some more, and I'm sure that LINVRNT() is wrong.
+> 
+> The cl_io_iter() call is meant to fail early, before ci_state gets to
+> CIS_LOCKED, let alone CIS_UNLOCKED.  It sets ->ci_need_write_intent when
+> it records the failure.  The code is then meant to fall through to
+> the cl_io_fini() call in cl_setattr_ost(), which calls into vvp_io_fini)_
+> which notices ->ci_need_write_intent, and calls ll_layout_write_intent(),
+> which presumably initializes the things that weren't initialized before.
+> This also sets ->ci_need_restart = 1 so that cl_setattr_ost() loops
+> around to "again:" and calls cl_io_init() again.
+> 
+> So the invariant in cl_io_iter_fini() should probably be
+> 
+> 	LINVRNT(io->ci_state == CIS_INIT || io->ci_state == CIS_UNLOCKED);
+> 
+> or something like that.  Maybe needs CIS_IT_ENDED as well.
+> 
+> 	LINVRNT(io->ci_state <= CIS_INIT || io->ci_state >= CIS_UNLOCKED);
+> 
+> ??
 
-obdfilter survery under ldiskfs performance is impacted by kernel swap hugging cpu usage, current configurations is as follows:
-2 osts: ost1,ost2
-/dev/sdc on /mnt/mdt type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-MDT0000,mgs,osd=osd-ldiskfs,user_xattr,errors=remount-ro)
-/dev/sdb on /mnt/ost1 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0001,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
-/dev/sda on /mnt/ost2 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0002,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
-[root at oss100 htop-2.2.0]#
-[root at oss100 htop-2.2.0]# dkms status
-lustre-ldiskfs, 2.11.0, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
-spl, 0.7.6, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
-[root at oss100 htop-2.2.0]#
-sh ./obdsurvey-script.sh 
-Mon Dec 10 17:19:52 PST 2018 Obdfilter-survey for case=disk from oss100
-ost 2 sz 512000000K rsz 1024K obj 2 thr 2 write 134.52 [ 49.99, 101.96] rewrite 132.09 [ 49.99, 78.99] read 2566.74 [ 258.96, 2068.71] 
-ost 2 sz 512000000K rsz 1024K obj 2 thr 4 write 195.73 [ 76.99, 128.98] rewrite
-root at oss100 htop-2.2.0]# lctl dl
-0 UP osd-ldiskfs tempAA-MDT0000-osd tempAA-MDT0000-osd_UUID 9
-1 UP mgs MGS MGS 4
-2 UP mgc MGC10.10.10.168 at o2ib 65f231a0-8fd8-001d-6b0f-3e986f914178 4
-3 UP mds MDS MDS_uuid 2
-4 UP lod tempAA-MDT0000-mdtlov tempAA-MDT0000-mdtlov_UUID 3
-5 UP mdt tempAA-MDT0000 tempAA-MDT0000_UUID 8
-6 UP mdd tempAA-MDD0000 tempAA-MDD0000_UUID 3
-7 UP qmt tempAA-QMT0000 tempAA-QMT0000_UUID 3
-8 UP lwp tempAA-MDT0000-lwp-MDT0000 tempAA-MDT0000-lwp-MDT0000_UUID 4
-9 UP osd-ldiskfs tempAA-OST0001-osd tempAA-OST0001-osd_UUID 4
-10 UP ost OSS OSS_uuid 2
-11 UP obdfilter tempAA-OST0001 tempAA-OST0001_UUID 5
-12 UP lwp tempAA-MDT0000-lwp-OST0001 tempAA-MDT0000-lwp-OST0001_UUID 4
-13 UP osp tempAA-OST0001-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
-14 UP echo_client tempAA-OST0001_ecc tempAA-OST0001_ecc_UUID 2
-15 UP osd-ldiskfs tempAA-OST0002-osd tempAA-OST0002-osd_UUID 4
-16 UP obdfilter tempAA-OST0002 tempAA-OST0002_UUID 5
-17 UP lwp tempAA-MDT0000-lwp-OST0002 tempAA-MDT0000-lwp-OST0002_UUID 4
-18 UP osp tempAA-OST0002-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
-19 UP echo_client tempAA-OST0002_ecc tempAA-OST0002_ecc_UUID 2
-[root at oss100 htop-2.2.0]#
-root at oss100 htop-2.2.0]# lsblk
-NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
-sda 8:0 0 152.8T 0 disk /mnt/ost2
-sdb 8:16 0 152.8T 0 disk /mnt/ost1
-sdc 8:32 0 931.5G 0 disk /mnt/mdt
-sdd 8:48 0 465.8G 0 disk 
-\u251c\u2500sdd1 8:49 0 200M 0 part /boot/efi
-\u251c\u2500sdd2 8:50 0 1G 0 part /boot
-\u2514\u2500sdd3 8:51 0 464.6G 0 part 
-\u251c\u2500centos-root 253:0 0 50G 0 lvm /
-\u251c\u2500centos-swap 253:1 0 4G 0 lvm [SWAP]
-\u2514\u2500centos-home 253:2 0 410.6G 0 lvm /home
-nvme0n1 259:2 0 372.6G 0 disk 
-\u2514\u2500md124 9:124 0 372.6G 0 raid1 
-nvme1n1 259:0 0 372.6G 0 disk 
-\u2514\u2500md124 9:124 0 372.6G 0 raid1 
-nvme2n1 259:3 0 372.6G 0 disk 
-\u2514\u2500md125 9:125 0 354G 0 raid1 
-nvme3n1 259:1 0 372.6G 0 disk 
-\u2514\u2500md125 9:125 0 354G 0 raid1
- 
-thanks,
-Abe
+You are right. I spent two weeks thinking I did the port wrong :-( I used
+the second version which worked and saw only sanity-pfl test 11 failing.
+I opened a ticket on this issue : 
+
+https://jira.whamcloud.com/browse/LU-11828
+
+and have pushed a patch for Bobi Jam to look at. We should have something
+worked out soon. So PFL mostly worked outside of that. I will combine this
+fix with a bunch others. I tracked down the majority of the causes of the
+failures seen in the sanity testing.
