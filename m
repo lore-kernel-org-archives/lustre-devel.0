@@ -1,10 +1,11 @@
-From: Abe Asraoui <AbeA@supermicro.com>
-Date: Sat, 29 Dec 2018 00:42:50 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Sat, 29 Dec 2018 00:48:40 +0000
 Subject: [lustre-devel] ldiskfs performance degradation due to kernel
  swap hugging cpu
-In-Reply-To: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
-References: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
-Message-ID: <B75D794A-8DFC-4467-B3A7-70B7B8BB4885@supermicro.com>
+In-Reply-To: <B75D794A-8DFC-4467-B3A7-70B7B8BB4885@supermicro.com>
+References: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>,
+ <B75D794A-8DFC-4467-B3A7-70B7B8BB4885@supermicro.com>
+Message-ID: <MWHPR11MB14882A9C776B83DF02BF24EDCBB00@MWHPR11MB1488.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,13 +14,26 @@ To: lustre-devel@lists.lustre.org
 
 
 
-+ lustre-discuss 
+Abe,
+
+You gave some general info, but unless I missed something, nothing specific to show any involvement by swap.  How did you determine that?  Can you share that data?  And what performance are you expecting here?
+
+- Patrick
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Abe Asraoui <AbeA@supermicro.com>
+Sent: Friday, December 28, 2018 6:42:50 PM
+To: Lustre Developement; lustre-discuss at lists.lustre.org; Abe Asraoui
+Subject: Re: [lustre-devel] ldiskfs performance degradation due to kernel swap hugging cpu
 
 
-    
+
++ lustre-discuss
+
+
+
      Hi All.
     We are seeing low performance with lustre2.11 in ldiskfs configuration with obdfilter survey, not sure if this is a known issue.
-    
+
     obdfilter survery under ldiskfs performance is impacted by kernel swap hugging cpu usage, current configurations is as follows:
     2 osts: ost1,ost2
     /dev/sdc on /mnt/mdt type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-MDT0000,mgs,osd=osd-ldiskfs,user_xattr,errors=remount-ro)
@@ -30,9 +44,9 @@ To: lustre-devel@lists.lustre.org
     lustre-ldiskfs, 2.11.0, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
     spl, 0.7.6, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
     [root at oss100 htop-2.2.0]#
-    sh ./obdsurvey-script.sh 
+    sh ./obdsurvey-script.sh
     Mon Dec 10 17:19:52 PST 2018 Obdfilter-survey for case=disk from oss100
-    ost 2 sz 512000000K rsz 1024K obj 2 thr 2 write 134.52 [ 49.99, 101.96] rewrite 132.09 [ 49.99, 78.99] read 2566.74 [ 258.96, 2068.71] 
+    ost 2 sz 512000000K rsz 1024K obj 2 thr 2 write 134.52 [ 49.99, 101.96] rewrite 132.09 [ 49.99, 78.99] read 2566.74 [ 258.96, 2068.71]
     ost 2 sz 512000000K rsz 1024K obj 2 thr 4 write 195.73 [ 76.99, 128.98] rewrite
     root at oss100 htop-2.2.0]# lctl dl
     0 UP osd-ldiskfs tempAA-MDT0000-osd tempAA-MDT0000-osd_UUID 9
@@ -61,24 +75,32 @@ To: lustre-devel@lists.lustre.org
     sda 8:0 0 152.8T 0 disk /mnt/ost2
     sdb 8:16 0 152.8T 0 disk /mnt/ost1
     sdc 8:32 0 931.5G 0 disk /mnt/mdt
-    sdd 8:48 0 465.8G 0 disk 
+    sdd 8:48 0 465.8G 0 disk
     \u251c\u2500sdd1 8:49 0 200M 0 part /boot/efi
     \u251c\u2500sdd2 8:50 0 1G 0 part /boot
-    \u2514\u2500sdd3 8:51 0 464.6G 0 part 
+    \u2514\u2500sdd3 8:51 0 464.6G 0 part
     \u251c\u2500centos-root 253:0 0 50G 0 lvm /
     \u251c\u2500centos-swap 253:1 0 4G 0 lvm [SWAP]
     \u2514\u2500centos-home 253:2 0 410.6G 0 lvm /home
-    nvme0n1 259:2 0 372.6G 0 disk 
-    \u2514\u2500md124 9:124 0 372.6G 0 raid1 
-    nvme1n1 259:0 0 372.6G 0 disk 
-    \u2514\u2500md124 9:124 0 372.6G 0 raid1 
-    nvme2n1 259:3 0 372.6G 0 disk 
-    \u2514\u2500md125 9:125 0 354G 0 raid1 
-    nvme3n1 259:1 0 372.6G 0 disk 
+    nvme0n1 259:2 0 372.6G 0 disk
+    \u2514\u2500md124 9:124 0 372.6G 0 raid1
+    nvme1n1 259:0 0 372.6G 0 disk
+    \u2514\u2500md124 9:124 0 372.6G 0 raid1
+    nvme2n1 259:3 0 372.6G 0 disk
     \u2514\u2500md125 9:125 0 354G 0 raid1
-     
+    nvme3n1 259:1 0 372.6G 0 disk
+    \u2514\u2500md125 9:125 0 354G 0 raid1
+
     thanks,
     Abe
-    
-    
-    
+
+
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181229/fe2e7261/attachment.html>
