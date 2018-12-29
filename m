@@ -1,11 +1,10 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Dec 2018 02:19:18 +0000 (GMT)
-Subject: [lustre-devel] drivers/staging updated to 4.20-rc1
-In-Reply-To: <87h8g2oui1.fsf@notabene.neil.brown.name>
-References: <87k1lsyssq.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1811052058590.11915@casper.infradead.org>
- <87h8g2oui1.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1812270217050.5850@casper.infradead.org>
+From: Abe Asraoui <AbeA@supermicro.com>
+Date: Sat, 29 Dec 2018 00:42:50 +0000
+Subject: [lustre-devel] ldiskfs performance degradation due to kernel
+ swap hugging cpu
+In-Reply-To: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
+References: <A70DA44B-0927-4E9E-8EF8-366BEB65A06D@supermicro.com>
+Message-ID: <B75D794A-8DFC-4467-B3A7-70B7B8BB4885@supermicro.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,67 +12,73 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> >> Hi,
-> >>  I've just pushed out new lustre/lustre, lustre/lustre-testing, lustre/lustre-wip
-> >>  to github.com:neilbrown/linux.git
-> >> 
-> >>  lustre is updated to 4.20-rc1 and doesn't compile because of some
-> >>  changes.
-> >>  The patch below makes it compile and (probably) work.
-> >> 
-> >>  I'd appreciate a review, especially of the iov_for_each change.
-> >
-> > Almost. I see the following errors while testing.
-> >
-> > [ 7111.002667] RIP: 0010:sanity+0xb2/0xb9
-> > [ 7111.002668] Code: 63 c5 48 c7 c7 a1 7c e8 81 ff c5 48 6b c0 28 48 03 43 
-> > 78 8b 48 08 48 8b 70 10 44 8b 40 0c 48 8b 10 31 c0 e8 4c 67 d6 ff  c
-> > [ 7111.002669] RSP: 0018:ffffc900072d3a60 EFLAGS: 00010246
-> > [ 7111.002670] RAX: 000000000000002a RBX: ffff8808502126c0 RCX: 
-> > 0000000000000006
-> > [ 7111.002671] RDX: 0000000000000000 RSI: ffffffff81e770e3 RDI: 
-> > 00000000ffffffff
-> > [ 7111.002672] RBP: 0000000000000010 R08: 0000000000000004 R09: 
-> > ffffffff82683e8e
-> > [ 7111.002673] R10: 00000000000015a9 R11: 0000000000000000 R12: 
-> > ffffea003f9523c0
-> > [ 7111.002674] R13: ffff8808502126c0 R14: ffffea003f9523c0 R15: 
-> > 0000000000001000
-> > [ 7111.002676] FS:  00007f140a193740(0000) GS:ffff88107fd80000(0000) 
-> > knlGS:0000000000000000
-> > [ 7111.002677] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> > [ 7111.002678] CR2: 000000000067a198 CR3: 00000008305dc001 CR4: 
-> > 00000000000606e0
-> > [ 7111.002679] Call Trace:
-> > [ 7111.002682]  copy_page_to_iter+0x245/0x2f0
-> > [ 7111.002686]  generic_file_buffered_read+0x345/0x7c0
-> > [ 7111.002689]  ? touch_atime+0x33/0xd0
-> > [ 7111.002701]  vvp_io_read_start+0x22a/0x3a0 [lustre]
-> > [ 7111.002715]  cl_io_start+0x6d/0x130 [obdclass]
-> > [ 7111.002727]  cl_io_loop+0xae/0x220 [obdclass]
-> > [ 7111.002736]  ll_file_io_generic+0x4ee/0x880 [lustre]
-> > [ 7111.002740]  ? generic_file_buffered_read+0x591/0x7c0
-> > [ 7111.002749]  ll_file_read_iter+0x13e/0x1b0 [lustre]
-> > [ 7111.002751]  generic_file_splice_read+0xe1/0x190
-> > [ 7111.002755]  splice_direct_to_actor+0xea/0x200
-> > [ 7111.002757]  ? generic_pipe_buf_nosteal+0x10/0x10
-> > [ 7111.002759]  do_splice_direct+0x87/0xd0
-> > [ 7111.002762]  do_sendfile+0x1c6/0x3c0
-> > [ 7111.002765]  __x64_sys_sendfile64+0x5c/0xb0
-> > [ 7111.002768]  do_syscall_64+0x68/0x38f
-> > [ 7111.002770]  ? do_page_fault+0x2d/0x130
-> > [ 7111.002773]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> > [ 7111.002775] RIP: 0033:0x7f1409ca71ca
-> >
-> 
-> Thanks for testing, and sorry that I didn't respond at the time - I
-> managed to lose track of it somehow.
-> Anyway, I hit testing problems that were quite different but in
-> a generally similar area.
-> This fixes them, and might fix yours too.  It'll appear in
-> lustre-testing shortly.
 
-I see the splice handling in the VFS layer has moved to iter pipes.
-Does Al plan to do that with all of the VFS layer? I wonder if iter
-pipes whould be a good replacement for the kiov and biovec handling
-in the LNet layer. 
++ lustre-discuss 
+
+
+    
+     Hi All.
+    We are seeing low performance with lustre2.11 in ldiskfs configuration with obdfilter survey, not sure if this is a known issue.
+    
+    obdfilter survery under ldiskfs performance is impacted by kernel swap hugging cpu usage, current configurations is as follows:
+    2 osts: ost1,ost2
+    /dev/sdc on /mnt/mdt type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-MDT0000,mgs,osd=osd-ldiskfs,user_xattr,errors=remount-ro)
+    /dev/sdb on /mnt/ost1 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0001,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
+    /dev/sda on /mnt/ost2 type lustre (ro,context=unconfined_u:object_r:user_tmp_t:s0,svname=tempAA-OST0002,mgsnode=10.10.10.168 at o2ib,osd=osd-ldiskfs,errors=remount-ro)
+    [root at oss100 htop-2.2.0]#
+    [root at oss100 htop-2.2.0]# dkms status
+    lustre-ldiskfs, 2.11.0, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
+    spl, 0.7.6, 3.10.0-693.21.1.el7_lustre.x86_64, x86_64: installed
+    [root at oss100 htop-2.2.0]#
+    sh ./obdsurvey-script.sh 
+    Mon Dec 10 17:19:52 PST 2018 Obdfilter-survey for case=disk from oss100
+    ost 2 sz 512000000K rsz 1024K obj 2 thr 2 write 134.52 [ 49.99, 101.96] rewrite 132.09 [ 49.99, 78.99] read 2566.74 [ 258.96, 2068.71] 
+    ost 2 sz 512000000K rsz 1024K obj 2 thr 4 write 195.73 [ 76.99, 128.98] rewrite
+    root at oss100 htop-2.2.0]# lctl dl
+    0 UP osd-ldiskfs tempAA-MDT0000-osd tempAA-MDT0000-osd_UUID 9
+    1 UP mgs MGS MGS 4
+    2 UP mgc MGC10.10.10.168 at o2ib 65f231a0-8fd8-001d-6b0f-3e986f914178 4
+    3 UP mds MDS MDS_uuid 2
+    4 UP lod tempAA-MDT0000-mdtlov tempAA-MDT0000-mdtlov_UUID 3
+    5 UP mdt tempAA-MDT0000 tempAA-MDT0000_UUID 8
+    6 UP mdd tempAA-MDD0000 tempAA-MDD0000_UUID 3
+    7 UP qmt tempAA-QMT0000 tempAA-QMT0000_UUID 3
+    8 UP lwp tempAA-MDT0000-lwp-MDT0000 tempAA-MDT0000-lwp-MDT0000_UUID 4
+    9 UP osd-ldiskfs tempAA-OST0001-osd tempAA-OST0001-osd_UUID 4
+    10 UP ost OSS OSS_uuid 2
+    11 UP obdfilter tempAA-OST0001 tempAA-OST0001_UUID 5
+    12 UP lwp tempAA-MDT0000-lwp-OST0001 tempAA-MDT0000-lwp-OST0001_UUID 4
+    13 UP osp tempAA-OST0001-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
+    14 UP echo_client tempAA-OST0001_ecc tempAA-OST0001_ecc_UUID 2
+    15 UP osd-ldiskfs tempAA-OST0002-osd tempAA-OST0002-osd_UUID 4
+    16 UP obdfilter tempAA-OST0002 tempAA-OST0002_UUID 5
+    17 UP lwp tempAA-MDT0000-lwp-OST0002 tempAA-MDT0000-lwp-OST0002_UUID 4
+    18 UP osp tempAA-OST0002-osc-MDT0000 tempAA-MDT0000-mdtlov_UUID 4
+    19 UP echo_client tempAA-OST0002_ecc tempAA-OST0002_ecc_UUID 2
+    [root at oss100 htop-2.2.0]#
+    root at oss100 htop-2.2.0]# lsblk
+    NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+    sda 8:0 0 152.8T 0 disk /mnt/ost2
+    sdb 8:16 0 152.8T 0 disk /mnt/ost1
+    sdc 8:32 0 931.5G 0 disk /mnt/mdt
+    sdd 8:48 0 465.8G 0 disk 
+    \u251c\u2500sdd1 8:49 0 200M 0 part /boot/efi
+    \u251c\u2500sdd2 8:50 0 1G 0 part /boot
+    \u2514\u2500sdd3 8:51 0 464.6G 0 part 
+    \u251c\u2500centos-root 253:0 0 50G 0 lvm /
+    \u251c\u2500centos-swap 253:1 0 4G 0 lvm [SWAP]
+    \u2514\u2500centos-home 253:2 0 410.6G 0 lvm /home
+    nvme0n1 259:2 0 372.6G 0 disk 
+    \u2514\u2500md124 9:124 0 372.6G 0 raid1 
+    nvme1n1 259:0 0 372.6G 0 disk 
+    \u2514\u2500md124 9:124 0 372.6G 0 raid1 
+    nvme2n1 259:3 0 372.6G 0 disk 
+    \u2514\u2500md125 9:125 0 354G 0 raid1 
+    nvme3n1 259:1 0 372.6G 0 disk 
+    \u2514\u2500md125 9:125 0 354G 0 raid1
+     
+    thanks,
+    Abe
+    
+    
+    
