@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 17:14:01 -0500
-Subject: [lustre-devel] [PATCH v2 06/33] lustre: lov: create struct
- lov_stripe_md_entry
+Date: Sun,  6 Jan 2019 17:14:06 -0500
+Subject: [lustre-devel] [PATCH v2 11/33] lustre: lov: change lo_entries to
+ array.
 In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546812868-11794-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,980 +13,766 @@ To: lustre-devel@lists.lustre.org
 
 From: Bobi Jam <bobijam@hotmail.com>
 
-Create a new struct lov_stripe_md_entry that will be shared with
-older striping methods and the new PFL handling. Rearrange the
-code to handle this new data structure.
+Old style striping is equal to a single component. To support PFL
+we need to change lo_entries to an array.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Signed-off-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: Niu Yawei <yawei.niu@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24849
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/24850
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h      |   4 -
- drivers/staging/lustre/lustre/lov/lov_ea.c       | 338 ++++++++++-------------
- drivers/staging/lustre/lustre/lov/lov_internal.h |  35 ++-
- drivers/staging/lustre/lustre/lov/lov_io.c       |  17 +-
- drivers/staging/lustre/lustre/lov/lov_merge.c    |   4 +-
- drivers/staging/lustre/lustre/lov/lov_object.c   |  80 +++---
- drivers/staging/lustre/lustre/lov/lov_offset.c   |   8 +-
- drivers/staging/lustre/lustre/lov/lov_pack.c     |  32 +--
- 8 files changed, 245 insertions(+), 273 deletions(-)
+ .../staging/lustre/lustre/lov/lov_cl_internal.h    |  14 +-
+ drivers/staging/lustre/lustre/lov/lov_internal.h   |  20 +--
+ drivers/staging/lustre/lustre/lov/lov_io.c         |  27 ++--
+ drivers/staging/lustre/lustre/lov/lov_lock.c       |  13 +-
+ drivers/staging/lustre/lustre/lov/lov_merge.c      |   6 +-
+ drivers/staging/lustre/lustre/lov/lov_object.c     | 149 ++++++++++++---------
+ drivers/staging/lustre/lustre/lov/lov_offset.c     |  30 +++--
+ drivers/staging/lustre/lustre/lov/lov_page.c       |  11 +-
+ drivers/staging/lustre/lustre/lov/lovsub_object.c  |   5 +-
+ 9 files changed, 158 insertions(+), 117 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index d6a968c..15d9573 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -75,10 +75,6 @@ static inline void loi_kms_set(struct lov_oinfo *oinfo, __u64 kms)
- 	oinfo->loi_kms_valid = 1;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
+index c44c937..99bd1c1 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
++++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
+@@ -219,9 +219,13 @@ struct lov_object {
+ 		struct lov_layout_state_released {
+ 		} released;
+ 		struct lov_layout_composite {
++			/**
++			 * Current valid entry count of lo_entries.
++			 */
++			unsigned int lo_entry_count;
+ 			struct lov_layout_entry {
+ 				struct lov_layout_raid0 lle_raid0;
+-			} lo_entries;
++			} *lo_entries;
+ 		} composite;
+ 	} u;
+ 	/**
+@@ -628,13 +632,13 @@ static inline struct lov_thread_info *lov_env_info(const struct lu_env *env)
+ 	return info;
  }
  
--static inline void loi_init(struct lov_oinfo *loi)
--{
--}
--
- struct lov_stripe_md;
- struct obd_info;
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index 5a01fbb..f794df9 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -103,114 +103,106 @@ static int lsm_lmm_verify_v1v3(struct lov_mds_md *lmm, size_t lmm_size,
- 	return 0;
- }
- 
--void lsm_free(struct lov_stripe_md *lsm)
-+static void lsme_free(struct lov_stripe_md_entry *lsme)
+-static inline struct lov_layout_raid0 *lov_r0(struct lov_object *lov)
++static inline struct lov_layout_raid0 *lov_r0(struct lov_object *lov, int i)
  {
--	__u16 stripe_count = lsm->lsm_stripe_count;
--	int i;
-+	unsigned int stripe_count = lsme->lsme_stripe_count;
-+	unsigned int i;
+ 	LASSERT(lov->lo_type == LLT_COMP);
+-	LASSERT(lov->lo_lsm->lsm_magic == LOV_MAGIC ||
+-		lov->lo_lsm->lsm_magic == LOV_MAGIC_V3);
++	LASSERTF(i < lov->u.composite.lo_entry_count,
++		 "entry %d entry_count %d", i, lov->u.composite.lo_entry_count);
  
- 	for (i = 0; i < stripe_count; i++)
--		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
--	kvfree(lsm);
--}
--
--struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
--{
--	size_t oinfo_ptrs_size, lsm_size;
--	struct lov_stripe_md *lsm;
--	struct lov_oinfo     *loi;
--	int i;
--
--	LASSERT(stripe_count <= LOV_MAX_STRIPE_COUNT);
--
--	oinfo_ptrs_size = sizeof(struct lov_oinfo *) * stripe_count;
--	lsm_size = sizeof(*lsm) + oinfo_ptrs_size;
-+		kmem_cache_free(lov_oinfo_slab, lsme->lsme_oinfo[i]);
- 
--	lsm = kvzalloc(lsm_size, GFP_NOFS);
--	if (!lsm)
--		return NULL;
--
--	for (i = 0; i < stripe_count; i++) {
--		loi = kmem_cache_zalloc(lov_oinfo_slab, GFP_NOFS);
--		if (!loi)
--			goto err;
--		lsm->lsm_oinfo[i] = loi;
--	}
--	lsm->lsm_stripe_count = stripe_count;
--	return lsm;
--
--err:
--	while (--i >= 0)
--		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
--	kvfree(lsm);
--	return NULL;
-+	kvfree(lsme);
+-	return &lov->u.composite.lo_entries.lle_raid0;
++	return &lov->u.composite.lo_entries[i].lle_raid0;
  }
  
--static struct lov_stripe_md *lov_lsm_alloc(u16 stripe_count, u32 pattern,
--					   u32 magic)
-+void lsm_free(struct lov_stripe_md *lsm)
- {
--	struct lov_stripe_md *lsm;
-+	unsigned int entry_count = lsm->lsm_entry_count;
- 	unsigned int i;
- 
--	CDEBUG(D_INFO, "alloc lsm, stripe_count %u\n", stripe_count);
--
--	lsm = lsm_alloc_plain(stripe_count);
--	if (!lsm) {
--		CERROR("cannot allocate LSM stripe_count %u\n", stripe_count);
--		return ERR_PTR(-ENOMEM);
--	}
--
--	atomic_set(&lsm->lsm_refc, 1);
--	spin_lock_init(&lsm->lsm_lock);
--	lsm->lsm_magic = magic;
--	lsm->lsm_stripe_count = stripe_count;
--	lsm->lsm_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES * stripe_count;
--	lsm->lsm_pattern = pattern;
--	lsm->lsm_pool_name[0] = '\0';
--	lsm->lsm_layout_gen = 0;
--	if (stripe_count > 0)
--		lsm->lsm_oinfo[0]->loi_ost_idx = ~0;
-+	for (i = 0; i < entry_count; i++)
-+		lsme_free(lsm->lsm_entries[i]);
- 
--	for (i = 0; i < stripe_count; i++)
--		loi_init(lsm->lsm_oinfo[i]);
--
--	return lsm;
-+	kfree(lsm);
- }
- 
--static int lsm_unpackmd_v1v3(struct lov_obd *lov,
--			     struct lov_stripe_md *lsm,
--			     struct lov_mds_md *lmm,
--			     const char *pool_name,
--			     struct lov_ost_data_v1 *objects)
-+/**
-+ * Unpack a struct lov_mds_md into a struct lov_stripe_md_entry.
-+ *
-+ * The caller should set id and extent.
-+ */
-+static struct lov_stripe_md_entry *
-+lsme_unpack(struct lov_obd *lov, struct lov_mds_md *lmm, size_t buf_size,
-+	    const char *pool_name, struct lov_ost_data_v1 *objects,
-+	    loff_t *maxbytes)
- {
-+	struct lov_stripe_md_entry *lsme;
- 	loff_t min_stripe_maxbytes = 0;
- 	unsigned int stripe_count;
--	struct lov_oinfo *loi;
- 	loff_t lov_bytes;
-+	size_t lsme_size;
- 	unsigned int i;
-+	u32 pattern;
-+	u32 magic;
-+	int rc;
- 
--	/*
--	 * This supposes lov_mds_md_v1/v3 first fields are
--	 * are the same
--	 */
--	lmm_oi_le_to_cpu(&lsm->lsm_oi, &lmm->lmm_oi);
--	lsm->lsm_stripe_size = le32_to_cpu(lmm->lmm_stripe_size);
--	lsm->lsm_pattern = le32_to_cpu(lmm->lmm_pattern);
--	lsm->lsm_layout_gen = le16_to_cpu(lmm->lmm_layout_gen);
--	lsm->lsm_pool_name[0] = '\0';
-+	magic = le32_to_cpu(lmm->lmm_magic);
-+	if (magic != LOV_MAGIC_V1 && magic != LOV_MAGIC_V3)
-+		return ERR_PTR(-EINVAL);
-+
-+	pattern = le32_to_cpu(lmm->lmm_pattern);
-+	if (pattern & LOV_PATTERN_F_RELEASED)
-+		stripe_count = 0;
-+	else
-+		stripe_count = le16_to_cpu(lmm->lmm_stripe_count);
-+
-+	if (buf_size < (magic == LOV_MAGIC_V1 ? sizeof(struct lov_mds_md_v1) :
-+						sizeof(struct lov_mds_md_v3))) {
-+		CERROR("LOV EA %s too small: %zu, need %u\n",
-+		       magic == LOV_MAGIC_V1 ? "V1" : "V3", buf_size,
-+		       lov_mds_md_size(stripe_count, magic == LOV_MAGIC_V1 ?
-+				       LOV_MAGIC_V1 : LOV_MAGIC_V3));
-+		lov_dump_lmm_common(D_WARNING, lmm);
-+		return ERR_PTR(-EINVAL);
-+	}
- 
--	stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
-+	rc = lsm_lmm_verify_v1v3(lmm, buf_size, stripe_count);
-+	if (rc < 0)
-+		return ERR_PTR(rc);
-+
-+	lsme_size = offsetof(typeof(*lsme), lsme_oinfo[stripe_count]);
-+	lsme = kvzalloc(lsme_size, GFP_KERNEL);
-+	if (!lsme)
-+		return ERR_PTR(-ENOMEM);
-+
-+	lsme->lsme_magic = magic;
-+	lsme->lsme_pattern = pattern;
-+	lsme->lsme_stripe_size = le32_to_cpu(lmm->lmm_stripe_size);
-+	lsme->lsme_stripe_count = stripe_count;
-+	lsme->lsme_layout_gen = le16_to_cpu(lmm->lmm_layout_gen);
- 
- 	if (pool_name) {
- 		size_t pool_name_len;
- 
--		pool_name_len = strlcpy(lsm->lsm_pool_name, pool_name,
--					sizeof(lsm->lsm_pool_name));
--		if (pool_name_len >= sizeof(lsm->lsm_pool_name))
--			return -E2BIG;
-+		pool_name_len = strlcpy(lsme->lsme_pool_name, pool_name,
-+					sizeof(lsme->lsme_pool_name));
-+		if (pool_name_len >= sizeof(lsme->lsme_pool_name)) {
-+			rc = -E2BIG;
-+			goto out_lsme;
-+		}
- 	}
- 
- 	for (i = 0; i < stripe_count; i++) {
--		loi = lsm->lsm_oinfo[i];
-+		struct lov_tgt_desc *ltd;
-+		struct lov_oinfo *loi;
-+
-+		loi = kmem_cache_zalloc(lov_oinfo_slab, GFP_KERNEL);
-+		if (!loi) {
-+			rc = -ENOMEM;
-+			goto out_lsme;
-+		}
-+
-+		lsme->lsme_oinfo[i] = loi;
-+
- 		ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
- 		loi->loi_ost_idx = le32_to_cpu(objects[i].l_ost_idx);
- 		loi->loi_ost_gen = le32_to_cpu(objects[i].l_ost_gen);
-@@ -223,10 +215,12 @@ static int lsm_unpackmd_v1v3(struct lov_obd *lov,
- 			       (char *)lov->desc.ld_uuid.uuid,
- 			       loi->loi_ost_idx, lov->desc.ld_tgt_count);
- 			lov_dump_lmm_v1(D_WARNING, lmm);
--			return -EINVAL;
-+			rc = -EINVAL;
-+			goto out_lsme;
- 		}
- 
--		if (!lov->lov_tgts[loi->loi_ost_idx]) {
-+		ltd = lov->lov_tgts[loi->loi_ost_idx];
-+		if (!ltd) {
- 			CERROR("%s: OST index %d missing\n",
- 			       (char *)lov->desc.ld_uuid.uuid,
- 			       loi->loi_ost_idx);
-@@ -234,7 +228,7 @@ static int lsm_unpackmd_v1v3(struct lov_obd *lov,
- 			continue;
- 		}
- 
--		lov_bytes = lov_tgt_maxbytes(lov->lov_tgts[loi->loi_ost_idx]);
-+		lov_bytes = lov_tgt_maxbytes(ltd);
- 		if (min_stripe_maxbytes == 0 || lov_bytes < min_stripe_maxbytes)
- 			min_stripe_maxbytes = lov_bytes;
- 	}
-@@ -242,15 +236,68 @@ static int lsm_unpackmd_v1v3(struct lov_obd *lov,
- 	if (min_stripe_maxbytes == 0)
- 		min_stripe_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
- 
--	stripe_count = lsm->lsm_stripe_count ?: lov->desc.ld_tgt_count;
- 	lov_bytes = min_stripe_maxbytes * stripe_count;
- 
--	if (lov_bytes < min_stripe_maxbytes) /* handle overflow */
--		lsm->lsm_maxbytes = MAX_LFS_FILESIZE;
--	else
--		lsm->lsm_maxbytes = lov_bytes;
-+	if (maxbytes) {
-+		if (lov_bytes < min_stripe_maxbytes) /* handle overflow */
-+			*maxbytes = MAX_LFS_FILESIZE;
-+		else
-+			*maxbytes = lov_bytes;
-+	}
- 
--	return 0;
-+	return lsme;
-+
-+out_lsme:
-+	for (i = 0; i < stripe_count; i++) {
-+		struct lov_oinfo *loi = lsme->lsme_oinfo[i];
-+
-+		if (loi)
-+			kmem_cache_free(lov_oinfo_slab, lsme->lsme_oinfo[i]);
-+	}
-+	kvfree(lsme);
-+
-+	return ERR_PTR(rc);
-+}
-+
-+static inline struct lov_stripe_md *
-+lsm_unpackmd_v1v3(struct lov_obd *lov,
-+		  struct lov_mds_md *lmm, size_t buf_size,
-+		  const char *pool_name,
-+		  struct lov_ost_data_v1 *objects)
-+{
-+	struct lov_stripe_md_entry *lsme;
-+	struct lov_stripe_md *lsm;
-+	size_t lsm_size;
-+	loff_t maxbytes;
-+	u32 pattern;
-+
-+	pattern = le32_to_cpu(lmm->lmm_pattern);
-+
-+	lsme = lsme_unpack(lov, lmm, buf_size, pool_name, objects, &maxbytes);
-+	if (IS_ERR(lsme))
-+		return ERR_CAST(lsme);
-+
-+	lsme->lsme_extent.e_start = 0;
-+	lsme->lsme_extent.e_end = LUSTRE_EOF;
-+
-+	lsm_size = offsetof(typeof(*lsm), lsm_entries[1]);
-+	lsm = kzalloc(lsm_size, GFP_KERNEL);
-+	if (!lsm) {
-+		lsme_free(lsme);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	atomic_set(&lsm->lsm_refc, 1);
-+	spin_lock_init(&lsm->lsm_lock);
-+	lsm->lsm_maxbytes = maxbytes;
-+	lmm_oi_le_to_cpu(&lsm->lsm_oi, &lmm->lmm_oi);
-+	lsm->lsm_magic = le32_to_cpu(lmm->lmm_magic);
-+	lsm->lsm_layout_gen = le16_to_cpu(lmm->lmm_layout_gen);
-+	lsm->lsm_entry_count = 1;
-+	lsm->lsm_is_released = pattern & LOV_PATTERN_F_RELEASED;
-+	lsm->lsm_entries[0] = lsme;
-+
-+	return lsm;
- }
- 
- static void
-@@ -258,7 +305,8 @@ static int lsm_unpackmd_v1v3(struct lov_obd *lov,
- 			  loff_t *lov_off, loff_t *swidth)
- {
- 	if (swidth)
--		*swidth = (u64)lsm->lsm_stripe_size * lsm->lsm_stripe_count;
-+		*swidth = (loff_t)lsm->lsm_entries[0]->lsme_stripe_size *
-+			  lsm->lsm_entries[0]->lsme_stripe_count;
- }
- 
- static void
-@@ -266,59 +314,16 @@ static int lsm_unpackmd_v1v3(struct lov_obd *lov,
- 			   loff_t *lov_off, loff_t *swidth)
- {
- 	if (swidth)
--		*swidth = (u64)lsm->lsm_stripe_size * lsm->lsm_stripe_count;
--}
--
--static int lsm_lmm_verify_v1(struct lov_mds_md_v1 *lmm, size_t lmm_bytes,
--			     __u16 *stripe_count)
--{
--	if (lmm_bytes < sizeof(*lmm)) {
--		CERROR("lov_mds_md_v1 too small: %zu, need@least %zu\n",
--		       lmm_bytes, sizeof(*lmm));
--		return -EINVAL;
--	}
--
--	*stripe_count = le16_to_cpu(lmm->lmm_stripe_count);
--	if (le32_to_cpu(lmm->lmm_pattern) & LOV_PATTERN_F_RELEASED)
--		*stripe_count = 0;
--
--	if (lmm_bytes < lov_mds_md_size(*stripe_count, LOV_MAGIC_V1)) {
--		CERROR("LOV EA V1 too small: %zu, need %d\n",
--		       lmm_bytes, lov_mds_md_size(*stripe_count, LOV_MAGIC_V1));
--		lov_dump_lmm_common(D_WARNING, lmm);
--		return -EINVAL;
--	}
--
--	return lsm_lmm_verify_v1v3(lmm, lmm_bytes, *stripe_count);
-+		*swidth = (loff_t)lsm->lsm_entries[0]->lsme_stripe_size *
-+			  lsm->lsm_entries[0]->lsme_stripe_count;
- }
- 
- static struct lov_stripe_md *
- lsm_unpackmd_v1(struct lov_obd *lov, void *buf, size_t buf_size)
- {
- 	struct lov_mds_md_v1 *lmm = buf;
--	u32 magic = le32_to_cpu(lmm->lmm_magic);
--	struct lov_stripe_md *lsm;
--	u16 stripe_count;
--	u32 pattern;
--	int rc;
- 
--	rc = lsm_lmm_verify_v1(lmm, buf_size, &stripe_count);
--	if (rc)
--		return ERR_PTR(rc);
--
--	pattern = le32_to_cpu(lmm->lmm_pattern);
--
--	lsm = lov_lsm_alloc(stripe_count, pattern, magic);
--	if (IS_ERR(lsm))
--		return lsm;
--
--	rc = lsm_unpackmd_v1v3(lov, lsm, lmm, NULL, lmm->lmm_objects);
--	if (rc) {
--		lov_free_memmd(&lsm);
--		lsm = ERR_PTR(rc);
--	}
--
--	return lsm;
-+	return lsm_unpackmd_v1v3(lov, buf, buf_size, NULL, lmm->lmm_objects);
- }
- 
- const static struct lsm_operations lsm_v1_ops = {
-@@ -327,58 +332,13 @@ static int lsm_lmm_verify_v1(struct lov_mds_md_v1 *lmm, size_t lmm_bytes,
- 	.lsm_unpackmd	   = lsm_unpackmd_v1,
- };
- 
--static int lsm_lmm_verify_v3(struct lov_mds_md_v3 *lmm, size_t lmm_bytes,
--			     __u16 *stripe_count)
--{
--	if (lmm_bytes < sizeof(*lmm)) {
--		CERROR("lov_mds_md_v3 too small: %zu, need@least %zu\n",
--		       lmm_bytes, sizeof(*lmm));
--		return -EINVAL;
--	}
--
--	*stripe_count = le16_to_cpu(lmm->lmm_stripe_count);
--	if (le32_to_cpu(lmm->lmm_pattern) & LOV_PATTERN_F_RELEASED)
--		*stripe_count = 0;
--
--	if (lmm_bytes < lov_mds_md_size(*stripe_count, LOV_MAGIC_V3)) {
--		CERROR("LOV EA V3 too small: %zu, need %d\n",
--		       lmm_bytes, lov_mds_md_size(*stripe_count, LOV_MAGIC_V3));
--		lov_dump_lmm_common(D_WARNING, lmm);
--		return -EINVAL;
--	}
--
--	return lsm_lmm_verify_v1v3((struct lov_mds_md_v1 *)lmm, lmm_bytes,
--				     *stripe_count);
--}
--
- static struct lov_stripe_md *
- lsm_unpackmd_v3(struct lov_obd *lov, void *buf, size_t buf_size)
- {
- 	struct lov_mds_md_v3 *lmm = buf;
--	u32 magic = le32_to_cpu(lmm->lmm_magic);
--	struct lov_stripe_md *lsm;
--	u16 stripe_count;
--	u32 pattern;
--	int rc;
--
--	rc = lsm_lmm_verify_v3(lmm, buf_size, &stripe_count);
--	if (rc)
--		return ERR_PTR(rc);
--
--	pattern = le32_to_cpu(lmm->lmm_pattern);
--
--	lsm = lov_lsm_alloc(stripe_count, pattern, magic);
--	if (IS_ERR(lsm))
--		return lsm;
- 
--	rc = lsm_unpackmd_v1v3(lov, lsm, (struct lov_mds_md_v1 *)lmm,
--			       lmm->lmm_pool_name, lmm->lmm_objects);
--	if (rc) {
--		lov_free_memmd(&lsm);
--		lsm = ERR_PTR(rc);
--	}
--
--	return lsm;
-+	return lsm_unpackmd_v1v3(lov, buf, buf_size, lmm->lmm_pool_name,
-+				 lmm->lmm_objects);
- }
- 
- const static struct lsm_operations lsm_v3_ops = {
-@@ -403,9 +363,9 @@ const struct lsm_operations *lsm_op_find(int magic)
- void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm)
- {
- 	CDEBUG(level, "lsm %p, objid " DOSTID ", maxbytes %#llx, magic 0x%08X, stripe_size %u, stripe_count %u, refc: %d, layout_gen %u, pool [" LOV_POOLNAMEF "]\n",
--	       lsm,
--	       POSTID(&lsm->lsm_oi), lsm->lsm_maxbytes, lsm->lsm_magic,
--	       lsm->lsm_stripe_size, lsm->lsm_stripe_count,
-+	       lsm, POSTID(&lsm->lsm_oi), lsm->lsm_maxbytes, lsm->lsm_magic,
-+	       lsm->lsm_entries[0]->lsme_stripe_size,
-+	       lsm->lsm_entries[0]->lsme_stripe_count,
- 	       atomic_read(&lsm->lsm_refc), lsm->lsm_layout_gen,
--	       lsm->lsm_pool_name);
-+	       lsm->lsm_entries[0]->lsme_pool_name);
- }
+ /* lov_pack.c */
 diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index ae122f6..f2747c9 100644
+index f2747c9..4c9e324 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_internal.h
 +++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -44,6 +44,18 @@
-  */
- #define LUSTRE_EXT3_STRIPE_MAXBYTES 0x1fffffff000ULL
+@@ -169,20 +169,22 @@ struct lov_request_set {
+ 	(char *)((lv)->lov_tgts[index]->ltd_uuid.uuid)
  
-+struct lov_stripe_md_entry {
-+	struct lu_extent	lsme_extent;
-+	u32			lsme_id;
-+	u32			lsme_magic;
-+	u32			lsme_pattern;
-+	u32			lsme_stripe_size;
-+	u16			lsme_stripe_count;
-+	u16			lsme_layout_gen;
-+	char			lsme_pool_name[LOV_MAXPOOLNAME + 1];
-+	struct lov_oinfo       *lsme_oinfo[];
-+};
-+
- struct lov_stripe_md {
- 	atomic_t	lsm_refc;
- 	spinlock_t	lsm_lock;
-@@ -56,28 +68,15 @@ struct lov_stripe_md {
- 	loff_t		lsm_maxbytes;
- 	struct ost_id	lsm_oi;
- 	u32		lsm_magic;
--	u32		lsm_stripe_size;
--	u32		lsm_pattern; /* RAID0, RAID1, released, ... */
--	u16		lsm_stripe_count;
--	u16		lsm_layout_gen;
--	char		lsm_pool_name[LOV_MAXPOOLNAME + 1];
--	struct lov_oinfo	*lsm_oinfo[0];
-+	u32		lsm_layout_gen;
-+	u32		lsm_entry_count;
-+	bool		lsm_is_released;
-+	struct lov_stripe_md_entry *lsm_entries[];
- };
+ /* lov_merge.c */
+-int lov_merge_lvb_kms(struct lov_stripe_md *lsm,
++int lov_merge_lvb_kms(struct lov_stripe_md *lsm, int index,
+ 		      struct ost_lvb *lvb, __u64 *kms_place);
  
--static inline bool lsm_is_released(struct lov_stripe_md *lsm)
--{
--	return !!(lsm->lsm_pattern & LOV_PATTERN_F_RELEASED);
--}
--
- static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
- {
--	if (!lsm)
--		return false;
--
--	if (lsm_is_released(lsm))
--		return false;
--
--	return true;
-+	return lsm && !lsm->lsm_is_released;
- }
+ /* lov_offset.c */
+-u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno);
+-int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
+-		      int stripeno, u64 *u64);
+-u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size, int stripeno);
+-int lov_stripe_intersects(struct lov_stripe_md *lsm, int stripeno,
++u64 lov_stripe_size(struct lov_stripe_md *lsm, int index, u64 ost_size,
++		    int stripeno);
++int lov_stripe_offset(struct lov_stripe_md *lsm, int index, u64 lov_off,
++		      int stripeno, u64 *obd_off);
++u64 lov_size_to_stripe(struct lov_stripe_md *lsm, int index, u64 file_size,
++		       int stripeno);
++int lov_stripe_intersects(struct lov_stripe_md *lsm, int index, int stripeno,
+ 			  u64 start, u64 end,
+ 			  u64 *obd_start, u64 *obd_end);
+-int lov_stripe_number(struct lov_stripe_md *lsm, u64 lov_off);
+-pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, pgoff_t stripe_index,
+-			 int stripe);
++int lov_stripe_number(struct lov_stripe_md *lsm, int index, u64 lov_off);
++pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, int index,
++			 pgoff_t stripe_index, int stripe);
  
- struct lsm_operations {
+ /* lov_request.c */
+ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
 diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index 6537ba3..2d62566 100644
+index 6dd5639..26d0043 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_io.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -251,10 +251,9 @@ static int lov_io_subio_init(const struct lu_env *env, struct lov_io *lio,
- 	 * Need to be optimized, we can't afford to allocate a piece of memory
- 	 * when writing a page. -jay
- 	 */
--	lio->lis_subs =
--		kvzalloc(lsm->lsm_stripe_count *
-+	lio->lis_subs = kcalloc(lsm->lsm_entries[0]->lsme_stripe_count,
- 				sizeof(lio->lis_subs[0]),
--				GFP_NOFS);
-+				GFP_KERNEL);
- 	if (lio->lis_subs) {
- 		lio->lis_nr_subios = lio->lis_stripe_count;
- 		lio->lis_single_subio_index = -1;
-@@ -272,7 +271,7 @@ static int lov_io_slice_init(struct lov_io *lio, struct lov_object *obj,
- 	io->ci_result = 0;
- 	lio->lis_object = obj;
+@@ -85,7 +85,7 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
+ 		if (cl_io_is_trunc(io)) {
+ 			loff_t new_size = parent->u.ci_setattr.sa_attr.lvb_size;
  
--	lio->lis_stripe_count = obj->lo_lsm->lsm_stripe_count;
-+	lio->lis_stripe_count = obj->lo_lsm->lsm_entries[0]->lsme_stripe_count;
+-			new_size = lov_size_to_stripe(lsm, new_size, stripe);
++			new_size = lov_size_to_stripe(lsm, 0, new_size, stripe);
+ 			io->u.ci_setattr.sa_attr.lvb_size = new_size;
+ 		}
+ 		break;
+@@ -101,7 +101,7 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
+ 		loff_t off = cl_offset(obj, parent->u.ci_fault.ft_index);
  
- 	switch (io->ci_type) {
- 	case CIT_READ:
-@@ -287,7 +286,7 @@ static int lov_io_slice_init(struct lov_io *lio, struct lov_object *obj,
- 			 * If there is LOV EA hole, then we may cannot locate
- 			 * the current file-tail exactly.
- 			 */
--			if (unlikely(obj->lo_lsm->lsm_pattern &
-+			if (unlikely(obj->lo_lsm->lsm_entries[0]->lsme_pattern &
- 				     LOV_PATTERN_F_HOLE))
- 				return -EIO;
+ 		io->u.ci_fault = parent->u.ci_fault;
+-		off = lov_size_to_stripe(lsm, off, stripe);
++		off = lov_size_to_stripe(lsm, 0, off, stripe);
+ 		io->u.ci_fault.ft_index = cl_index(obj, off);
+ 		break;
+ 	}
+@@ -144,13 +144,14 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
+ 	struct cl_object  *sub_obj;
+ 	struct cl_io      *io  = lio->lis_cl.cis_io;
+ 	int stripe = sub->sub_subio_index;
++	int index = 0;
+ 	int rc;
  
-@@ -419,9 +418,9 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
- 	struct lov_io	*lio = cl2lov_io(env, ios);
- 	struct cl_io	 *io  = ios->cis_io;
- 	struct lov_stripe_md *lsm = lio->lis_object->lo_lsm;
--	__u64 start = io->u.ci_rw.crw_pos;
-+	unsigned long ssize = lsm->lsm_entries[0]->lsme_stripe_size;
-+	u64 start = io->u.ci_rw.crw_pos;
- 	loff_t next;
--	unsigned long ssize = lsm->lsm_stripe_size;
+ 	LASSERT(!sub->sub_io);
+ 	LASSERT(!sub->sub_env);
+ 	LASSERT(sub->sub_subio_index < lio->lis_stripe_count);
  
- 	LASSERT(io->ci_type == CIT_READ || io->ci_type == CIT_WRITE);
+-	if (unlikely(!lov_r0(lov)->lo_sub[stripe]))
++	if (unlikely(!lov_r0(lov, index)->lo_sub[stripe]))
+ 		return -EIO;
  
-@@ -596,11 +595,11 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 	sub->sub_io_initialized = 0;
+@@ -179,7 +180,7 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
+ 		}
+ 	}
+ 
+-	sub_obj = lovsub2cl(lov_r0(lov)->lo_sub[stripe]);
++	sub_obj = lovsub2cl(lov_r0(lov, index)->lo_sub[stripe]);
+ 	sub_io = sub->sub_io;
+ 
+ 	sub_io->ci_obj = sub_obj;
+@@ -375,14 +376,15 @@ static int lov_io_iter_init(const struct lu_env *env,
+ 	u64 end;
+ 	int stripe;
+ 	int rc = 0;
++	int index = 0;
+ 
+ 	endpos = lov_offset_mod(lio->lis_endpos, -1);
+ 	for (stripe = 0; stripe < lio->lis_stripe_count; stripe++) {
+-		if (!lov_stripe_intersects(lsm, stripe, lio->lis_pos,
++		if (!lov_stripe_intersects(lsm, index, stripe, lio->lis_pos,
+ 					   endpos, &start, &end))
+ 			continue;
+ 
+-		if (unlikely(!lov_r0(lio->lis_object)->lo_sub[stripe])) {
++		if (unlikely(!lov_r0(lio->lis_object, index)->lo_sub[stripe])) {
+ 			if (ios->cis_io->ci_type == CIT_READ ||
+ 			    ios->cis_io->ci_type == CIT_WRITE ||
+ 			    ios->cis_io->ci_type == CIT_FAULT)
+@@ -555,15 +557,18 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 	struct lov_io *lio = cl2lov_io(env, ios);
+ 	struct lov_object *loo = lio->lis_object;
+ 	struct cl_object *obj = lov2cl(loo);
+-	struct lov_layout_raid0 *r0 = lov_r0(loo);
++	struct lov_layout_raid0 *r0;
+ 	unsigned int pps; /* pages per stripe */
+ 	struct lov_io_sub *sub;
+ 	pgoff_t ra_end;
+-	loff_t suboff;
++	u64 suboff;
+ 	int stripe;
++	int index = 0;
+ 	int rc;
+ 
+-	stripe = lov_stripe_number(loo->lo_lsm, cl_offset(obj, start));
++	stripe = lov_stripe_number(loo->lo_lsm, index, cl_offset(obj, start));
++
++	r0 = lov_r0(loo, index);
+ 	if (unlikely(!r0->lo_sub[stripe]))
+ 		return -EIO;
+ 
+@@ -571,7 +576,7 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 	if (IS_ERR(sub))
+ 		return PTR_ERR(sub);
+ 
+-	lov_stripe_offset(loo->lo_lsm, cl_offset(obj, start), stripe, &suboff);
++	lov_stripe_offset(loo->lo_lsm, index, cl_offset(obj, start), stripe, &suboff);
+ 	rc = cl_io_read_ahead(sub->sub_env, sub->sub_io,
+ 			      cl_index(lovsub2cl(r0->lo_sub[stripe]), suboff),
+ 			      ra);
+@@ -593,7 +598,7 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 	/* cra_end is stripe level, convert it into file level */
+ 	ra_end = ra->cra_end;
  	if (ra_end != CL_PAGE_EOF)
- 		ra_end = lov_stripe_pgoff(loo->lo_lsm, ra_end, stripe);
+-		ra_end = lov_stripe_pgoff(loo->lo_lsm, ra_end, stripe);
++		ra_end = lov_stripe_pgoff(loo->lo_lsm, index, ra_end, stripe);
  
--	pps = loo->lo_lsm->lsm_stripe_size >> PAGE_SHIFT;
-+	pps = loo->lo_lsm->lsm_entries[0]->lsme_stripe_size >> PAGE_SHIFT;
+ 	pps = loo->lo_lsm->lsm_entries[0]->lsme_stripe_size >> PAGE_SHIFT;
  
- 	CDEBUG(D_READA, DFID " max_index = %lu, pps = %u, stripe_size = %u, stripe no = %u, start index = %lu\n",
- 	       PFID(lu_object_fid(lov2lu(loo))), ra_end, pps,
--	       loo->lo_lsm->lsm_stripe_size, stripe, start);
-+	       loo->lo_lsm->lsm_entries[0]->lsme_stripe_size, stripe, start);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_lock.c b/drivers/staging/lustre/lustre/lov/lov_lock.c
+index 4340063..36c9eb7 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_lock.c
++++ b/drivers/staging/lustre/lustre/lov/lov_lock.c
+@@ -114,7 +114,11 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
+ 					  const struct cl_object *obj,
+ 					  struct cl_lock *lock)
+ {
++	struct lov_object *loo = cl2lov(obj);
++	struct lov_layout_raid0 *r0;
++	struct lov_lock	*lovlck;
+ 	int result = 0;
++	int index = 0;
+ 	int i;
+ 	int nr;
+ 	u64 start;
+@@ -122,10 +126,6 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
+ 	u64 file_start;
+ 	u64 file_end;
  
- 	/* never exceed the end of the stripe */
- 	ra->cra_end = min_t(pgoff_t, ra_end, start + pps - start % pps - 1);
+-	struct lov_object       *loo    = cl2lov(obj);
+-	struct lov_layout_raid0 *r0     = lov_r0(loo);
+-	struct lov_lock		*lovlck;
+-
+ 	CDEBUG(D_INODE, "%p: lock/io FID " DFID "/" DFID ", lock/io clobj %p/%p\n",
+ 	       loo, PFID(lu_object_fid(lov2lu(loo))),
+ 	       PFID(lu_object_fid(&obj->co_lu)),
+@@ -134,13 +134,14 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
+ 	file_start = cl_offset(lov2cl(loo), lock->cll_descr.cld_start);
+ 	file_end   = cl_offset(lov2cl(loo), lock->cll_descr.cld_end + 1) - 1;
+ 
++	r0 = lov_r0(loo, index);
+ 	for (i = 0, nr = 0; i < r0->lo_nr; i++) {
+ 		/*
+ 		 * XXX for wide striping smarter algorithm is desirable,
+ 		 * breaking out of the loop, early.
+ 		 */
+ 		if (likely(r0->lo_sub[i]) && /* spare layout */
+-		    lov_stripe_intersects(loo->lo_lsm, i,
++		    lov_stripe_intersects(loo->lo_lsm, index, i,
+ 					  file_start, file_end, &start, &end))
+ 			nr++;
+ 	}
+@@ -153,7 +154,7 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
+ 	lovlck->lls_nr = nr;
+ 	for (i = 0, nr = 0; i < r0->lo_nr; ++i) {
+ 		if (likely(r0->lo_sub[i]) &&
+-		    lov_stripe_intersects(loo->lo_lsm, i,
++		    lov_stripe_intersects(loo->lo_lsm, index, i,
+ 					  file_start, file_end, &start, &end)) {
+ 			struct lov_lock_sub *lls = &lovlck->lls_sub[nr];
+ 			struct cl_lock_descr *descr;
 diff --git a/drivers/staging/lustre/lustre/lov/lov_merge.c b/drivers/staging/lustre/lustre/lov/lov_merge.c
-index 006717c..10b8448 100644
+index 10b8448..020795f 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_merge.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_merge.c
-@@ -59,8 +59,8 @@ int lov_merge_lvb_kms(struct lov_stripe_md *lsm,
- 	CDEBUG(D_INODE, "MDT ID " DOSTID " initial value: s=%llu m=%llu a=%llu c=%llu b=%llu\n",
- 	       POSTID(&lsm->lsm_oi), lvb->lvb_size, lvb->lvb_mtime,
- 	       lvb->lvb_atime, lvb->lvb_ctime, lvb->lvb_blocks);
--	for (i = 0; i < lsm->lsm_stripe_count; i++) {
--		struct lov_oinfo *loi = lsm->lsm_oinfo[i];
-+	for (i = 0; i < lsm->lsm_entries[0]->lsme_stripe_count; i++) {
-+		struct lov_oinfo *loi = lsm->lsm_entries[0]->lsme_oinfo[i];
- 		u64 lov_size, tmpsize;
+@@ -41,7 +41,7 @@
+  * initializes the current atime, mtime, ctime to avoid regressing a more
+  * uptodate time on the local client.
+  */
+-int lov_merge_lvb_kms(struct lov_stripe_md *lsm,
++int lov_merge_lvb_kms(struct lov_stripe_md *lsm, int index,
+ 		      struct ost_lvb *lvb, __u64 *kms_place)
+ {
+ 	__u64 size = 0;
+@@ -69,14 +69,14 @@ int lov_merge_lvb_kms(struct lov_stripe_md *lsm,
+ 		}
  
- 		if (OST_LVB_IS_ERR(loi->loi_lvb.lvb_blocks)) {
+ 		tmpsize = loi->loi_kms;
+-		lov_size = lov_stripe_size(lsm, tmpsize, i);
++		lov_size = lov_stripe_size(lsm, index, tmpsize, i);
+ 		if (lov_size > kms)
+ 			kms = lov_size;
+ 
+ 		if (loi->loi_lvb.lvb_size > tmpsize)
+ 			tmpsize = loi->loi_lvb.lvb_size;
+ 
+-		lov_size = lov_stripe_size(lsm, tmpsize, i);
++		lov_size = lov_stripe_size(lsm, index, tmpsize, i);
+ 		if (lov_size > size)
+ 			size = lov_size;
+ 		/* merge blocks, mtime, atime */
 diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index adc90f3..ad2901a 100644
+index 1ebaa23..de5e2a2 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_object.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -153,7 +153,7 @@ static int lov_init_sub(const struct lu_env *env, struct lov_object *lov,
- 	hdr    = cl_object_header(lov2cl(lov));
- 	subhdr = cl_object_header(stripe);
- 
--	oinfo = lov->lo_lsm->lsm_oinfo[idx];
-+	oinfo = lov->lo_lsm->lsm_entries[0]->lsme_oinfo[idx];
- 	CDEBUG(D_INODE, DFID "@%p[%d] -> " DFID "@%p: ostid: " DOSTID " idx: %d gen: %d\n",
- 	       PFID(&subhdr->coh_lu.loh_fid), subhdr, idx,
- 	       PFID(&hdr->coh_lu.loh_fid), hdr, POSTID(&oinfo->loi_oi),
-@@ -239,7 +239,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 	LASSERT(!lov->lo_lsm);
- 	lov->lo_lsm = lsm_addref(lsm);
- 	lov->lo_layout_invalid = true;
--	r0->lo_nr  = lsm->lsm_stripe_count;
-+	r0->lo_nr  = lsm->lsm_entries[0]->lsme_stripe_count;
- 	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
- 
- 	r0->lo_sub = kvzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
-@@ -255,9 +255,10 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 		 */
- 		for (i = 0; i < r0->lo_nr && result == 0; ++i) {
- 			struct cl_device *subdev;
--			struct lov_oinfo *oinfo = lsm->lsm_oinfo[i];
--			int ost_idx = oinfo->loi_ost_idx;
-+			struct lov_oinfo *oinfo;
-+			int ost_idx;
- 
-+			oinfo = lsm->lsm_entries[0]->lsme_oinfo[i];
- 			if (lov_oinfo_is_dummy(oinfo))
- 				continue;
- 
-@@ -266,6 +267,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 			if (result != 0)
- 				goto out;
- 
-+			ost_idx = oinfo->loi_ost_idx;
- 			if (!dev->ld_target[ost_idx]) {
- 				CERROR("%s: OST %04x is not initialized\n",
- 				lov2obd(dev->ld_lov)->obd_name, ost_idx);
-@@ -314,7 +316,7 @@ static int lov_init_released(const struct lu_env *env, struct lov_device *dev,
- 			     union  lov_layout_state *state)
+@@ -221,24 +221,13 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
+ 			  const struct cl_object_conf *conf,
+ 			  struct lov_layout_raid0 *r0)
  {
- 	LASSERT(lsm);
--	LASSERT(lsm_is_released(lsm));
-+	LASSERT(lsm->lsm_is_released);
- 	LASSERT(!lov->lo_lsm);
++	struct cl_object *stripe;
++	struct lov_thread_info *lti = lov_env_info(env);
++	struct cl_object_conf *subconf = &lti->lti_stripe_conf;
++	struct lu_fid *ofid = &lti->lti_fid;
+ 	int result;
+-	int i;
+-
+-	struct cl_object	*stripe;
+-	struct lov_thread_info  *lti     = lov_env_info(env);
+-	struct cl_object_conf   *subconf = &lti->lti_stripe_conf;
+-	struct lu_fid	   *ofid    = &lti->lti_fid;
+ 	int psz;
+-
+-	if (lsm->lsm_magic != LOV_MAGIC_V1 && lsm->lsm_magic != LOV_MAGIC_V3) {
+-		dump_lsm(D_ERROR, lsm);
+-		LASSERTF(0, "magic mismatch, expected %d/%d, actual %d.\n",
+-			 LOV_MAGIC_V1, LOV_MAGIC_V3, lsm->lsm_magic);
+-	}
+-
+-	LASSERT(!lov->lo_lsm);
+-	lov->lo_lsm = lsm_addref(lsm);
+-	lov->lo_layout_invalid = true;
++	int i;
  
- 	lov->lo_lsm = lsm_addref(lsm);
-@@ -327,7 +329,7 @@ static struct cl_object *lov_find_subobj(const struct lu_env *env,
- 					 int stripe_idx)
+ 	spin_lock_init(&r0->lo_sub_lock);
+ 	r0->lo_nr  = lsm->lsm_entries[0]->lsme_stripe_count;
+@@ -305,10 +294,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
+ 		}
+ 	}
+ 	if (result == 0)
+-		cl_object_header(&lov->lo_cl)->coh_page_bufsize += psz;
+-	else
+-		result = -ENOMEM;
+-
++		result = psz;
+ out:
+ 	return result;
+ }
+@@ -319,9 +305,37 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 			      union lov_layout_state *state)
  {
- 	struct lov_device *dev = lu2lov_dev(lov2lu(lov)->lo_dev);
--	struct lov_oinfo *oinfo = lsm->lsm_oinfo[stripe_idx];
-+	struct lov_oinfo *oinfo = lsm->lsm_entries[0]->lsme_oinfo[stripe_idx];
- 	struct lov_thread_info *lti = lov_env_info(env);
- 	struct lu_fid *ofid = &lti->lti_fid;
- 	struct cl_device *subdev;
-@@ -485,7 +487,7 @@ static int lov_print_raid0(const struct lu_env *env, void *cookie,
+ 	struct lov_layout_composite *comp = &state->composite;
+-	struct lov_layout_entry *le = &comp->lo_entries;
++	unsigned int entry_count = 1;
++	unsigned int psz = 0;
++	int result = 0;
++	int i;
+ 
+-	return lov_init_raid0(env, dev, lov, lsm, conf, &le->lle_raid0);
++	LASSERT(!lov->lo_lsm);
++	lov->lo_lsm = lsm_addref(lsm);
++	lov->lo_layout_invalid = true;
++
++	comp->lo_entry_count = entry_count;
++
++	comp->lo_entries = kcalloc(entry_count, sizeof(*comp->lo_entries),
++				   GFP_KERNEL);
++	if (!comp->lo_entries)
++		return -ENOMEM;
++
++	for (i = 0; i < entry_count; i++) {
++		struct lov_layout_entry *le = &comp->lo_entries[i];
++
++		result = lov_init_raid0(env, dev, lov, lsm, conf,
++					&le->lle_raid0);
++		if (result < 0)
++			break;
++
++		LASSERT(ergo(psz > 0, psz == result));
++		psz = result;
++	}
++	if (psz > 0)
++		cl_object_header(&lov->lo_cl)->coh_page_bufsize += psz;
++
++	return result > 0 ? 0 : result;
+ }
+ 
+ static int lov_init_released(const struct lu_env *env, struct lov_device *dev,
+@@ -454,7 +468,7 @@ static int lov_delete_composite(const struct lu_env *env,
+ 				union lov_layout_state *state)
+ {
+ 	struct lov_layout_composite *comp = &state->composite;
+-	struct lov_layout_entry *entry = &comp->lo_entries;
++	struct lov_layout_entry *entry = &comp->lo_entries[0];
+ 
+ 	dump_lsm(D_INODE, lov->lo_lsm);
+ 
+@@ -484,9 +498,15 @@ static void lov_fini_composite(const struct lu_env *env,
+ 			       union lov_layout_state *state)
+ {
+ 	struct lov_layout_composite *comp = &state->composite;
+-	struct lov_layout_entry *entry = &comp->lo_entries;
+ 
+-	lov_fini_raid0(env, &entry->lle_raid0);
++	if (comp->lo_entries) {
++		struct lov_layout_entry *entry = &comp->lo_entries[0];
++
++		lov_fini_raid0(env, &entry->lle_raid0);
++
++		kvfree(comp->lo_entries);
++		comp->lo_entries = NULL;
++	}
+ 
+ 	dump_lsm(D_INODE, lov->lo_lsm);
+ 	lov_free_memmd(&lov->lo_lsm);
+@@ -528,7 +548,7 @@ static int lov_print_composite(const struct lu_env *env, void *cookie,
+ 			       lu_printer_t p, const struct lu_object *o)
+ {
+ 	struct lov_object *lov = lu2lov(o);
+-	struct lov_layout_raid0	*r0 = lov_r0(lov);
++	struct lov_layout_raid0	*r0 = lov_r0(lov, 0);
+ 	struct lov_stripe_md *lsm = lov->lo_lsm;
+ 
  	(*p)(env, cookie, "stripes: %d, %s, lsm{%p 0x%08X %d %u %u}:\n",
- 	     r0->lo_nr, lov->lo_layout_invalid ? "invalid" : "valid", lsm,
- 	     lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
--	     lsm->lsm_stripe_count, lsm->lsm_layout_gen);
-+	     lsm->lsm_entries[0]->lsme_stripe_count, lsm->lsm_layout_gen);
- 	for (i = 0; i < r0->lo_nr; ++i) {
- 		struct lu_object *sub;
- 
-@@ -509,7 +511,7 @@ static int lov_print_released(const struct lu_env *env, void *cookie,
- 	     "released: %s, lsm{%p 0x%08X %d %u %u}:\n",
- 	     lov->lo_layout_invalid ? "invalid" : "valid", lsm,
- 	     lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
--	     lsm->lsm_stripe_count, lsm->lsm_layout_gen);
-+	     lsm->lsm_entries[0]->lsme_stripe_count, lsm->lsm_layout_gen);
- 	return 0;
- }
- 
-@@ -650,8 +652,13 @@ static enum lov_layout_type lov_type(struct lov_stripe_md *lsm)
+@@ -600,7 +620,7 @@ static int lov_attr_get_raid0(const struct lu_env *env, struct lov_object *lov,
+ 	 * sub-object attributes.
+ 	 */
+ 	lov_stripe_lock(lsm);
+-	result = lov_merge_lvb_kms(lsm, lvb, &kms);
++	result = lov_merge_lvb_kms(lsm, 0, lvb, &kms);
+ 	lov_stripe_unlock(lsm);
+ 	if (result)
+ 		return result;
+@@ -617,7 +637,7 @@ static int lov_attr_get_composite(const struct lu_env *env,
+ 				  struct cl_attr *attr)
  {
- 	if (!lsm)
- 		return LLT_EMPTY;
--	if (lsm_is_released(lsm))
-+
-+	if (lsm->lsm_magic == LOV_MAGIC_COMP_V1)
-+		return LLT_EMPTY;
-+
-+	if (lsm->lsm_is_released)
- 		return LLT_RELEASED;
-+
- 	return LLT_RAID0;
- }
+ 	struct lov_object *lov = cl2lov(obj);
+-	struct lov_layout_raid0 *r0 = lov_r0(lov);
++	struct lov_layout_raid0 *r0 = lov_r0(lov, 0);
+ 	struct cl_attr *lov_attr = &r0->lo_attr;
+ 	int result;
  
-@@ -882,7 +889,8 @@ static int lov_conf_set(const struct lu_env *env, struct cl_object *obj,
- 	if ((!lsm && !lov->lo_lsm) ||
- 	    ((lsm && lov->lo_lsm) &&
- 	     (lov->lo_lsm->lsm_layout_gen == lsm->lsm_layout_gen) &&
--	     (lov->lo_lsm->lsm_pattern == lsm->lsm_pattern))) {
-+	     (lov->lo_lsm->lsm_entries[0]->lsme_pattern ==
-+	      lsm->lsm_entries[0]->lsme_pattern))) {
- 		/* same version of layout */
- 		lov->lo_layout_invalid = false;
- 		result = 0;
-@@ -1010,19 +1018,24 @@ static int fiemap_calc_last_stripe(struct lov_stripe_md *lsm,
+@@ -1051,33 +1071,31 @@ int lov_lock_init(const struct lu_env *env, struct cl_object *obj,
+  *
+  * \retval last_stripe		return the last stripe of the mapping
+  */
+-static int fiemap_calc_last_stripe(struct lov_stripe_md *lsm,
++static int fiemap_calc_last_stripe(struct lov_stripe_md *lsm, int index,
+ 				   u64 fm_start, u64 fm_end,
+ 				   int start_stripe, int *stripe_count)
+ {
++	struct lov_stripe_md_entry *lsme = lsm->lsm_entries[index];
+ 	int last_stripe;
+ 	u64 obd_start;
  	u64 obd_end;
  	int i, j;
  
--	if (fm_end - fm_start > lsm->lsm_stripe_size * lsm->lsm_stripe_count) {
--		last_stripe = (start_stripe < 1 ? lsm->lsm_stripe_count - 1 :
-+	if (fm_end - fm_start > lsm->lsm_entries[0]->lsme_stripe_size *
-+				lsm->lsm_entries[0]->lsme_stripe_count) {
-+		last_stripe = (start_stripe < 1 ?
-+			       lsm->lsm_entries[0]->lsme_stripe_count - 1 :
- 			       start_stripe - 1);
--		*stripe_count = lsm->lsm_stripe_count;
-+		*stripe_count = lsm->lsm_entries[0]->lsme_stripe_count;
+-	if (fm_end - fm_start > lsm->lsm_entries[0]->lsme_stripe_size *
+-				lsm->lsm_entries[0]->lsme_stripe_count) {
+-		last_stripe = (start_stripe < 1 ?
+-			       lsm->lsm_entries[0]->lsme_stripe_count - 1 :
+-			       start_stripe - 1);
+-		*stripe_count = lsm->lsm_entries[0]->lsme_stripe_count;
++	if (fm_end - fm_start >
++	    lsme->lsme_stripe_size * lsme->lsme_stripe_count) {
++		last_stripe = (start_stripe < 1 ? lsme->lsme_stripe_count - 1 :
++						  start_stripe - 1);
++		*stripe_count = lsme->lsme_stripe_count;
  	} else {
--		for (j = 0, i = start_stripe; j < lsm->lsm_stripe_count;
--		     i = (i + 1) % lsm->lsm_stripe_count, j++) {
--			if (!(lov_stripe_intersects(lsm, i, fm_start, fm_end,
--						    &obd_start, &obd_end)))
-+		for (j = 0, i = start_stripe;
-+		     j < lsm->lsm_entries[0]->lsme_stripe_count;
-+		     i = (i + 1) % lsm->lsm_entries[0]->lsme_stripe_count,
-+		     j++) {
-+			if (lov_stripe_intersects(lsm, i, fm_start, fm_end,
-+						  &obd_start, &obd_end) == 0)
+-		for (j = 0, i = start_stripe;
+-		     j < lsm->lsm_entries[0]->lsme_stripe_count;
+-		     i = (i + 1) % lsm->lsm_entries[0]->lsme_stripe_count,
++		for (j = 0, i = start_stripe; j < lsme->lsme_stripe_count;
++		     i = (i + 1) % lsme->lsme_stripe_count,
+ 		     j++) {
+-			if (lov_stripe_intersects(lsm, i, fm_start, fm_end,
++			if (lov_stripe_intersects(lsm, index, i, fm_start, fm_end,
+ 						  &obd_start, &obd_end) == 0)
  				break;
  		}
  		*stripe_count = j;
--		last_stripe = (start_stripe + j - 1) % lsm->lsm_stripe_count;
-+		last_stripe = (start_stripe + j - 1) %
-+			      lsm->lsm_entries[0]->lsme_stripe_count;
+-		last_stripe = (start_stripe + j - 1) %
+-			      lsm->lsm_entries[0]->lsme_stripe_count;
++		last_stripe = (start_stripe + j - 1) % lsme->lsme_stripe_count;
  	}
  
  	return last_stripe;
-@@ -1090,8 +1103,8 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+@@ -1132,9 +1150,10 @@ static void fiemap_prepare_and_copy_exts(struct fiemap *fiemap,
+  */
+ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+ 				     struct lov_stripe_md *lsm,
+-				     u64 fm_start, u64 fm_end,
++				     int index, u64 fm_start, u64 fm_end,
+ 				     int *start_stripe)
+ {
++	struct lov_stripe_md_entry *lsme = lsm->lsm_entries[index];
+ 	u64 local_end = fiemap->fm_extents[0].fe_logical;
+ 	u64 lun_start, lun_end;
+ 	u64 fm_end_offset;
+@@ -1145,8 +1164,8 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
  		return 0;
  
  	/* Find out stripe_no from ost_index saved in the fe_device */
--	for (i = 0; i < lsm->lsm_stripe_count; i++) {
--		struct lov_oinfo *oinfo = lsm->lsm_oinfo[i];
-+	for (i = 0; i < lsm->lsm_entries[0]->lsme_stripe_count; i++) {
-+		struct lov_oinfo *oinfo = lsm->lsm_entries[0]->lsme_oinfo[i];
+-	for (i = 0; i < lsm->lsm_entries[0]->lsme_stripe_count; i++) {
+-		struct lov_oinfo *oinfo = lsm->lsm_entries[0]->lsme_oinfo[i];
++	for (i = 0; i < lsme->lsme_stripe_count; i++) {
++		struct lov_oinfo *oinfo = lsme->lsme_oinfo[i];
  
  		if (lov_oinfo_is_dummy(oinfo))
  			continue;
-@@ -1110,7 +1123,7 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+@@ -1164,7 +1183,7 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+ 	 * If we have finished mapping on previous device, shift logical
  	 * offset to start of next device
  	 */
- 	if (lov_stripe_intersects(lsm, stripe_no, fm_start, fm_end,
--				  &lun_start, &lun_end) &&
-+				  &lun_start, &lun_end) != 0 &&
+-	if (lov_stripe_intersects(lsm, stripe_no, fm_start, fm_end,
++	if (lov_stripe_intersects(lsm, index, stripe_no, fm_start, fm_end,
+ 				  &lun_start, &lun_end) != 0 &&
  	    local_end < lun_end) {
  		fm_end_offset = local_end;
- 		*start_stripe = stripe_no;
-@@ -1119,7 +1132,8 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+@@ -1174,8 +1193,7 @@ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
  		 * calculate offset in next stripe.
  		 */
  		fm_end_offset = 0;
--		*start_stripe = (stripe_no + 1) % lsm->lsm_stripe_count;
-+		*start_stripe = (stripe_no + 1) %
-+				lsm->lsm_entries[0]->lsme_stripe_count;
+-		*start_stripe = (stripe_no + 1) %
+-				lsm->lsm_entries[0]->lsme_stripe_count;
++		*start_stripe = (stripe_no + 1) % lsme->lsme_stripe_count;
  	}
  
  	return fm_end_offset;
-@@ -1168,7 +1182,7 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+@@ -1197,11 +1215,11 @@ struct fiemap_state {
+ };
+ 
+ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+-			     struct lov_stripe_md *lsm,
+-			     struct fiemap *fiemap, size_t *buflen,
+-			     struct ll_fiemap_info_key *fmkey, int stripeno,
+-			     struct fiemap_state *fs)
++			     struct lov_stripe_md *lsm, struct fiemap *fiemap,
++			     size_t *buflen, struct ll_fiemap_info_key *fmkey,
++			     int index, int stripeno, struct fiemap_state *fs)
+ {
++	struct lov_stripe_md_entry *lsme = lsm->lsm_entries[index];
+ 	struct cl_object *subobj;
+ 	struct lov_obd *lov = lu2lov_dev(obj->co_lu.lo_dev)->ld_lov;
+ 	struct fiemap_extent *fm_ext = &fs->fs_fm->fm_extents[0];
+@@ -1220,11 +1238,12 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+ 
+ 	fs->fs_device_done = false;
+ 	/* Find out range of mapping on this stripe */
+-	if ((lov_stripe_intersects(lsm, stripeno, fs->fs_start, fs->fs_end,
++	if ((lov_stripe_intersects(lsm, index, stripeno,
++				   fs->fs_start, fs->fs_end,
  				   &lun_start, &obd_object_end)) == 0)
  		return 0;
  
--	if (lov_oinfo_is_dummy(lsm->lsm_oinfo[stripeno]))
-+	if (lov_oinfo_is_dummy(lsm->lsm_entries[0]->lsme_oinfo[stripeno]))
+-	if (lov_oinfo_is_dummy(lsm->lsm_entries[0]->lsme_oinfo[stripeno]))
++	if (lov_oinfo_is_dummy(lsme->lsme_oinfo[stripeno]))
  		return -EIO;
  
  	/* If this is a continuation FIEMAP call and we are on
-@@ -1218,7 +1232,7 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+@@ -1239,7 +1258,8 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+ 		/* Handle fs->fs_start + fs->fs_length overflow */
+ 		if (fs->fs_start + fs->fs_length < fs->fs_start)
+ 			fs->fs_length = ~0ULL - fs->fs_start;
+-		lun_end = lov_size_to_stripe(lsm, fs->fs_start + fs->fs_length,
++		lun_end = lov_size_to_stripe(lsm, index,
++					     fs->fs_start + fs->fs_length,
+ 					     stripeno);
+ 	}
+ 
+@@ -1274,7 +1294,7 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
  		fs->fs_fm->fm_mapped_extents = 0;
  		fs->fs_fm->fm_flags = fiemap->fm_flags;
  
--		ost_index = lsm->lsm_oinfo[stripeno]->loi_ost_idx;
-+		ost_index = lsm->lsm_entries[0]->lsme_oinfo[stripeno]->loi_ost_idx;
+-		ost_index = lsm->lsm_entries[0]->lsme_oinfo[stripeno]->loi_ost_idx;
++		ost_index = lsme->lsme_oinfo[stripeno]->loi_ost_idx;
  
  		if (ost_index < 0 || ost_index >= lov->desc.ld_tgt_count) {
  			rc = -EINVAL;
-@@ -1347,13 +1361,13 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	 * If the stripe_count > 1 and the application does not understand
- 	 * DEVICE_ORDER flag, it cannot interpret the extents correctly.
- 	 */
--	if (lsm->lsm_stripe_count > 1 &&
-+	if (lsm->lsm_entries[0]->lsme_stripe_count > 1 &&
- 	    !(fiemap->fm_flags & FIEMAP_FLAG_DEVICE_ORDER)) {
- 		rc = -ENOTSUPP;
+@@ -1345,8 +1365,9 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+ 		 */
+ 		if (fm_ext[ext_count - 1].fe_flags & FIEMAP_EXTENT_LAST)
+ 			fm_ext[ext_count - 1].fe_flags &= ~FIEMAP_EXTENT_LAST;
+-		if (lov_stripe_size(lsm, fm_ext[ext_count - 1].fe_logical +
+-					 fm_ext[ext_count - 1].fe_length,
++		if (lov_stripe_size(lsm, index,
++				    fm_ext[ext_count - 1].fe_logical +
++				    fm_ext[ext_count - 1].fe_length,
+ 				    stripeno) >= fmkey->lfik_oa.o_size) {
+ 			ost_eof = true;
+ 			fs->fs_device_done = true;
+@@ -1391,6 +1412,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+ 	struct fiemap *fm_local = NULL;
+ 	struct lov_stripe_md *lsm;
+ 	int rc = 0;
++	int entry = 0;
+ 	int cur_stripe;
+ 	int stripe_count;
+ 	struct fiemap_state fs = { NULL };
+@@ -1450,7 +1472,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
  		goto out;
  	}
- 
--	if (lsm_is_released(lsm)) {
-+	if (lsm->lsm_is_released) {
- 		if (fiemap->fm_start < fmkey->lfik_oa.o_size) {
- 			/**
- 			 * released file, return a minimal FIEMAP if
-@@ -1431,7 +1445,8 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	/* Check each stripe */
- 	for (cur_stripe = fs.fs_start_stripe; stripe_count > 0;
- 	     --stripe_count,
--	     cur_stripe = (cur_stripe + 1) % lsm->lsm_stripe_count) {
-+	     cur_stripe = (cur_stripe + 1) %
-+			  lsm->lsm_entries[0]->lsme_stripe_count) {
- 		rc = fiemap_for_stripe(env, obj, lsm, fiemap, buflen, fmkey,
- 				       cur_stripe, &fs);
- 		if (rc < 0)
-@@ -1443,7 +1458,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	 * Indicate that we are returning device offsets unless file just has
- 	 * single stripe
- 	 */
--	if (lsm->lsm_stripe_count > 1)
-+	if (lsm->lsm_entries[0]->lsme_stripe_count > 1)
- 		fiemap->fm_flags |= FIEMAP_FLAG_DEVICE_ORDER;
- 
- 	if (!fiemap->fm_extent_count)
-@@ -1495,7 +1510,8 @@ static int lov_object_layout_get(const struct lu_env *env,
- 		return 0;
+ 	/* Calculate start stripe, last stripe and length of mapping */
+-	fs.fs_start_stripe = lov_stripe_number(lsm, fs.fs_start);
++	fs.fs_start_stripe = lov_stripe_number(lsm, 0, fs.fs_start);
+ 	fs.fs_end = (fs.fs_length == ~0ULL) ? fmkey->lfik_oa.o_size :
+ 					      fs.fs_start + fs.fs_length - 1;
+ 	/* If fs_length != ~0ULL but fs_start+fs_length-1 exceeds file size */
+@@ -1459,11 +1481,12 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+ 		fs.fs_length = fs.fs_end - fs.fs_start;
  	}
  
--	cl->cl_size = lov_mds_md_size(lsm->lsm_stripe_count, lsm->lsm_magic);
-+	cl->cl_size = lov_mds_md_size(lsm->lsm_entries[0]->lsme_stripe_count,
-+				      lsm->lsm_magic);
- 	cl->cl_layout_gen = lsm->lsm_layout_gen;
- 
- 	rc = lov_lsm_pack(lsm, buf->lb_buf, buf->lb_len);
-@@ -1599,9 +1615,11 @@ int lov_read_and_clear_async_rc(struct cl_object *clob)
- 			int i;
- 
- 			lsm = lov->lo_lsm;
--			for (i = 0; i < lsm->lsm_stripe_count; i++) {
--				struct lov_oinfo *loi = lsm->lsm_oinfo[i];
-+			for (i = 0; i < lsm->lsm_entries[0]->lsme_stripe_count;
-+			     i++) {
-+				struct lov_oinfo *loi;
- 
-+				loi = lsm->lsm_entries[0]->lsme_oinfo[i];
- 				if (lov_oinfo_is_dummy(loi))
- 					continue;
- 
+-	fs.fs_last_stripe = fiemap_calc_last_stripe(lsm, fs.fs_start, fs.fs_end,
++	fs.fs_last_stripe = fiemap_calc_last_stripe(lsm, entry,
++						    fs.fs_start, fs.fs_end,
+ 						    fs.fs_start_stripe,
+ 						    &stripe_count);
+-	fs.fs_end_offset = fiemap_calc_fm_end_offset(fiemap, lsm, fs.fs_start,
+-						     fs.fs_end,
++	fs.fs_end_offset = fiemap_calc_fm_end_offset(fiemap, lsm, entry,
++						     fs.fs_start, fs.fs_end,
+ 						     &fs.fs_start_stripe);
+ 	if (fs.fs_end_offset == -EINVAL) {
+ 		rc = -EINVAL;
+@@ -1489,8 +1512,8 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+ 	     --stripe_count,
+ 	     cur_stripe = (cur_stripe + 1) %
+ 			  lsm->lsm_entries[0]->lsme_stripe_count) {
+-		rc = fiemap_for_stripe(env, obj, lsm, fiemap, buflen, fmkey,
+-				       cur_stripe, &fs);
++		rc = fiemap_for_stripe(env, obj, lsm, fiemap, buflen,
++				       fmkey, 0, cur_stripe, &fs);
+ 		if (rc < 0)
+ 			goto out;
+ 		if (fs.fs_finish)
 diff --git a/drivers/staging/lustre/lustre/lov/lov_offset.c b/drivers/staging/lustre/lustre/lov/lov_offset.c
-index a5f00f6..19a44d3 100644
+index 19a44d3..d817aa5 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_offset.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_offset.c
-@@ -40,7 +40,7 @@
+@@ -38,9 +38,10 @@
+ #include "lov_internal.h"
+ 
  /* compute object size given "stripeno" and the ost size */
- u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno)
+-u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno)
++u64 lov_stripe_size(struct lov_stripe_md *lsm, int index, u64 ost_size,
++		    int stripeno)
  {
--	unsigned long ssize = lsm->lsm_stripe_size;
-+	unsigned long ssize = lsm->lsm_entries[0]->lsme_stripe_size;
+-	unsigned long ssize = lsm->lsm_entries[0]->lsme_stripe_size;
++	unsigned long ssize = lsm->lsm_entries[index]->lsme_stripe_size;
  	unsigned long stripe_size;
  	u64 swidth;
  	u64 lov_size;
-@@ -125,7 +125,7 @@ pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, pgoff_t stripe_index,
- int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
+@@ -64,12 +65,13 @@ u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno)
+ /**
+  * Compute file level page index by stripe level page offset
+  */
+-pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, pgoff_t stripe_index,
+-			 int stripe)
++pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, int index,
++			 pgoff_t stripe_index, int stripe)
+ {
+ 	loff_t offset;
+ 
+-	offset = lov_stripe_size(lsm, (stripe_index << PAGE_SHIFT) + 1, stripe);
++	offset = lov_stripe_size(lsm, index, (stripe_index << PAGE_SHIFT) + 1,
++				 stripe);
+ 	return offset >> PAGE_SHIFT;
+ }
+ 
+@@ -122,10 +124,10 @@ pgoff_t lov_stripe_pgoff(struct lov_stripe_md *lsm, pgoff_t stripe_index,
+  * falls in the stripe and no shifting was done; > 0 when the offset
+  * was outside the stripe and was pulled back to its final byte.
+  */
+-int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
++int lov_stripe_offset(struct lov_stripe_md *lsm, int index, u64 lov_off,
  		      int stripeno, u64 *obdoff)
  {
--	unsigned long ssize  = lsm->lsm_stripe_size;
-+	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
+-	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
++	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
  	u64 stripe_off, this_stripe, swidth;
  	int magic = lsm->lsm_magic;
  	int ret = 0;
-@@ -180,7 +180,7 @@ int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
- u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size,
+@@ -177,10 +179,10 @@ int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
+  * |    0    |     1     |     2     |    0    |     1     |     2     |
+  * ---------------------------------------------------------------------
+  */
+-u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size,
++u64 lov_size_to_stripe(struct lov_stripe_md *lsm, int index, u64 file_size,
  		       int stripeno)
  {
--	unsigned long ssize  = lsm->lsm_stripe_size;
-+	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
+-	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
++	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
  	u64 stripe_off, this_stripe, swidth;
  	int magic = lsm->lsm_magic;
  
-@@ -254,7 +254,7 @@ int lov_stripe_intersects(struct lov_stripe_md *lsm, int stripeno,
- /* compute which stripe number "lov_off" will be written into */
- int lov_stripe_number(struct lov_stripe_md *lsm, u64 lov_off)
+@@ -218,13 +220,13 @@ u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size,
+  * that is contained within the lov extent.  this returns true if the given
+  * stripe does intersect with the lov extent.
+  */
+-int lov_stripe_intersects(struct lov_stripe_md *lsm, int stripeno,
++int lov_stripe_intersects(struct lov_stripe_md *lsm, int index, int stripeno,
+ 			  u64 start, u64 end, u64 *obd_start, u64 *obd_end)
  {
--	unsigned long ssize  = lsm->lsm_stripe_size;
-+	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
+ 	int start_side, end_side;
+ 
+-	start_side = lov_stripe_offset(lsm, start, stripeno, obd_start);
+-	end_side = lov_stripe_offset(lsm, end, stripeno, obd_end);
++	start_side = lov_stripe_offset(lsm, index, start, stripeno, obd_start);
++	end_side = lov_stripe_offset(lsm, index, end, stripeno, obd_end);
+ 
+ 	CDEBUG(D_INODE, "[%llu->%llu] -> [(%d) %llu->%llu (%d)]\n",
+ 	       start, end, start_side, *obd_start, *obd_end, end_side);
+@@ -252,9 +254,9 @@ int lov_stripe_intersects(struct lov_stripe_md *lsm, int stripeno,
+ }
+ 
+ /* compute which stripe number "lov_off" will be written into */
+-int lov_stripe_number(struct lov_stripe_md *lsm, u64 lov_off)
++int lov_stripe_number(struct lov_stripe_md *lsm, int index, u64 lov_off)
+ {
+-	unsigned long ssize  = lsm->lsm_entries[0]->lsme_stripe_size;
++	unsigned long ssize  = lsm->lsm_entries[index]->lsme_stripe_size;
  	u64 stripe_off, swidth;
  	int magic = lsm->lsm_magic;
  
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 90f9f2d..3700937 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -116,7 +116,8 @@ ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
- 	size_t lmm_size;
- 	unsigned int i;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+index d94d003..ad34fc3 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_page.c
++++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+@@ -67,21 +67,24 @@ int lov_page_init_composite(const struct lu_env *env, struct cl_object *obj,
+ 			    struct cl_page *page, pgoff_t index)
+ {
+ 	struct lov_object *loo = cl2lov(obj);
+-	struct lov_layout_raid0 *r0 = lov_r0(loo);
+ 	struct lov_io     *lio = lov_env_io(env);
++	struct lov_layout_raid0 *r0;
+ 	struct cl_object  *subobj;
+ 	struct cl_object  *o;
+ 	struct lov_io_sub *sub;
+ 	struct lov_page   *lpg = cl_object_page_slice(obj, page);
+-	loff_t	     offset;
++	u64 offset;
+ 	u64	    suboff;
+ 	int		stripe;
++	int entry = 0;
+ 	int		rc;
  
--	lmm_size = lov_mds_md_size(lsm->lsm_stripe_count, lsm->lsm_magic);
-+	lmm_size = lov_mds_md_size(lsm->lsm_entries[0]->lsme_stripe_count,
-+				   lsm->lsm_magic);
- 	if (!buf_size)
- 		return lmm_size;
+ 	offset = cl_offset(obj, index);
+-	stripe = lov_stripe_number(loo->lo_lsm, offset);
++
++	r0 = lov_r0(loo, entry);
++	stripe = lov_stripe_number(loo->lo_lsm, entry, offset);
+ 	LASSERT(stripe < r0->lo_nr);
+-	rc = lov_stripe_offset(loo->lo_lsm, offset, stripe, &suboff);
++	rc = lov_stripe_offset(loo->lo_lsm, entry, offset, stripe, &suboff);
+ 	LASSERT(rc == 0);
  
-@@ -129,23 +130,24 @@ ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
+ 	lpg->lps_index = stripe;
+diff --git a/drivers/staging/lustre/lustre/lov/lovsub_object.c b/drivers/staging/lustre/lustre/lov/lovsub_object.c
+index d3e9537..cd7806b 100644
+--- a/drivers/staging/lustre/lustre/lov/lovsub_object.c
++++ b/drivers/staging/lustre/lustre/lov/lovsub_object.c
+@@ -79,8 +79,9 @@ static void lovsub_object_free(const struct lu_env *env, struct lu_object *obj)
+ 	 * object handling in lu_object_find.
  	 */
- 	lmmv1->lmm_magic = cpu_to_le32(lsm->lsm_magic);
- 	lmm_oi_cpu_to_le(&lmmv1->lmm_oi, &lsm->lsm_oi);
--	lmmv1->lmm_stripe_size = cpu_to_le32(lsm->lsm_stripe_size);
--	lmmv1->lmm_stripe_count = cpu_to_le16(lsm->lsm_stripe_count);
--	lmmv1->lmm_pattern = cpu_to_le32(lsm->lsm_pattern);
-+	lmmv1->lmm_stripe_size = cpu_to_le32(lsm->lsm_entries[0]->lsme_stripe_size);
-+	lmmv1->lmm_stripe_count = cpu_to_le16(lsm->lsm_entries[0]->lsme_stripe_count);
-+	lmmv1->lmm_pattern = cpu_to_le32(lsm->lsm_entries[0]->lsme_pattern);
- 	lmmv1->lmm_layout_gen = cpu_to_le16(lsm->lsm_layout_gen);
+ 	if (lov) {
++		int index = 0;
+ 		int stripe = los->lso_index;
+-		struct lov_layout_raid0 *r0 = lov_r0(lov);
++		struct lov_layout_raid0 *r0 = lov_r0(lov, index);
  
- 	if (lsm->lsm_magic == LOV_MAGIC_V3) {
--		BUILD_BUG_ON(sizeof(lsm->lsm_pool_name) !=
--			 sizeof(lmmv3->lmm_pool_name));
--		strlcpy(lmmv3->lmm_pool_name, lsm->lsm_pool_name,
-+		BUILD_BUG_ON(sizeof(lsm->lsm_entries[0]->lsme_pool_name) !=
-+			     sizeof(lmmv3->lmm_pool_name));
-+		strlcpy(lmmv3->lmm_pool_name,
-+			lsm->lsm_entries[0]->lsme_pool_name,
- 			sizeof(lmmv3->lmm_pool_name));
- 		lmm_objects = lmmv3->lmm_objects;
- 	} else {
- 		lmm_objects = lmmv1->lmm_objects;
- 	}
+ 		LASSERT(lov->lo_type == LLT_COMP);
+ 		LASSERT(r0->lo_sub[stripe] == los);
+@@ -107,7 +108,7 @@ static int lovsub_attr_update(const struct lu_env *env, struct cl_object *obj,
+ {
+ 	struct lov_object *lov = cl2lovsub(obj)->lso_super;
  
--	for (i = 0; i < lsm->lsm_stripe_count; i++) {
--		struct lov_oinfo *loi = lsm->lsm_oinfo[i];
-+	for (i = 0; i < lsm->lsm_entries[0]->lsme_stripe_count; i++) {
-+		struct lov_oinfo *loi = lsm->lsm_entries[0]->lsme_oinfo[i];
+-	lov_r0(lov)->lo_attr_valid = 0;
++	lov_r0(lov, 0)->lo_attr_valid = 0;
+ 	return 0;
+ }
  
- 		ostid_cpu_to_le(&loi->loi_oi, &lmm_objects[i].l_ost_oi);
- 		lmm_objects[i].l_ost_gen = cpu_to_le32(loi->loi_ost_gen);
-@@ -240,8 +242,8 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 		goto out;
- 	}
- 
--	if (!lsm_is_released(lsm))
--		stripe_count = lsm->lsm_stripe_count;
-+	if (!lsm->lsm_is_released)
-+		stripe_count = lsm->lsm_entries[0]->lsme_stripe_count;
- 	else
- 		stripe_count = 0;
- 
-@@ -260,18 +262,16 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 		goto out;
- 	}
- 
--	if (lum.lmm_stripe_count &&
--	    (lum.lmm_stripe_count < lsm->lsm_stripe_count)) {
-+	if (lum.lmm_stripe_count && lum.lmm_stripe_count < stripe_count) {
- 		/* Return right size of stripe to user */
- 		lum.lmm_stripe_count = stripe_count;
- 		rc = copy_to_user(lump, &lum, lum_size);
- 		rc = -EOVERFLOW;
- 		goto out;
- 	}
--	lmmk_size = lov_mds_md_size(stripe_count, lsm->lsm_magic);
--
- 
--	lmmk = kvzalloc(lmmk_size, GFP_NOFS);
-+	lmmk_size = lov_mds_md_size(stripe_count, lsm->lsm_magic);
-+	lmmk = kvzalloc(lmmk_size, GFP_KERNEL);
- 	if (!lmmk) {
- 		rc = -ENOMEM;
- 		goto out;
 -- 
 1.8.3.1
