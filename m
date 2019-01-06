@@ -1,45 +1,64 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 17:14:26 -0500
-Subject: [lustre-devel] [PATCH v2 31/33] lustre: lov: call
- cl_object_attr_get under cl_attr lock
+Date: Sun,  6 Jan 2019 17:14:25 -0500
+Subject: [lustre-devel] [PATCH v2 30/33] lustre: lov: do not split IO for
+ single striped file
 In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546812868-11794-32-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-31-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mike Pershin <mpershin@whamcloud.com>
+From: Jinshan Xiong <jinshan.xiong@gmail.com>
 
-cl_object_attr_get() must be called under cl_object_attr_lock
-get. There is place in lov_getstripe where it is called
-without that lock.
+stripe size for single striped file is not reliable, it shouldn't
+be used to split I/O.
 
-Signed-off-by: Mike Pershin <mpershin@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10232
-Reviewed-on: https://review.whamcloud.com/30052
-Reviewed-by: Fan Yong <fan.yong@intel.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9841
+Reviewed-on: https://review.whamcloud.com/28451
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_pack.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/staging/lustre/lustre/lov/lov_io.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index ef3c040..089e556 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -397,7 +397,9 @@ int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 9a3352f..47bb618 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -466,7 +466,6 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
+ 	struct cl_io	 *io  = ios->cis_io;
+ 	u64 start = io->u.ci_rw.crw_pos;
+ 	struct lov_stripe_md_entry *lse;
+-	unsigned long ssize;
+ 	int index;
+ 	u64 next;
  
- 			attr.cat_size = 0;
- 			cl_obj = cl_object_top(&obj->lo_cl);
-+			cl_object_attr_lock(cl_obj);
- 			cl_object_attr_get(env, cl_obj, &attr);
-+			cl_object_attr_unlock(cl_obj);
+@@ -491,11 +490,15 @@ static int lov_io_rw_iter_init(const struct lu_env *env,
  
- 			/* return the last instantiated component if file size
- 			 * is non-zero, otherwise, return the last component.
+ 	lse = lov_lse(lio->lis_object, index);
+ 
+-	ssize = lse->lsme_stripe_size;
+-	lov_do_div64(start, ssize);
+-	next = (start + 1) * ssize;
+-	if (next <= start * ssize)
+-		next = ~0ull;
++	next = MAX_LFS_FILESIZE;
++	if (lse->lsme_stripe_count > 1) {
++		unsigned long ssize = lse->lsme_stripe_size;
++
++		lov_do_div64(start, ssize);
++		next = (start + 1) * ssize;
++		if (next <= start * ssize)
++			next = MAX_LFS_FILESIZE;
++	}
+ 
+ 	LASSERTF(io->u.ci_rw.crw_pos >= lse->lsme_extent.e_start,
+ 		 "pos %lld, [%lld, %lld]\n", io->u.ci_rw.crw_pos,
 -- 
 1.8.3.1
