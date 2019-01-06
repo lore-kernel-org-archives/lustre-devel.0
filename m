@@ -1,131 +1,105 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 16:36:36 -0500
-Subject: [lustre-devel] [PATCH 03/14] lustre: llite: add LL_IOC_FUTIMES_3
+Date: Sun,  6 Jan 2019 16:36:39 -0500
+Subject: [lustre-devel] [PATCH 06/14] lustre: uapi: replace cfs_size_*
+ macros with __ALIGN_KERNEL
 In-Reply-To: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
 References: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546810607-6348-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546810607-6348-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+The lustre specific cfs_size_* macros can be easily replaced with
+the __ALIGN_KERNEL macro provided by the linux kernel for our
+user land code. This brings us closer to building against the
+upstream client.
 
-Add a new regular file ioctl LL_IOC_FUTIMES_3 similar to futimes() but
-which allows setting of all three inode timestamps. Use this ioctl
-during HSM restore to ensure that the volatile file has the same
-timestamps as the file to be restored. Strengthen sanity-hsm test_24a
-to check that archive, release, and restore do not change a file's
-ctime. Add sanity-hsm test_24e to check that tar will succeed when it
-encounters a HSM released file.
-
-This is a hold over until a generic solution is worked out.
-
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-bug-id: https://jira.hpdd.intel.com/browse/LU-6213
-Reviewed-on: http://review.whamcloud.com/13665
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: frank zago <fzago@cray.com>
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
+Reviewed-on: https://review.whamcloud.com/30379
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_user.h | 10 +++++
- drivers/staging/lustre/lustre/llite/file.c         | 46 ++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
+ .../lustre/include/uapi/linux/lustre/lustre_user.h | 32 +++++++++-------------
+ 1 file changed, 13 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index 9d553ce6..6904d6d 100644
+index fef53b1..aac91a1 100644
 --- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -215,6 +215,15 @@ struct ost_id {
- #define DOSTID "%#llx:%llu"
- #define POSTID(oi) ostid_seq(oi), ostid_id(oi)
+@@ -42,6 +42,9 @@
+  * @{
+  */
  
-+struct ll_futimes_3 {
-+	__u64 lfu_atime_sec;
-+	__u64 lfu_atime_nsec;
-+	__u64 lfu_mtime_sec;
-+	__u64 lfu_mtime_nsec;
-+	__u64 lfu_ctime_sec;
-+	__u64 lfu_ctime_nsec;
-+};
++#include <linux/kernel.h>
++#include <linux/types.h>
 +
- /*
-  * The ioctl naming rules:
-  * LL_*     - works on the currently opened filehandle instead of parent dir
-@@ -251,6 +260,7 @@ struct ost_id {
- #define LL_IOC_PATH2FID		 _IOR('f', 173, long)
- #define LL_IOC_GET_CONNECT_FLAGS	_IOWR('f', 174, __u64 *)
- #define LL_IOC_GET_MDTIDX	       _IOR('f', 175, int)
-+#define LL_IOC_FUTIMES_3		_IOWR('f', 176, struct ll_futimes_3)
+ #ifdef __KERNEL__
+ # include <linux/fs.h>
+ # include <linux/quota.h>
+@@ -835,8 +838,8 @@ enum changelog_send_flag {
+ 	CHANGELOG_FLAG_JOBID	= 0x04,
+ };
  
- /*	lustre_ioctl.h			177-210 */
- #define LL_IOC_HSM_STATE_GET		_IOR('f', 211, struct hsm_user_state)
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index a6f149c..5c6ebfa 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -2098,6 +2098,42 @@ static inline long ll_lease_type_from_fmode(fmode_t fmode)
- 	       ((fmode & FMODE_WRITE) ? LL_LEASE_WRLCK : 0);
+-#define CR_MAXSIZE cfs_size_round(2 * NAME_MAX + 2 + \
+-				  changelog_rec_offset(CLF_SUPPORTED))
++#define CR_MAXSIZE __ALIGN_KERNEL(2 * NAME_MAX + 2 + \
++				  changelog_rec_offset(CLF_SUPPORTED), 8)
+ 
+ /* 31 usable bytes string + null terminator. */
+ #define LUSTRE_JOBID_SIZE	32
+@@ -1270,29 +1273,20 @@ struct hsm_action_list {
+ 	 */
+ } __packed;
+ 
+-#ifndef HAVE_CFS_SIZE_ROUND
+-static inline int cfs_size_round(int val)
+-{
+-	return (val + 7) & (~0x7);
+-}
+-
+-#define HAVE_CFS_SIZE_ROUND
+-#endif
+-
+ /* Return pointer to first hai in action list */
+ static inline struct hsm_action_item *hai_first(struct hsm_action_list *hal)
+ {
+-	return (struct hsm_action_item *)(hal->hal_fsname +
+-					  cfs_size_round(strlen(hal-> \
+-								hal_fsname)
+-							 + 1));
++	size_t offset = __ALIGN_KERNEL(strlen(hal->hal_fsname) + 1, 8);
++
++	return (struct hsm_action_item *)(hal->hal_fsname + offset);
  }
  
-+static int ll_file_futimes_3(struct file *file, const struct ll_futimes_3 *lfu)
-+{
-+	struct inode *inode = file_inode(file);
-+	struct iattr ia = {
-+		.ia_valid = ATTR_ATIME | ATTR_ATIME_SET |
-+			    ATTR_MTIME | ATTR_MTIME_SET |
-+			    ATTR_CTIME,
-+		.ia_atime = {
-+			.tv_sec = lfu->lfu_atime_sec,
-+			.tv_nsec = lfu->lfu_atime_nsec,
-+		},
-+		.ia_mtime = {
-+			.tv_sec = lfu->lfu_mtime_sec,
-+			.tv_nsec = lfu->lfu_mtime_nsec,
-+		},
-+		.ia_ctime = {
-+			.tv_sec = lfu->lfu_ctime_sec,
-+			.tv_nsec = lfu->lfu_ctime_nsec,
-+		},
-+	};
-+	int rc;
+ /* Return pointer to next hai */
+ static inline struct hsm_action_item *hai_next(struct hsm_action_item *hai)
+ {
+-	return (struct hsm_action_item *)((char *)hai +
+-					  cfs_size_round(hai->hai_len));
++	size_t offset = __ALIGN_KERNEL(hai->hai_len, 8);
 +
-+	if (!capable(CAP_SYS_ADMIN))
-+		return -EPERM;
-+
-+	if (!S_ISREG(inode->i_mode))
-+		return -EINVAL;
-+
-+	inode_lock(inode);
-+	rc = ll_setattr_raw(file_dentry(file), &ia, OP_XVALID_CTIME_SET,
-+			    false);
-+	inode_unlock(inode);
-+
-+	return rc;
-+}
-+
- /*
-  * Give file access advices
-  *
-@@ -2552,6 +2588,16 @@ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
- 		kfree(hui);
- 		return rc;
- 	}
-+	case LL_IOC_FUTIMES_3: {
-+		const struct ll_futimes_3 __user *lfu_user;
-+		struct ll_futimes_3 lfu;
-+
-+		lfu_user = (const struct ll_futimes_3 __user *)arg;
-+		if (copy_from_user(&lfu, lfu_user, sizeof(lfu)))
-+			return -EFAULT;
-+
-+		return ll_file_futimes_3(file, &lfu);
-+        }
- 	case LL_IOC_LADVISE: {
- 		struct llapi_ladvise_hdr *ladvise_hdr;
- 		int alloc_size = sizeof(*ladvise_hdr);
++	return (struct hsm_action_item *)((char *)hai + offset);
+ }
+ 
+ /* Return size of an hsm_action_list */
+@@ -1302,10 +1296,10 @@ static inline size_t hal_size(struct hsm_action_list *hal)
+ 	size_t sz;
+ 	struct hsm_action_item *hai;
+ 
+-	sz = sizeof(*hal) + cfs_size_round(strlen(hal->hal_fsname) + 1);
++	sz = sizeof(*hal) + __ALIGN_KERNEL(strlen(hal->hal_fsname) + 1, 8);
+ 	hai = hai_first(hal);
+ 	for (i = 0; i < hal->hal_count; i++, hai = hai_next(hai))
+-		sz += cfs_size_round(hai->hai_len);
++		sz += __ALIGN_KERNEL(hai->hai_len, 8);
+ 
+ 	return sz;
+ }
 -- 
 1.8.3.1
