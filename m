@@ -1,107 +1,147 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 17:14:20 -0500
-Subject: [lustre-devel] [PATCH v2 25/33] lustre: pfl: fix ost pool op->size
- handling
+Date: Sun,  6 Jan 2019 17:14:23 -0500
+Subject: [lustre-devel] [PATCH v2 28/33] lustre: llite: return v1/v3 layout
+ for legacy app
 In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546812868-11794-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-29-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bobi Jam <bobijam@hotmail.com>
+From: Niu Yawei <yawei.niu@intel.com>
 
-This patch fixes the misunderstanding of ost_pool::op->size, it
-indicates the buffer size allocated instead of the array count.
+Legacy app such as ADIO fetches LOVEA by ioctl LL_IOC_LOV_GETSTRIPE
+and treats file layout as v1/v3 blindly, we'd return a reasonable
+v1/v3 in this case.
 
-Signed-off-by: Bobi Jam <bobijam@hotmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9359
-Reviewed-on: https://review.whamcloud.com/26706
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9490
+Reviewed-on: https://review.whamcloud.com/27183
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_internal.h |  1 -
- drivers/staging/lustre/lustre/lov/lov_io.c       |  3 ++-
- drivers/staging/lustre/lustre/lov/lov_pool.c     | 20 +++++++++++---------
- 3 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_object.c |  2 +-
+ drivers/staging/lustre/lustre/lov/lov_pack.c   | 72 +++++++++++++++++++++++---
+ 2 files changed, 67 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index dd4dd24..3878cad 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -195,7 +195,6 @@ struct lsm_operations {
- })
- #endif
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index 968c49d..aad4fee 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -1615,7 +1615,7 @@ static int lov_object_getstripe(const struct lu_env *env, struct cl_object *obj,
+ 	if (!lsm)
+ 		return -ENODATA;
  
--#define pool_tgt_size(p)	((p)->pool_obds.op_size)
- #define pool_tgt_count(p)	((p)->pool_obds.op_count)
- #define pool_tgt_array(p)	((p)->pool_obds.op_array)
- #define pool_tgt_rw_sem(p)	((p)->pool_obds.op_rw_sem)
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index 0d809b1..ec0d14f 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -100,7 +100,8 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
- 
- 	LASSERT(!sub->sub_env);
- 
--	if (unlikely(!lov_r0(lov, index)->lo_sub[stripe]))
-+	if (unlikely(!lov_r0(lov, index)->lo_sub ||
-+		     !lov_r0(lov, index)->lo_sub[stripe]))
- 		return -EIO;
- 
- 	/* obtain new environment */
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index c79c2ae..b90fb1c 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -238,8 +238,9 @@ int lov_ost_pool_init(struct ost_pool *op, unsigned int count)
- 	op->op_array = NULL;
- 	op->op_count = 0;
- 	init_rwsem(&op->op_rw_sem);
--	op->op_size = count;
--	op->op_array = kcalloc(op->op_size, sizeof(op->op_array[0]), GFP_NOFS);
-+	op->op_size = count * sizeof(op->op_array[0]);
-+	op->op_array = kcalloc(count, sizeof(op->op_array[0]),
-+			       GFP_KERNEL);
- 	if (!op->op_array) {
- 		op->op_size = 0;
- 		return -ENOMEM;
-@@ -250,24 +251,25 @@ int lov_ost_pool_init(struct ost_pool *op, unsigned int count)
- /* Caller must hold write op_rwlock */
- int lov_ost_pool_extend(struct ost_pool *op, unsigned int min_count)
- {
--	__u32 *new;
--	int new_size;
-+	int new_count;
-+	u32 *new;
- 
- 	LASSERT(min_count != 0);
- 
--	if (op->op_count < op->op_size)
-+	if (op->op_count * sizeof(op->op_array[0]) < op->op_size)
- 		return 0;
- 
--	new_size = max(min_count, 2 * op->op_size);
--	new = kcalloc(new_size, sizeof(op->op_array[0]), GFP_NOFS);
-+	new_count = max_t(u32, min_count,
-+			  2 * op->op_size / sizeof(op->op_array[0]));
-+	new = kcalloc(new_count, sizeof(op->op_array[0]), GFP_KERNEL);
- 	if (!new)
- 		return -ENOMEM;
- 
- 	/* copy old array to new one */
--	memcpy(new, op->op_array, op->op_size * sizeof(op->op_array[0]));
-+	memcpy(new, op->op_array, op->op_size);
- 	kfree(op->op_array);
- 	op->op_array = new;
--	op->op_size = new_size;
-+	op->op_size = new_count * sizeof(op->op_array[0]);
- 	return 0;
+-	rc = lov_getstripe(cl2lov(obj), lsm, lum);
++	rc = lov_getstripe(env, cl2lov(obj), lsm, lum);
+ 	lov_lsm_put(lsm);
+ 	return rc;
  }
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 32e4b33..10be119 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -315,12 +315,14 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, void *buf,
+  * the maximum number of OST indices which will fit in the user buffer.
+  * lmm_magic must be LOV_USER_MAGIC.
+  */
+-int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+-		  struct lov_user_md __user *lump)
++int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
++		  struct lov_stripe_md *lsm, struct lov_user_md __user *lump)
+ {
+ 	/* we use lov_user_md_v3 because it is larger than lov_user_md_v1 */
+ 	struct lov_mds_md *lmmk;
+-	ssize_t lmm_size;
++	struct lov_user_md_v1 lum;
++	ssize_t lmm_size, lum_size = 0;
++	static bool printed;
+ 	size_t lmmk_size;
+ 	int rc = 0;
  
+@@ -332,6 +334,13 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+ 		goto out;
+ 	}
+ 
++	if (!printed) {
++		LCONSOLE_WARN("%s: using old ioctl(LL_IOC_LOV_GETSTRIPE) on " DFID ", use llapi_layout_get_by_path()\n",
++			      current->comm,
++			      PFID(&obj->lo_cl.co_lu.lo_header->loh_fid));
++		printed = true;
++	}
++
+ 	lmmk_size = lov_comp_md_size(lsm);
+ 	lmmk = kvzalloc(lmmk_size, GFP_KERNEL);
+ 	if (!lmmk) {
+@@ -357,10 +366,61 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+ 		}
+ 	}
+ 
+-	if (copy_to_user(lump, lmmk, lmmk_size))
++	/* Legacy appication passes limited buffer, we need to figure out
++	 * the user buffer size by the passed in lmm_stripe_count.
++	 */
++	if (copy_from_user(&lum, lump, sizeof(struct lov_user_md_v1))) {
+ 		rc = -EFAULT;
+-	else
+-		rc = 0;
++		goto out_free;
++	}
++
++	if (lum.lmm_magic == LOV_USER_MAGIC_V1 ||
++	    lum.lmm_magic == LOV_USER_MAGIC_V3)
++		lum_size = lov_user_md_size(lum.lmm_stripe_count,
++					    lum.lmm_magic);
++
++	if (lum_size != 0) {
++		struct lov_mds_md *comp_md = lmmk;
++
++		/* Legacy app (ADIO for instance) treats the layout as V1/V3
++		 * blindly, we'd return a reasonable V1/V3 for them.
++		 */
++		if (lmmk->lmm_magic == LOV_MAGIC_COMP_V1) {
++			struct lov_comp_md_v1 *comp_v1;
++			struct cl_object *cl_obj;
++			struct cl_attr attr;
++			int i;
++
++			attr.cat_size = 0;
++			cl_obj = cl_object_top(&obj->lo_cl);
++			cl_object_attr_get(env, cl_obj, &attr);
++
++			/* return the last instantiated component if file size
++			 * is non-zero, otherwise, return the last component.
++			 */
++			comp_v1 = (struct lov_comp_md_v1 *)lmmk;
++			i = attr.cat_size == 0 ? comp_v1->lcm_entry_count : 0;
++			for (; i < comp_v1->lcm_entry_count; i++) {
++				if (!(comp_v1->lcm_entries[i].lcme_flags &
++				    LCME_FL_INIT))
++					break;
++			}
++			if (i > 0)
++				i--;
++			comp_md = (struct lov_mds_md *)((char *)comp_v1 +
++					comp_v1->lcm_entries[i].lcme_offset);
++		}
++		if (copy_to_user(lump, comp_md, lum_size)) {
++			rc = -EFAULT;
++			goto out_free;
++		}
++	} else {
++		if (copy_to_user(lump, lmmk, lmmk_size)) {
++			rc = -EFAULT;
++			goto out_free;
++		}
++	}
++
+ out_free:
+ 	kvfree(lmmk);
+ out:
 -- 
 1.8.3.1
