@@ -1,131 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 16:36:47 -0500
-Subject: [lustre-devel] [PATCH 14/14] lustre: libcfs: hide struct
- cfs_cpt_table internals
+Date: Sun,  6 Jan 2019 16:36:45 -0500
+Subject: [lustre-devel] [PATCH 12/14] lustre: llite: fix file migration
 In-Reply-To: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
 References: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546810607-6348-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546810607-6348-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Exposing the internals of struct cfs_cpt_table in the libcfs
-header used by lustre makes it too tempting to use but those
-fields are not available for UP systems. Make cfs_cpt_table
-abstract so the lustre and LNet code will never use the
-internals and instead use the functions provided in
-libcfs_cpu.h.
+Several small bugs have appeared over the years that broke file
+migration. The first bug is that the hash was created using the
+parent inode instead of using file_dentry(file). The second
+problem occured with op_fid3 being set when the child dentry
+was found. The last problem was rn_opcode was always being set
+to REINT_RENAME in mdc_rename_pack(). Remove that extra
+nr_opcode setting.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_cpu.h       | 39 ++--------------------
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 34 +++++++++++++++++++
- 2 files changed, 37 insertions(+), 36 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c  | 3 +--
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c | 1 -
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 50eb484..3e51752 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -79,42 +79,9 @@
- /* any CPU partition */
- #define CFS_CPT_ANY		(-1)
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 3647618..c018c5f 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -3003,12 +3003,11 @@ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 		return PTR_ERR(op_data);
  
--#ifdef CONFIG_SMP
--/** virtual processing unit */
--struct cfs_cpu_partition {
--	/* CPUs mask for this partition */
--	cpumask_var_t			cpt_cpumask;
--	/* nodes mask for this partition */
--	nodemask_t			*cpt_nodemask;
--	/* NUMA distance between CPTs */
--	unsigned int			*cpt_distance;
--	/* spread rotor for NUMA allocator */
--	unsigned int			cpt_spread_rotor;
--	/* NUMA node if cpt_nodemask is empty */
--	int				cpt_node;
--};
--
--
--/** descriptor for CPU partitions */
--struct cfs_cpt_table {
--	/* spread rotor for NUMA allocator */
--	unsigned int			ctb_spread_rotor;
--	/* maximum NUMA distance between all nodes in table */
--	unsigned int			ctb_distance;
--	/* # of CPU partitions */
--	unsigned int			ctb_nparts;
--	/* partitions tables */
--	struct cfs_cpu_partition	*ctb_parts;
--	/* shadow HW CPU to CPU partition ID */
--	int				*ctb_cpu2cpt;
--	/* all cpus in this partition table */
--	cpumask_var_t			ctb_cpumask;
--	/* shadow HW node to CPU partition ID */
--	int				*ctb_node2cpt;
--	/* all nodes in this partition table */
--	nodemask_t			*ctb_nodemask;
--};
-+struct cfs_cpt_table;
- 
-+#ifdef CONFIG_SMP
- extern struct cfs_cpt_table	*cfs_cpt_tab;
- 
- /**
-@@ -215,7 +182,7 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
- void cfs_cpu_fini(void);
- 
- #else /* !CONFIG_SMP */
--struct cfs_cpt_table;
-+
- #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
- 
- static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index a9b59cc..a384a73 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -41,6 +41,40 @@
- #include <linux/libcfs/libcfs_string.h>
- #include <linux/libcfs/libcfs.h>
- 
-+/** virtual processing unit */
-+struct cfs_cpu_partition {
-+	/* CPUs mask for this partition */
-+	cpumask_var_t			cpt_cpumask;
-+	/* nodes mask for this partition */
-+	nodemask_t			*cpt_nodemask;
-+	/* NUMA distance between CPTs */
-+	unsigned int			*cpt_distance;
-+	/* spread rotor for NUMA allocator */
-+	unsigned int			cpt_spread_rotor;
-+	/* NUMA node if cpt_nodemask is empty */
-+	int				cpt_node;
-+};
-+
-+/** descriptor for CPU partitions */
-+struct cfs_cpt_table {
-+	/* spread rotor for NUMA allocator */
-+	unsigned int			ctb_spread_rotor;
-+	/* maximum NUMA distance between all nodes in table */
-+	unsigned int			ctb_distance;
-+	/* # of CPU partitions */
-+	unsigned int			ctb_nparts;
-+	/* partitions tables */
-+	struct cfs_cpu_partition	*ctb_parts;
-+	/* shadow HW CPU to CPU partition ID */
-+	int				*ctb_cpu2cpt;
-+	/* all cpus in this partition table */
-+	cpumask_var_t			ctb_cpumask;
-+	/* shadow HW node to CPU partition ID */
-+	int				*ctb_node2cpt;
-+	/* all nodes in this partition table */
-+	nodemask_t			*ctb_nodemask;
-+};
-+
- /** Global CPU partition table */
- struct cfs_cpt_table   *cfs_cpt_tab __read_mostly;
- EXPORT_SYMBOL(cfs_cpt_tab);
+ 	/* Get child FID first */
+-	qstr.hash = full_name_hash(parent, name, namelen);
++	qstr.hash = full_name_hash(file_dentry(file), name, namelen);
+ 	qstr.name = name;
+ 	qstr.len = namelen;
+ 	dchild = d_lookup(file_dentry(file), &qstr);
+ 	if (dchild) {
+-		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
+ 		if (dchild->d_inode)
+ 			child_inode = igrab(dchild->d_inode);
+ 		dput(dchild);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+index 415127f..a1b1e75 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+@@ -457,7 +457,6 @@ void mdc_rename_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
+ 	/* XXX do something about time, uid, gid */
+ 	rec->rn_opcode	 = op_data->op_cli_flags & CLI_MIGRATE ?
+ 				REINT_MIGRATE : REINT_RENAME;
+-	rec->rn_opcode   = REINT_RENAME;
+ 	rec->rn_fsuid    = op_data->op_fsuid;
+ 	rec->rn_fsgid    = op_data->op_fsgid;
+ 	rec->rn_cap      = op_data->op_cap.cap[0];
 -- 
 1.8.3.1
