@@ -1,114 +1,183 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 17:13:55 -0500
-Subject: [lustre-devel] [PATCH v2 00/33] lustre: add PFL support
-Message-ID: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
+Date: Sun,  6 Jan 2019 17:13:58 -0500
+Subject: [lustre-devel] [PATCH v2 03/33] lustre: lov: move code for PFL work
+In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
+References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Progressive file layouts are characterized by increasing the
-stripe count of the file in a step-wise manner as the file
-offset increases. This will be achieved by using multiple
-extent-based composite layouts as described in the Layout
-Enhancement High Level Design:
+From: Bobi Jam <bobijam@hotmail.com>
 
-http://wiki.lustre.org/Layout_Enhancement_High_Level_Design
+Move lov_tgt_maxbytes() and lsm_free_plain() toward the top of
+lov_ea.c for upcoming PFL work. Migrate inline function
+lsm_op_find() out of lov_internal.h to lov_ea.c since it is
+consider bad code style to add define external structures
+and have an inline function in the same header. Instead
+only add lsm_op_find() prototype to lov_internal.h and
+make all the struct lsm_operations static in lov_ea.c.
 
-This was the key item still missing in the linux lustre client.
-We added this funcitonality with this patch set. With this last
-key feature added this brings the linux lustre client on about
-the same level as the 2.10.6 LTS. Since this is the case we can
-bump the lustre version.
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Signed-off-by: Bobi Jam <bobijam@hotmail.com>
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
+Reviewed-on: https://review.whamcloud.com/24849
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/lov/lov_ea.c       | 87 ++++++++++++++----------
+ drivers/staging/lustre/lustre/lov/lov_internal.h | 16 +----
+ 2 files changed, 51 insertions(+), 52 deletions(-)
 
-Andreas Dilger (1):
-  lustre: lov: use stripe_count instead of stripe_nr
-
-Bobi Jam (20):
-  lustre: lov: move code for PFL work
-  lustre: lov: merge lov_mds_md_v3 and lov_mds_md_v1 handling
-  lustre: lov: fold lmm_verify() handling into lmm_unpackmd()
-  lustre: lov: create struct lov_stripe_md_entry
-  lustre: lov: add composite layout unpacking
-  lustre: lov: embedded raid0 in struct lov_layout_composite
-  lustre: lov: migrate lov raid0 to future PFL component handling
-  lustre: lov: reduce code indentation
-  lustre: lov: change lo_entries to array.
-  lustre: lov: move around PFL code and cleanups
-  lustre: lov: remove lsm_stripe_by_[index|offset]_plain
-  lustre: lov: add looping lsm_entry_count times
-  lustre: lov: create lov_comp_* wrappers
-  lustre: clio: client side implementation for PFL
-  lustre: pfl: dynamic layout modification with write/truncate
-  lustre: pfl: calculate PFL file LOVEA correctly
-  lustre: lov: keep minimum LOVEA size
-  lustre: pfl: fix hang with grouplocks
-  lustre: pfl: fix ost pool op->size handling
-  lustre: llite: restore ll_file_getstripe in ll_lov_setstripe
-
-Fan Yong (1):
-  lustre: pfl: enhance PFID EA for PFL
-
-James Simmons (2):
-  lustre: clio: fix incorrect invariant in cl_io_iter_fini()
-  lustre: update version to 2.9.99
-
-Jinshan Xiong (3):
-  lustre: pfl: Read should not trigger layout write intent
-  lustre: lov: readahead shouldn't exceed component boundary
-  lustre: lov: do not split IO for single striped file
-
-Mike Pershin (1):
-  lustre: lov: call cl_object_attr_get under cl_attr lock
-
-Niu Yawei (4):
-  lustre: pfl: Basic data structures for composite layout
-  lustre: clio: getstripe support comp layout
-  lustre: uapi: support negative flags
-  lustre: llite: return v1/v3 layout for legacy app
-
-wang di (1):
-  lustre: ldlm: Transfer layout only if layout lock is granted
-
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  36 +-
- .../lustre/include/uapi/linux/lustre/lustre_user.h |  84 ++-
- .../lustre/include/uapi/linux/lustre/lustre_ver.h  |   4 +-
- drivers/staging/lustre/lustre/include/cl_object.h  |  12 +-
- drivers/staging/lustre/lustre/include/lustre_sec.h |   4 +-
- .../staging/lustre/lustre/include/lustre_swab.h    |   1 +
- drivers/staging/lustre/lustre/include/obd.h        |   4 -
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |  18 -
- drivers/staging/lustre/lustre/llite/dir.c          |  38 +-
- drivers/staging/lustre/lustre/llite/file.c         | 200 +++--
- .../staging/lustre/lustre/llite/llite_internal.h   |   3 +
- drivers/staging/lustre/lustre/llite/vvp_io.c       |  44 +-
- drivers/staging/lustre/lustre/llite/xattr.c        |  70 +-
- .../staging/lustre/lustre/lov/lov_cl_internal.h    | 191 ++---
- drivers/staging/lustre/lustre/lov/lov_ea.c         | 570 ++++++++++----
- drivers/staging/lustre/lustre/lov/lov_internal.h   | 177 +++--
- drivers/staging/lustre/lustre/lov/lov_io.c         | 651 +++++++++-------
- drivers/staging/lustre/lustre/lov/lov_lock.c       |  94 ++-
- drivers/staging/lustre/lustre/lov/lov_merge.c      |  12 +-
- drivers/staging/lustre/lustre/lov/lov_object.c     | 833 ++++++++++++---------
- drivers/staging/lustre/lustre/lov/lov_offset.c     |  65 +-
- drivers/staging/lustre/lustre/lov/lov_pack.c       | 368 +++++----
- drivers/staging/lustre/lustre/lov/lov_page.c       |  42 +-
- drivers/staging/lustre/lustre/lov/lov_pool.c       |  20 +-
- drivers/staging/lustre/lustre/lov/lov_request.c    |   4 +-
- drivers/staging/lustre/lustre/lov/lovsub_object.c  |  23 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |  89 ++-
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |   2 +-
- drivers/staging/lustre/lustre/obdclass/cl_object.c |   5 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |  16 +-
- drivers/staging/lustre/lustre/osc/osc_io.c         |   4 +-
- drivers/staging/lustre/lustre/osc/osc_lock.c       |   7 +-
- drivers/staging/lustre/lustre/ptlrpc/layout.c      |   6 +-
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  84 ++-
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |   7 +-
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |   5 +-
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 125 +++-
- 37 files changed, 2507 insertions(+), 1411 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
+index c80320a..3dfb204 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_ea.c
++++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
+@@ -44,6 +44,33 @@
+ 
+ #include "lov_internal.h"
+ 
++/*
++ * Find minimum stripe maxbytes value. For inactive or
++ * reconnecting targets use LUSTRE_EXT3_STRIPE_MAXBYTES.
++ */
++static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
++{
++	loff_t maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
++	struct obd_import *imp;
++
++	if (!tgt->ltd_active)
++		return maxbytes;
++
++	imp = tgt->ltd_obd->u.cli.cl_import;
++	if (!imp)
++		return maxbytes;
++
++	spin_lock(&imp->imp_lock);
++	if (imp->imp_state == LUSTRE_IMP_FULL &&
++	    (imp->imp_connect_data.ocd_connect_flags & OBD_CONNECT_MAXBYTES) &&
++	     imp->imp_connect_data.ocd_maxbytes > 0)
++		maxbytes = imp->imp_connect_data.ocd_maxbytes;
++
++	spin_unlock(&imp->imp_lock);
++
++	return maxbytes;
++}
++
+ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+ 				 __u16 stripe_count)
+ {
+@@ -76,6 +103,16 @@ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+ 	return 0;
+ }
+ 
++void lsm_free_plain(struct lov_stripe_md *lsm)
++{
++	__u16 stripe_count = lsm->lsm_stripe_count;
++	int i;
++
++	for (i = 0; i < stripe_count; i++)
++		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
++	kvfree(lsm);
++}
++
+ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
+ {
+ 	size_t oinfo_ptrs_size, lsm_size;
+@@ -108,43 +145,6 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
+ 	return NULL;
+ }
+ 
+-void lsm_free_plain(struct lov_stripe_md *lsm)
+-{
+-	__u16 stripe_count = lsm->lsm_stripe_count;
+-	int i;
+-
+-	for (i = 0; i < stripe_count; i++)
+-		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
+-	kvfree(lsm);
+-}
+-
+-/*
+- * Find minimum stripe maxbytes value.  For inactive or
+- * reconnecting targets use LUSTRE_EXT3_STRIPE_MAXBYTES.
+- */
+-static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
+-{
+-	loff_t maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
+-	struct obd_import *imp;
+-
+-	if (!tgt->ltd_active)
+-		return maxbytes;
+-
+-	imp = tgt->ltd_obd->u.cli.cl_import;
+-	if (!imp)
+-		return maxbytes;
+-
+-	spin_lock(&imp->imp_lock);
+-	if (imp->imp_state == LUSTRE_IMP_FULL &&
+-	    (imp->imp_connect_data.ocd_connect_flags & OBD_CONNECT_MAXBYTES) &&
+-	     imp->imp_connect_data.ocd_maxbytes > 0)
+-		maxbytes = imp->imp_connect_data.ocd_maxbytes;
+-
+-	spin_unlock(&imp->imp_lock);
+-
+-	return maxbytes;
+-}
+-
+ static int lsm_unpackmd_common(struct lov_obd *lov,
+ 			       struct lov_stripe_md *lsm,
+ 			       struct lov_mds_md *lmm,
+@@ -320,6 +320,19 @@ static int lsm_unpackmd_v3(struct lov_obd *lov, struct lov_stripe_md *lsm,
+ 	.lsm_unpackmd	   = lsm_unpackmd_v3,
+ };
+ 
++const struct lsm_operations *lsm_op_find(int magic)
++{
++	switch (magic) {
++	case LOV_MAGIC_V1:
++		return &lsm_v1_ops;
++	case LOV_MAGIC_V3:
++		return &lsm_v3_ops;
++	default:
++		CERROR("unrecognized lsm_magic %08x\n", magic);
++		return NULL;
++	}
++}
++
+ void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm)
+ {
+ 	CDEBUG(level, "lsm %p, objid " DOSTID ", maxbytes %#llx, magic 0x%08X, stripe_size %u, stripe_count %u, refc: %d, layout_gen %u, pool [" LOV_POOLNAMEF "]\n",
+diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
+index 44a997e..51f416e 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_internal.h
++++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
+@@ -92,21 +92,7 @@ struct lsm_operations {
+ 			    struct lov_mds_md *lmm);
+ };
+ 
+-extern const struct lsm_operations lsm_v1_ops;
+-extern const struct lsm_operations lsm_v3_ops;
+-
+-static inline const struct lsm_operations *lsm_op_find(int magic)
+-{
+-	switch (magic) {
+-	case LOV_MAGIC_V1:
+-		return &lsm_v1_ops;
+-	case LOV_MAGIC_V3:
+-		return &lsm_v3_ops;
+-	default:
+-		CERROR("unrecognized lsm_magic %08x\n", magic);
+-		return NULL;
+-	}
+-}
++const struct lsm_operations *lsm_op_find(int magic);
+ 
+ /* lov_do_div64(a, b) returns a % b, and a = a / b.
+  * The 32-bit code is LOV-specific due to knowing about stripe limits in
 -- 
 1.8.3.1
