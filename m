@@ -1,288 +1,256 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 17:13:57 -0500
-Subject: [lustre-devel] [PATCH v2 02/33] lustre: pfl: Basic data structures
- for composite layout
+Date: Sun,  6 Jan 2019 17:13:59 -0500
+Subject: [lustre-devel] [PATCH v2 04/33] lustre: lov: merge lov_mds_md_v3
+ and lov_mds_md_v1 handling
 In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546812868-11794-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Bobi Jam <bobijam@hotmail.com>
 
-Added basic structures and magic numbers for composite layout.
+Several of the struct lsm_operations functions for both v1 and v3
+are nearly identical. Let's merge them together.
 
-Details about PFL can be reviewed at
-http://wiki.lustre.org/PFL_Prototype_High_Level_Design
-
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Signed-off-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: Niu Yawei <yawei.niu@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24822
+Reviewed-on: https://review.whamcloud.com/24849
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9315
+Reviewed-on: https://review.whamcloud.com/26503
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  1 +
- .../lustre/include/uapi/linux/lustre/lustre_user.h | 50 +++++++++++++++
- .../staging/lustre/lustre/include/lustre_swab.h    |  1 +
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    | 71 ++++++++++++++++++++++
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 67 ++++++++++++++++++++
- 5 files changed, 190 insertions(+)
+ drivers/staging/lustre/lustre/lov/lov_ea.c       | 58 ++++++++++++------------
+ drivers/staging/lustre/lustre/lov/lov_internal.h |  3 +-
+ drivers/staging/lustre/lustre/lov/lov_pack.c     | 30 ++++--------
+ 3 files changed, 38 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index a42ce9d..333b791 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -960,6 +960,7 @@ enum obdo_flags {
- /* reserved for specifying OSTs */
- #define LOV_MAGIC_SPECIFIC	(0x0BD50000 | LOV_MAGIC_MAGIC)
- #define LOV_MAGIC		LOV_MAGIC_V1
-+#define LOV_MAGIC_COMP_V1	(0x0BD60000 | LOV_MAGIC_MAGIC)
- 
- /*
-  * magic for fully defined striping
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index 4412dc8..bb87a6f 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -327,6 +327,7 @@ enum ll_lease_type {
- #define LOV_USER_MAGIC_V3	0x0BD30BD0
- /* 0x0BD40BD0 is occupied by LOV_MAGIC_MIGRATE */
- #define LOV_USER_MAGIC_SPECIFIC	0x0BD50BD0	/* for specific OSTs */
-+#define LOV_USER_MAGIC_COMP_V1	0x0BD60BD0
- 
- #define LMV_USER_MAGIC    0x0CD30CD0    /*default lmv magic*/
- 
-@@ -405,6 +406,55 @@ struct lov_user_md_v3 {	   /* LOV EA user data (host-endian) */
- 	struct lov_user_ost_data_v1 lmm_objects[0]; /* per-stripe data */
- } __packed;
- 
-+struct lu_extent {
-+	__u64	e_start;
-+	__u64	e_end;
-+};
-+
-+enum lov_comp_md_entry_flags {
-+	LCME_FL_PRIMARY		= 0x00000001,   /* Not used */
-+	LCME_FL_STALE		= 0x00000002,   /* Not used */
-+	LCME_FL_OFFLINE		= 0x00000004,   /* Not used */
-+	LCME_FL_PREFERRED	= 0x00000008,	/* Not used */
-+	LCME_FL_INIT		= 0x00000010,	/* instantiated */
-+};
-+
-+#define LCME_KNOWN_FLAGS	LCME_FL_INIT
-+
-+/* lcme_id can be specified as certain flags, and the first
-+ * bit of lcme_id is used to indicate that the ID is representing
-+ * certain LCME_FL_* but not a real ID. Which implies we can have
-+ * at most 31 flags (see LCME_FL_XXX).
-+ */
-+enum lcme_id {
-+	LCME_ID_INVAL	= 0x0,
-+	LCME_ID_MAX	= 0x7FFFFFFF,
-+	LCME_ID_ALL	= 0xFFFFFFFF,
-+	LCME_ID_NONE	= 0x80000000
-+};
-+
-+struct lov_comp_md_entry_v1 {
-+	__u32			lcme_id;	/* unique id of component */
-+	__u32			lcme_flags;	/* LCME_FL_XXX */
-+	struct lu_extent	lcme_extent;	/* file extent for component */
-+	__u32			lcme_offset;	/* offset of component blob,
-+						 * start from lov_comp_md_v1
-+						 */
-+	__u32			lcme_size;	/* size of component blob */
-+	__u64			lcme_padding[2];
-+} __packed;
-+
-+struct lov_comp_md_v1 {
-+	__u32	lcm_magic;	/* LOV_USER_MAGIC_COMP_V1 */
-+	__u32	lcm_size;	/* overall size including this struct */
-+	__u32	lcm_layout_gen;
-+	__u16	lcm_flags;
-+	__u16	lcm_entry_count;
-+	__u64	lcm_padding1;
-+	__u64	lcm_padding2;
-+	struct lov_comp_md_entry_v1 lcm_entries[0];
-+} __packed;
-+
- static inline __u32 lov_user_md_size(__u16 stripes, __u32 lmm_magic)
- {
- 	if (lmm_magic == LOV_USER_MAGIC_V1)
-diff --git a/drivers/staging/lustre/lustre/include/lustre_swab.h b/drivers/staging/lustre/lustre/include/lustre_swab.h
-index e09a3dc..6939ac1 100644
---- a/drivers/staging/lustre/lustre/include/lustre_swab.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_swab.h
-@@ -83,6 +83,7 @@
- void lustre_swab_fiemap(struct fiemap *fiemap);
- void lustre_swab_lov_user_md_v1(struct lov_user_md_v1 *lum);
- void lustre_swab_lov_user_md_v3(struct lov_user_md_v3 *lum);
-+void lustre_swab_lov_comp_md_v1(struct lov_comp_md_v1 *lum);
- void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
- 				     int stripe_count);
- void lustre_swab_lov_mds_md(struct lov_mds_md *lmm);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-index 951bb92..9c5be30 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-@@ -1990,6 +1990,77 @@ void lustre_swab_lov_user_md_v3(struct lov_user_md_v3 *lum)
+diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
+index 3dfb204..2b3552a 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_ea.c
++++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
+@@ -71,8 +71,8 @@ static loff_t lov_tgt_maxbytes(struct lov_tgt_desc *tgt)
+ 	return maxbytes;
  }
- EXPORT_SYMBOL(lustre_swab_lov_user_md_v3);
  
-+void lustre_swab_lov_comp_md_v1(struct lov_comp_md_v1 *lum)
-+{
-+	struct lov_comp_md_entry_v1 *ent;
-+	bool cpu_endian;
-+	u16 ent_count;
-+	int i;
-+
-+	cpu_endian = lum->lcm_magic == LOV_USER_MAGIC_COMP_V1;
-+	ent_count = lum->lcm_entry_count;
-+	if (!cpu_endian)
-+		__swab16s(&ent_count);
-+
-+	CDEBUG(D_IOCTL, "swabbing lov_user_comp_md v1\n");
-+	__swab32s(&lum->lcm_magic);
-+	__swab32s(&lum->lcm_size);
-+	__swab32s(&lum->lcm_layout_gen);
-+	__swab16s(&lum->lcm_flags);
-+	__swab16s(&lum->lcm_entry_count);
-+	BUILD_BUG_ON(offsetof(typeof(*lum), lcm_padding1) == 0);
-+	BUILD_BUG_ON(offsetof(typeof(*lum), lcm_padding2) == 0);
-+
-+	for (i = 0; i < ent_count; i++) {
-+		struct lov_user_md_v1 *v1;
-+		u16 stripe_count;
-+		u32 off, size;
-+
-+		ent = &lum->lcm_entries[i];
-+		off = ent->lcme_offset;
-+		size = ent->lcme_size;
-+
-+		if (!cpu_endian) {
-+			__swab32s(&off);
-+			__swab32s(&size);
-+		}
-+		__swab32s(&ent->lcme_id);
-+		__swab32s(&ent->lcme_flags);
-+		__swab64s(&ent->lcme_extent.e_start);
-+		__swab64s(&ent->lcme_extent.e_end);
-+		__swab32s(&ent->lcme_offset);
-+		__swab32s(&ent->lcme_size);
-+		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding) == 0);
-+
-+		v1 = (struct lov_user_md_v1 *)((char *)lum + off);
-+		stripe_count = v1->lmm_stripe_count;
-+		if (!cpu_endian)
-+			__swab16s(&stripe_count);
-+
-+		if (v1->lmm_magic == __swab32(LOV_USER_MAGIC_V1) ||
-+		    v1->lmm_magic == LOV_USER_MAGIC_V1) {
-+			lustre_swab_lov_user_md_v1(v1);
-+			if (size > sizeof(*v1))
-+				lustre_swab_lov_user_md_objects(v1->lmm_objects,
-+								stripe_count);
-+		} else if (v1->lmm_magic == __swab32(LOV_USER_MAGIC_V3) ||
-+			   v1->lmm_magic == LOV_USER_MAGIC_V3 ||
-+			   v1->lmm_magic == __swab32(LOV_USER_MAGIC_SPECIFIC) ||
-+			   v1->lmm_magic == LOV_USER_MAGIC_SPECIFIC) {
-+			struct lov_user_md_v3 *v3;
-+
-+			v3 = (struct lov_user_md_v3 *)v1;
-+			lustre_swab_lov_user_md_v3(v3);
-+			if (size > sizeof(*v3))
-+				lustre_swab_lov_user_md_objects(v3->lmm_objects,
-+								stripe_count);
-+		} else {
-+			CERROR("Invalid magic %#x\n", v1->lmm_magic);
-+		}
-+	}
-+}
-+EXPORT_SYMBOL(lustre_swab_lov_comp_md_v1);
-+
- void lustre_swab_lov_mds_md(struct lov_mds_md *lmm)
+-static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+-				 __u16 stripe_count)
++static int lsm_lmm_verify_v1v3(struct lov_mds_md *lmm, size_t lmm_size,
++			       u16 stripe_count)
  {
- 	CDEBUG(D_IOCTL, "swabbing lov_mds_md\n");
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 3aaaebb..90e6b8c 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -1450,6 +1450,73 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF(LOV_PATTERN_CMOBD == 0x00000200UL, "found 0x%.8xUL\n",
- 		 (unsigned int)LOV_PATTERN_CMOBD);
+ 	if (stripe_count > LOV_V1_INSANE_STRIPE_COUNT) {
+ 		CERROR("bad stripe count %d\n", stripe_count);
+@@ -103,7 +103,7 @@ static int lsm_lmm_verify_common(struct lov_mds_md *lmm, int lmm_bytes,
+ 	return 0;
+ }
  
-+	/* Checks for struct lov_comp_md_entry_v1 */
-+	LASSERTF((int)sizeof(struct lov_comp_md_entry_v1) == 48, "found %lld\n",
-+		 (long long)(int)sizeof(struct lov_comp_md_entry_v1));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_id) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_id));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_id) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_id));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_flags) == 4, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_flags));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_flags) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_flags));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_extent) == 8, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_extent));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_extent) == 16, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_extent));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_offset) == 24, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_offset));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_offset) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_offset));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_size) == 28, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_size));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_size) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_size));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding) == 32, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding) == 16, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding));
-+	LASSERTF(LCME_FL_INIT == 0x00000010UL, "found 0x%.8xUL\n",
-+	         (unsigned int)LCME_FL_INIT);
+-void lsm_free_plain(struct lov_stripe_md *lsm)
++void lsm_free(struct lov_stripe_md *lsm)
+ {
+ 	__u16 stripe_count = lsm->lsm_stripe_count;
+ 	int i;
+@@ -145,10 +145,11 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
+ 	return NULL;
+ }
+ 
+-static int lsm_unpackmd_common(struct lov_obd *lov,
+-			       struct lov_stripe_md *lsm,
+-			       struct lov_mds_md *lmm,
+-			       struct lov_ost_data_v1 *objects)
++static int lsm_unpackmd_v1v3(struct lov_obd *lov,
++			     struct lov_stripe_md *lsm,
++			     struct lov_mds_md *lmm,
++			     const char *pool_name,
++			     struct lov_ost_data_v1 *objects)
+ {
+ 	loff_t min_stripe_maxbytes = 0;
+ 	unsigned int stripe_count;
+@@ -168,6 +169,15 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
+ 
+ 	stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
+ 
++	if (pool_name) {
++		size_t pool_name_len;
 +
-+	/* Checks for struct lov_comp_md_v1 */
-+	LASSERTF((int)sizeof(struct lov_comp_md_v1) == 32, "found %lld\n",
-+		 (long long)(int)sizeof(struct lov_comp_md_v1));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_magic) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_magic));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_magic) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_magic));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_size) == 4, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_size));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_size) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_size));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_layout_gen) == 8, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_layout_gen));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_layout_gen) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_layout_gen));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_flags) == 12, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_flags));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_flags) == 2, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_flags));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_entry_count) == 14, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_entry_count));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entry_count) == 2, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entry_count));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_padding1) == 16, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_padding1));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_padding1) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_padding1));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_padding2) == 24, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_padding2));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_padding2) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_padding2));
-+	LASSERTF((int)offsetof(struct lov_comp_md_v1, lcm_entries[0]) == 32, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_v1, lcm_entries[0]));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entries[0]) == 48, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entries[0]));
-+	BUILD_BUG_ON(LOV_MAGIC_COMP_V1 != (0x0BD60000 | 0x0BD0));
++		pool_name_len = strlcpy(lsm->lsm_pool_name, pool_name,
++					sizeof(lsm->lsm_pool_name));
++		if (pool_name_len >= sizeof(lsm->lsm_pool_name))
++			return -E2BIG;
++	}
 +
- 	/* Checks for struct lmv_mds_md_v1 */
- 	LASSERTF((int)sizeof(struct lmv_mds_md_v1) == 56, "found %lld\n",
- 		 (long long)(int)sizeof(struct lmv_mds_md_v1));
+ 	for (i = 0; i < stripe_count; i++) {
+ 		loi = lsm->lsm_oinfo[i];
+ 		ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
+@@ -248,17 +258,16 @@ static int lsm_lmm_verify_v1(struct lov_mds_md_v1 *lmm, int lmm_bytes,
+ 		return -EINVAL;
+ 	}
+ 
+-	return lsm_lmm_verify_common(lmm, lmm_bytes, *stripe_count);
++	return lsm_lmm_verify_v1v3(lmm, lmm_bytes, *stripe_count);
+ }
+ 
+ static int lsm_unpackmd_v1(struct lov_obd *lov, struct lov_stripe_md *lsm,
+ 			   struct lov_mds_md_v1 *lmm)
+ {
+-	return lsm_unpackmd_common(lov, lsm, lmm, lmm->lmm_objects);
++	return lsm_unpackmd_v1v3(lov, lsm, lmm, NULL, lmm->lmm_objects);
+ }
+ 
+-const struct lsm_operations lsm_v1_ops = {
+-	.lsm_free	    = lsm_free_plain,
++const static struct lsm_operations lsm_v1_ops = {
+ 	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
+ 	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
+ 	.lsm_lmm_verify	 = lsm_lmm_verify_v1,
+@@ -289,7 +298,7 @@ static int lsm_lmm_verify_v3(struct lov_mds_md *lmmv1, int lmm_bytes,
+ 		return -EINVAL;
+ 	}
+ 
+-	return lsm_lmm_verify_common((struct lov_mds_md_v1 *)lmm, lmm_bytes,
++	return lsm_lmm_verify_v1v3((struct lov_mds_md_v1 *)lmm, lmm_bytes,
+ 				     *stripe_count);
+ }
+ 
+@@ -297,27 +306,16 @@ static int lsm_unpackmd_v3(struct lov_obd *lov, struct lov_stripe_md *lsm,
+ 			   struct lov_mds_md *lmm)
+ {
+ 	struct lov_mds_md_v3 *lmm_v3 = (struct lov_mds_md_v3 *)lmm;
+-	size_t cplen = 0;
+-	int rc;
+-
+-	rc = lsm_unpackmd_common(lov, lsm, lmm, lmm_v3->lmm_objects);
+-	if (rc)
+-		return rc;
+ 
+-	cplen = strlcpy(lsm->lsm_pool_name, lmm_v3->lmm_pool_name,
+-			sizeof(lsm->lsm_pool_name));
+-	if (cplen >= sizeof(lsm->lsm_pool_name))
+-		return -E2BIG;
+-
+-	return 0;
++	return lsm_unpackmd_v1v3(lov, lsm, lmm, lmm_v3->lmm_pool_name,
++				 lmm_v3->lmm_objects);
+ }
+ 
+-const struct lsm_operations lsm_v3_ops = {
+-	.lsm_free	    = lsm_free_plain,
+-	.lsm_stripe_by_index    = lsm_stripe_by_index_plain,
+-	.lsm_stripe_by_offset   = lsm_stripe_by_offset_plain,
+-	.lsm_lmm_verify	 = lsm_lmm_verify_v3,
+-	.lsm_unpackmd	   = lsm_unpackmd_v3,
++const static struct lsm_operations lsm_v3_ops = {
++	.lsm_stripe_by_index	= lsm_stripe_by_index_plain,
++	.lsm_stripe_by_offset	= lsm_stripe_by_offset_plain,
++	.lsm_lmm_verify		= lsm_lmm_verify_v3,
++	.lsm_unpackmd		= lsm_unpackmd_v3,
+ };
+ 
+ const struct lsm_operations *lsm_op_find(int magic)
+diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
+index 51f416e..2c416b4 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_internal.h
++++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
+@@ -81,7 +81,6 @@ static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
+ }
+ 
+ struct lsm_operations {
+-	void (*lsm_free)(struct lov_stripe_md *);
+ 	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, loff_t *,
+ 				    loff_t *);
+ 	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, loff_t *,
+@@ -93,6 +92,7 @@ struct lsm_operations {
+ };
+ 
+ const struct lsm_operations *lsm_op_find(int magic);
++void lsm_free(struct lov_stripe_md *lsm);
+ 
+ /* lov_do_div64(a, b) returns a % b, and a = a / b.
+  * The 32-bit code is LOV-specific due to knowing about stripe limits in
+@@ -224,7 +224,6 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
+ 
+ /* lov_ea.c */
+ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count);
+-void lsm_free_plain(struct lov_stripe_md *lsm);
+ void dump_lsm(unsigned int level, const struct lov_stripe_md *lsm);
+ 
+ /* lproc_lov.c */
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 98b114b..02936bf 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -181,22 +181,6 @@ __u16 lov_get_stripecnt(struct lov_obd *lov, __u32 magic, __u16 stripe_count)
+ 	return stripe_count;
+ }
+ 
+-static int lov_verify_lmm(void *lmm, int lmm_bytes, __u16 *stripe_count)
+-{
+-	int rc;
+-
+-	if (!lsm_op_find(le32_to_cpu(*(__u32 *)lmm))) {
+-		CERROR("bad disk LOV MAGIC: 0x%08X; dumping LMM (size=%d):\n",
+-		       le32_to_cpu(*(__u32 *)lmm), lmm_bytes);
+-		CERROR("%*phN\n", lmm_bytes, lmm);
+-		return -EINVAL;
+-	}
+-	rc = lsm_op_find(le32_to_cpu(*(__u32 *)lmm))->lsm_lmm_verify(lmm,
+-								     lmm_bytes,
+-								  stripe_count);
+-	return rc;
+-}
+-
+ static struct lov_stripe_md *lov_lsm_alloc(u16 stripe_count, u32 pattern,
+ 					   u32 magic)
+ {
+@@ -237,7 +221,7 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
+ 	LASSERT(atomic_read(&lsm->lsm_refc) > 0);
+ 	refc = atomic_dec_return(&lsm->lsm_refc);
+ 	if (refc == 0)
+-		lsm_op_find(lsm->lsm_magic)->lsm_free(lsm);
++		lsm_free(lsm);
+ 
+ 	return refc;
+ }
+@@ -248,25 +232,29 @@ int lov_free_memmd(struct lov_stripe_md **lsmp)
+ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, struct lov_mds_md *lmm,
+ 				   size_t lmm_size)
+ {
++	const struct lsm_operations *op;
+ 	struct lov_stripe_md *lsm;
+ 	u16 stripe_count;
+ 	u32 pattern;
+ 	u32 magic;
+ 	int rc;
+ 
+-	rc = lov_verify_lmm(lmm, lmm_size, &stripe_count);
++	magic = le32_to_cpu(lmm->lmm_magic);
++	op = lsm_op_find(magic);
++	if (!op)
++		return ERR_PTR(-EINVAL);
++
++	rc = op->lsm_lmm_verify(lmm, lmm_size, &stripe_count);
+ 	if (rc)
+ 		return ERR_PTR(rc);
+ 
+-	magic = le32_to_cpu(lmm->lmm_magic);
+ 	pattern = le32_to_cpu(lmm->lmm_pattern);
+ 
+ 	lsm = lov_lsm_alloc(stripe_count, pattern, magic);
+ 	if (IS_ERR(lsm))
+ 		return lsm;
+ 
+-	LASSERT(lsm_op_find(magic));
+-	rc = lsm_op_find(magic)->lsm_unpackmd(lov, lsm, lmm);
++	rc = op->lsm_unpackmd(lov, lsm, lmm);
+ 	if (rc) {
+ 		lov_free_memmd(&lsm);
+ 		return ERR_PTR(rc);
 -- 
 1.8.3.1
