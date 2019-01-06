@@ -1,85 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  6 Jan 2019 16:36:46 -0500
-Subject: [lustre-devel] [PATCH 13/14] lustre: sysfs: temporary work around
- for sysfs naming
-In-Reply-To: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
-References: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1546810607-6348-14-git-send-email-jsimmons@infradead.org>
+Date: Sun,  6 Jan 2019 17:13:56 -0500
+Subject: [lustre-devel] [PATCH v2 01/33] lustre: clio: fix incorrect
+ invariant in cl_io_iter_fini()
+In-Reply-To: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
+References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1546812868-11794-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lustre uses the internal addressing of data structures to name
-the sysfs objects. With newer kernels hashing is done on the
-data structure addresses to make it harder to bypass address
-space randomization. This breaks auto tuning with lustre. The
-temporary work around is to use "%px" for the naming just to
-make things work again. The long term solution is to move to
-proper uuids for the name which is being worked on.
+It was discovered during PFL testing that if you enable invarients
+that cl_io_iter_fini() will crash with the following back trace:
 
+kernel: cl_io_iter_fini+0x10c/0x110 [obdclass]
+kernel: cl_io_loop+0x46/0x220 [obdclass]
+kernel: cl_setattr_ost+0x1ed/0x2a0 [lustre]
+kernel: ll_setattr_raw+0x7b0/0x9a0 [lustre]
+kernel: notify_change+0x1dc/0x430
+kernel: do_truncate+0x72/0xc0
+kernel: do_sys_ftruncate+0xf5/0x160
+
+This is due to assumption that the ci_state will always be
+CIS_UNLOCKED but by looking at the behavior of cl_io_loop() it
+can be seen that is not the case. We do want to make sure the
+state is in the range of CIS_IT_STARTED to CIS_IO_FINISHED when
+cl_io_iter_fini() is called.
+
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-11828
+Reviewed-on: https://review.whamcloud.com/33915
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/llite_lib.c     | 6 +++---
- drivers/staging/lustre/lustre/mgc/mgc_request.c     | 2 +-
- drivers/staging/lustre/lustre/obdclass/obd_config.c | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/cl_io.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 203a1f7..b258c80 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -959,7 +959,7 @@ int ll_fill_super(struct super_block *sb)
- 		len -= 7;
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 879383ae..0da731c 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -436,7 +436,7 @@ void cl_io_iter_fini(const struct lu_env *env, struct cl_io *io)
+ 	const struct cl_io_slice *scan;
  
- 	/* Mount info */
--	snprintf(name, MAX_STRING_SIZE, "%.*s-%p", len,
-+	snprintf(name, MAX_STRING_SIZE, "%.*s-%px", len,
- 		 lsi->lsi_lmd->lmd_profile, sb);
+ 	LINVRNT(cl_io_is_loopable(io));
+-	LINVRNT(io->ci_state == CIS_UNLOCKED);
++	LINVRNT(io->ci_state < CIS_LOCKED || io->ci_state > CIS_IO_FINISHED);
+ 	LINVRNT(cl_io_invariant(io));
  
- 	/* Call ll_debugsfs_register_super() before lustre_process_log()
-@@ -997,13 +997,13 @@ int ll_fill_super(struct super_block *sb)
- 	CDEBUG(D_CONFIG, "Found profile %s: mdc=%s osc=%s\n", profilenm,
- 	       lprof->lp_md, lprof->lp_dt);
- 
--	dt = kasprintf(GFP_NOFS, "%s-%p", lprof->lp_dt, cfg->cfg_instance);
-+	dt = kasprintf(GFP_NOFS, "%s-%px", lprof->lp_dt, cfg->cfg_instance);
- 	if (!dt) {
- 		err = -ENOMEM;
- 		goto out_debugfs;
- 	}
- 
--	md = kasprintf(GFP_NOFS, "%s-%p", lprof->lp_md, cfg->cfg_instance);
-+	md = kasprintf(GFP_NOFS, "%s-%px", lprof->lp_md, cfg->cfg_instance);
- 	if (!md) {
- 		err = -ENOMEM;
- 		goto out_debugfs;
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index a6be2ca..ca74c75 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -1142,7 +1142,7 @@ static int mgc_apply_recover_logs(struct obd_device *mgc,
- 	if (!inst)
- 		return -ENOMEM;
- 
--	pos = snprintf(inst, PAGE_SIZE, "%p", cfg->cfg_instance);
-+	pos = snprintf(inst, PAGE_SIZE, "%px", cfg->cfg_instance);
- 	if (pos >= PAGE_SIZE) {
- 		kfree(inst);
- 		return -E2BIG;
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 8be8751..7d00ca4 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -1323,7 +1323,7 @@ int class_config_llog_handler(const struct lu_env *env,
- 		    LUSTRE_CFG_BUFLEN(lcfg, 0) > 0) {
- 			inst_len = LUSTRE_CFG_BUFLEN(lcfg, 0) +
- 				   sizeof(clli->cfg_instance) * 2 + 4;
--			inst_name = kasprintf(GFP_NOFS, "%s-%p",
-+			inst_name = kasprintf(GFP_NOFS, "%s-%px",
- 					      lustre_cfg_string(lcfg, 0),
- 					      clli->cfg_instance);
- 			if (!inst_name) {
+ 	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
 -- 
 1.8.3.1
