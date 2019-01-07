@@ -1,25 +1,36 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Jan 2019 03:11:13 +0000 (GMT)
-Subject: [lustre-devel] linux lustre client progress
-Message-ID: <alpine.LFD.2.21.1901070208080.26665@casper.infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 07 Jan 2019 16:17:33 +1100
+Subject: [lustre-devel] [PATCH 00/14] lustre: fixes for many test
+ failures
+In-Reply-To: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
+References: <1546810607-6348-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <87ftu5jbbm.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Sun, Jan 06 2019, James Simmons wrote:
 
-Over the last few weeks the final major bugs have been resolved for the
-linux lustre client as well as a port of PFL. Once these patches are 
-merged the client will be at a 2.10 LTS release level. A few minor
-patches are still out standing but they need more work before being 
-acceptable in the kernel tree. The remaining test failures are the
-same ones seen in the latest OpenSFS tree testing.
+> This patch series contains mostly fixes to resolve the majority of
+> the testing failures seen. Besides that are UAPI headers fixes to
+> prepare for when lustre will leave the staging tree. Include Neil's
+> dump_page_cache patch as well since it was landed in the OpenSFS
+> branch and the migration of lu_objects to rhashtables depended on
+> it.
 
-Before we jump into 2.11 porting I'm thinking some house cleaning with
-checkpatch etc and then moving lustre out of the staging tree to
-prepare for its eventual merger upstream. As for 2.11 I started to
-look at the what is missing and outside of the DoM feature most
-things have landed to the linux client. In fact the next patch missing
-in the git logs is the first DoM patch. Dynamic LNet discovery already
-has been landed so we are in good shape :-)
+Thanks - I've applied these.
+I haven't received all of the PFL series yet ... 16,17,18 still in limbo
+- so I haven't applied those yet.
+When the stragglers here here, I suspect they'll all go in.
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190107/694eb512/attachment.sig>
