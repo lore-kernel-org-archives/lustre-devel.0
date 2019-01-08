@@ -1,171 +1,95 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 8 Jan 2019 10:13:53 +0000
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 8 Jan 2019 21:47:42 +0000 (GMT)
 Subject: [lustre-devel] [PATCH v2 33/33] lustre: update version to 2.9.99
-In-Reply-To: <alpine.LFD.2.21.1901080352210.15230@casper.infradead.org>
+In-Reply-To: <45806D2E-8AAD-48ED-8B14-6D5CC11D824E@whamcloud.com>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
  <1546812868-11794-34-git-send-email-jsimmons@infradead.org>
  <874lakj5ck.fsf@notabene.neil.brown.name>
  <alpine.LFD.2.21.1901080352210.15230@casper.infradead.org>
-Message-ID: <45806D2E-8AAD-48ED-8B14-6D5CC11D824E@whamcloud.com>
+ <45806D2E-8AAD-48ED-8B14-6D5CC11D824E@whamcloud.com>
+Message-ID: <alpine.LFD.2.21.1901081932010.14458@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jan 7, 2019, at 21:26, James Simmons <jsimmons@infradead.org> wrote:
-> 
->> 
->> On Sun, Jan 06 2019, James Simmons wrote:
->> 
->>> With the majority of missing patches and features from the lustre
->>> 2.10 release merged upstream its time to update the upstream
->>> client's version.
->> 
->> :-)
->> 
->> Thanks to some of these patches (this batch or previous) I have fewer
->> failing tests now .. those not many fewer.
->> 
->> The current summary is
->>     45             status: FAIL
->>    556             status: PASS
->>     47             status: SKIP
->> 
->> It used to be >50 FAIL.
->> 
->> The failing tests are listed below.
->> I know why the FID patches fail - we've discussed that.
->> Maybe it is time to start working out why some of the others are
->> failing.
-> 
-> You are running a much newer test suite. Using the test suite from lustre 
-> 2.10 I see the following failures.
-> 
-> sanity: FAIL: test_103a run_acl_subtest cp failed    (real failure)
-> sanity: FAIL: test_215 cannot read lnet.stats	     (not sysfs aware)
-> sanity: FAIL: test_233a cannot access /lustre/lustre using its FID '[0x200000007:0x1:0x0]'
-> sanity: FAIL: test_233b cannot access /lustre/lustre/.lustre using its FID '[0x200000002:0x1:0x0]'
-> sanity: FAIL: test_256 Changelog catalog has wrong number of slots 0  (fails for 2.10 LTS release as well)
 
-Yes, there are definitely some tests that do not have proper client/server version/feature checks, since the tests are introduced with the code they
-are testing.  There are a number of patches in Gerrit that are adding the
-proper checks that I'd like to get landed, because we do run client/server
-version interop testing, but they always lag a bit behind and we never see
-test-script/client version issues in our testing. 
+> >> sanity: FAIL: test_104b lfs check servers test failed
+> > 
+> > sysfs bug. I have a patch for this.
+> > 
+> >> sanity: FAIL: test_130a filefrag /mnt/lustre/f130a.sanity failed
+> >> sanity: FAIL: test_130b filefrag /mnt/lustre/f130b.sanity failed
+> >> sanity: FAIL: test_130c filefrag /mnt/lustre/f130c.sanity failed
+> >> sanity: FAIL: test_130e filefrag /mnt/lustre/f130e.sanity failed
+> >> sanity: FAIL: test_130f filefrag /mnt/lustre/f130f.sanity failed
+> > 
+> > What version of e2fsprog are you running? You need a 1.44 version and
+> > this should go away.
+> 
+> To be clear - the Lustre-patched "filefrag" at:
+> 
+> https://downloads.whamcloud.com/public/e2fsprogs/1.44.3.wc1/
+> 
+> Once Lustre gets into upstream, or convince another filesystem to use the
+> Lustre filefrag extension (multiple devices, which BtrFS and XFS could
+> use) we can get the support landed into the upstream e2fsprogs.
 
->> Your two recent series are in my lustre-testing branch now - thanks.
->> 
->> NeilBrown
->> 
->> 
->> sanity: FAIL: test_27G 'testpool' is not empty 
+I swore that Ubuntu18 testing passed with the default e2fsprogs (1.44.4).
+To let Neil know, this is why lustre_fiemap.h exist in the uapi headers 
+directory. This kind of functionality would help the community at large.
+ 
+> >> sanity: FAIL: test_160a changelog 'f160a.sanity' fid  != file fid [0x240002342:0xd:0x0]
+> >> sanity: FAIL: test_161d cat failed
+> > 
+> > Might be missing some more changelog improvements.
+> > 
+> >> sanity: FAIL: test_205 No jobstats for id.205.mkdir.9480 found on mds1::*.lustre-MDT0000.job_stats
+> > 
+> > Strange?
 > 
-> See LU-11208. Test currently with older lustre versions.
-> 
->> sanity: FAIL: test_56w /root/lustre-release/lustre/utils/lfs getstripe -c /mnt/lustre/d56w.sanity/file1 wrong: found 2, expected 1
->> sanity: FAIL: test_56x migrate failed rc = 11
->> sanity: FAIL: test_56xa migrate failed rc = 11
->> sanity: FAIL: test_56z /root/lustre-release/lustre/utils/lfs find did not continue after error
->> sanity: FAIL: test_56aa lfs find --size wrong under striped dir
->> sanity: FAIL: test_56ca create /mnt/lustre/d56ca.sanity/f56ca.sanity- failed
->> sanity: FAIL: test_64b oos.sh failed: 1
->> sanity: FAIL: test_102c setstripe failed
->> sanity: FAIL: test_102j file1-0-1: size  != 65536
-> 
-> I believe these are due to the DoM feature missing
-> 
->> sanity: FAIL: test_103a misc test failed
-> 
-> 103a is real failure. Never solved yet. (LU-11594 and LU-10334 for Ubuntu)
-> 
->> sanity: FAIL: test_104b lfs check servers test failed
-> 
-> sysfs bug. I have a patch for this.
-> 
->> sanity: FAIL: test_130a filefrag /mnt/lustre/f130a.sanity failed
->> sanity: FAIL: test_130b filefrag /mnt/lustre/f130b.sanity failed
->> sanity: FAIL: test_130c filefrag /mnt/lustre/f130c.sanity failed
->> sanity: FAIL: test_130e filefrag /mnt/lustre/f130e.sanity failed
->> sanity: FAIL: test_130f filefrag /mnt/lustre/f130f.sanity failed
-> 
-> What version of e2fsprog are you running? You need a 1.44 version and
-> this should go away.
+> This might be because the upstream Lustre doesn't allow setting per-process
+> JobID via environment variable, only as a single per-node value.  The real
+> unfortunate part is that the "get JobID from environment" actually works for
+> every reasonable architecture (even the one which was originally broken
+> fixed it), but it got yanked anyway.  This is actually one of the features
+> of Lustre that lots of HPC sites like to use, since it allows them to track
+> on the servers which users/jobs/processes on the client are doing IO.
 
-To be clear - the Lustre-patched "filefrag" at:
+To give background for Neil see thread:
 
-https://downloads.whamcloud.com/public/e2fsprogs/1.44.3.wc1/
+https://lore.kernel.org/patchwork/patch/416846
 
-Once Lustre gets into upstream, or convince another filesystem to use the
-Lustre filefrag extension (multiple devices, which BtrFS and XFS could
-use) we can get the support landed into the upstream e2fsprogs.
+In this case I do agree with Greg. The latest jobid does implement an
+upcall and upcalls don't play niece with containers. Their is also the
+namespace issue pointed out. I think the namespace issue might be fixed
+in the latest OpenSFS code. The whole approach to stats in lustre is
+pretty awful. Take jobstats for example. Currently the approach is
+to poll inside the kernel at specific intervals. Part of the polling is 
+scanning the running processes environment space. On top of this the 
+administor ends up creating scripts to poll the proc / debugfs entry. 
+Other types of lustre stat files take a similar approach. Scripts have
+to poll debugfs / procfs entries.
 
->> sanity: FAIL: test_160a changelog 'f160a.sanity' fid  != file fid [0x240002342:0xd:0x0]
->> sanity: FAIL: test_161d cat failed
-> 
-> Might be missing some more changelog improvements.
-> 
->> sanity: FAIL: test_205 No jobstats for id.205.mkdir.9480 found on mds1::*.lustre-MDT0000.job_stats
-> 
-> Strange?
+I have been thinking what would be a better approach since I like to
+approach this problem for the 2.13 time frame. Our admins at my work
+place want to be able to collect application stats without being root.
+So placing stats in debugfs is not an option, which we currently do
+the linux client :-( The stats are not a good fit for sysfs. The solution 
+I have been pondering is using netlink. Since netlink is socket based it 
+can be treated as a pipe. Now you are thinking well you still need to poll 
+on the netlink socket but you don't have too. systemd does it for you :-)  
+We can create systemd service file which uses
 
-This might be because the upstream Lustre doesn't allow setting per-process
-JobID via environment variable, only as a single per-node value.  The real
-unfortunate part is that the "get JobID from environment" actually works for
-every reasonable architecture (even the one which was originally broken
-fixed it), but it got yanked anyway.  This is actually one of the features
-of Lustre that lots of HPC sites like to use, since it allows them to track
-on the servers which users/jobs/processes on the client are doing IO.
+ListenNetlink=generic "multicast group" ...
 
->> sanity: FAIL: test_208 get lease error
->> sanity: FAIL: test_225a mds-survey with zero-stripe failed
->> sanity: FAIL: test_225b mds-survey with stripe_count failed
-> 
-> Never ran that since its not in 2.10.
-> 
->> sanity: FAIL: test_233a cannot access /mnt/lustre using its FID '[0x200000007:0x1:0x0]'
->> sanity: FAIL: test_233b cannot access /mnt/lustre/.lustre using its FID '[0x200000002:0x1:0x0]'
-> 
->> sanity: FAIL: test_255c Ladvise test10 failed, 255
->> sanity: FAIL: test_270a Can't create DoM layout
->> sanity: FAIL: test_270c bad pattern
->> sanity: FAIL: test_270e lfs find -L: found 1, expected 20
->> sanity: FAIL: test_270f Can't create file with 262144 DoM stripe
->> sanity: FAIL: test_271c Too few enqueues , expected > 2000
->> sanity: FAIL: test_271f expect 1 READ RPC,  occured
->> sanity: FAIL: test_300g create striped_dir failed
->> sanity: FAIL: test_300n create striped dir fails with gid=-1
->> sanity: FAIL: test_300q create d300q.sanity fails
->> sanity: FAIL: test_315 read is not accounted ()
->> sanity: FAIL: test_317 Expected Block 4096 got 10240 for f317.sanity
->> sanity: FAIL: test_405 One layout swap locked test failed
->> sanity: FAIL: test_406 mkdir d406.sanity failed
->> sanity: FAIL: test_409 Fail to cleanup the env!
-> 
-> More DoM issues? Could be FLR as well if you are running the latest
-> test suite.
-> 
->> sanity: FAIL: test_410 no inode match
-> 
-> This is a weird test running a local kernel module.
-> 
->> sanity: FAIL: test_412 mkdir failed
->> sanity: FAIL: test_413 don't expect 1
-> 
-> More DoM ???? Have to look at this.
-> 
->> sanity: FAIL: test_802 (5) Mount client with 'ro' should succeed
-> 
-> Is test is broken. It assumes you have a specially patched kernel.
-> Details are under ticket LU-684.
-> 
-> The nice thing is with the linux client is that we are at a point
-> it wouldn't be a huge leap to integrate DoM (Data on MetaData).
-> The reason I suggest cleanups and moving out of staging first was
-> to perserve git blame a bit better with future patches. Currently
-> we see a lot of "0846e85ba2346 (NeilBrown 2018-06-07" with git blame.
+to launch a service to collect the stats. As for job stats we use another
+type of netlink class called process connector. The below link cover this
+little know feature. It is available on every system in the support 
+matrix.
 
-Cheers, Andreas
----
-Andreas Dilger
-CTO Whamcloud
+https://www.slideshare.net/kerneltlv/kernel-proc-connector-and-containers
+
+In this case we parsen for the job schedular ids and pass that to lustre
+using system.d.
