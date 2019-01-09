@@ -1,338 +1,278 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:02 +1100
-Subject: [lustre-devel] [PATCH 25/29] lustre: remove cl_page_cancel()
+Subject: [lustre-devel] [PATCH 26/29] lustre: osc_cache: simplify
+ osc_page_gang_lookup()
 In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
-Message-ID: <154701504264.26726.17608454548660581136.stgit@noble>
+Message-ID: <154701504269.26726.8061168646539306509.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-cl_page_cancel() is never used, so remove it and various
-other things that it is the only user of.
+osc_page_gang_lookup() has 4 values that it can receive from a
+callback, and that it can return to the caller:
+	CLP_GANG_OKAY,
+	CLP_GANG_RESCHED,
+	CLP_GANG_AGAIN,
+	CLP_GANG_ABORT
+
+"AGAIN" is never used.
+"RESCHED" is not needed as a cond_resched() can safely be called at
+the point this is returned, rather than returning it.
+That leaves "OKAY" and "ABORT" which can simply by "true" and "false"
+boolean values.
+
+Internalizing the RESCHED case means the callers don't need to loop
+themselves.  This simplify calling patterns.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |   18 -----
- drivers/staging/lustre/lustre/include/lustre_net.h |    1 
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |   20 ------
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   67 --------------------
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |    1 
- drivers/staging/lustre/lustre/osc/osc_internal.h   |    1 
- drivers/staging/lustre/lustre/osc/osc_page.c       |   20 ------
- drivers/staging/lustre/lustre/osc/osc_request.c    |    9 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   15 +---
- 9 files changed, 4 insertions(+), 148 deletions(-)
+ drivers/staging/lustre/lustre/include/cl_object.h  |    7 ----
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   40 ++++++++------------
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |   10 +++--
+ drivers/staging/lustre/lustre/osc/osc_io.c         |    4 +-
+ drivers/staging/lustre/lustre/osc/osc_lock.c       |   27 ++++++--------
+ 5 files changed, 33 insertions(+), 55 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index a1e07f8b5eda..de5d68879740 100644
+index de5d68879740..57d8fe676995 100644
 --- a/drivers/staging/lustre/lustre/include/cl_object.h
 +++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -969,23 +969,6 @@ struct cl_page_operations {
- 	void (*cpo_clip)(const struct lu_env *env,
- 			 const struct cl_page_slice *slice,
- 			 int from, int to);
--	/**
--	 * \pre  the page was queued for transferring.
--	 * \post page is removed from client's pending list, or -EBUSY
--	 *       is returned if it has already been in transferring.
--	 *
--	 * This is one of seldom page operation which is:
--	 * 0. called from top level;
--	 * 1. don't have vmpage locked;
--	 * 2. every layer should synchronize execution of its ->cpo_cancel()
--	 *    with completion handlers. Osc uses client obd lock for this
--	 *    purpose. Based on there is no vvp_page_cancel and
--	 *    lov_page_cancel(), cpo_cancel is defacto protected by client lock.
--	 *
--	 * \see osc_page_cancel().
--	 */
--	int (*cpo_cancel)(const struct lu_env *env,
--			  const struct cl_page_slice *slice);
- 	/**
- 	 * Write out a page by kernel. This is only called by ll_writepage
- 	 * right now.
-@@ -2159,7 +2142,6 @@ int cl_page_cache_add(const struct lu_env *env, struct cl_io *io,
- 		      struct cl_page *pg, enum cl_req_type crt);
- void cl_page_clip(const struct lu_env *env, struct cl_page *pg,
- 		  int from, int to);
--int cl_page_cancel(const struct lu_env *env, struct cl_page *page);
- int cl_page_flush(const struct lu_env *env, struct cl_io *io,
- 		  struct cl_page *pg);
- 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index 468a03edefd9..6d328b48a96b 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -1830,7 +1830,6 @@ struct ptlrpc_request_set *ptlrpc_prep_fcset(int max, set_producer_func func,
- 					     void *arg);
- int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set);
- int ptlrpc_set_wait(struct ptlrpc_request_set *);
--void ptlrpc_mark_interrupted(struct ptlrpc_request *req);
- void ptlrpc_set_destroy(struct ptlrpc_request_set *);
- void ptlrpc_set_add_req(struct ptlrpc_request_set *, struct ptlrpc_request *);
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 00df94b87606..217a5ebe1691 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -932,26 +932,6 @@ void cl_page_print(const struct lu_env *env, void *cookie,
- }
- EXPORT_SYMBOL(cl_page_print);
- 
--/**
-- * Cancel a page which is still in a transfer.
-- */
--int cl_page_cancel(const struct lu_env *env, struct cl_page *page)
--{
--	const struct cl_page_slice *slice;
--	int result = 0;
--
--	list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
--		if (slice->cpl_ops->cpo_cancel)
--			result = (*slice->cpl_ops->cpo_cancel)(env, slice);
--		if (result != 0)
--			break;
--	}
--	if (result > 0)
--		result = 0;
--
--	return result;
--}
--
- /**
-  * Converts a byte offset within object \a obj into a page index.
+@@ -2076,14 +2076,7 @@ static inline int cl_object_refc(struct cl_object *clob)
+ /** \defgroup cl_page cl_page
+  * @{
   */
+-enum {
+-	CLP_GANG_OKAY = 0,
+-	CLP_GANG_RESCHED,
+-	CLP_GANG_AGAIN,
+-	CLP_GANG_ABORT
+-};
+ 
+-/* callback of cl_page_gang_lookup() */
+ struct cl_page *cl_page_find(const struct lu_env *env, struct cl_object *obj,
+ 			     pgoff_t idx, struct page *vmpage,
+ 			     enum cl_page_type type);
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 1476f84e6156..79bcaa212339 100644
+index 79bcaa212339..e01f3815978c 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1822,7 +1822,6 @@ static void osc_ap_completion(const struct lu_env *env, struct client_obd *cli,
- 	spin_lock(&oap->oap_lock);
- 	oap->oap_async_flags = 0;
- 	spin_unlock(&oap->oap_lock);
--	oap->oap_interrupted = 0;
+@@ -2994,18 +2994,14 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
+ /**
+  * Returns a list of pages by a given [start, end] of \a obj.
+  *
+- * \param resched If not NULL, then we give up before hogging CPU for too
+- * long and set *resched = 1, in that case caller should implement a retry
+- * logic.
+- *
+  * Gang tree lookup (radix_tree_gang_lookup()) optimization is absolutely
+  * crucial in the face of [offset, EOF] locks.
+  *
+  * Return at least one page in @queue unless there is no covered page.
+  */
+-int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+-			 struct osc_object *osc, pgoff_t start, pgoff_t end,
+-			 osc_page_gang_cbt cb, void *cbdata)
++bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
++			  struct osc_object *osc, pgoff_t start, pgoff_t end,
++			  osc_page_gang_cbt cb, void *cbdata)
+ {
+ 	struct osc_page *ops;
+ 	void            **pvec;
+@@ -3013,7 +3009,7 @@ int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 	unsigned int    nr;
+ 	unsigned int    i;
+ 	unsigned int    j;
+-	int             res = CLP_GANG_OKAY;
++	bool            res = true;
+ 	bool            tree_lock = true;
  
- 	if (oap->oap_cmd & OBD_BRW_WRITE && xid > 0) {
- 		spin_lock(&cli->cl_loi_list_lock);
-@@ -2591,72 +2590,6 @@ int osc_flush_async_page(const struct lu_env *env, struct cl_io *io,
- 	return rc;
+ 	idx = start;
+@@ -3059,7 +3055,7 @@ int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 
+ 		for (i = 0; i < j; ++i) {
+ 			ops = pvec[i];
+-			if (res == CLP_GANG_OKAY)
++			if (res)
+ 				res = (*cb)(env, io, ops, cbdata);
+ 
+ 			page = ops->ops_cl.cpl_page;
+@@ -3069,10 +3065,10 @@ int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 		if (nr < OTI_PVEC_SIZE || end_of_region)
+ 			break;
+ 
+-		if (res == CLP_GANG_OKAY && need_resched())
+-			res = CLP_GANG_RESCHED;
+-		if (res != CLP_GANG_OKAY)
++		if (!res)
+ 			break;
++		if (need_resched())
++			cond_resched();
+ 
+ 		spin_lock(&osc->oo_tree_lock);
+ 		tree_lock = true;
+@@ -3085,7 +3081,7 @@ int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ /**
+  * Check if page @page is covered by an extra lock or discard it.
+  */
+-static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
++static bool check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+ 				struct osc_page *ops, void *cbdata)
+ {
+ 	struct osc_thread_info *info = osc_env_info(env);
+@@ -3121,10 +3117,10 @@ static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+ 	}
+ 
+ 	info->oti_next_index = index + 1;
+-	return CLP_GANG_OKAY;
++	return true;
  }
  
--/**
-- * this is called when a sync waiter receives an interruption.  Its job is to
-- * get the caller woken as soon as possible.  If its page hasn't been put in an
-- * rpc yet it can dequeue immediately.  Otherwise it has to mark the rpc as
-- * desiring interruption which will forcefully complete the rpc once the rpc
-- * has timed out.
-- */
--int osc_cancel_async_page(const struct lu_env *env, struct osc_page *ops)
--{
--	struct osc_async_page *oap = &ops->ops_oap;
--	struct osc_object *obj = oap->oap_obj;
--	struct client_obd *cli = osc_cli(obj);
--	struct osc_extent *ext;
--	struct osc_extent *found = NULL;
--	struct list_head *plist;
--	pgoff_t index = osc_index(ops);
--	int rc = -EBUSY;
--	int cmd;
--
--	LASSERT(!oap->oap_interrupted);
--	oap->oap_interrupted = 1;
--
--	/* Find out the caching extent */
--	osc_object_lock(obj);
--	if (oap->oap_cmd & OBD_BRW_WRITE) {
--		plist = &obj->oo_urgent_exts;
--		cmd = OBD_BRW_WRITE;
--	} else {
--		plist = &obj->oo_reading_exts;
--		cmd = OBD_BRW_READ;
--	}
--	list_for_each_entry(ext, plist, oe_link) {
--		if (ext->oe_start <= index && ext->oe_end >= index) {
--			LASSERT(ext->oe_state == OES_LOCK_DONE);
--			/* For OES_LOCK_DONE state extent, it has already held
--			 * a refcount for RPC.
--			 */
--			found = osc_extent_get(ext);
--			break;
--		}
--	}
--	if (found) {
--		list_del_init(&found->oe_link);
--		osc_update_pending(obj, cmd, -found->oe_nr_pages);
--		osc_object_unlock(obj);
--
--		osc_extent_finish(env, found, 0, -EINTR);
--		osc_extent_put(env, found);
--		rc = 0;
--	} else {
--		osc_object_unlock(obj);
--		/* ok, it's been put in an rpc. only one oap gets a request
--		 * reference
--		 */
--		if (oap->oap_request) {
--			ptlrpc_mark_interrupted(oap->oap_request);
--			ptlrpcd_wake(oap->oap_request);
--			ptlrpc_req_finished(oap->oap_request);
--			oap->oap_request = NULL;
--		}
--	}
--
--	osc_list_maint(cli, obj);
--	return rc;
--}
--
- int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
- 			 struct list_head *list, int cmd, int brw_flags)
+-static int discard_cb(const struct lu_env *env, struct cl_io *io,
++static bool discard_cb(const struct lu_env *env, struct cl_io *io,
+ 		      struct osc_page *ops, void *cbdata)
  {
+ 	struct osc_thread_info *info = osc_env_info(env);
+@@ -3145,7 +3141,7 @@ static int discard_cb(const struct lu_env *env, struct cl_io *io,
+ 		LASSERT(page->cp_state == CPS_FREEING);
+ 	}
+ 
+-	return CLP_GANG_OKAY;
++	return true;
+ }
+ 
+ /**
+@@ -3162,7 +3158,7 @@ int osc_lock_discard_pages(const struct lu_env *env, struct osc_object *osc,
+ 	struct osc_thread_info *info = osc_env_info(env);
+ 	struct cl_io *io = &info->oti_io;
+ 	osc_page_gang_cbt cb;
+-	int res;
++	bool res;
+ 	int result;
+ 
+ 	io->ci_obj = cl_object_top(osc2cl(osc));
+@@ -3174,15 +3170,9 @@ int osc_lock_discard_pages(const struct lu_env *env, struct osc_object *osc,
+ 	cb = discard ? discard_cb : check_and_discard_cb;
+ 	info->oti_fn_index = start;
+ 	info->oti_next_index = start;
+-	do {
+-		res = osc_page_gang_lookup(env, io, osc,
+-					   info->oti_next_index, end, cb, osc);
+-		if (info->oti_next_index > end)
+-			break;
+ 
+-		if (res == CLP_GANG_RESCHED)
+-			cond_resched();
+-	} while (res != CLP_GANG_OKAY);
++	res = osc_page_gang_lookup(env, io, osc,
++				   info->oti_next_index, end, cb, osc);
+ out:
+ 	cl_io_fini(env, io);
+ 	return result;
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-index b1a1d241cc6c..3af096e0dbdd 100644
+index 3af096e0dbdd..c0f58f41513f 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
 +++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-@@ -380,7 +380,6 @@ int osc_lvb_print(const struct lu_env *env, void *cookie,
- void osc_lru_add_batch(struct client_obd *cli, struct list_head *list);
- void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
- 		     enum cl_req_type crt, int brw_flags);
--int osc_cancel_async_page(const struct lu_env *env, struct osc_page *ops);
- int osc_set_async_flags(struct osc_object *obj, struct osc_page *opg,
- 			u32 async_flags);
- int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
-diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-index 0354272fe192..586f0dfe3790 100644
---- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-@@ -60,7 +60,6 @@ enum async_flags {
- struct osc_async_page {
- 	int				oap_magic;
- 	unsigned short			oap_cmd;
--	unsigned short			oap_interrupted:1;
+@@ -660,11 +660,11 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext);
+ int osc_lock_discard_pages(const struct lu_env *env, struct osc_object *osc,
+ 			   pgoff_t start, pgoff_t end, bool discard_pages);
  
- 	struct list_head		oap_pending_item;
- 	struct list_head		oap_rpc_item;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index 28b12729d7e9..e0187fafcc37 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -137,11 +137,10 @@ static int osc_page_print(const struct lu_env *env,
- 	struct osc_object *obj = cl2osc(slice->cpl_obj);
- 	struct client_obd *cli = &osc_export(obj)->exp_obd->u.cli;
+-typedef int (*osc_page_gang_cbt)(const struct lu_env *, struct cl_io *,
+-				 struct osc_page *, void *);
+-int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+-			 struct osc_object *osc, pgoff_t start, pgoff_t end,
+-			 osc_page_gang_cbt cb, void *cbdata);
++typedef bool (*osc_page_gang_cbt)(const struct lu_env *, struct cl_io *,
++				  struct osc_page *, void *);
++bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
++			  struct osc_object *osc, pgoff_t start, pgoff_t end,
++			  osc_page_gang_cbt cb, void *cbdata);
+ /* @} osc */
  
--	return (*printer)(env, cookie, LUSTRE_OSC_NAME "-page@%p %lu: 1< %#x %d %u %s %s > 2< %llu %u %u %#x %#x | %p %p %p > 3< %d %lu %d > 4< %d %d %d %lu %s | %s %s %s %s > 5< %s %s %s %s | %d %s | %d %s %s>\n",
-+	return (*printer)(env, cookie, LUSTRE_OSC_NAME "-page@%p %lu: 1< %#x %d %s %s > 2< %llu %u %u %#x %#x | %p %p %p > 3< %d %lu %d > 4< %d %d %d %lu %s | %s %s %s %s > 5< %s %s %s %s | %d %s | %d %s %s>\n",
- 			  opg, osc_index(opg),
- 			  /* 1 */
- 			  oap->oap_magic, oap->oap_cmd,
--			  oap->oap_interrupted,
- 			  osc_list(&oap->oap_pending_item),
- 			  osc_list(&oap->oap_rpc_item),
- 			  /* 2 */
-@@ -216,22 +215,6 @@ static void osc_page_clip(const struct lu_env *env,
- 	spin_unlock(&oap->oap_lock);
- }
- 
--static int osc_page_cancel(const struct lu_env *env,
--			   const struct cl_page_slice *slice)
--{
--	struct osc_page *opg = cl2osc_page(slice);
--	int rc = 0;
--
--	/* Check if the transferring against this page
--	 * is completed, or not even queued.
--	 */
--	if (opg->ops_transfer_pinned)
--		/* FIXME: may not be interrupted.. */
--		rc = osc_cancel_async_page(env, opg);
--	LASSERT(ergo(rc == 0, opg->ops_transfer_pinned == 0));
--	return rc;
--}
--
- static int osc_page_flush(const struct lu_env *env,
- 			  const struct cl_page_slice *slice,
- 			  struct cl_io *io)
-@@ -247,7 +230,6 @@ static const struct cl_page_operations osc_page_ops = {
- 	.cpo_print	 = osc_page_print,
- 	.cpo_delete	= osc_page_delete,
- 	.cpo_clip	   = osc_page_clip,
--	.cpo_cancel	 = osc_page_cancel,
- 	.cpo_flush	  = osc_page_flush
- };
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index b28fbacbcfbf..ccc491efa982 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -1635,10 +1635,6 @@ static int osc_brw_redo_request(struct ptlrpc_request *request,
- 			LASSERTF(request == oap->oap_request,
- 				 "request %p != oap_request %p\n",
- 				 request, oap->oap_request);
--			if (oap->oap_interrupted) {
--				ptlrpc_req_finished(new_req);
--				return -EINTR;
--			}
- 		}
- 	}
- 	/* New request takes over pga and oaps from old request.
-@@ -1879,7 +1875,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 	int mem_tight = 0;
- 	int page_count = 0;
- 	bool soft_sync = false;
--	bool interrupted = false;
- 	int grant = 0;
- 	int i;
- 	int rc;
-@@ -1937,8 +1932,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 			else
- 				LASSERT(oap->oap_page_off + oap->oap_count ==
- 					PAGE_SIZE);
--			if (oap->oap_interrupted)
--				interrupted = true;
- 		}
- 	}
- 
-@@ -1968,8 +1961,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 
- 	req->rq_memalloc = mem_tight != 0;
- 	oap->oap_request = ptlrpc_request_addref(req);
--	if (interrupted && !req->rq_intr)
--		ptlrpc_mark_interrupted(req);
- 
- 	/* Need to update the timestamps after the request is built in case
- 	 * we race with setattr (locally or in queue at OST).  If OST gets
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 8fafc8dc3f57..f90a3eef5daf 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -2148,17 +2148,6 @@ void ptlrpc_expired_set(struct ptlrpc_request_set *set)
- 	}
- }
- 
--/**
-- * Sets rq_intr flag in \a req under spinlock.
-- */
--void ptlrpc_mark_interrupted(struct ptlrpc_request *req)
--{
--	spin_lock(&req->rq_lock);
--	req->rq_intr = 1;
--	spin_unlock(&req->rq_lock);
--}
--EXPORT_SYMBOL(ptlrpc_mark_interrupted);
--
+ #endif /* OSC_CL_INTERNAL_H */
+diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
+index dabdf6da8b38..b95e0358d7ff 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_io.c
++++ b/drivers/staging/lustre/lustre/osc/osc_io.c
+@@ -449,7 +449,7 @@ static int osc_async_upcall(void *a, int rc)
  /**
-  * Interrupts (sets interrupted flag) all uncompleted requests in
-  * a set \a data. Called when l_wait_event_abortable_timeout receives signal.
-@@ -2174,7 +2163,9 @@ static void ptlrpc_interrupted_set(struct ptlrpc_request_set *set)
- 		    req->rq_phase != RQ_PHASE_UNREG_RPC)
- 			continue;
+  * Checks that there are no pages being written in the extent being truncated.
+  */
+-static int trunc_check_cb(const struct lu_env *env, struct cl_io *io,
++static bool trunc_check_cb(const struct lu_env *env, struct cl_io *io,
+ 			  struct osc_page *ops, void *cbdata)
+ {
+ 	struct cl_page *page = ops->ops_cl.cpl_page;
+@@ -466,7 +466,7 @@ static int trunc_check_cb(const struct lu_env *env, struct cl_io *io,
+ 		CDEBUG(D_CACHE, "page %p index %lu locked for %d.\n",
+ 		       ops, osc_index(ops), oap->oap_cmd & OBD_BRW_RWMASK);
  
--		ptlrpc_mark_interrupted(req);
-+		spin_lock(&req->rq_lock);
-+		req->rq_intr = 1;
-+		spin_unlock(&req->rq_lock);
- 	}
+-	return CLP_GANG_OKAY;
++	return true;
  }
  
+ static void osc_trunc_check(const struct lu_env *env, struct cl_io *io,
+diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
+index 4cc813d192d9..1eab61d720e2 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_lock.c
++++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
+@@ -630,18 +630,18 @@ static int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
+ 	return result;
+ }
+ 
+-static int weigh_cb(const struct lu_env *env, struct cl_io *io,
+-		    struct osc_page *ops, void *cbdata)
++static bool weigh_cb(const struct lu_env *env, struct cl_io *io,
++		     struct osc_page *ops, void *cbdata)
+ {
+ 	struct cl_page *page = ops->ops_cl.cpl_page;
+ 
+ 	if (cl_page_is_vmlocked(env, page) ||
+ 	    PageDirty(page->cp_vmpage) || PageWriteback(page->cp_vmpage)
+ 	   )
+-		return CLP_GANG_ABORT;
++		return false;
+ 
+ 	*(pgoff_t *)cbdata = osc_index(ops) + 1;
+-	return CLP_GANG_OKAY;
++	return true;
+ }
+ 
+ static unsigned long osc_lock_weight(const struct lu_env *env,
+@@ -651,7 +651,7 @@ static unsigned long osc_lock_weight(const struct lu_env *env,
+ 	struct cl_io *io = &osc_env_info(env)->oti_io;
+ 	struct cl_object *obj = cl_object_top(&oscobj->oo_cl);
+ 	pgoff_t page_index;
+-	int result;
++	bool result;
+ 
+ 	io->ci_obj = obj;
+ 	io->ci_ignore_layout = 1;
+@@ -660,19 +660,14 @@ static unsigned long osc_lock_weight(const struct lu_env *env,
+ 		return result;
+ 
+ 	page_index = cl_index(obj, extent->start);
+-	do {
+-		result = osc_page_gang_lookup(env, io, oscobj,
+-					      page_index,
+-					      cl_index(obj, extent->end),
+-					      weigh_cb, (void *)&page_index);
+-		if (result == CLP_GANG_ABORT)
+-			break;
+-		if (result == CLP_GANG_RESCHED)
+-			cond_resched();
+-	} while (result != CLP_GANG_OKAY);
++
++	result = osc_page_gang_lookup(env, io, oscobj,
++				      page_index,
++				      cl_index(obj, extent->end),
++				      weigh_cb, (void *)&page_index);
+ 	cl_io_fini(env, io);
+ 
+-	return result == CLP_GANG_ABORT ? 1 : 0;
++	return result ? 1 : 0;
+ }
+ 
+ /**
