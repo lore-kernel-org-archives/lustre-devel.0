@@ -1,64 +1,37 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:02 +1100
-Subject: [lustre-devel] [PATCH 16/29] lustre: osc_cache: use
- osc_makes_hprpc() more consistently.
+Subject: [lustre-devel] [PATCH 17/29] lustre: osc_cache: simplify list walk
+ in get_write_extents().
 In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
-Message-ID: <154701504207.26726.261002093793293176.stgit@noble>
+Message-ID: <154701504211.26726.81439906958866826.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We have a function "osc_makes_hprpc()", and a few places
-that could use it, but instead open-code the content.
-
-Move the function earlier, and use it more broadly.
+This iteration is exactly what list_first_entry_or_null() is for.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 9b78562d3366..d2d5867156ad 100644
+index d2d5867156ad..14e6efb4b80b 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1654,9 +1654,14 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
- 	return rc;
- }
+@@ -1982,9 +1982,9 @@ static unsigned int get_write_extents(struct osc_object *obj,
+ 	};
  
-+static int osc_makes_hprpc(struct osc_object *obj)
-+{
-+	return !list_empty(&obj->oo_hp_exts);
-+}
-+
- static int osc_max_rpc_in_flight(struct client_obd *cli, struct osc_object *osc)
- {
--	int hprpc = !!list_empty(&osc->oo_hp_exts);
-+	int hprpc = !osc_makes_hprpc(osc);
- 
- 	return rpcs_in_flight(cli) >= cli->cl_max_rpcs_in_flight + hprpc;
- }
-@@ -1685,7 +1690,7 @@ static bool osc_makes_rpc(struct client_obd *cli, struct osc_object *osc,
- 			CDEBUG(D_CACHE, "invalid import forcing RPC\n");
- 			return true;
- 		}
--		if (!list_empty(&osc->oo_hp_exts)) {
-+		if (osc_makes_hprpc(osc)) {
- 			CDEBUG(D_CACHE, "high prio request forcing RPC\n");
- 			return true;
- 		}
-@@ -1736,11 +1741,6 @@ static void osc_update_pending(struct osc_object *obj, int cmd, int delta)
- 	OSC_IO_DEBUG(obj, "update pending cmd %d delta %d.\n", cmd, delta);
- }
- 
--static int osc_makes_hprpc(struct osc_object *obj)
--{
--	return !list_empty(&obj->oo_hp_exts);
--}
--
- static void on_list(struct list_head *item, struct list_head *list, int should_be_on)
- {
- 	if (list_empty(item) && should_be_on)
+ 	assert_osc_object_is_locked(obj);
+-	while (!list_empty(&obj->oo_hp_exts)) {
+-		ext = list_entry(obj->oo_hp_exts.next, struct osc_extent,
+-				 oe_link);
++	while ((ext = list_first_entry_or_null(&obj->oo_hp_exts,
++					       struct osc_extent,
++					       oe_link))) {
+ 		LASSERT(ext->oe_state == OES_CACHE);
+ 		if (!try_to_add_extent_for_io(cli, ext, &data))
+ 			return data.erd_page_count;
