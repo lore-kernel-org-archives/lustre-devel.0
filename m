@@ -1,168 +1,62 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:02 +1100
-Subject: [lustre-devel] [PATCH 20/29] lustre: osc_cache: don't drop a lock
- we didn't take.
+Subject: [lustre-devel] [PATCH 21/29] lustre: osc_cache: don't drop a lock
+ we didn't take - two
 In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
-Message-ID: <154701504236.26726.14318399777937714593.stgit@noble>
+Message-ID: <154701504241.26726.16825256312797481549.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Dropping a lock in a function which didn't take the lock
-is best avoided as it makes it difficult to understand the code.
-Sometimes it is unavoidable, but not in this case.
+osc_check_rpcs() drops a lock that it was called with, which can make
+it harder to understand the code.
 
-There is very little code in the (only) calling function which is also
-locked, so we can move that code into the called function, and
-then just take the lock inside the called function - the same function
-which drops it.
+It is only called from one place, and that places takes the lock just
+to all this function.
+So instead, take the lock at the start of the function,
+and drop it at the end.
+This makes the code easier to follow.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c |   78 ++++++++++++-------------
- 1 file changed, 38 insertions(+), 40 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index db28cc4d5ae8..863884cac028 100644
+index 863884cac028..b2ad6a15014e 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -2029,7 +2029,6 @@ static unsigned int get_write_extents(struct osc_object *obj,
- static int
- osc_send_write_rpc(const struct lu_env *env, struct client_obd *cli,
- 		   struct osc_object *osc)
--	__must_hold(osc)
+@@ -2187,11 +2187,11 @@ static struct osc_object *osc_next_obj(struct client_obd *cli)
+ 
+ /* called with the loi list lock held */
+ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
+-	__must_hold(&cli->cl_loi_list_lock)
  {
- 	LIST_HEAD(rpclist);
- 	struct osc_extent *ext;
-@@ -2039,13 +2038,16 @@ osc_send_write_rpc(const struct lu_env *env, struct client_obd *cli,
- 	int srvlock = 0;
+ 	struct osc_object *osc;
  	int rc = 0;
  
--	assert_osc_object_is_locked(osc);
-+	osc_object_lock(osc);
-+	if (osc_makes_rpc(cli, osc, OBD_BRW_WRITE))
-+		page_count = get_write_extents(osc, &rpclist);
++	spin_lock(&cli->cl_loi_list_lock);
+ 	while ((osc = osc_next_obj(cli)) != NULL) {
+ 		struct cl_object *obj = osc2cl(osc);
+ 		struct lu_ref_link link;
+@@ -2247,6 +2247,7 @@ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
  
--	page_count = get_write_extents(osc, &rpclist);
- 	LASSERT(equi(page_count == 0, list_empty(&rpclist)));
+ 		spin_lock(&cli->cl_loi_list_lock);
+ 	}
++	spin_unlock(&cli->cl_loi_list_lock);
+ }
  
--	if (list_empty(&rpclist))
-+	if (list_empty(&rpclist)) {
-+		osc_object_unlock(osc);
+ static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
+@@ -2258,9 +2259,7 @@ static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
  		return 0;
-+	}
  
- 	osc_update_pending(osc, OBD_BRW_WRITE, -page_count);
- 
-@@ -2086,7 +2088,6 @@ osc_send_write_rpc(const struct lu_env *env, struct client_obd *cli,
- 		LASSERT(list_empty(&rpclist));
- 	}
- 
--	osc_object_lock(osc);
- 	return rc;
- }
- 
-@@ -2103,7 +2104,6 @@ osc_send_write_rpc(const struct lu_env *env, struct client_obd *cli,
- static int
- osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
- 		  struct osc_object *osc)
--	__must_hold(osc)
- {
- 	struct osc_extent *ext;
- 	struct osc_extent *next;
-@@ -2117,7 +2117,12 @@ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
- 	};
- 	int rc = 0;
- 
--	assert_osc_object_is_locked(osc);
-+	osc_object_lock(osc);
-+	if (!osc_makes_rpc(cli, osc, OBD_BRW_READ)) {
-+		osc_object_unlock(osc);
-+		return rc;
-+	}
-+
- 	list_for_each_entry_safe(ext, next, &osc->oo_reading_exts, oe_link) {
- 		EASSERT(ext->oe_state == OES_LOCK_DONE, ext);
- 		if (!try_to_add_extent_for_io(cli, ext, &data))
-@@ -2129,13 +2134,12 @@ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
- 
- 	osc_update_pending(osc, OBD_BRW_READ, -data.erd_page_count);
- 
-+	osc_object_unlock(osc);
- 	if (!list_empty(&rpclist)) {
--		osc_object_unlock(osc);
- 
- 		rc = osc_build_rpc(env, cli, &rpclist, OBD_BRW_READ);
- 		LASSERT(list_empty(&rpclist));
- 
--		osc_object_lock(osc);
- 	}
- 	return rc;
- }
-@@ -2210,38 +2214,32 @@ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
- 		 * partial read pending queue when we're given this object to
- 		 * do io on writes while there are cache waiters
- 		 */
--		osc_object_lock(osc);
--		if (osc_makes_rpc(cli, osc, OBD_BRW_WRITE)) {
--			rc = osc_send_write_rpc(env, cli, osc);
--			if (rc < 0) {
--				CERROR("Write request failed with %d\n", rc);
--
--				/* osc_send_write_rpc failed, mostly because of
--				 * memory pressure.
--				 *
--				 * It can't break here, because if:
--				 *  - a page was submitted by osc_io_submit, so
--				 *    page locked;
--				 *  - no request in flight
--				 *  - no subsequent request
--				 * The system will be in live-lock state,
--				 * because there is no chance to call
--				 * osc_io_unplug() and osc_check_rpcs() any
--				 * more. pdflush can't help in this case,
--				 * because it might be blocked at grabbing
--				 * the page lock as we mentioned.
--				 *
--				 * Anyway, continue to drain pages.
--				 */
--				/* break; */
--			}
--		}
--		if (osc_makes_rpc(cli, osc, OBD_BRW_READ)) {
--			rc = osc_send_read_rpc(env, cli, osc);
--			if (rc < 0)
--				CERROR("Read request failed with %d\n", rc);
-+		rc = osc_send_write_rpc(env, cli, osc);
-+		if (rc < 0) {
-+			CERROR("Write request failed with %d\n", rc);
-+
-+			/* osc_send_write_rpc failed, mostly because of
-+			 * memory pressure.
-+			 *
-+			 * It can't break here, because if:
-+			 *  - a page was submitted by osc_io_submit, so
-+			 *    page locked;
-+			 *  - no request in flight
-+			 *  - no subsequent request
-+			 * The system will be in live-lock state,
-+			 * because there is no chance to call
-+			 * osc_io_unplug() and osc_check_rpcs() any
-+			 * more. pdflush can't help in this case,
-+			 * because it might be blocked@grabbing
-+			 * the page lock as we mentioned.
-+			 *
-+			 * Anyway, continue to drain pages.
-+			 */
-+			/* break; */
- 		}
--		osc_object_unlock(osc);
-+		rc = osc_send_read_rpc(env, cli, osc);
-+		if (rc < 0)
-+			CERROR("Read request failed with %d\n", rc);
- 
- 		osc_list_maint(cli, osc);
- 		lu_object_ref_del_at(&obj->co_lu, &link, "check", current);
+ 	if (!async) {
+-		spin_lock(&cli->cl_loi_list_lock);
+ 		osc_check_rpcs(env, cli);
+-		spin_unlock(&cli->cl_loi_list_lock);
+ 	} else {
+ 		CDEBUG(D_CACHE, "Queue writeback work for client %p.\n", cli);
+ 		LASSERT(cli->cl_writeback_work);
