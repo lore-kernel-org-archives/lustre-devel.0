@@ -1,76 +1,105 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:00 +1100
-Subject: [lustre-devel] [PATCH 00/29] assorted osc cleanups.
-Message-ID: <154701488711.26726.17363928508883972338.stgit@noble>
+Subject: [lustre-devel] [PATCH 01/29] lustre: osc_cache: discard oe_intree
+In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
+References: <154701488711.26726.17363928508883972338.stgit@noble>
+Message-ID: <154701504072.26726.12597270089564992131.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I was reading through the osc code recently trying to understand it,
-and tripped over various things that made it harded to understand.
-So I wrote patches to clean those things up.  As you can see below,
-this deleted nearly 300 lines of code.
+An rbnode knows if it is in the tree or not, using RB_EMPTY_NODE().
+There is no need for an extra flag.
 
-None of these are bug-fixes, and some may only be subjective
-improvements, so I can drop any that anyone objects to.
-
-This seems to fit well with James' recent suggesting to focus on
-house-cleaning for a while (which I support).
-
-Thanks,
-NeilBrown
-
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   15 +++++++--------
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |    3 +--
+ 2 files changed, 8 insertions(+), 10 deletions(-)
 
-NeilBrown (29):
-      lustre: osc_cache: discard oe_intree
-      lustre: osc_cache: use assert_spin_locked()
-      lustre: osc: simplify osc_extent_wait()
-      lustre: osc: simplify list manipulation
-      lustre: osc: convert oe_refc and oe_users to kref and refcount_
-      lustre: osc: use overlapped() consistently.
-      lustre: osc: convert a while loop to for
-      lustre: osc: simplify osc_extent_find()
-      lustre: osc: remove test on 'found' being an error.
-      lustre: osc_cache: avoid list_for_each_entry_safe when clearing list.
-      lustre: osc_cache: simplify osc_wake_cache_waiters()
-      lustre: osc_cache: avoid confusing variable reuse.
-      lustre: osc_cache: change osc_enter_cache_try to return bool.
-      lustre: osc_cache: convert cl_cache_waiters to a wait_queue.
-      lustre: osc_cache: change osc_make_rpc() to return bool.
-      lustre: osc_cache: use osc_makes_hprpc() more consistently.
-      lustre: osc_cache: simplify list walk in get_write_extents().
-      lustre: osc_cache: avoid unnecessary tests.
-      lustre: osc_cache: convert while to for in get_write_extents()
-      lustre: osc_cache: don't drop a lock we didn't take.
-      lustre: osc_cache: don't drop a lock we didn't take - two
-      lustre: osc_cache: osc_prep_async_page() has meaningless return
-      lustre: osc_cache: remove 'transient' arg from osc_enter_cache_try
-      lustre: osc_cache: change need_release to bool
-      lustre: remove cl_page_cancel()
-      lustre: osc_cache: simplify osc_page_gang_lookup()
-      lustre: osc_cache: white-space and other checkpatch fixes.
-      lustre: osc_request: assorted white-space and check-patch fixes.
-      lustre: centralize handling of PTLRPCD_SET
-
-
- drivers/staging/lustre/lustre/include/cl_object.h  |   25 -
- drivers/staging/lustre/lustre/include/lustre_net.h |    2 
- drivers/staging/lustre/lustre/include/obd.h        |    2 
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    2 
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |   20 -
- drivers/staging/lustre/lustre/osc/osc_cache.c      |  722 +++++++-------------
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |   33 -
- drivers/staging/lustre/lustre/osc/osc_internal.h   |   15 
- drivers/staging/lustre/lustre/osc/osc_io.c         |    4 
- drivers/staging/lustre/lustre/osc/osc_lock.c       |   27 -
- drivers/staging/lustre/lustre/osc/osc_page.c       |   22 -
- drivers/staging/lustre/lustre/osc/osc_request.c    |  199 +++---
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   20 -
- 13 files changed, 399 insertions(+), 694 deletions(-)
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 93330cb77e94..fbf16547003d 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -74,7 +74,7 @@ static inline char *ext_flags(struct osc_extent *ext, char *flags)
+ {
+ 	char *buf = flags;
+ 	*buf++ = ext->oe_rw ? 'r' : 'w';
+-	if (ext->oe_intree)
++	if (!RB_EMPTY_NODE(&ext->oe_node))
+ 		*buf++ = 'i';
+ 	if (ext->oe_sync)
+ 		*buf++ = 'S';
+@@ -154,7 +154,7 @@ static inline struct osc_extent *next_extent(struct osc_extent *ext)
+ 	if (!ext)
+ 		return NULL;
+ 
+-	LASSERT(ext->oe_intree);
++	LASSERT(!RB_EMPTY_NODE(&ext->oe_node));
+ 	return rb_extent(rb_next(&ext->oe_node));
+ }
+ 
+@@ -163,7 +163,7 @@ static inline struct osc_extent *prev_extent(struct osc_extent *ext)
+ 	if (!ext)
+ 		return NULL;
+ 
+-	LASSERT(ext->oe_intree);
++	LASSERT(!RB_EMPTY_NODE(&ext->oe_node));
+ 	return rb_extent(rb_prev(&ext->oe_node));
+ }
+ 
+@@ -393,7 +393,7 @@ static void osc_extent_put(const struct lu_env *env, struct osc_extent *ext)
+ 		LASSERT(list_empty(&ext->oe_link));
+ 		LASSERT(atomic_read(&ext->oe_users) == 0);
+ 		LASSERT(ext->oe_state == OES_INV);
+-		LASSERT(!ext->oe_intree);
++		LASSERT(RB_EMPTY_NODE(&ext->oe_node));
+ 
+ 		if (ext->oe_dlmlock) {
+ 			lu_ref_add(&ext->oe_dlmlock->l_reference,
+@@ -465,7 +465,7 @@ static void osc_extent_insert(struct osc_object *obj, struct osc_extent *ext)
+ 	struct rb_node *parent = NULL;
+ 	struct osc_extent *tmp;
+ 
+-	LASSERT(ext->oe_intree == 0);
++	LASSERT(RB_EMPTY_NODE(&ext->oe_node));
+ 	LASSERT(ext->oe_obj == obj);
+ 	LASSERT(osc_object_is_locked(obj));
+ 	while (*n) {
+@@ -482,7 +482,6 @@ static void osc_extent_insert(struct osc_object *obj, struct osc_extent *ext)
+ 	rb_link_node(&ext->oe_node, parent, n);
+ 	rb_insert_color(&ext->oe_node, &obj->oo_root);
+ 	osc_extent_get(ext);
+-	ext->oe_intree = 1;
+ }
+ 
+ /* caller must have held object lock. */
+@@ -491,9 +490,9 @@ static void osc_extent_erase(struct osc_extent *ext)
+ 	struct osc_object *obj = ext->oe_obj;
+ 
+ 	LASSERT(osc_object_is_locked(obj));
+-	if (ext->oe_intree) {
++	if (!RB_EMPTY_NODE(&ext->oe_node)) {
+ 		rb_erase(&ext->oe_node, &obj->oo_root);
+-		ext->oe_intree = 0;
++		RB_CLEAR_NODE(&ext->oe_node);
+ 		/* rbtree held a refcount */
+ 		osc_extent_put_trust(ext);
+ 	}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+index 077a2b183634..b78deef3963a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+@@ -598,9 +598,8 @@ struct osc_extent {
+ 	/* state of this extent */
+ 	enum osc_extent_state	oe_state;
+ 	/* flags for this extent. */
+-	unsigned int		oe_intree:1,
+ 	/* 0 is write, 1 is read */
+-				oe_rw:1,
++	unsigned int		oe_rw:1,
+ 	/* sync extent, queued by osc_queue_sync_pages() */
+ 				oe_sync:1,
+ 	/* set if this extent has partial, sync pages.
