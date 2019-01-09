@@ -1,42 +1,98 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:01 +1100
-Subject: [lustre-devel] [PATCH 09/29] lustre: osc: remove test on 'found'
- being an error.
+Subject: [lustre-devel] [PATCH 10/29] lustre: osc_cache: avoid
+ list_for_each_entry_safe when clearing list.
 In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
-Message-ID: <154701504152.26726.5389367058165286948.stgit@noble>
+Message-ID: <154701504159.26726.15747465883750837429.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Found cannot be IS_ERR() at this point in the code, as it is only ever
-assigned a value from osc_extent_hold() (or NULL).
-
-So discard the test.
+When removing some items from a list, list_for_each_entry_safe() is a
+good choice.
+When removing all items, it is clearer to use a while loop
+that repeatedly removes the first element, until there are
+none left.  This makes it obvious that the list ends up
+empty.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c |   22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 848e440ae2a9..e65d917336b9 100644
+index e65d917336b9..5cd3732101e7 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -821,11 +821,9 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
- 	osc_extent_tree_dump(D_CACHE, obj);
- 	if (found) {
- 		LASSERT(!conflict);
--		if (!IS_ERR(found)) {
--			LASSERT(found->oe_dlmlock == cur->oe_dlmlock);
--			OSC_EXTENT_DUMP(D_CACHE, found,
--					"found caching ext for %lu.\n", index);
--		}
-+		LASSERT(found->oe_dlmlock == cur->oe_dlmlock);
-+		OSC_EXTENT_DUMP(D_CACHE, found,
-+				"found caching ext for %lu.\n", index);
- 	} else if (!conflict) {
- 		/* create a new extent */
- 		EASSERT(osc_extent_is_overlapped(obj, cur) == 0, cur);
+@@ -869,7 +869,6 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
+ {
+ 	struct client_obd *cli = osc_cli(ext->oe_obj);
+ 	struct osc_async_page *oap;
+-	struct osc_async_page *tmp;
+ 	int nr_pages = ext->oe_nr_pages;
+ 	int lost_grant = 0;
+ 	int blocksize = cli->cl_import->imp_obd->obd_osfs.os_bsize ? : 4096;
+@@ -882,7 +881,9 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
+ 	EASSERT(ergo(rc == 0, ext->oe_state == OES_RPC), ext);
+ 
+ 	osc_lru_add_batch(cli, &ext->oe_pages);
+-	list_for_each_entry_safe(oap, tmp, &ext->oe_pages, oap_pending_item) {
++	while ((oap = list_first_entry_or_null(&ext->oe_pages,
++					       struct osc_async_page,
++					       oap_pending_item))) {
+ 		list_del_init(&oap->oap_rpc_item);
+ 		list_del_init(&oap->oap_pending_item);
+ 		if (last_off <= oap->oap_obj_off) {
+@@ -1686,11 +1687,11 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
+ /* caller must hold loi_list_lock */
+ void osc_wake_cache_waiters(struct client_obd *cli)
+ {
+-	struct list_head *l, *tmp;
+ 	struct osc_cache_waiter *ocw;
+ 
+-	list_for_each_safe(l, tmp, &cli->cl_cache_waiters) {
+-		ocw = list_entry(l, struct osc_cache_waiter, ocw_entry);
++	while ((ocw = list_first_entry_or_null(&cli->cl_cache_waiters,
++					       struct osc_cache_waiter,
++					       ocw_entry))) {
+ 		list_del_init(&ocw->ocw_entry);
+ 
+ 		ocw->ocw_rc = -EDQUOT;
+@@ -2739,7 +2740,7 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
+ {
+ 	struct client_obd *cli = osc_cli(obj);
+ 	struct osc_extent *ext;
+-	struct osc_async_page *oap, *tmp;
++	struct osc_async_page *oap;
+ 	int page_count = 0;
+ 	int mppr = cli->cl_max_pages_per_rpc;
+ 	bool can_merge = true;
+@@ -2763,7 +2764,9 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
+ 
+ 	ext = osc_extent_alloc(obj);
+ 	if (!ext) {
+-		list_for_each_entry_safe(oap, tmp, list, oap_pending_item) {
++		while ((oap = list_first_entry_or_null(&oap->oap_pending_item,
++						       struct osc_async_page,
++						       oap_pending_item))) {
+ 			list_del_init(&oap->oap_pending_item);
+ 			osc_ap_completion(env, cli, oap, 0, -ENOMEM);
+ 		}
+@@ -3093,11 +3096,12 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
+ 
+ 	LASSERT(ergo(!discard, list_empty(&discard_list)));
+ 	if (!list_empty(&discard_list)) {
+-		struct osc_extent *tmp;
+ 		int rc;
+ 
+ 		osc_list_maint(osc_cli(obj), obj);
+-		list_for_each_entry_safe(ext, tmp, &discard_list, oe_link) {
++		while ((ext = list_first_entry_or_null(&discard_list,
++						       struct osc_extent,
++						       oe_link))) {
+ 			list_del_init(&ext->oe_link);
+ 			EASSERT(ext->oe_state == OES_LOCKING, ext);
+ 
