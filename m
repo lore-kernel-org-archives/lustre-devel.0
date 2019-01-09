@@ -1,65 +1,79 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 09 Jan 2019 17:24:01 +1100
-Subject: [lustre-devel] [PATCH 12/29] lustre: osc_cache: avoid confusing
- variable reuse.
+Subject: [lustre-devel] [PATCH 13/29] lustre: osc_cache: change
+ osc_enter_cache_try to return bool.
 In-Reply-To: <154701488711.26726.17363928508883972338.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
-Message-ID: <154701504179.26726.1340537377320556999.stgit@noble>
+Message-ID: <154701504186.26726.10969814573194089501.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-In osc_extent_wait(), the 'rc' variable use used for
-three very different purposes.  This makes the code
-a bit harder to read.
-For one of the purposes, introduce a boolean 'need_release'.
-For another, use a conditional expression instead.
+'bool' is the natural type for this, so make that obvious.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c |   13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c |   26 +++++++++++--------------
+ 1 file changed, 11 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 0c78b95e45a3..5a295799f177 100644
+index 5a295799f177..e9987c187ecd 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -929,7 +929,8 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
- 			   enum osc_extent_state state)
+@@ -1533,17 +1533,14 @@ static void osc_exit_cache(struct client_obd *cli, struct osc_async_page *oap)
+  * Non-blocking version of osc_enter_cache() that consumes grant only when it
+  * is available.
+  */
+-static int osc_enter_cache_try(struct client_obd *cli,
+-			       struct osc_async_page *oap,
+-			       int bytes, int transient)
++static bool osc_enter_cache_try(struct client_obd *cli,
++				struct osc_async_page *oap,
++				int bytes, int transient)
  {
- 	struct osc_object *obj = ext->oe_obj;
--	int rc = 0;
-+	bool need_release = false;
-+	int rc;
+-	int rc;
+-
+ 	OSC_DUMP_GRANT(D_CACHE, cli, "need:%d\n", bytes);
  
- 	osc_object_lock(obj);
- 	LASSERT(sanity_check_nolock(ext) == 0);
-@@ -943,11 +944,11 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
- 		} else if (ext->oe_state == OES_CACHE) {
- 			ext->oe_urgent = 1;
- 			osc_extent_hold(ext);
--			rc = 1;
-+			need_release = true;
+-	rc = osc_reserve_grant(cli, bytes);
+-	if (rc < 0)
+-		return 0;
++	if (osc_reserve_grant(cli, bytes) < 0)
++		return false;
+ 
+ 	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
+ 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
+@@ -1553,12 +1550,11 @@ static int osc_enter_cache_try(struct client_obd *cli,
+ 			atomic_long_inc(&obd_dirty_transit_pages);
+ 			oap->oap_brw_flags |= OBD_BRW_NOCACHE;
  		}
- 	}
- 	osc_object_unlock(obj);
--	if (rc == 1)
-+	if (need_release)
- 		osc_extent_release(env, ext);
- 
- 	/* wait for the extent until its state becomes @state */
-@@ -963,11 +964,7 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
- 				smp_load_acquire(&ext->oe_state) == state);
- 
- 	}
--	if (ext->oe_rc < 0)
--		rc = ext->oe_rc;
--	else
+-		rc = 1;
++		return true;
+ 	} else {
+ 		__osc_unreserve_grant(cli, bytes, bytes);
 -		rc = 0;
++		return false;
+ 	}
 -	return rc;
-+	return ext->oe_rc < 0 ? ext->oe_rc : 0;
  }
  
- /**
+ static int ocw_granted(struct client_obd *cli, struct osc_cache_waiter *ocw)
+@@ -2457,12 +2453,12 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+ 
+ 		/* it doesn't need any grant to dirty this page */
+ 		spin_lock(&cli->cl_loi_list_lock);
+-		rc = osc_enter_cache_try(cli, oap, grants, 0);
+-		spin_unlock(&cli->cl_loi_list_lock);
+-		if (rc == 0) { /* try failed */
++		if (!osc_enter_cache_try(cli, oap, grants, 0)) {
+ 			grants = 0;
+ 			need_release = 1;
+-		} else if (ext->oe_end < index) {
++		}
++		spin_unlock(&cli->cl_loi_list_lock);
++		if (!need_release && ext->oe_end < index) {
+ 			tmp = grants;
+ 			/* try to expand this extent */
+ 			rc = osc_extent_expand(ext, index, &tmp);
