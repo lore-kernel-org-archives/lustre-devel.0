@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 10 Jan 2019 02:43:12 +0000
-Subject: [lustre-devel] [PATCH 24/29] lustre: osc_cache: change
- need_release to bool
-In-Reply-To: <154701504259.26726.10938592737685333082.stgit@noble>
+Date: Thu, 10 Jan 2019 03:02:45 +0000
+Subject: [lustre-devel] [PATCH 23/29] lustre: osc_cache: remove
+ 'transient' arg from osc_enter_cache_try
+In-Reply-To: <154701504254.26726.7702205638412400024.stgit@noble>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
- <154701504259.26726.10938592737685333082.stgit@noble>
-Message-ID: <8F602893-D0CE-4746-B48C-1FDD1C27BDAC@whamcloud.com>
+ <154701504254.26726.7702205638412400024.stgit@noble>
+Message-ID: <87E1C21A-052C-46A7-81AA-2183EB3BB178@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,61 +14,82 @@ To: lustre-devel@lists.lustre.org
 
 On Jan 8, 2019, at 23:24, NeilBrown <neilb@suse.com> wrote:
 > 
-> This variable is used like a bool, so declare it as one.
+> This arg is always '0', so remove it.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
+
+Out of curiosity, how would you find something like this?  Just
+through code reading, or do you have some sort of static analysis
+tool that shows this is dead code?
+
+Digging into this a bit more, it looks like this is the only place
+that increments cl_dirty_transit and sets OBD_BRW_NOCACHE, which
+means the corresponding code in osc_release_write_grant() that checks
+OBD_BRW_NOCACHE and decrements cl_dirty_transit is also dead, which
+is good otherwise there would have been some kind of accounting leak.
+
+That further implies that cl_dirty_transit is unused and can be removed,
+along with obd_dirty_transit_pages.  The OBD_BRW_NOCACHE flag is part
+of the wire protocol, but it looks like this was never actually sent on
+the wire, just an internal housekeeping flag, so it should be marked like:
+
+/* #define OBD_BRW_NOCACHE		0x400 internal use only 2.2.57-2.12 */
+
+The follow-on cleanup could be part of this patch or a separate one.
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
 > ---
-> drivers/staging/lustre/lustre/osc/osc_cache.c |    8 ++++----
-> 1 file changed, 4 insertions(+), 4 deletions(-)
+> drivers/staging/lustre/lustre/osc/osc_cache.c |   11 +++--------
+> 1 file changed, 3 insertions(+), 8 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> index b4bb36926046..1476f84e6156 100644
+> index 8a68d3eb9314..b4bb36926046 100644
 > --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 > +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> @@ -2316,7 +2316,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
-> 	unsigned int grants = 0, tmp;
-> 	int brw_flags = OBD_BRW_ASYNC;
-> 	int cmd = OBD_BRW_WRITE;
-> -	int need_release = 0;
-> +	bool need_release = false;
-> 	int rc = 0;
+> @@ -1535,7 +1535,7 @@ static void osc_exit_cache(struct client_obd *cli, struct osc_async_page *oap)
+>  */
+> static bool osc_enter_cache_try(struct client_obd *cli,
+> 				struct osc_async_page *oap,
+> -				int bytes, int transient)
+> +				int bytes)
+> {
+> 	OSC_DUMP_GRANT(D_CACHE, cli, "need:%d\n", bytes);
 > 
-> 	if (oap->oap_magic != OAP_MAGIC)
-> @@ -2393,7 +2393,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+> @@ -1545,11 +1545,6 @@ static bool osc_enter_cache_try(struct client_obd *cli,
+> 	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
+> 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
+> 		osc_consume_write_grant(cli, &oap->oap_brw_page);
+> -		if (transient) {
+> -			cli->cl_dirty_transit++;
+> -			atomic_long_inc(&obd_dirty_transit_pages);
+> -			oap->oap_brw_flags |= OBD_BRW_NOCACHE;
+> -		}
+> 		return true;
+> 	} else {
+> 		__osc_unreserve_grant(cli, bytes, bytes);
+> @@ -1618,7 +1613,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
+> 	remain = wait_event_idle_exclusive_timeout_cmd(
+> 		cli->cl_cache_waiters,
+> 		(entered = osc_enter_cache_try(
+> -			cli, oap, bytes, 0)) ||
+> +			cli, oap, bytes)) ||
+> 		(cli->cl_dirty_pages == 0 &&
+> 		 cli->cl_w_in_flight == 0),
+> 		timeout,
+> @@ -2396,7 +2391,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+> 
+> 		/* it doesn't need any grant to dirty this page */
 > 		spin_lock(&cli->cl_loi_list_lock);
-> 		if (!osc_enter_cache_try(cli, oap, grants)) {
+> -		if (!osc_enter_cache_try(cli, oap, grants, 0)) {
+> +		if (!osc_enter_cache_try(cli, oap, grants)) {
 > 			grants = 0;
-> -			need_release = 1;
-> +			need_release = true;
+> 			need_release = 1;
 > 		}
-> 		spin_unlock(&cli->cl_loi_list_lock);
-> 		if (!need_release && ext->oe_end < index) {
-> @@ -2401,7 +2401,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
-> 			/* try to expand this extent */
-> 			rc = osc_extent_expand(ext, index, &tmp);
-> 			if (rc < 0) {
-> -				need_release = 1;
-> +				need_release = true;
-> 				/* don't free reserved grant */
-> 			} else {
-> 				OSC_EXTENT_DUMP(D_CACHE, ext,
-> @@ -2413,7 +2413,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
-> 		rc = 0;
-> 	} else if (ext) {
-> 		/* index is located outside of active extent */
-> -		need_release = 1;
-> +		need_release = true;
-> 	}
-> 	if (need_release) {
-> 		osc_extent_release(env, ext);
 > 
 > 
 
 Cheers, Andreas
 ---
 Andreas Dilger
-Principal Lustre Architect
-Whamcloud
+CTO Whamcloud
