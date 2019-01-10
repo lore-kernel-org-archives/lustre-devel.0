@@ -1,137 +1,128 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 9 Jan 2019 23:16:19 +0000
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 10 Jan 2019 11:40:35 +1100
 Subject: [lustre-devel] [PATCH v2 33/33] lustre: update version to 2.9.99
-In-Reply-To: <alpine.LFD.2.21.1901091734180.18138@casper.infradead.org>
+In-Reply-To: <45806D2E-8AAD-48ED-8B14-6D5CC11D824E@whamcloud.com>
 References: <1546812868-11794-1-git-send-email-jsimmons@infradead.org>
  <1546812868-11794-34-git-send-email-jsimmons@infradead.org>
  <874lakj5ck.fsf@notabene.neil.brown.name>
  <alpine.LFD.2.21.1901080352210.15230@casper.infradead.org>
  <45806D2E-8AAD-48ED-8B14-6D5CC11D824E@whamcloud.com>
- <alpine.LFD.2.21.1901081932010.14458@casper.infradead.org>
- <9BDCA6A9-A826-49A7-9126-BC1DCC96AC1D@whamcloud.com>
- <alpine.LFD.2.21.1901091734180.18138@casper.infradead.org>
-Message-ID: <53F17B0D-5FB3-4B69-B483-7AA4FBCA259B@whamcloud.com>
+Message-ID: <87muo9ibuk.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jan 9, 2019, at 11:28, James Simmons <jsimmons@infradead.org> wrote:
-> 
-> 
->>>> This might be because the upstream Lustre doesn't allow setting per-process
->>>> JobID via environment variable, only as a single per-node value.  The real
->>>> unfortunate part is that the "get JobID from environment" actually works for
->>>> every reasonable architecture (even the one which was originally broken
->>>> fixed it), but it got yanked anyway.  This is actually one of the features
->>>> of Lustre that lots of HPC sites like to use, since it allows them to track
->>>> on the servers which users/jobs/processes on the client are doing IO.
->>> 
->>> To give background for Neil see thread:
->>> 
->>> https://lore.kernel.org/patchwork/patch/416846
->>> 
->>> In this case I do agree with Greg. The latest jobid does implement an
->>> upcall and upcalls don't play niece with containers. Their is also the
->>> namespace issue pointed out. I think the namespace issue might be fixed
->>> in the latest OpenSFS code.
+On Tue, Jan 08 2019, Andreas Dilger wrote:
+
+> On Jan 7, 2019, at 21:26, James Simmons <jsimmons@infradead.org> wrote:
 >> 
->> I'm not sure what you mean?  AFAIK, there is no upcall for JobID, except
->> maybe in the kernel client where we weren't allowed to parse the process
->> environment directly.  I agree an upcall is problematic with namespaces,
->> in addition to being less functional (only a JobID per node instead of
->> per process), which is why direct access to JOBENV is better IMHO.
-> 
-> I have some evil ideas about this. Need to think about it some more since
-> this is a more complex problem.
-
-Since the kernel manages the environment variables via getenv() and setenv(),
-I honestly don't see why accessing them directly is a huge issue?
-
->>> The whole approach to stats in lustre is
->>> pretty awful. Take jobstats for example. Currently the approach is
->>> to poll inside the kernel at specific intervals. Part of the polling is 
->>> scanning the running processes environment space. On top of this the 
->>> administor ends up creating scripts to poll the proc / debugfs entry. 
->>> Other types of lustre stat files take a similar approach. Scripts have
->>> to poll debugfs / procfs entries.
+>>> 
+>>> On Sun, Jan 06 2019, James Simmons wrote:
+>>> 
+>>>> With the majority of missing patches and features from the lustre
+>>>> 2.10 release merged upstream its time to update the upstream
+>>>> client's version.
+>>> 
+>>> :-)
+>>> 
+>>> Thanks to some of these patches (this batch or previous) I have fewer
+>>> failing tests now .. those not many fewer.
+>>> 
+>>> The current summary is
+>>>     45             status: FAIL
+>>>    556             status: PASS
+>>>     47             status: SKIP
+>>> 
+>>> It used to be >50 FAIL.
+>>> 
+>>> The failing tests are listed below.
+>>> I know why the FID patches fail - we've discussed that.
+>>> Maybe it is time to start working out why some of the others are
+>>> failing.
 >> 
->> I think that issue is orthogonal to getting the actual JobID.  That is
->> the stats collection from the kernel.  We shouldn't be inventing a new
->> way to process that.  What does "top" do?  Read a thousand /proc files
->> every second because that is flexible for different use cases.  There
->> are much fewer Lustre stats files on a given node, and I haven't heard
->> that the actual stats reading interface is a performance issue.
-> 
-> Because the policy for the linux kernel is not to add non processes 
-> related information in procfs anymore. "top" reads process information
-> from procfs which is okay.
-
-The location of the stats (procfs vs. sysfs vs. debugfs) wasn't my point.
-My point was that a *very* core kernel performance monitoring utility is
-doing open/read/close from virtual kernel files, so before we go ahead
-and invent our own performance monitoring framework (which may be frowned
-upon by upstream for arbitrary reasons because it isn't using /proc or
-/sys files).
-
-> This means the stats lustre generates are
-> required to be placed in debugfs. The problem their is you need to be
-> root to access this information.
-
-That is a self-inflicted problem because of upstream kernel policy to
-move the existing files out of /proc and being unable to use /sys either.
-
-> I told the administrator about this
-> and they told me in no way will they run an application as root just
-> to read stats. We really don't want to require users to mount their
-> debugfs partitions to allow non root uses to access it. So I looked 
-> into alteranatives. Actually with netlink you have far more power for 
-> handling stats then polling some proc file. Also while for most cases the 
-> stat files are not huge in general but if we do end up having a stat 
-> seq_file with a huge amount of data then polling that file can really 
-> spike the load on an node.
-
-I agree it is not ideal.  One option (AFAIK) would be a udev rule that
-changes the /sys/kernel/debug/lustre/* files to be at readable by a
-non-root group (e.g. admin or perftools or whatever) for the collector.
-
->>> I have been thinking what would be a better approach since I like to
->>> approach this problem for the 2.13 time frame. Our admins at my work
->>> place want to be able to collect application stats without being root.
->>> So placing stats in debugfs is not an option, which we currently do
->>> the linux client :-( The stats are not a good fit for sysfs. The solution 
->>> I have been pondering is using netlink. Since netlink is socket based it 
->>> can be treated as a pipe. Now you are thinking well you still need to poll 
->>> on the netlink socket but you don't have too. systemd does it for you :-)  
->>> We can create systemd service file which uses
+>> You are running a much newer test suite. Using the test suite from lustre 
+>> 2.10 I see the following failures.
 >> 
->> For the love of all that is holy, do not make Lustre stats usage depend
->> on Systemd to be usable.
-> 
-> I never write code that locks in one approach ever. Take for example the
-> lctl conf_param / set_param -P handling with the move to sysfs. Instead
-> of the old upcall method to lctl now we have a udev rule. That rule is not
-> law!!! A site could create their own udev rule if they want to say log
-> changes to the lustre tunables. Keep in mind udev rules need to be simple
-> since they block until completed much like upcalls do. If you want to
-> run a heavy application you can create a system.d service to handle the
-> tunable uevent. If you are really clever you can use dbus to send that
-> the tuning event to external nodes. Their are many creative options.
-> 
-> The same is true with the stats netlink approach. I was up late last night
-> pondering a design for the netlink stats. I have to put together a list
-> of my ideas and run it by my admins. So no systemd is not a hard 
-> requirment. Just an option for people into that sort of thing. Using
-> udev and netlink opens up a whole new stack to take advantage of.
+>> sanity: FAIL: test_103a run_acl_subtest cp failed    (real failure)
+>> sanity: FAIL: test_215 cannot read lnet.stats	     (not sysfs aware)
+>> sanity: FAIL: test_233a cannot access /lustre/lustre using its FID '[0x200000007:0x1:0x0]'
+>> sanity: FAIL: test_233b cannot access /lustre/lustre/.lustre using its FID '[0x200000002:0x1:0x0]'
+>> sanity: FAIL: test_256 Changelog catalog has wrong number of slots 0  (fails for 2.10 LTS release as well)
+>
+> Yes, there are definitely some tests that do not have proper client/server version/feature checks, since the tests are introduced with the code they
+> are testing.  There are a number of patches in Gerrit that are adding the
+> proper checks that I'd like to get landed, because we do run client/server
+> version interop testing, but they always lag a bit behind and we never see
+> test-script/client version issues in our testing. 
+>
+>>> Your two recent series are in my lustre-testing branch now - thanks.
+>>> 
+>>> NeilBrown
+>>> 
+>>> 
+>>> sanity: FAIL: test_27G 'testpool' is not empty 
+>> 
+>> See LU-11208. Test currently with older lustre versions.
+>> 
+>>> sanity: FAIL: test_56w /root/lustre-release/lustre/utils/lfs getstripe -c /mnt/lustre/d56w.sanity/file1 wrong: found 2, expected 1
+>>> sanity: FAIL: test_56x migrate failed rc = 11
+>>> sanity: FAIL: test_56xa migrate failed rc = 11
+>>> sanity: FAIL: test_56z /root/lustre-release/lustre/utils/lfs find did not continue after error
+>>> sanity: FAIL: test_56aa lfs find --size wrong under striped dir
+>>> sanity: FAIL: test_56ca create /mnt/lustre/d56ca.sanity/f56ca.sanity- failed
+>>> sanity: FAIL: test_64b oos.sh failed: 1
+>>> sanity: FAIL: test_102c setstripe failed
+>>> sanity: FAIL: test_102j file1-0-1: size  != 65536
+>> 
+>> I believe these are due to the DoM feature missing
+>> 
+>>> sanity: FAIL: test_103a misc test failed
+>> 
+>> 103a is real failure. Never solved yet. (LU-11594 and LU-10334 for Ubuntu)
+>> 
+>>> sanity: FAIL: test_104b lfs check servers test failed
+>> 
+>> sysfs bug. I have a patch for this.
+>> 
+>>> sanity: FAIL: test_130a filefrag /mnt/lustre/f130a.sanity failed
+>>> sanity: FAIL: test_130b filefrag /mnt/lustre/f130b.sanity failed
+>>> sanity: FAIL: test_130c filefrag /mnt/lustre/f130c.sanity failed
+>>> sanity: FAIL: test_130e filefrag /mnt/lustre/f130e.sanity failed
+>>> sanity: FAIL: test_130f filefrag /mnt/lustre/f130f.sanity failed
+>> 
+>> What version of e2fsprog are you running? You need a 1.44 version and
+>> this should go away.
+>
+> To be clear - the Lustre-patched "filefrag" at:
+>
+> https://downloads.whamcloud.com/public/e2fsprogs/1.44.3.wc1/
+>
 
-Sorry to be negative, but I was just having fun with systemd over the
-weekend on one of my home systems, and I really don't want to entangle
-it into our stats.  If the existing procfs/sysfs/debugfs scraping will
-continue to work in the future then I'm fine with that.
+I looked at Commit 41aee4226789 ("filefrag: Lustre changes to filefrag FIEMAP handling")
+in the git tree instead.
 
-Cheers, Andreas
----
-Andreas Dilger
-Principal Lustre Architect
-Whamcloud
+This appears to add 3, features.
+
+- It adds an optional device to struct fiemap.
+  Presumably this is always returned if available, else zero is provided
+  which means "the device".
+- It adds a flag FIEMAP_EXTENT_NET which indicates that the device
+  number is *not*  dev_t, but is some fs-specific value
+- It allows FIEMAP_FLAG_DEVICE_ORDER to be requested.  I can't quite
+  work out what this does.  Presumably it changes the order that entries
+  are returned (why?) and maybe returns multiple entries for a region
+  that is mirrored ???
+
+As you say, I can see how these might be useful to other filesystems.
+Maybe we should try upstreaming the support sooner rather than later.
+
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190110/614ef3d7/attachment.sig>
