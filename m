@@ -1,142 +1,240 @@
 From: NeilBrown <neilb@suse.com>
-Date: Fri, 11 Jan 2019 11:00:46 +1100
-Subject: [lustre-devel] [PATCH 4/4] lustre: ptlrpc: change some foo0() to
- __foo()
-In-Reply-To: <154716475327.28978.3817067697027604609.stgit@noble>
-References: <154716475327.28978.3817067697027604609.stgit@noble>
-Message-ID: <154716484609.28978.296505839179223953.stgit@noble>
+Date: Fri, 11 Jan 2019 11:27:38 +1100
+Subject: [lustre-devel] [PATCH 23/29] lustre: osc_cache: remove
+ 'transient' arg from osc_enter_cache_try
+In-Reply-To: <87E1C21A-052C-46A7-81AA-2183EB3BB178@whamcloud.com>
+References: <154701488711.26726.17363928508883972338.stgit@noble>
+ <154701504254.26726.7702205638412400024.stgit@noble>
+ <87E1C21A-052C-46A7-81AA-2183EB3BB178@whamcloud.com>
+Message-ID: <87ftu0ghs5.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Change:
-  nrs_policy_stop0 -> __nrs_policy_stop
-  nrs_svcpt_setup_locked0 -> __nrs_svcpt_setup_locked
-  ptlrpc_nrs_req_get_nolock0 -> __ptlrpc_nrs_req_get_nolock
+On Thu, Jan 10 2019, Andreas Dilger wrote:
 
-This is more consistent with Linux naming style.
+> On Jan 8, 2019, at 23:24, NeilBrown <neilb@suse.com> wrote:
+>> 
+>> This arg is always '0', so remove it.
+>> 
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>
+> Out of curiosity, how would you find something like this?  Just
+> through code reading, or do you have some sort of static analysis
+> tool that shows this is dead code?
+>
+> Digging into this a bit more, it looks like this is the only place
+> that increments cl_dirty_transit and sets OBD_BRW_NOCACHE, which
+> means the corresponding code in osc_release_write_grant() that checks
+> OBD_BRW_NOCACHE and decrements cl_dirty_transit is also dead, which
+> is good otherwise there would have been some kind of accounting leak.
+>
+> That further implies that cl_dirty_transit is unused and can be removed,
+> along with obd_dirty_transit_pages.  The OBD_BRW_NOCACHE flag is part
+> of the wire protocol, but it looks like this was never actually sent on
+> the wire, just an internal housekeeping flag, so it should be marked like:
+>
+> /* #define OBD_BRW_NOCACHE		0x400 internal use only 2.2.57-2.12 */
+>
+> The follow-on cleanup could be part of this patch or a separate one.
+>
+> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
+Below is the revised version of this patch.
+Thanks,
+NeilBrown
+
+From: NeilBrown <neilb@suse.com>
+Subject: [PATCH] lustre: osc_cache: remove 'transient' arg from
+ osc_enter_cache_try
+
+This arg is always '0', so remove it.
+Consequently, OBD_BRW_NOCACHE is never set, and
+ cl_dirty_transit and obd_dirty_transit_pages
+are never non-zero.
+So they can be removed as well.
+
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ptlrpc/nrs.c         |   20 ++++++++++----------
- drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c    |    2 +-
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    6 +++---
- 3 files changed, 14 insertions(+), 14 deletions(-)
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h        |  2 +-
+ drivers/staging/lustre/lustre/include/obd.h              |  1 -
+ drivers/staging/lustre/lustre/include/obd_support.h      |  1 -
+ drivers/staging/lustre/lustre/obdclass/class_obd.c       |  3 ---
+ drivers/staging/lustre/lustre/osc/osc_cache.c            | 16 +++-------------
+ drivers/staging/lustre/lustre/osc/osc_request.c          | 14 ++++++--------
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c          |  2 --
+ 7 files changed, 10 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs.c b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-index e09b86529c5d..248ba045fb79 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-@@ -82,7 +82,7 @@ static int nrs_policy_ctl_locked(struct ptlrpc_nrs_policy *policy,
- 	       -ENOSYS;
- }
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+index a8de36c8fbe4..bffe62e87e00 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+@@ -1182,7 +1182,7 @@ struct hsm_state_set {
+ #define OBD_BRW_CHECK		0x10
+ #define OBD_BRW_FROM_GRANT	0x20 /* the osc manages this under llite */
+ #define OBD_BRW_GRANTED		0x40 /* the ost manages this */
+-#define OBD_BRW_NOCACHE		0x80 /* this page is a part of non-cached IO */
++/* #define OBD_BRW_NOCACHE	0x80 internal use only 2.2.57-2.12 */
+ #define OBD_BRW_NOQUOTA	       0x100
+ #define OBD_BRW_SRVLOCK	       0x200 /* Client holds no lock over this page */
+ #define OBD_BRW_ASYNC	       0x400 /* Server may delay commit to disk */
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 0d8b9fe4bcec..4b43707f3d36 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -193,7 +193,6 @@ struct client_obd {
+ 	/* the grant values are protected by loi_list_lock below */
+ 	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pages */
+ 	unsigned long		 cl_dirty_max_pages;	/* allowed w/o rpc */
+-	unsigned long		 cl_dirty_transit;	/* dirty synchronous */
+ 	unsigned long		 cl_avail_grant;	/* bytes of credit for ost */
+ 	unsigned long		 cl_lost_grant;		/* lost credits (trunc) */
+ 	/* grant consumed for dirty pages */
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index 79875fad3f18..93a374514a77 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -55,7 +55,6 @@ extern int at_early_margin;
+ extern int at_extra;
+ extern unsigned long obd_max_dirty_pages;
+ extern atomic_long_t obd_dirty_pages;
+-extern atomic_long_t obd_dirty_transit_pages;
+ extern char obd_jobid_var[];
  
--static void nrs_policy_stop0(struct ptlrpc_nrs_policy *policy)
-+static void __nrs_policy_stop(struct ptlrpc_nrs_policy *policy)
- {
- 	if (policy->pol_desc->pd_ops->op_policy_stop)
- 		policy->pol_desc->pd_ops->op_policy_stop(policy);
-@@ -126,7 +126,7 @@ static int nrs_policy_stop_locked(struct ptlrpc_nrs_policy *policy)
+ /* Some hash init argument constants */
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 5b0b2f64a4a3..e563ebb5b328 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -77,9 +77,6 @@ EXPORT_SYMBOL(at_early_margin);
+ int at_extra = 30;
+ EXPORT_SYMBOL(at_extra);
  
- 	/* I have the only refcount */
- 	if (policy->pol_ref == 1)
--		nrs_policy_stop0(policy);
-+		__nrs_policy_stop(policy);
+-atomic_long_t obd_dirty_transit_pages;
+-EXPORT_SYMBOL(obd_dirty_transit_pages);
+-
+ char obd_jobid_var[JOBSTATS_JOBID_VAR_MAX_LEN + 1] = JOBSTATS_DISABLE;
+ char obd_jobid_node[LUSTRE_JOBID_SIZE + 1];
  
- 	return 0;
- }
-@@ -151,7 +151,7 @@ static void nrs_policy_stop_primary(struct ptlrpc_nrs *nrs)
- 	tmp->pol_state = NRS_POL_STATE_STOPPING;
- 
- 	if (tmp->pol_ref == 0)
--		nrs_policy_stop0(tmp);
-+		__nrs_policy_stop(tmp);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 8f5c567b4e15..53f067d4e09b 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -1424,11 +1424,6 @@ static void osc_release_write_grant(struct client_obd *cli,
+ 	pga->flag &= ~OBD_BRW_FROM_GRANT;
+ 	atomic_long_dec(&obd_dirty_pages);
+ 	cli->cl_dirty_pages--;
+-	if (pga->flag & OBD_BRW_NOCACHE) {
+-		pga->flag &= ~OBD_BRW_NOCACHE;
+-		atomic_long_dec(&obd_dirty_transit_pages);
+-		cli->cl_dirty_transit--;
+-	}
  }
  
  /**
-@@ -300,7 +300,7 @@ static void nrs_policy_put_locked(struct ptlrpc_nrs_policy *policy)
- 	policy->pol_ref--;
- 	if (unlikely(policy->pol_ref == 0 &&
- 		     policy->pol_state == NRS_POL_STATE_STOPPING))
--		nrs_policy_stop0(policy);
-+		__nrs_policy_stop(policy);
- }
- 
- static void nrs_policy_put(struct ptlrpc_nrs_policy *policy)
-@@ -888,8 +888,8 @@ static int nrs_register_policies_locked(struct ptlrpc_nrs *nrs)
-  *
-  * \pre mutex_is_locked(&nrs_core.nrs_mutex)
+@@ -1535,7 +1530,7 @@ static void osc_exit_cache(struct client_obd *cli, struct osc_async_page *oap)
   */
--static int nrs_svcpt_setup_locked0(struct ptlrpc_nrs *nrs,
--				   struct ptlrpc_service_part *svcpt)
-+static int __nrs_svcpt_setup_locked(struct ptlrpc_nrs *nrs,
-+				    struct ptlrpc_service_part *svcpt)
+ static bool osc_enter_cache_try(struct client_obd *cli,
+ 				struct osc_async_page *oap,
+-				int bytes, int transient)
++				int bytes)
  {
- 	enum ptlrpc_nrs_queue_type queue;
+ 	OSC_DUMP_GRANT(D_CACHE, cli, "need:%d\n", bytes);
  
-@@ -931,7 +931,7 @@ static int nrs_svcpt_setup_locked(struct ptlrpc_service_part *svcpt)
- 	 * Initialize the regular NRS head.
- 	 */
- 	nrs = nrs_svcpt2nrs(svcpt, false);
--	rc = nrs_svcpt_setup_locked0(nrs, svcpt);
-+	rc = __nrs_svcpt_setup_locked(nrs, svcpt);
- 	if (rc < 0)
- 		goto out;
+@@ -1545,11 +1540,6 @@ static bool osc_enter_cache_try(struct client_obd *cli,
+ 	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
+ 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
+ 		osc_consume_write_grant(cli, &oap->oap_brw_page);
+-		if (transient) {
+-			cli->cl_dirty_transit++;
+-			atomic_long_inc(&obd_dirty_transit_pages);
+-			oap->oap_brw_flags |= OBD_BRW_NOCACHE;
+-		}
+ 		return true;
+ 	} else {
+ 		__osc_unreserve_grant(cli, bytes, bytes);
+@@ -1618,7 +1608,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
+ 	remain = wait_event_idle_exclusive_timeout_cmd(
+ 		cli->cl_cache_waiters,
+ 		(entered = osc_enter_cache_try(
+-			cli, oap, bytes, 0)) ||
++			cli, oap, bytes)) ||
+ 		(cli->cl_dirty_pages == 0 &&
+ 		 cli->cl_w_in_flight == 0),
+ 		timeout,
+@@ -2396,7 +2386,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
  
-@@ -951,7 +951,7 @@ static int nrs_svcpt_setup_locked(struct ptlrpc_service_part *svcpt)
- 	}
- 
- 	nrs = nrs_svcpt2nrs(svcpt, true);
--	rc = nrs_svcpt_setup_locked0(nrs, svcpt);
-+	rc = __nrs_svcpt_setup_locked(nrs, svcpt);
- 
- out:
- 	return rc;
-@@ -1444,8 +1444,8 @@ static void nrs_request_removed(struct ptlrpc_nrs_policy *policy)
-  * \retval NULL the head has no requests to serve
-  */
- struct ptlrpc_request *
--ptlrpc_nrs_req_get_nolock0(struct ptlrpc_service_part *svcpt, bool hp,
--			   bool peek, bool force)
-+__ptlrpc_nrs_req_get_nolock(struct ptlrpc_service_part *svcpt, bool hp,
-+			    bool peek, bool force)
+ 		/* it doesn't need any grant to dirty this page */
+ 		spin_lock(&cli->cl_loi_list_lock);
+-		if (!osc_enter_cache_try(cli, oap, grants, 0)) {
++		if (!osc_enter_cache_try(cli, oap, grants)) {
+ 			grants = 0;
+ 			need_release = 1;
+ 		}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index b28fbacbcfbf..e18d592bf42a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -678,22 +678,20 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+ 		oa->o_dirty = cli->cl_dirty_grant;
+ 	else
+ 		oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
+-	if (unlikely(cli->cl_dirty_pages - cli->cl_dirty_transit >
++	if (unlikely(cli->cl_dirty_pages >
+ 		     cli->cl_dirty_max_pages)) {
+-		CERROR("dirty %lu - %lu > dirty_max %lu\n",
+-		       cli->cl_dirty_pages, cli->cl_dirty_transit,
++		CERROR("dirty %lu > dirty_max %lu\n",
++		       cli->cl_dirty_pages,
+ 		       cli->cl_dirty_max_pages);
+ 		oa->o_undirty = 0;
+-	} else if (unlikely(atomic_long_read(&obd_dirty_pages) -
+-			    atomic_long_read(&obd_dirty_transit_pages) >
++	} else if (unlikely(atomic_long_read(&obd_dirty_pages) >
+ 			    (long)(obd_max_dirty_pages + 1))) {
+ 		/* The atomic_read() allowing the atomic_inc() are
+ 		 * not covered by a lock thus they may safely race and trip
+ 		 * this CERROR() unless we add in a small fudge factor (+1).
+ 		 */
+-		CERROR("%s: dirty %ld + %ld > system dirty_max %ld\n",
++		CERROR("%s: dirty %ld > system dirty_max %ld\n",
+ 		       cli_name(cli), atomic_long_read(&obd_dirty_pages),
+-		       atomic_long_read(&obd_dirty_transit_pages),
+ 		       obd_max_dirty_pages);
+ 		oa->o_undirty = 0;
+ 	} else if (unlikely(cli->cl_dirty_max_pages - cli->cl_dirty_pages >
+@@ -1047,7 +1045,7 @@ static int check_write_rcs(struct ptlrpc_request *req,
+ static inline int can_merge_pages(struct brw_page *p1, struct brw_page *p2)
  {
- 	struct ptlrpc_nrs *nrs = nrs_svcpt2nrs(svcpt, hp);
- 	struct ptlrpc_nrs_policy *policy;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-index ff630d94dd26..7fe8aeeff428 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-@@ -96,7 +96,7 @@ static int nrs_fifo_start(struct ptlrpc_nrs_policy *policy)
-  *
-  * \param[in] policy The policy to stop
-  *
-- * \see nrs_policy_stop0()
-+ * \see __nrs_policy_stop()
-  */
- static void nrs_fifo_stop(struct ptlrpc_nrs_policy *policy)
- {
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-index 177010cf7148..da42b99fc36f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-@@ -133,14 +133,14 @@ void ptlrpc_nrs_req_add(struct ptlrpc_service_part *svcpt,
- 			struct ptlrpc_request *req, bool hp);
+ 	if (p1->flag != p2->flag) {
+-		unsigned int mask = ~(OBD_BRW_FROM_GRANT | OBD_BRW_NOCACHE |
++		unsigned int mask = ~(OBD_BRW_FROM_GRANT |
+ 				      OBD_BRW_SYNC | OBD_BRW_ASYNC |
+ 				      OBD_BRW_NOQUOTA | OBD_BRW_SOFT_SYNC);
  
- struct ptlrpc_request *
--ptlrpc_nrs_req_get_nolock0(struct ptlrpc_service_part *svcpt, bool hp,
--			   bool peek, bool force);
-+__ptlrpc_nrs_req_get_nolock(struct ptlrpc_service_part *svcpt, bool hp,
-+			    bool peek, bool force);
- 
- static inline struct ptlrpc_request *
- ptlrpc_nrs_req_get_nolock(struct ptlrpc_service_part *svcpt, bool hp,
- 			  bool force)
- {
--	return ptlrpc_nrs_req_get_nolock0(svcpt, hp, false, force);
-+	return __ptlrpc_nrs_req_get_nolock(svcpt, hp, false, force);
- }
- 
- bool ptlrpc_nrs_req_pending_nolock(struct ptlrpc_service_part *svcpt, bool hp);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 639db24b4f63..c2f49a3e0454 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -1823,8 +1823,6 @@ void lustre_assert_wire_constants(void)
+ 		 OBD_BRW_FROM_GRANT);
+ 	LASSERTF(OBD_BRW_GRANTED == 0x40, "found 0x%.8x\n",
+ 		 OBD_BRW_GRANTED);
+-	LASSERTF(OBD_BRW_NOCACHE == 0x80, "found 0x%.8x\n",
+-		 OBD_BRW_NOCACHE);
+ 	LASSERTF(OBD_BRW_NOQUOTA == 0x100, "found 0x%.8x\n",
+ 		 OBD_BRW_NOQUOTA);
+ 	LASSERTF(OBD_BRW_SRVLOCK == 0x200, "found 0x%.8x\n",
+-- 
+2.14.0.rc0.dirty
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190111/29144464/attachment.sig>
