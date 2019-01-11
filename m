@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Fri, 11 Jan 2019 11:27:38 +1100
-Subject: [lustre-devel] [PATCH 23/29] lustre: osc_cache: remove
- 'transient' arg from osc_enter_cache_try
-In-Reply-To: <87E1C21A-052C-46A7-81AA-2183EB3BB178@whamcloud.com>
+Date: Fri, 11 Jan 2019 11:48:56 +1100
+Subject: [lustre-devel] [PATCH 27/29] lustre: osc_cache: white-space and
+ other checkpatch fixes.
+In-Reply-To: <058406C4-B01E-4DD5-8EBB-3014A23CA963@whamcloud.com>
 References: <154701488711.26726.17363928508883972338.stgit@noble>
- <154701504254.26726.7702205638412400024.stgit@noble>
- <87E1C21A-052C-46A7-81AA-2183EB3BB178@whamcloud.com>
-Message-ID: <87ftu0ghs5.fsf@notabene.neil.brown.name>
+ <154701504274.26726.6932313520085605572.stgit@noble>
+ <058406C4-B01E-4DD5-8EBB-3014A23CA963@whamcloud.com>
+Message-ID: <87d0p4ggsn.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,217 +17,433 @@ On Thu, Jan 10 2019, Andreas Dilger wrote:
 
 > On Jan 8, 2019, at 23:24, NeilBrown <neilb@suse.com> wrote:
 >> 
->> This arg is always '0', so remove it.
+>> Assorted minor checkpatch issues fixed.
 >> 
 >> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>> drivers/staging/lustre/lustre/osc/osc_cache.c |   25 +++++++++++++------------
+>> 1 file changed, 13 insertions(+), 12 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> index e01f3815978c..019854b78277 100644
+>> --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> @@ -962,7 +962,6 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
+>> 
+>> 		wait_event_idle(ext->oe_waitq,
+>> 				smp_load_acquire(&ext->oe_state) == state);
+>> -
+>> 	}
+>> 	return ext->oe_rc < 0 ? ext->oe_rc : 0;
+>> }
 >
-> Out of curiosity, how would you find something like this?  Just
-> through code reading, or do you have some sort of static analysis
-> tool that shows this is dead code?
->
-> Digging into this a bit more, it looks like this is the only place
-> that increments cl_dirty_transit and sets OBD_BRW_NOCACHE, which
-> means the corresponding code in osc_release_write_grant() that checks
-> OBD_BRW_NOCACHE and decrements cl_dirty_transit is also dead, which
-> is good otherwise there would have been some kind of accounting leak.
->
-> That further implies that cl_dirty_transit is unused and can be removed,
-> along with obd_dirty_transit_pages.  The OBD_BRW_NOCACHE flag is part
-> of the wire protocol, but it looks like this was never actually sent on
-> the wire, just an internal housekeeping flag, so it should be marked like:
->
-> /* #define OBD_BRW_NOCACHE		0x400 internal use only 2.2.57-2.12 */
->
-> The follow-on cleanup could be part of this patch or a separate one.
->
-> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> Typically we prefer a blank line before return.  Otherwise fine.
 
-Below is the revised version of this patch.
+Interesting ... I had a look through osc_cache.c and I can find some
+evidence of this preference, but also many cases of the opposite.
+
+While I do see the value in a lot of places, this is one place where I
+I'm not so sure.  Specifically, if the line before "return" is a lone "}", it
+seems (visually) close enough to a blank line, that adding another line
+looks wasteful.
+After some debate I have added blank lines there, but not when the
+'return' is followed by an 'LASSERT' or other debugging code.
+
+Here is the new version.
+
 Thanks,
 NeilBrown
 
 From: NeilBrown <neilb@suse.com>
-Subject: [PATCH] lustre: osc_cache: remove 'transient' arg from
- osc_enter_cache_try
+Subject: [PATCH] lustre: osc_cache: white-space and other checkpatch fixes.
 
-This arg is always '0', so remove it.
-Consequently, OBD_BRW_NOCACHE is never set, and
- cl_dirty_transit and obd_dirty_transit_pages
-are never non-zero.
-So they can be removed as well.
+Assorted minor checkpatch issues fixed.
+
+Also add some blank links to help 'return' lines to stand out.
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_idl.h        |  2 +-
- drivers/staging/lustre/lustre/include/obd.h              |  1 -
- drivers/staging/lustre/lustre/include/obd_support.h      |  1 -
- drivers/staging/lustre/lustre/obdclass/class_obd.c       |  3 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c            | 16 +++-------------
- drivers/staging/lustre/lustre/osc/osc_request.c          | 14 ++++++--------
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c          |  2 --
- 7 files changed, 10 insertions(+), 29 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c | 61 +++++++++++++++++++++------
+ 1 file changed, 49 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index a8de36c8fbe4..bffe62e87e00 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -1182,7 +1182,7 @@ struct hsm_state_set {
- #define OBD_BRW_CHECK		0x10
- #define OBD_BRW_FROM_GRANT	0x20 /* the osc manages this under llite */
- #define OBD_BRW_GRANTED		0x40 /* the ost manages this */
--#define OBD_BRW_NOCACHE		0x80 /* this page is a part of non-cached IO */
-+/* #define OBD_BRW_NOCACHE	0x80 internal use only 2.2.57-2.12 */
- #define OBD_BRW_NOQUOTA	       0x100
- #define OBD_BRW_SRVLOCK	       0x200 /* Client holds no lock over this page */
- #define OBD_BRW_ASYNC	       0x400 /* Server may delay commit to disk */
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 0d8b9fe4bcec..4b43707f3d36 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -193,7 +193,6 @@ struct client_obd {
- 	/* the grant values are protected by loi_list_lock below */
- 	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pages */
- 	unsigned long		 cl_dirty_max_pages;	/* allowed w/o rpc */
--	unsigned long		 cl_dirty_transit;	/* dirty synchronous */
- 	unsigned long		 cl_avail_grant;	/* bytes of credit for ost */
- 	unsigned long		 cl_lost_grant;		/* lost credits (trunc) */
- 	/* grant consumed for dirty pages */
-diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
-index 79875fad3f18..93a374514a77 100644
---- a/drivers/staging/lustre/lustre/include/obd_support.h
-+++ b/drivers/staging/lustre/lustre/include/obd_support.h
-@@ -55,7 +55,6 @@ extern int at_early_margin;
- extern int at_extra;
- extern unsigned long obd_max_dirty_pages;
- extern atomic_long_t obd_dirty_pages;
--extern atomic_long_t obd_dirty_transit_pages;
- extern char obd_jobid_var[];
- 
- /* Some hash init argument constants */
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 5b0b2f64a4a3..e563ebb5b328 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -77,9 +77,6 @@ EXPORT_SYMBOL(at_early_margin);
- int at_extra = 30;
- EXPORT_SYMBOL(at_extra);
- 
--atomic_long_t obd_dirty_transit_pages;
--EXPORT_SYMBOL(obd_dirty_transit_pages);
--
- char obd_jobid_var[JOBSTATS_JOBID_VAR_MAX_LEN + 1] = JOBSTATS_DISABLE;
- char obd_jobid_node[LUSTRE_JOBID_SIZE + 1];
- 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 8f5c567b4e15..53f067d4e09b 100644
+index d89edad9fbc5..902e5fd3f501 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1424,11 +1424,6 @@ static void osc_release_write_grant(struct client_obd *cli,
- 	pga->flag &= ~OBD_BRW_FROM_GRANT;
- 	atomic_long_dec(&obd_dirty_pages);
- 	cli->cl_dirty_pages--;
--	if (pga->flag & OBD_BRW_NOCACHE) {
--		pga->flag &= ~OBD_BRW_NOCACHE;
--		atomic_long_dec(&obd_dirty_transit_pages);
--		cli->cl_dirty_transit--;
--	}
+@@ -91,6 +91,7 @@ static inline char *ext_flags(struct osc_extent *ext, char *flags)
+ 	if (ext->oe_fsync_wait)
+ 		*buf++ = 'Y';
+ 	*buf = 0;
++
+ 	return flags;
  }
  
- /**
-@@ -1535,7 +1530,7 @@ static void osc_exit_cache(struct client_obd *cli, struct osc_async_page *oap)
-  */
- static bool osc_enter_cache_try(struct client_obd *cli,
- 				struct osc_async_page *oap,
--				int bytes, int transient)
-+				int bytes)
+@@ -101,7 +102,7 @@ static inline char list_empty_marker(struct list_head *list)
+ 
+ #define EXTSTR       "[%lu -> %lu/%lu]"
+ #define EXTPARA(ext) (ext)->oe_start, (ext)->oe_end, (ext)->oe_max_end
+-static const char *oes_strings[] = {
++static const char * const oes_strings[] = {
+ 	"inv", "active", "cache", "locking", "lockdone", "rpc", "trunc", NULL };
+ 
+ #define OSC_EXTENT_DUMP(lvl, extent, fmt, ...) do {			      \
+@@ -337,6 +338,7 @@ static int osc_extent_is_overlapped(struct osc_object *obj,
+ 		if (overlapped(tmp, ext))
+ 			return 1;
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -404,6 +406,7 @@ static struct osc_extent *osc_extent_get(struct osc_extent *ext)
  {
- 	OSC_DUMP_GRANT(D_CACHE, cli, "need:%d\n", bytes);
+ 	LASSERT(kref_read(&ext->oe_refc) >= 0);
+ 	kref_get(&ext->oe_refc);
++
+ 	return ext;
+ }
  
-@@ -1545,11 +1540,6 @@ static bool osc_enter_cache_try(struct client_obd *cli,
- 	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
- 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
- 		osc_consume_write_grant(cli, &oap->oap_brw_page);
--		if (transient) {
--			cli->cl_dirty_transit++;
--			atomic_long_inc(&obd_dirty_transit_pages);
--			oap->oap_brw_flags |= OBD_BRW_NOCACHE;
--		}
- 		return true;
- 	} else {
- 		__osc_unreserve_grant(cli, bytes, bytes);
-@@ -1618,7 +1608,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
- 	remain = wait_event_idle_exclusive_timeout_cmd(
- 		cli->cl_cache_waiters,
- 		(entered = osc_enter_cache_try(
--			cli, oap, bytes, 0)) ||
-+			cli, oap, bytes)) ||
- 		(cli->cl_dirty_pages == 0 &&
- 		 cli->cl_w_in_flight == 0),
- 		timeout,
-@@ -2396,7 +2386,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
- 
- 		/* it doesn't need any grant to dirty this page */
- 		spin_lock(&cli->cl_loi_list_lock);
--		if (!osc_enter_cache_try(cli, oap, grants, 0)) {
-+		if (!osc_enter_cache_try(cli, oap, grants)) {
- 			grants = 0;
- 			need_release = 1;
+@@ -454,6 +457,7 @@ static struct osc_extent *osc_extent_search(struct osc_object *obj,
+ 			return tmp;
  		}
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index b28fbacbcfbf..e18d592bf42a 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -678,22 +678,20 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
- 		oa->o_dirty = cli->cl_dirty_grant;
- 	else
- 		oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
--	if (unlikely(cli->cl_dirty_pages - cli->cl_dirty_transit >
-+	if (unlikely(cli->cl_dirty_pages >
- 		     cli->cl_dirty_max_pages)) {
--		CERROR("dirty %lu - %lu > dirty_max %lu\n",
--		       cli->cl_dirty_pages, cli->cl_dirty_transit,
-+		CERROR("dirty %lu > dirty_max %lu\n",
-+		       cli->cl_dirty_pages,
- 		       cli->cl_dirty_max_pages);
- 		oa->o_undirty = 0;
--	} else if (unlikely(atomic_long_read(&obd_dirty_pages) -
--			    atomic_long_read(&obd_dirty_transit_pages) >
-+	} else if (unlikely(atomic_long_read(&obd_dirty_pages) >
- 			    (long)(obd_max_dirty_pages + 1))) {
- 		/* The atomic_read() allowing the atomic_inc() are
- 		 * not covered by a lock thus they may safely race and trip
- 		 * this CERROR() unless we add in a small fudge factor (+1).
- 		 */
--		CERROR("%s: dirty %ld + %ld > system dirty_max %ld\n",
-+		CERROR("%s: dirty %ld > system dirty_max %ld\n",
- 		       cli_name(cli), atomic_long_read(&obd_dirty_pages),
--		       atomic_long_read(&obd_dirty_transit_pages),
- 		       obd_max_dirty_pages);
- 		oa->o_undirty = 0;
- 	} else if (unlikely(cli->cl_dirty_max_pages - cli->cl_dirty_pages >
-@@ -1047,7 +1045,7 @@ static int check_write_rcs(struct ptlrpc_request *req,
- static inline int can_merge_pages(struct brw_page *p1, struct brw_page *p2)
- {
- 	if (p1->flag != p2->flag) {
--		unsigned int mask = ~(OBD_BRW_FROM_GRANT | OBD_BRW_NOCACHE |
-+		unsigned int mask = ~(OBD_BRW_FROM_GRANT |
- 				      OBD_BRW_SYNC | OBD_BRW_ASYNC |
- 				      OBD_BRW_NOQUOTA | OBD_BRW_SOFT_SYNC);
+ 	}
++
+ 	return p;
+ }
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 639db24b4f63..c2f49a3e0454 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -1823,8 +1823,6 @@ void lustre_assert_wire_constants(void)
- 		 OBD_BRW_FROM_GRANT);
- 	LASSERTF(OBD_BRW_GRANTED == 0x40, "found 0x%.8x\n",
- 		 OBD_BRW_GRANTED);
--	LASSERTF(OBD_BRW_NOCACHE == 0x80, "found 0x%.8x\n",
--		 OBD_BRW_NOCACHE);
- 	LASSERTF(OBD_BRW_NOQUOTA == 0x100, "found 0x%.8x\n",
- 		 OBD_BRW_NOQUOTA);
- 	LASSERTF(OBD_BRW_SRVLOCK == 0x200, "found 0x%.8x\n",
+@@ -469,6 +473,7 @@ static struct osc_extent *osc_extent_lookup(struct osc_object *obj,
+ 	ext = osc_extent_search(obj, index);
+ 	if (ext && ext->oe_start <= index && index <= ext->oe_end)
+ 		return osc_extent_get(ext);
++
+ 	return NULL;
+ }
+ 
+@@ -524,6 +529,7 @@ static struct osc_extent *osc_extent_hold(struct osc_extent *ext)
+ 	}
+ 	refcount_inc(&ext->oe_users);
+ 	list_del_init(&ext->oe_link);
++
+ 	return osc_extent_get(ext);
+ }
+ 
+@@ -668,7 +674,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
+ 					  unsigned int *grants)
+ {
+ 	struct client_obd *cli = osc_cli(obj);
+-	struct osc_lock   *olck;
++	struct osc_lock *olck;
+ 	struct cl_lock_descr *descr;
+ 	struct osc_extent *cur;
+ 	struct osc_extent *ext;
+@@ -705,6 +711,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
+ 	if ((max_pages & ~chunk_mask) != 0) {
+ 		CERROR("max_pages: %#x chunkbits: %u chunk_mask: %#lx\n",
+ 		       max_pages, cli->cl_chunkbits, chunk_mask);
++
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 	max_end = index - (index % max_pages) + max_pages - 1;
+@@ -858,6 +865,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
+ 
+ out:
+ 	osc_extent_put(env, cur);
++
+ 	return found;
+ }
+ 
+@@ -919,6 +927,7 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
+ 	osc_extent_remove(ext);
+ 	/* put the refcount for RPC */
+ 	osc_extent_put(env, ext);
++
+ 	return 0;
+ }
+ 
+@@ -962,8 +971,8 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
+ 
+ 		wait_event_idle(ext->oe_waitq,
+ 				smp_load_acquire(&ext->oe_state) == state);
+-
+ 	}
++
+ 	return ext->oe_rc < 0 ? ext->oe_rc : 0;
+ }
+ 
+@@ -1020,7 +1029,8 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
+ 		if (index < trunc_index ||
+ 		    (index == trunc_index && partial)) {
+ 			/* accounting how many pages remaining in the chunk
+-			 * so that we can calculate grants correctly. */
++			 * so that we can calculate grants correctly.
++			 */
+ 			if (index >> ppc_bits == trunc_chunk)
+ 				++pages_in_chunk;
+ 			continue;
+@@ -1087,6 +1097,7 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
+ out:
+ 	cl_io_fini(env, io);
+ 	cl_env_put(env, &refcheck);
++
+ 	return rc;
+ }
+ 
+@@ -1141,7 +1152,8 @@ static int osc_extent_make_ready(const struct lu_env *env,
+ 	 * the size of file.
+ 	 */
+ 	if (!(last->oap_async_flags & ASYNC_COUNT_STABLE)) {
+-		int last_oap_count = osc_refresh_count(env, last, OBD_BRW_WRITE);
++		int last_oap_count = osc_refresh_count(env, last,
++						       OBD_BRW_WRITE);
+ 
+ 		LASSERT(last_oap_count > 0);
+ 		LASSERT(last->oap_page_off + last_oap_count <= PAGE_SIZE);
+@@ -1233,6 +1245,7 @@ static int osc_extent_expand(struct osc_extent *ext, pgoff_t index,
+ 
+ out:
+ 	osc_object_unlock(obj);
++
+ 	return rc;
+ }
+ 
+@@ -1299,6 +1312,7 @@ static int osc_make_ready(const struct lu_env *env, struct osc_async_page *oap,
+ 	result = cl_page_make_ready(env, page, CRT_WRITE);
+ 	if (result == 0)
+ 		opg->ops_submit_time = jiffies;
++
+ 	return result;
+ }
+ 
+@@ -1322,6 +1336,7 @@ static int osc_refresh_count(const struct lu_env *env,
+ 	cl_object_attr_unlock(obj);
+ 	if (result < 0)
+ 		return result;
++
+ 	kms = attr->cat_kms;
+ 	if (cl_offset(obj, index) >= kms)
+ 		/* catch race with truncate */
+@@ -1337,7 +1352,7 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
+ 			  int cmd, int rc)
+ {
+ 	struct osc_page *opg = oap2osc_page(oap);
+-	struct cl_page    *page = oap2cl_page(oap);
++	struct cl_page *page = oap2cl_page(oap);
+ 	enum cl_req_type crt;
+ 	int srvlock;
+ 
+@@ -1441,6 +1456,7 @@ static int osc_reserve_grant(struct client_obd *cli, unsigned int bytes)
+ 		cli->cl_reserved_grant += bytes;
+ 		rc = 0;
+ 	}
++
+ 	return rc;
+ }
+ 
+@@ -1641,6 +1657,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
+ 	}
+ out:
+ 	spin_unlock(&cli->cl_loi_list_lock);
++
+ 	return rc;
+ }
+ 
+@@ -1731,7 +1748,8 @@ static void osc_update_pending(struct osc_object *obj, int cmd, int delta)
+ 	OSC_IO_DEBUG(obj, "update pending cmd %d delta %d.\n", cmd, delta);
+ }
+ 
+-static void on_list(struct list_head *item, struct list_head *list, int should_be_on)
++static void on_list(struct list_head *item, struct list_head *list,
++		    int should_be_on)
+ {
+ 	if (list_empty(item) && should_be_on)
+ 		list_add_tail(item, list);
+@@ -1790,6 +1808,7 @@ static void osc_process_ar(struct osc_async_rc *ar, __u64 xid,
+ 
+ 		ar->ar_force_sync = 1;
+ 		ar->ar_min_xid = ptlrpc_sample_next_xid();
++
+ 		return;
+ 	}
+ 
+@@ -1893,7 +1912,8 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
+ 					oap_pending_item);
+ 		EASSERT(tmp->oe_owner == current, tmp);
+ 		if (oap2cl_page(oap)->cp_type != oap2cl_page(oap2)->cp_type) {
+-			CDEBUG(D_CACHE, "Do not permit different type of IO in one RPC\n");
++			CDEBUG(D_CACHE,
++			       "Do not permit different type of IO in one RPC\n");
+ 			return 0;
+ 		}
+ 
+@@ -1911,6 +1931,7 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
+ 	data->erd_page_count += ext->oe_nr_pages;
+ 	list_move_tail(&ext->oe_link, data->erd_rpc_list);
+ 	ext->oe_owner = current;
++
+ 	return 1;
+ }
+ 
+@@ -2012,6 +2033,7 @@ static unsigned int get_write_extents(struct osc_object *obj,
+ 		if (!try_to_add_extent_for_io(cli, ext, &data))
+ 			return data.erd_page_count;
+ 	}
++
+ 	return data.erd_page_count;
+ }
+ 
+@@ -2035,6 +2057,7 @@ osc_send_write_rpc(const struct lu_env *env, struct client_obd *cli,
+ 
+ 	if (list_empty(&rpclist)) {
+ 		osc_object_unlock(osc);
++
+ 		return 0;
+ 	}
+ 
+@@ -2109,6 +2132,7 @@ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
+ 	osc_object_lock(osc);
+ 	if (!osc_makes_rpc(cli, osc, OBD_BRW_READ)) {
+ 		osc_object_unlock(osc);
++
+ 		return rc;
+ 	}
+ 
+@@ -2125,11 +2149,10 @@ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
+ 
+ 	osc_object_unlock(osc);
+ 	if (!list_empty(&rpclist)) {
+-
+ 		rc = osc_build_rpc(env, cli, &rpclist, OBD_BRW_READ);
+ 		LASSERT(list_empty(&rpclist));
+-
+ 	}
++
+ 	return rc;
+ }
+ 
+@@ -2150,6 +2173,7 @@ static struct osc_object *osc_next_obj(struct client_obd *cli)
+ 	 */
+ 	if (!list_empty(&cli->cl_loi_hp_ready_list))
+ 		return list_to_obj(&cli->cl_loi_hp_ready_list, hp_ready_item);
++
+ 	if (!list_empty(&cli->cl_loi_ready_list))
+ 		return list_to_obj(&cli->cl_loi_ready_list, ready_item);
+ 
+@@ -2168,9 +2192,11 @@ static struct osc_object *osc_next_obj(struct client_obd *cli)
+ 	if (!cli->cl_import || cli->cl_import->imp_invalid) {
+ 		if (!list_empty(&cli->cl_loi_write_list))
+ 			return list_to_obj(&cli->cl_loi_write_list, write_item);
++
+ 		if (!list_empty(&cli->cl_loi_read_list))
+ 			return list_to_obj(&cli->cl_loi_read_list, read_item);
+ 	}
++
+ 	return NULL;
+ }
+ 
+@@ -2254,6 +2280,7 @@ static int __osc_io_unplug(const struct lu_env *env, struct client_obd *cli,
+ 		LASSERT(cli->cl_writeback_work);
+ 		rc = ptlrpcd_queue_work(cli->cl_writeback_work);
+ 	}
++
+ 	return rc;
+ }
+ 
+@@ -2295,6 +2322,7 @@ int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
+ 	spin_lock_init(&oap->oap_lock);
+ 	CDEBUG(D_INFO, "oap %p page %p obj off %llu\n",
+ 	       oap, page, oap->oap_obj_off);
++
+ 	return 0;
+ }
+ 
+@@ -2464,6 +2492,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+ 		list_add_tail(&oap->oap_pending_item, &ext->oe_pages);
+ 		osc_object_unlock(osc);
+ 	}
++
+ 	return rc;
+ }
+ 
+@@ -2499,6 +2528,7 @@ int osc_teardown_async_page(const struct lu_env *env,
+ 		if (ext)
+ 			osc_extent_put(env, ext);
+ 	}
++
+ 	return rc;
+ }
+ 
+@@ -2582,6 +2612,7 @@ int osc_flush_async_page(const struct lu_env *env, struct cl_io *io,
+ 	osc_extent_put(env, ext);
+ 	if (unplug)
+ 		osc_io_unplug_async(env, osc_cli(obj), obj);
++
+ 	return rc;
+ }
+ 
+@@ -2620,6 +2651,7 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
+ 			list_del_init(&oap->oap_pending_item);
+ 			osc_ap_completion(env, cli, oap, 0, -ENOMEM);
+ 		}
++
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -2649,6 +2681,7 @@ int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
+ 	osc_object_unlock(obj);
+ 
+ 	osc_io_unplug_async(env, cli, obj);
++
+ 	return 0;
+ }
+ 
+@@ -2777,6 +2810,7 @@ int osc_cache_truncate_start(const struct lu_env *env, struct osc_object *obj,
+ 		waiting = NULL;
+ 		goto again;
+ 	}
++
+ 	return result;
+ }
+ 
+@@ -3070,6 +3104,7 @@ bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 	}
+ 	if (tree_lock)
+ 		spin_unlock(&osc->oo_tree_lock);
++
+ 	return res;
+ }
+ 
+@@ -3077,7 +3112,7 @@ bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+  * Check if page @page is covered by an extra lock or discard it.
+  */
+ static bool check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+-				struct osc_page *ops, void *cbdata)
++				 struct osc_page *ops, void *cbdata)
+ {
+ 	struct osc_thread_info *info = osc_env_info(env);
+ 	struct osc_object *osc = cbdata;
+@@ -3112,11 +3147,12 @@ static bool check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+ 	}
+ 
+ 	info->oti_next_index = index + 1;
++
+ 	return true;
+ }
+ 
+ static bool discard_cb(const struct lu_env *env, struct cl_io *io,
+-		      struct osc_page *ops, void *cbdata)
++		       struct osc_page *ops, void *cbdata)
+ {
+ 	struct osc_thread_info *info = osc_env_info(env);
+ 	struct cl_page *page = ops->ops_cl.cpl_page;
+@@ -3170,6 +3206,7 @@ int osc_lock_discard_pages(const struct lu_env *env, struct osc_object *osc,
+ 				   info->oti_next_index, end, cb, osc);
+ out:
+ 	cl_io_fini(env, io);
++
+ 	return result;
+ }
+ 
 -- 
 2.14.0.rc0.dirty
 
@@ -237,4 +453,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190111/29144464/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190111/3edabe33/attachment-0001.sig>
