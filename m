@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Sun, 13 Jan 2019 20:40:26 +0000
-Subject: [lustre-devel] [PATCH 1/4] lustre: osc: change some foo0() to
+Date: Sun, 13 Jan 2019 20:41:30 +0000
+Subject: [lustre-devel] [PATCH 2/4] lustre: llite: change some foo0() to
  __foo()
-In-Reply-To: <154716484583.28978.14863799416083470252.stgit@noble>
+In-Reply-To: <154716484597.28978.7362652816645934722.stgit@noble>
 References: <154716475327.28978.3817067697027604609.stgit@noble>
- <154716484583.28978.14863799416083470252.stgit@noble>
-Message-ID: <31E3F1E2-37ED-4BCA-85ED-D210DC1BAF21@whamcloud.com>
+ <154716484597.28978.7362652816645934722.stgit@noble>
+Message-ID: <F5D1CC32-F2A7-456F-8DDD-816325629956@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,207 +14,138 @@ To: lustre-devel@lists.lustre.org
 
 On Jan 10, 2019, at 16:00, NeilBrown <neilb@suse.com> wrote:
 > 
-> It is standard practice in Linux, when naming a
-> helper-function which is not meant to be called directly,
-> to use a name starting __.
-> e.g. foo() and foo_too() might call __foo(), which is otherwise
-> not directly called.
-> Lustre has a similar convention, but instead uses names like foo0().
+> Change:
+>  cl_glimpse_size0 -> __cl_glimpse_size
+>  ll_page_mkwrite0 -> __ll_page_mkwrite
+>  ll_fault0 -> __ll_fault
+>  vvp_object_init0 -> __vvp_object_init
 > 
-> This patch convert
-> osc_extent_tree_dump0 -> __osc_extent_tree_dump
-> osc_extent_sanity_check0 -> __osc_extent_sanity_check
-> osc_io_unplug0 -> __osc_io_unplug
-> osc_dlm_blocking_ast0 -> __osc_dlm_blocking_ast
+> This is more consistent with Linux naming style.
 > 
-> Suggested-by: Andreas Dilger <adilger@whamcloud.com>
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
 > ---
-> drivers/staging/lustre/lustre/osc/osc_cache.c |   44 +++++++++++++------------
-> drivers/staging/lustre/lustre/osc/osc_lock.c  |    8 ++---
-> 2 files changed, 26 insertions(+), 26 deletions(-)
+> drivers/staging/lustre/lustre/llite/glimpse.c      |    2 +-
+> .../staging/lustre/lustre/llite/llite_internal.h   |    6 +++---
+> drivers/staging/lustre/lustre/llite/llite_mmap.c   |   11 +++++------
+> drivers/staging/lustre/lustre/llite/vvp_object.c   |    8 ++++----
+> 4 files changed, 13 insertions(+), 14 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> index 1ce9f673f1bf..57046d355eda 100644
-> --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-> +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> @@ -57,10 +57,10 @@ static int osc_io_unplug_async(const struct lu_env *env,
-> static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
-> 			   unsigned int lost_grant, unsigned int dirty_grant);
-> 
-> -static void osc_extent_tree_dump0(int level, struct osc_object *obj,
-> -				  const char *func, int line);
-> +static void __osc_extent_tree_dump(int level, struct osc_object *obj,
-> +				   const char *func, int line);
-> #define osc_extent_tree_dump(lvl, obj) \
-> -	osc_extent_tree_dump0(lvl, obj, __func__, __LINE__)
-> +	__osc_extent_tree_dump(lvl, obj, __func__, __LINE__)
-> 
-> static void osc_unreserve_grant(struct client_obd *cli, unsigned int reserved,
-> 				unsigned int unused);
-> @@ -173,8 +173,8 @@ static inline struct osc_extent *first_extent(struct osc_object *obj)
+> diff --git a/drivers/staging/lustre/lustre/llite/glimpse.c b/drivers/staging/lustre/lustre/llite/glimpse.c
+> index ce0d51767da3..d8712a392e58 100644
+> --- a/drivers/staging/lustre/lustre/llite/glimpse.c
+> +++ b/drivers/staging/lustre/lustre/llite/glimpse.c
+> @@ -163,7 +163,7 @@ static int cl_io_get(struct inode *inode, struct lu_env **envout,
+> 	return result;
 > }
 > 
-> /* object must be locked by caller. */
-> -static int osc_extent_sanity_check0(struct osc_extent *ext,
-> -				    const char *func, const int line)
-> +static int __osc_extent_sanity_check(struct osc_extent *ext,
-> +				     const char *func, const int line)
+> -int cl_glimpse_size0(struct inode *inode, int agl)
+> +int __cl_glimpse_size(struct inode *inode, int agl)
 > {
-> 	struct osc_object *obj = ext->oe_obj;
-> 	struct osc_async_page *oap;
-> @@ -302,13 +302,13 @@ static int osc_extent_sanity_check0(struct osc_extent *ext,
-> 	return rc;
-> }
+> 	/*
+> 	 * We don't need ast_flags argument to cl_glimpse_size(), because
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> index b2a1f54ab228..c680a49d900c 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
+> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> @@ -1161,18 +1161,18 @@ void ll_deauthorize_statahead(struct inode *dir, void *key);
 > 
-> -#define sanity_check_nolock(ext) \
-> -	osc_extent_sanity_check0(ext, __func__, __LINE__)
-> +#define osc_extent_sanity_check_nolock(ext) \
-> +	__osc_extent_sanity_check(ext, __func__, __LINE__)
+> blkcnt_t dirty_cnt(struct inode *inode);
 > 
-> -#define sanity_check(ext) ({						\
-> +#define osc_extent_sanity_check(ext) ({					\
-> 	int __res;							\
-> 	osc_object_lock((ext)->oe_obj);					\
-> -	__res = sanity_check_nolock(ext);				\
-> +	__res = osc_extent_sanity_check_nolock(ext);			\
-> 	osc_object_unlock((ext)->oe_obj);				\
-> 	__res;								\
-> })
-> @@ -342,7 +342,7 @@ static void osc_extent_state_set(struct osc_extent *ext, int state)
-> 	LASSERT(state >= OES_INV && state < OES_STATE_MAX);
+> -int cl_glimpse_size0(struct inode *inode, int agl);
+> +int __cl_glimpse_size(struct inode *inode, int agl);
+> int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
+> 		    struct inode *inode, struct cl_object *clob, int agl);
 > 
-> 	/* Never try to sanity check a state changing extent :-) */
-> -	/* LASSERT(sanity_check_nolock(ext) == 0); */
-> +	/* LASSERT(osc_extent_sanity_check_nolock(ext) == 0); */
-> 
-> 	/* TODO: validate the state machine */
-> 	ext->oe_state = state;
-> @@ -600,7 +600,7 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
-> 	struct client_obd *cli = osc_cli(obj);
-> 
-> 	LASSERT(atomic_read(&ext->oe_users) > 0);
-> -	LASSERT(sanity_check(ext) == 0);
-> +	LASSERT(osc_extent_sanity_check(ext) == 0);
-> 	LASSERT(ext->oe_grants > 0);
-> 
-> 	if (atomic_dec_and_lock(&ext->oe_users, &obj->oo_lock)) {
-> @@ -729,7 +729,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
-> 		pgoff_t ext_chk_start = ext->oe_start >> ppc_bits;
-> 		pgoff_t ext_chk_end = ext->oe_end >> ppc_bits;
-> 
-> -		LASSERT(sanity_check_nolock(ext) == 0);
-> +		LASSERT(osc_extent_sanity_check_nolock(ext) == 0);
-> 		if (chunk > ext_chk_end + 1)
-> 			break;
-> 
-> @@ -969,7 +969,7 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
-> 	int rc = 0;
-> 
-> 	osc_object_lock(obj);
-> -	LASSERT(sanity_check_nolock(ext) == 0);
-> +	LASSERT(osc_extent_sanity_check_nolock(ext) == 0);
-> 	/* `Kick' this extent only if the caller is waiting for it to be
-> 	 * written out.
-> 	 */
-> @@ -1025,7 +1025,7 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
-> 	int rc = 0;
-> 	u16 refcheck;
-> 
-> -	LASSERT(sanity_check(ext) == 0);
-> +	LASSERT(osc_extent_sanity_check(ext) == 0);
-> 	EASSERT(ext->oe_state == OES_TRUNC, ext);
-> 	EASSERT(!ext->oe_urgent, ext);
-> 
-> @@ -1141,7 +1141,7 @@ static int osc_extent_make_ready(const struct lu_env *env,
-> 	int rc;
-> 
-> 	/* we're going to grab page lock, so object lock must not be taken. */
-> -	LASSERT(sanity_check(ext) == 0);
-> +	LASSERT(osc_extent_sanity_check(ext) == 0);
-> 	/* in locking state, any process should not touch this extent. */
-> 	EASSERT(ext->oe_state == OES_LOCKING, ext);
-> 	EASSERT(ext->oe_owner, ext);
-> @@ -1229,7 +1229,7 @@ static int osc_extent_expand(struct osc_extent *ext, pgoff_t index,
-> 
-> 	LASSERT(ext->oe_max_end >= index && ext->oe_start <= index);
-> 	osc_object_lock(obj);
-> -	LASSERT(sanity_check_nolock(ext) == 0);
-> +	LASSERT(osc_extent_sanity_check_nolock(ext) == 0);
-> 	end_chunk = ext->oe_end >> ppc_bits;
-> 	if (chunk > end_chunk + 1) {
-> 		rc = -ERANGE;
-> @@ -1273,8 +1273,8 @@ static int osc_extent_expand(struct osc_extent *ext, pgoff_t index,
-> 	return rc;
-> }
-> 
-> -static void osc_extent_tree_dump0(int level, struct osc_object *obj,
-> -				  const char *func, int line)
-> +static void __osc_extent_tree_dump(int level, struct osc_object *obj,
-> +				   const char *func, int line)
+> static inline int cl_glimpse_size(struct inode *inode)
 > {
-> 	struct osc_extent *ext;
-> 	int cnt;
-> @@ -2355,8 +2355,8 @@ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
-> 	}
+> -	return cl_glimpse_size0(inode, 0);
+> +	return __cl_glimpse_size(inode, 0);
 > }
 > 
-> -static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
-> -			  struct osc_object *osc, int async)
-> +static int __osc_io_unplug(const struct lu_env *env, struct client_obd *cli,
-> +			   struct osc_object *osc, int async)
+> static inline int cl_agl(struct inode *inode)
 > {
-> 	int rc = 0;
-> 
-> @@ -2378,13 +2378,13 @@ static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
-> static int osc_io_unplug_async(const struct lu_env *env,
-> 			       struct client_obd *cli, struct osc_object *osc)
-> {
-> -	return osc_io_unplug0(env, cli, osc, 1);
-> +	return __osc_io_unplug(env, cli, osc, 1);
+> -	return cl_glimpse_size0(inode, 1);
+> +	return __cl_glimpse_size(inode, 1);
 > }
 > 
-> void osc_io_unplug(const struct lu_env *env, struct client_obd *cli,
-> 		   struct osc_object *osc)
-> {
-> -	(void)osc_io_unplug0(env, cli, osc, 0);
-> +	(void)__osc_io_unplug(env, cli, osc, 0);
+> static inline int ll_glimpse_size(struct inode *inode)
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> index 023d62e53051..33e23ee4aff4 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> +++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> @@ -143,9 +143,8 @@ ll_fault_io_init(struct lu_env *env, struct vm_area_struct *vma,
+> 	return io;
 > }
 > 
-> int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
-> diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-> index 824c655b4ce0..01b6bf7df3b7 100644
-> --- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-> +++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-> @@ -413,9 +413,9 @@ static int osc_lock_flush(struct osc_object *obj, pgoff_t start, pgoff_t end,
->  * Helper for osc_dlm_blocking_ast() handling discrepancies between cl_lock
->  * and ldlm_lock caches.
+> -/* Sharing code of page_mkwrite method for rhel5 and rhel6 */
+> -static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
+> -			    bool *retry)
+> +static int __ll_page_mkwrite(struct vm_area_struct *vma, struct page *vmpage,
+> +			     bool *retry)
+> {
+> 	struct lu_env	   *env;
+> 	struct cl_io	    *io;
+> @@ -262,7 +261,7 @@ static inline vm_fault_t to_fault_error(int result)
+>  * \retval VM_FAULT_ERROR on general error
+>  * \retval NOPAGE_OOM not have memory for allocate new page
 >  */
-> -static int osc_dlm_blocking_ast0(const struct lu_env *env,
-> -				 struct ldlm_lock *dlmlock,
-> -				 void *data, int flag)
-> +static int __osc_dlm_blocking_ast(const struct lu_env *env,
-> +				  struct ldlm_lock *dlmlock,
-> +				  void *data, int flag)
+> -static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+> +static vm_fault_t __ll_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 > {
-> 	enum cl_lock_mode mode = CLM_READ;
-> 	struct cl_object *obj = NULL;
-> @@ -556,7 +556,7 @@ static int osc_ldlm_blocking_ast(struct ldlm_lock *dlmlock,
-> 			break;
-> 		}
+> 	struct lu_env	   *env;
+> 	struct cl_io	    *io;
+> @@ -365,7 +364,7 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+> 			   LPROC_LL_FAULT, 1);
 > 
-> -		result = osc_dlm_blocking_ast0(env, dlmlock, data, flag);
-> +		result = __osc_dlm_blocking_ast(env, dlmlock, data, flag);
-> 		cl_env_put(env, &refcheck);
-> 		break;
-> 		}
+> restart:
+> -	result = ll_fault0(vmf->vma, vmf);
+> +	result = __ll_fault(vmf->vma, vmf);
+> 	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
+> 		struct page *vmpage = vmf->page;
+> 
+> @@ -406,7 +405,7 @@ static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
+> 	file_update_time(vma->vm_file);
+> 	do {
+> 		retry = false;
+> -		err = ll_page_mkwrite0(vma, vmf->page, &retry);
+> +		err = __ll_page_mkwrite(vma, vmf->page, &retry);
+> 
+> 		if (!printed && ++count > 16) {
+> 			const struct dentry *de = vma->vm_file->f_path.dentry;
+> diff --git a/drivers/staging/lustre/lustre/llite/vvp_object.c b/drivers/staging/lustre/lustre/llite/vvp_object.c
+> index e1000f6b7f22..86e077bd516b 100644
+> --- a/drivers/staging/lustre/lustre/llite/vvp_object.c
+> +++ b/drivers/staging/lustre/lustre/llite/vvp_object.c
+> @@ -220,9 +220,9 @@ static const struct cl_object_operations vvp_ops = {
+> 	.coo_req_attr_set	= vvp_req_attr_set
+> };
+> 
+> -static int vvp_object_init0(const struct lu_env *env,
+> -			    struct vvp_object *vob,
+> -			    const struct cl_object_conf *conf)
+> +static int __vvp_object_init(const struct lu_env *env,
+> +			     struct vvp_object *vob,
+> +			     const struct cl_object_conf *conf)
+> {
+> 	vob->vob_inode = conf->coc_inode;
+> 	atomic_set(&vob->vob_transient_pages, 0);
+> @@ -246,7 +246,7 @@ static int vvp_object_init(const struct lu_env *env, struct lu_object *obj,
+> 
+> 		cconf = lu2cl_conf(conf);
+> 		lu_object_add(obj, below);
+> -		result = vvp_object_init0(env, vob, cconf);
+> +		result = __vvp_object_init(env, vob, cconf);
+> 	} else {
+> 		result = -ENOMEM;
+> 	}
 > 
 > 
 
 Cheers, Andreas
 ---
 Andreas Dilger
-CTO Whamcloud
+Principal Lustre Architect
+Whamcloud
