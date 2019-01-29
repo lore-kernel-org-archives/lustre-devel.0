@@ -1,22 +1,25 @@
-From: Degremont, Aurelien <degremoa@amazon.com>
-Date: Fri, 25 Jan 2019 13:26:57 +0000
-Subject: [lustre-devel] LibCFS and LNET module versions
-Message-ID: <41616FC6-B2B4-4B72-B7D6-69D1B5713653@amazon.com>
+From: Leonel Ochoa <lochoa@whamcloud.com>
+Date: Tue, 29 Jan 2019 21:12:07 +0000
+Subject: [lustre-devel] Maloo Unscheduled Maintenance
+Message-ID: <57473651-AA57-4469-B2DD-2D07D0B2A885@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,
+NOTICE TO ALL MALOO USERS
 
-All Lustre modules uses the Lustre version as their module version except for lnet and libcfs modules. Is there a specific reason to that?
+The Maloo web server has been down since yesterday 1/28 due to unscheduled maintenance, at present we expect the downtime to last all of today 1/29 and possibly tomorrow 1/30 as well. Once service has been restored we?ll post a notification to this mailing list.
 
-These version are hardcoded and never change. Tools like dkms could think some libcfs modules are the same because the version is the same but actually it changed a lot.
-Until we decide to properly manage a real version for these modules, could it be possible to also use Lustre version for them?
+Gerrit can still receive patches and Autotest will continue to run test sessions while Maloo remains offline, once the server is back up all pending results and gerrit +/- notifications (from Maloo) will be sent for all completed tests.
+
+Thank you for your patience.
+
+Lee Ochoa
+lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
 
 
-Aur?lien
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190125/b9c02d7a/attachment.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190129/6abc1076/attachment.html>
