@@ -1,55 +1,45 @@
-From: Patrick Farrell <pfarrell@whamcloud.com>
-Date: Wed, 30 Jan 2019 19:01:50 +0000
-Subject: [lustre-devel] Run acceptance tests on client side only
-In-Reply-To: <9E0B8A72-3AFF-4141-8E94-28AF402B0CC9@amazon.com>
-References: <9E0B8A72-3AFF-4141-8E94-28AF402B0CC9@amazon.com>
-Message-ID: <DM6PR19MB2508057050FAA6F37D7A987BC5900@DM6PR19MB2508.namprd19.prod.outlook.com>
+From: Leonel Ochoa <lochoa@whamcloud.com>
+Date: Thu, 31 Jan 2019 04:49:36 +0000
+Subject: [lustre-devel] Maloo Unscheduled Maintenance
+In-Reply-To: <57473651-AA57-4469-B2DD-2D07D0B2A885@ddn.com>
+References: <57473651-AA57-4469-B2DD-2D07D0B2A885@ddn.com>
+Message-ID: <A53CC773-FD57-4D95-B43C-8FF83E1078F1@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Aurelien,
+UPDATE:
+
+Maloo is back up?but not fully restored yet. For the time being you?ll notice the following things:
+
+  1.  Test queue pages DO show accurate state of ongoing tests in Autotest
+  2.  The main test session page is missing results from 1/19 ? 1/30, these results will start getting ingested from oldest to newest, please be patient and all results will eventually show up
+  3.  For test sessions EARLIER than 1/19, sub test and test log pages are missing and will slowly populate, also from oldest to newest, also please be patient
+I?ll be sending periodic updates as we fill in the missing data
+
+Lee Ochoa
+lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
 
 
-We played with this idea some when I was at Cray, and I believe we decided it wasn't worth it.  Many, many tests - maybe a majority - depend on running commands on the server.  Many are intentionally destructive in various ways, and since we don't test them with other data on the file system, some of them are probably *accidentally* destructive as well.
+From: Leonel Ochoa <lochoa@whamcloud.com>
+Date: Tuesday, January 29, 2019 at 14:12
+To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
+Subject: Maloo Unscheduled Maintenance
+
+NOTICE TO ALL MALOO USERS
+
+The Maloo web server has been down since yesterday 1/28 due to unscheduled maintenance, at present we expect the downtime to last all of today 1/29 and possibly tomorrow 1/30 as well. Once service has been restored we?ll post a notification to this mailing list.
+
+Gerrit can still receive patches and Autotest will continue to run test sessions while Maloo remains offline, once the server is back up all pending results and gerrit +/- notifications (from Maloo) will be sent for all completed tests.
+
+Thank you for your patience.
+
+Lee Ochoa
+lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
 
 
-My conclusion then was that the test framework tests (acceptance small included) are not designed to be run A) without server access, or B ) on any kind of production file system.
-
-
-It would be possible to create a curated client only & non-destructive list, but it would be a lot of work, and it would miss large areas of the test framework.  (Many tests which are primarily client require some manipulation of the server (settings, cache dropping, fail loc...) to work.)
-
-
-- Patrick
-
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Degremont, Aurelien <degremoa@amazon.com>
-Sent: Wednesday, January 30, 2019 8:53:12 AM
-To: lustre-devel at lists.lustre.org
-Subject: [lustre-devel] Run acceptance tests on client side only
-
-
-Hello
-
-
-
-I?m trying to run test suites without having access to servers.
-
-A lot of tests in acc-sm assume that servers are reachable. Is there way to automatically skip these tests?
-
-
-
-Does somebody has a smart way to run acc-sm?
-
-
-
-Thanks
-
-
-
-Aur?lien
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190130/a93f4149/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190131/3043e1be/attachment.html>
