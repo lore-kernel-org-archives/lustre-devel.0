@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 04 Feb 2019 14:13:10 +1100
-Subject: [lustre-devel] [PATCH 24/26] lnet: cleanup white spaces
-In-Reply-To: <1548955170-13456-25-git-send-email-jsimmons@infradead.org>
+Date: Mon, 04 Feb 2019 14:18:38 +1100
+Subject: [lustre-devel] [PATCH 19/26] ptlrpc: cleanup white spaces
+In-Reply-To: <1548955170-13456-20-git-send-email-jsimmons@infradead.org>
 References: <1548955170-13456-1-git-send-email-jsimmons@infradead.org>
- <1548955170-13456-25-git-send-email-jsimmons@infradead.org>
-Message-ID: <87a7jcjlfd.fsf@notabene.neil.brown.name>
+ <1548955170-13456-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <877eegjl69.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,1789 +13,1198 @@ To: lustre-devel@lists.lustre.org
 
 On Thu, Jan 31 2019, James Simmons wrote:
 
-> The LNet core code is very messy and difficult to read. Remove
-> excess white space and properly align data structures so they
-> are easy on the eyes.
+> The ptlrpc code is very messy and difficult to read. Remove excess
+> white space and properly align data structures so they are easy on
+> the eyes.
 >
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
-
-> @@ -218,7 +218,7 @@ struct lnet_lnd {
->  	 */
+>  drivers/staging/lustre/lustre/ptlrpc/client.c      |  45 ++--
+>  drivers/staging/lustre/lustre/ptlrpc/import.c      |   2 +-
+>  drivers/staging/lustre/lustre/ptlrpc/layout.c      |   3 -
+>  .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    | 278 ++++++++++-----------
+>  drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   7 +-
+>  drivers/staging/lustre/lustre/ptlrpc/nrs.c         |   1 -
+>  .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |  14 +-
+>  drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |  20 +-
+>  drivers/staging/lustre/lustre/ptlrpc/recover.c     |   1 +
+>  drivers/staging/lustre/lustre/ptlrpc/sec.c         |   4 +-
+>  drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  74 +++---
+>  drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |  22 +-
+>  drivers/staging/lustre/lustre/ptlrpc/sec_null.c    |  34 +--
+>  drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |  68 ++---
+>  drivers/staging/lustre/lustre/ptlrpc/service.c     |  20 +-
+>  15 files changed, 293 insertions(+), 300 deletions(-)
+>
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+> index f4b3875..0831810 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/client.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+> @@ -49,14 +49,14 @@
+>  #include "ptlrpc_internal.h"
 >  
->  	/*
-> -	 * Start sending a preformatted message.  'private' is NULL for PUT and
-> +	 * Start sending a preformatted message.x  'private' is NULL for PUT and
->  	 * GET messages; otherwise this is a response to an incoming message
->  	 * and 'private' is the 'private' passed to lnet_parse().  Return
->  	 * non-zero for immediate failure, otherwise complete later with
+>  const struct ptlrpc_bulk_frag_ops ptlrpc_bulk_kiov_pin_ops = {
+> -	.add_kiov_frag	= ptlrpc_prep_bulk_page_pin,
+> -	.release_frags	= ptlrpc_release_bulk_page_pin,
+> +	.add_kiov_frag		= ptlrpc_prep_bulk_page_pin,
+> +	.release_frags		= ptlrpc_release_bulk_page_pin,
+>  };
+>  EXPORT_SYMBOL(ptlrpc_bulk_kiov_pin_ops);
+>  
+>  const struct ptlrpc_bulk_frag_ops ptlrpc_bulk_kiov_nopin_ops = {
+> -	.add_kiov_frag	= ptlrpc_prep_bulk_page_nopin,
+> -	.release_frags	= NULL,
+> +	.add_kiov_frag		= ptlrpc_prep_bulk_page_nopin,
+> +	.release_frags		= NULL,
+>  };
+>  EXPORT_SYMBOL(ptlrpc_bulk_kiov_nopin_ops);
+>  
+> @@ -658,15 +658,14 @@ static void __ptlrpc_free_req_to_pool(struct ptlrpc_request *request)
+>  
+>  void ptlrpc_add_unreplied(struct ptlrpc_request *req)
+>  {
+> -	struct obd_import	*imp = req->rq_import;
+> -	struct ptlrpc_request	*iter;
+> +	struct obd_import *imp = req->rq_import;
+> +	struct ptlrpc_request *iter;
+>  
+>  	assert_spin_locked(&imp->imp_lock);
+>  	LASSERT(list_empty(&req->rq_unreplied_list));
+>  
+>  	/* unreplied list is sorted by xid in ascending order */
+>  	list_for_each_entry_reverse(iter, &imp->imp_unreplied_list, rq_unreplied_list) {
+> -
+>  		LASSERT(req->rq_xid != iter->rq_xid);
+>  		if (req->rq_xid < iter->rq_xid)
+>  			continue;
+> @@ -1318,10 +1317,10 @@ static int after_reply(struct ptlrpc_request *req)
+>  		 * reply).  NB: no need to round up because alloc_repbuf will
+>  		 * round it up
+>  		 */
+> -		req->rq_replen       = req->rq_nob_received;
+> +		req->rq_replen = req->rq_nob_received;
+>  		req->rq_nob_received = 0;
+>  		spin_lock(&req->rq_lock);
+> -		req->rq_resend       = 1;
+> +		req->rq_resend = 1;
+>  		spin_unlock(&req->rq_lock);
+>  		return 0;
+>  	}
+> @@ -1359,7 +1358,7 @@ static int after_reply(struct ptlrpc_request *req)
+>  		spin_unlock(&req->rq_lock);
+>  		req->rq_nr_resend++;
+>  
+> -		/* Readjust the timeout for current conditions */
+> +		/* Read just the timeout for current conditions */
+>  		ptlrpc_at_set_req_timeout(req);
+>  		/*
+>  		 * delay resend to give a chance to the server to get ready.
 
-I suspect you just added that 'x' to see if anyone really read you patch
-I did.  I found it.  I've removed it.
+Uhmm... I don't think this function us reading anything, not even "just
+the timeout".
+I think it is adjusting the timeout - which has already been done
+previously.
+So this time it is re-adjusting.
+??
+I've changed this to Re-adjust
 
-:-)
+There is a similar comment in ptlrpc_replay_req which I've also
+changed from readjust to re-adjust.
 
 NeilBrown
 
 
-> @@ -267,7 +267,7 @@ struct lnet_tx_queue {
+> @@ -1620,7 +1619,7 @@ static inline int ptlrpc_set_producer(struct ptlrpc_request_set *set)
+>  		rc = set->set_producer(set, set->set_producer_arg);
+>  		if (rc == -ENOENT) {
+>  			/* no more RPC to produce */
+> -			set->set_producer     = NULL;
+> +			set->set_producer = NULL;
+>  			set->set_producer_arg = NULL;
+>  			return 0;
+>  		}
+> @@ -1654,7 +1653,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
 >  
->  enum lnet_ni_state {
->  	/* set when NI block is allocated */
-> -	LNET_NI_STATE_INIT = 0,
-> +	LNET_NI_STATE_INIT	= 0,
->  	/* set when NI is started successfully */
->  	LNET_NI_STATE_ACTIVE,
->  	/* set when LND notifies NI failed */
-> @@ -279,23 +279,23 @@ enum lnet_ni_state {
->  };
+>  		/*
+>  		 * This schedule point is mainly for the ptlrpcd caller of this
+> -		 * function.  Most ptlrpc sets are not long-lived and unbounded
+> +		 * function. Most ptlrpc sets are not long-lived and unbounded
+>  		 * in length, but at the least the set used by the ptlrpcd is.
+>  		 * Since the processing time is unbounded, we need to insert an
+>  		 * explicit schedule point to make the thread well-behaved.
+> @@ -2130,7 +2129,6 @@ void ptlrpc_expired_set(struct ptlrpc_request_set *set)
 >  
->  enum lnet_stats_type {
-> -	LNET_STATS_TYPE_SEND = 0,
-> +	LNET_STATS_TYPE_SEND	= 0,
->  	LNET_STATS_TYPE_RECV,
->  	LNET_STATS_TYPE_DROP
->  };
+>  	/* A timeout expired. See which reqs it applies to...  */
+>  	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+> -
+>  		/* don't expire request waiting for context */
+>  		if (req->rq_wait_ctx)
+>  			continue;
+> @@ -2185,7 +2183,6 @@ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
+>  	time64_t deadline;
 >  
->  struct lnet_comm_count {
-> -	atomic_t co_get_count;
-> -	atomic_t co_put_count;
-> -	atomic_t co_reply_count;
-> -	atomic_t co_ack_count;
-> -	atomic_t co_hello_count;
-> +	atomic_t		co_get_count;
-> +	atomic_t		co_put_count;
-> +	atomic_t		co_reply_count;
-> +	atomic_t		co_ack_count;
-> +	atomic_t		co_hello_count;
->  };
->  
->  struct lnet_element_stats {
-> -	struct lnet_comm_count el_send_stats;
-> -	struct lnet_comm_count el_recv_stats;
-> -	struct lnet_comm_count el_drop_stats;
-> +	struct lnet_comm_count	el_send_stats;
-> +	struct lnet_comm_count	el_recv_stats;
-> +	struct lnet_comm_count	el_drop_stats;
->  };
->  
->  struct lnet_net {
-> @@ -376,7 +376,7 @@ struct lnet_ni {
->  	struct lnet_lnd_tunables ni_lnd_tunables;
->  
->  	/* lnd tunables set explicitly */
-> -	bool ni_lnd_tunables_set;
-> +	bool			ni_lnd_tunables_set;
->  
->  	/* NI statistics */
->  	struct lnet_element_stats ni_stats;
-> @@ -391,9 +391,9 @@ struct lnet_ni {
->  	 * equivalent interfaces to use
->  	 * This is an array because socklnd bonding can still be configured
->  	 */
-> -	char			 *ni_interfaces[LNET_INTERFACES_NUM];
-> +	char			*ni_interfaces[LNET_INTERFACES_NUM];
->  	/* original net namespace */
-> -	struct net		 *ni_net_ns;
-> +	struct net		*ni_net_ns;
->  };
->  
->  #define LNET_PROTO_PING_MATCHBITS	0x8000000000000000LL
-> @@ -434,9 +434,9 @@ struct lnet_rc_data {
->  
->  struct lnet_peer_ni {
->  	/* chain on lpn_peer_nis */
-> -	struct list_head	lpni_peer_nis;
-> +	struct list_head	 lpni_peer_nis;
->  	/* chain on remote peer list */
-> -	struct list_head	lpni_on_remote_peer_ni_list;
-> +	struct list_head	 lpni_on_remote_peer_ni_list;
->  	/* chain on peer hash */
->  	struct list_head	 lpni_hashlist;
->  	/* messages blocking for tx credits */
-> @@ -448,7 +448,7 @@ struct lnet_peer_ni {
->  	/* statistics kept on each peer NI */
->  	struct lnet_element_stats lpni_stats;
->  	/* spin lock protecting credits and lpni_txq / lpni_rtrq */
-> -	spinlock_t		lpni_lock;
-> +	spinlock_t		 lpni_lock;
->  	/* # tx credits available */
->  	int			 lpni_txcredits;
->  	struct lnet_peer_net	*lpni_peer_net;
-> @@ -491,26 +491,26 @@ struct lnet_peer_ni {
->  	/* CPT this peer attached on */
->  	int			 lpni_cpt;
->  	/* state flags -- protected by lpni_lock */
-> -	unsigned int		lpni_state;
-> +	unsigned int		 lpni_state;
->  	/* # refs from lnet_route::lr_gateway */
->  	int			 lpni_rtr_refcount;
->  	/* sequence number used to round robin over peer nis within a net */
-> -	u32			lpni_seq;
-> +	u32			 lpni_seq;
->  	/* sequence number used to round robin over gateways */
-> -	u32			lpni_gw_seq;
-> +	u32			 lpni_gw_seq;
->  	/* health flag */
-> -	bool			lpni_healthy;
-> +	bool			 lpni_healthy;
->  	/* returned RC ping features. Protected with lpni_lock */
->  	unsigned int		 lpni_ping_feats;
->  	/* routers on this peer */
->  	struct list_head	 lpni_routes;
->  	/* preferred local nids: if only one, use lpni_pref.nid */
->  	union lpni_pref {
-> -		lnet_nid_t	nid;
-> +		lnet_nid_t	 nid;
->  		lnet_nid_t	*nids;
->  	} lpni_pref;
->  	/* number of preferred NIDs in lnpi_pref_nids */
-> -	u32			lpni_pref_nnids;
-> +	u32			 lpni_pref_nnids;
->  	/* router checker state */
->  	struct lnet_rc_data	*lpni_rcd;
->  };
-> @@ -676,9 +676,9 @@ struct lnet_peer_table {
->  	/* # peers extant */
->  	atomic_t		 pt_number;
->  	/* peers */
-> -	struct list_head	pt_peer_list;
-> +	struct list_head	 pt_peer_list;
->  	/* # peers */
-> -	int			pt_peers;
-> +	int			 pt_peers;
->  	/* # zombies to go to deathrow (and not there yet) */
->  	int			 pt_zombies;
->  	/* zombie peers_ni */
-> @@ -704,7 +704,7 @@ struct lnet_route {
->  	/* chain on gateway */
->  	struct list_head	lr_gwlist;
->  	/* router node */
-> -	struct lnet_peer_ni	*lr_gateway;
-> +	struct lnet_peer_ni    *lr_gateway;
->  	/* remote network number */
->  	u32			lr_net;
->  	/* sequence for round-robin */
-> @@ -754,9 +754,9 @@ struct lnet_rtrbufpool {
->  };
->  
->  struct lnet_rtrbuf {
-> -	struct list_head	 rb_list;	/* chain on rbp_bufs */
-> -	struct lnet_rtrbufpool	*rb_pool;	/* owning pool */
-> -	struct bio_vec		 rb_kiov[0];	/* the buffer space */
-> +	struct list_head	rb_list;	/* chain on rbp_bufs */
-> +	struct lnet_rtrbufpool *rb_pool;	/* owning pool */
-> +	struct bio_vec		rb_kiov[0];	/* the buffer space */
->  };
->  
->  #define LNET_PEER_HASHSIZE	503	/* prime! */
-> @@ -904,58 +904,58 @@ enum lnet_state {
->  
->  struct lnet {
->  	/* CPU partition table of LNet */
-> -	struct cfs_cpt_table		 *ln_cpt_table;
-> +	struct cfs_cpt_table	       *ln_cpt_table;
->  	/* number of CPTs in ln_cpt_table */
-> -	unsigned int			  ln_cpt_number;
-> -	unsigned int			  ln_cpt_bits;
-> +	unsigned int			ln_cpt_number;
-> +	unsigned int			ln_cpt_bits;
->  
->  	/* protect LNet resources (ME/MD/EQ) */
-> -	struct cfs_percpt_lock		 *ln_res_lock;
-> +	struct cfs_percpt_lock	       *ln_res_lock;
->  	/* # portals */
-> -	int				  ln_nportals;
-> +	int				ln_nportals;
->  	/* the vector of portals */
-> -	struct lnet_portal		**ln_portals;
-> +	struct lnet_portal	      **ln_portals;
->  	/* percpt ME containers */
-> -	struct lnet_res_container	**ln_me_containers;
-> +	struct lnet_res_container     **ln_me_containers;
->  	/* percpt MD container */
-> -	struct lnet_res_container	**ln_md_containers;
-> +	struct lnet_res_container     **ln_md_containers;
->  
->  	/* Event Queue container */
-> -	struct lnet_res_container	  ln_eq_container;
-> -	wait_queue_head_t		  ln_eq_waitq;
-> -	spinlock_t			  ln_eq_wait_lock;
-> -	unsigned int			  ln_remote_nets_hbits;
-> +	struct lnet_res_container	ln_eq_container;
-> +	wait_queue_head_t		ln_eq_waitq;
-> +	spinlock_t			ln_eq_wait_lock;
-> +	unsigned int			ln_remote_nets_hbits;
->  
->  	/* protect NI, peer table, credits, routers, rtrbuf... */
-> -	struct cfs_percpt_lock		 *ln_net_lock;
-> +	struct cfs_percpt_lock	       *ln_net_lock;
->  	/* percpt message containers for active/finalizing/freed message */
-> -	struct lnet_msg_container	**ln_msg_containers;
-> -	struct lnet_counters		**ln_counters;
-> -	struct lnet_peer_table		**ln_peer_tables;
-> +	struct lnet_msg_container     **ln_msg_containers;
-> +	struct lnet_counters	      **ln_counters;
-> +	struct lnet_peer_table	      **ln_peer_tables;
->  	/* list of peer nis not on a local network */
->  	struct list_head		ln_remote_peer_ni_list;
->  	/* failure simulation */
-> -	struct list_head		  ln_test_peers;
-> -	struct list_head		  ln_drop_rules;
-> -	struct list_head		  ln_delay_rules;
-> +	struct list_head		ln_test_peers;
-> +	struct list_head		ln_drop_rules;
-> +	struct list_head		ln_delay_rules;
->  
->  	/* LND instances */
->  	struct list_head		ln_nets;
->  	/* network zombie list */
->  	struct list_head		ln_net_zombie;
->  	/* the loopback NI */
-> -	struct lnet_ni			*ln_loni;
-> +	struct lnet_ni		       *ln_loni;
->  
->  	/* remote networks with routes to them */
-> -	struct list_head		 *ln_remote_nets_hash;
-> +	struct list_head	       *ln_remote_nets_hash;
->  	/* validity stamp */
-> -	u64				  ln_remote_nets_version;
-> +	u64				ln_remote_nets_version;
->  	/* list of all known routers */
-> -	struct list_head		  ln_routers;
-> +	struct list_head		ln_routers;
->  	/* validity stamp */
-> -	u64				  ln_routers_version;
-> +	u64				ln_routers_version;
->  	/* percpt router buffer pools */
-> -	struct lnet_rtrbufpool		**ln_rtrpools;
-> +	struct lnet_rtrbufpool	      **ln_rtrpools;
->  
->  	/*
->  	 * Ping target / Push source
-> @@ -964,9 +964,9 @@ struct lnet {
->  	 * ln_ping_target is protected against concurrent updates by
->  	 * ln_api_mutex.
->  	 */
-> -	struct lnet_handle_md		  ln_ping_target_md;
-> -	struct lnet_handle_eq		  ln_ping_target_eq;
-> -	struct lnet_ping_buffer		 *ln_ping_target;
-> +	struct lnet_handle_md		ln_ping_target_md;
-> +	struct lnet_handle_eq		ln_ping_target_eq;
-> +	struct lnet_ping_buffer	       *ln_ping_target;
->  	atomic_t			ln_ping_target_seqno;
->  
->  	/*
-> @@ -979,7 +979,7 @@ struct lnet {
->  	 */
->  	struct lnet_handle_eq		ln_push_target_eq;
->  	struct lnet_handle_md		ln_push_target_md;
-> -	struct lnet_ping_buffer		*ln_push_target;
-> +	struct lnet_ping_buffer	       *ln_push_target;
->  	int				ln_push_target_nnis;
->  
->  	/* discovery event queue handle */
-> @@ -996,35 +996,35 @@ struct lnet {
->  	int				ln_dc_state;
->  
->  	/* router checker startup/shutdown state */
-> -	enum lnet_rc_state		  ln_rc_state;
-> +	enum lnet_rc_state		ln_rc_state;
->  	/* router checker's event queue */
-> -	struct lnet_handle_eq		  ln_rc_eqh;
-> +	struct lnet_handle_eq		ln_rc_eqh;
->  	/* rcd still pending on net */
-> -	struct list_head		  ln_rcd_deathrow;
-> +	struct list_head		ln_rcd_deathrow;
->  	/* rcd ready for free */
-> -	struct list_head		  ln_rcd_zombie;
-> +	struct list_head		ln_rcd_zombie;
->  	/* serialise startup/shutdown */
-> -	struct completion		  ln_rc_signal;
-> +	struct completion		ln_rc_signal;
->  
-> -	struct mutex			  ln_api_mutex;
-> -	struct mutex			  ln_lnd_mutex;
-> -	struct mutex			  ln_delay_mutex;
-> +	struct mutex			ln_api_mutex;
-> +	struct mutex			ln_lnd_mutex;
-> +	struct mutex			ln_delay_mutex;
->  	/* Have I called LNetNIInit myself? */
-> -	int				  ln_niinit_self;
-> +	int				ln_niinit_self;
->  	/* LNetNIInit/LNetNIFini counter */
-> -	int				  ln_refcount;
-> +	int				ln_refcount;
->  	/* SHUTDOWN/RUNNING/STOPPING */
-> -	enum lnet_state			  ln_state;
-> +	enum lnet_state			ln_state;
->  
-> -	int				  ln_routing;	/* am I a router? */
-> -	lnet_pid_t			  ln_pid;	/* requested pid */
-> +	int				ln_routing;	/* am I a router? */
-> +	lnet_pid_t			ln_pid;		/* requested pid */
->  	/* uniquely identifies this ni in this epoch */
-> -	u64				  ln_interface_cookie;
-> +	u64				ln_interface_cookie;
->  	/* registered LNDs */
-> -	struct list_head		  ln_lnds;
-> +	struct list_head		ln_lnds;
->  
->  	/* test protocol compatibility flags */
-> -	int				  ln_testprotocompat;
-> +	int				ln_testprotocompat;
->  
->  	/*
->  	 * 0 - load the NIs from the mod params
-> @@ -1032,14 +1032,14 @@ struct lnet {
->  	 * Reverse logic to ensure that other calls to LNetNIInit
->  	 * need no change
->  	 */
-> -	bool				  ln_nis_from_mod_params;
-> +	bool				ln_nis_from_mod_params;
->  
->  	/*
->  	 * waitq for router checker.  As long as there are no routes in
->  	 * the list, the router checker will sleep on this queue.  when
->  	 * routes are added the thread will wake up
->  	 */
-> -	wait_queue_head_t		  ln_rc_waitq;
-> +	wait_queue_head_t		ln_rc_waitq;
->  
->  };
->  
-> diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-> index aa28a9f..83ab3b1 100644
-> --- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-> +++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-> @@ -36,9 +36,9 @@
->  #include <net/sock.h>
->  #include <linux/lnet/lib-lnet.h>
->  
-> -static int   accept_port    = 988;
-> -static int   accept_backlog = 127;
-> -static int   accept_timeout = 5;
-> +static int accept_port = 988;
-> +static int accept_backlog = 127;
-> +static int accept_timeout = 5;
->  
->  static struct {
->  	int			pta_shutdown;
-> @@ -167,9 +167,9 @@
->  
->  		BUILD_BUG_ON(LNET_PROTO_ACCEPTOR_VERSION != 1);
->  
-> -		cr.acr_magic   = LNET_PROTO_ACCEPTOR_MAGIC;
-> +		cr.acr_magic = LNET_PROTO_ACCEPTOR_MAGIC;
->  		cr.acr_version = LNET_PROTO_ACCEPTOR_VERSION;
-> -		cr.acr_nid     = peer_nid;
-> +		cr.acr_nid = peer_nid;
->  
->  		if (the_lnet.ln_testprotocompat) {
->  			/* single-shot proto check */
-> @@ -196,9 +196,9 @@
->  	rc = -EADDRINUSE;
->  	goto failed;
->  
-> - failed_sock:
-> +failed_sock:
->  	sock_release(sock);
-> - failed:
-> +failed:
->  	lnet_connect_console_error(rc, peer_nid, peer_ip, peer_port);
->  	return rc;
->  }
-> @@ -297,7 +297,7 @@
->  		__swab64s(&cr.acr_nid);
->  
->  	ni = lnet_nid2ni_addref(cr.acr_nid);
-> -	if (!ni ||	       /* no matching net */
-> +	if (!ni ||			/* no matching net */
->  	    ni->ni_nid != cr.acr_nid) { /* right NET, wrong NID! */
->  		if (ni)
->  			lnet_ni_decref(ni);
-> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> index be77e10..64b8bef9 100644
-> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> @@ -47,7 +47,7 @@
->   * before module init completes. The mutex needs to be ready for use then.
+>  	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+> -
+>  		/* Request in-flight? */
+>  		if (!(((req->rq_phase == RQ_PHASE_RPC) && !req->rq_waiting) ||
+>  		      (req->rq_phase == RQ_PHASE_BULK) ||
+> @@ -2568,7 +2565,7 @@ static void ptlrpc_free_request(struct ptlrpc_request *req)
 >   */
->  struct lnet the_lnet = {
-> -	.ln_api_mutex = __MUTEX_INITIALIZER(the_lnet.ln_api_mutex),
-> +	.ln_api_mutex		= __MUTEX_INITIALIZER(the_lnet.ln_api_mutex),
->  };		/* THE state of the network */
->  EXPORT_SYMBOL(the_lnet);
->  
-> @@ -281,7 +281,7 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
->  
->  	return 0;
->  
-> - failed:
-> +failed:
->  	lnet_destroy_locks();
->  	return -ENOMEM;
->  }
-> @@ -476,17 +476,17 @@ static void lnet_assert_wire_constants(void)
->  	lnet_net_lock(LNET_LOCK_EX);
->  
->  	cfs_percpt_for_each(ctr, i, the_lnet.ln_counters) {
-> -		counters->msgs_max     += ctr->msgs_max;
-> -		counters->msgs_alloc   += ctr->msgs_alloc;
-> -		counters->errors       += ctr->errors;
-> -		counters->send_count   += ctr->send_count;
-> -		counters->recv_count   += ctr->recv_count;
-> -		counters->route_count  += ctr->route_count;
-> -		counters->drop_count   += ctr->drop_count;
-> -		counters->send_length  += ctr->send_length;
-> -		counters->recv_length  += ctr->recv_length;
-> +		counters->msgs_max += ctr->msgs_max;
-> +		counters->msgs_alloc += ctr->msgs_alloc;
-> +		counters->errors += ctr->errors;
-> +		counters->send_count += ctr->send_count;
-> +		counters->recv_count += ctr->recv_count;
-> +		counters->route_count += ctr->route_count;
-> +		counters->drop_count += ctr->drop_count;
-> +		counters->send_length += ctr->send_length;
-> +		counters->recv_length += ctr->recv_length;
->  		counters->route_length += ctr->route_length;
-> -		counters->drop_length  += ctr->drop_length;
-> +		counters->drop_length += ctr->drop_length;
->  	}
->  	lnet_net_unlock(LNET_LOCK_EX);
->  }
-> @@ -755,7 +755,7 @@ struct lnet_libhandle *
->  
->  	return 0;
->  
-> - failed:
-> +failed:
->  	lnet_unprepare();
->  	return rc;
->  }
-> @@ -942,7 +942,7 @@ struct lnet_net *
->  	return false;
->  }
->  
-> -struct lnet_ni  *
-> +struct lnet_ni *
->  lnet_nid2ni_locked(lnet_nid_t nid, int cpt)
+>  void ptlrpc_request_committed(struct ptlrpc_request *req, int force)
 >  {
->  	struct lnet_net *net;
-> @@ -1146,8 +1146,10 @@ struct lnet_ping_buffer *
->  		       struct lnet_handle_md *ping_mdh,
->  		       int ni_count, bool set_eq)
+> -	struct obd_import	*imp = req->rq_import;
+> +	struct obd_import *imp = req->rq_import;
+>  
+>  	spin_lock(&imp->imp_lock);
+>  	if (list_empty(&req->rq_replay_list)) {
+> @@ -2896,7 +2893,7 @@ static int ptlrpc_replay_interpret(const struct lu_env *env,
+>  
+>  	/* continue with recovery */
+>  	rc = ptlrpc_import_recovery_state_machine(imp);
+> - out:
+> +out:
+>  	req->rq_send_state = aa->praa_old_state;
+>  
+>  	if (rc != 0)
+> @@ -3031,7 +3028,7 @@ void ptlrpc_abort_set(struct ptlrpc_request_set *set)
+>  /**
+>   * Initialize the XID for the node.  This is common among all requests on
+>   * this node, and only requires the property that it is monotonically
+> - * increasing.  It does not need to be sequential.  Since this is also used
+> + * increasing. It does not need to be sequential.  Since this is also used
+>   * as the RDMA match bits, it is important that a single client NOT have
+>   * the same match bits for two different in-flight requests, hence we do
+>   * NOT want to have an XID per target or similar.
+> @@ -3198,12 +3195,12 @@ struct ptlrpc_work_async_args {
+>  static void ptlrpcd_add_work_req(struct ptlrpc_request *req)
 >  {
-> -	struct lnet_process_id id = { .nid = LNET_NID_ANY,
-> -				      .pid = LNET_PID_ANY };
-> +	struct lnet_process_id id = {
-> +		.nid = LNET_NID_ANY,
-> +		.pid = LNET_PID_ANY
-> +	};
->  	struct lnet_handle_me me_handle;
->  	struct lnet_md md = { NULL };
->  	int rc, rc2;
-> @@ -1244,7 +1246,7 @@ struct lnet_ping_buffer *
+>  	/* re-initialize the req */
+> -	req->rq_timeout		= obd_timeout;
+> -	req->rq_sent		= ktime_get_real_seconds();
+> -	req->rq_deadline	= req->rq_sent + req->rq_timeout;
+> -	req->rq_phase		= RQ_PHASE_INTERPRET;
+> -	req->rq_next_phase	= RQ_PHASE_COMPLETE;
+> -	req->rq_xid		= ptlrpc_next_xid();
+> +	req->rq_timeout	= obd_timeout;
+> +	req->rq_sent = ktime_get_real_seconds();
+> +	req->rq_deadline = req->rq_sent + req->rq_timeout;
+> +	req->rq_phase = RQ_PHASE_INTERPRET;
+> +	req->rq_next_phase = RQ_PHASE_COMPLETE;
+> +	req->rq_xid = ptlrpc_next_xid();
+>  	req->rq_import_generation = req->rq_import->imp_generation;
 >  
->  			lnet_ni_lock(ni);
->  			ns->ns_status = ni->ni_status ?
-> -					 ni->ni_status->ns_status :
-> +					ni->ni_status->ns_status :
->  						LNET_NI_STATUS_UP;
->  			ni->ni_status = ns;
->  			lnet_ni_unlock(ni);
-> @@ -1322,7 +1324,10 @@ struct lnet_ping_buffer *
->  /* Resize the push target. */
->  int lnet_push_target_resize(void)
+>  	ptlrpcd_add_req(req);
+> @@ -3241,7 +3238,7 @@ static int ptlrpcd_check_work(struct ptlrpc_request *req)
+>  void *ptlrpcd_alloc_work(struct obd_import *imp,
+>  			 int (*cb)(const struct lu_env *, void *), void *cbdata)
 >  {
-> -	struct lnet_process_id id = { LNET_NID_ANY, LNET_PID_ANY };
-> +	struct lnet_process_id id = {
-> +		.nid	= LNET_NID_ANY,
-> +		.pid	= LNET_PID_ANY
-> +	};
->  	struct lnet_md md = { NULL };
->  	struct lnet_handle_me meh;
->  	struct lnet_handle_md mdh;
-> @@ -1353,13 +1358,13 @@ int lnet_push_target_resize(void)
->  	}
+> -	struct ptlrpc_request	 *req = NULL;
+> +	struct ptlrpc_request *req = NULL;
+>  	struct ptlrpc_work_async_args *args;
 >  
->  	/* initialize md content */
-> -	md.start     = &pbuf->pb_info;
-> -	md.length    = LNET_PING_INFO_SIZE(nnis);
-> +	md.start = &pbuf->pb_info;
-> +	md.length = LNET_PING_INFO_SIZE(nnis);
->  	md.threshold = LNET_MD_THRESH_INF;
-> -	md.max_size  = 0;
-> -	md.options   = LNET_MD_OP_PUT | LNET_MD_TRUNCATE |
-> -		       LNET_MD_MANAGE_REMOTE;
-> -	md.user_ptr  = pbuf;
-> +	md.max_size = 0;
-> +	md.options = LNET_MD_OP_PUT | LNET_MD_TRUNCATE |
-> +		     LNET_MD_MANAGE_REMOTE;
-> +	md.user_ptr = pbuf;
->  	md.eq_handle = the_lnet.ln_push_target_eq;
+>  	might_sleep();
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> index 56a0b76..7bb2e06 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> @@ -51,7 +51,7 @@
+>  #include "ptlrpc_internal.h"
 >  
->  	rc = LNetMDAttach(meh, md, LNET_RETAIN, &mdh);
-> @@ -1428,7 +1433,6 @@ static int lnet_push_target_init(void)
->  	the_lnet.ln_push_target_nnis = LNET_INTERFACES_MIN;
->  
->  	rc = lnet_push_target_resize();
-> -
->  	if (rc) {
->  		LNetEQFree(the_lnet.ln_push_target_eq);
->  		LNetInvalidateEQHandle(&the_lnet.ln_push_target_eq);
-> @@ -1723,10 +1727,10 @@ static void lnet_push_target_fini(void)
->  
->  	CDEBUG(D_LNI, "Added LNI %s [%d/%d/%d/%d]\n",
->  	       libcfs_nid2str(ni->ni_nid),
-> -		ni->ni_net->net_tunables.lct_peer_tx_credits,
-> +	       ni->ni_net->net_tunables.lct_peer_tx_credits,
->  	       lnet_ni_tq_credits(ni) * LNET_CPT_NUMBER,
->  	       ni->ni_net->net_tunables.lct_peer_rtr_credits,
-> -		ni->ni_net->net_tunables.lct_peer_timeout);
-> +	       ni->ni_net->net_tunables.lct_peer_timeout);
->  
->  	return 0;
->  failed0:
-> @@ -1932,7 +1936,6 @@ static void lnet_push_target_fini(void)
->  		list_del_init(&net->net_list);
->  
->  		rc = lnet_startup_lndnet(net, NULL);
-> -
->  		if (rc < 0)
->  			goto failed;
->  
-> @@ -1963,8 +1966,8 @@ int lnet_lib_init(void)
->  	lnet_assert_wire_constants();
->  
->  	/* refer to global cfs_cpt_tab for now */
-> -	the_lnet.ln_cpt_table	= cfs_cpt_tab;
-> -	the_lnet.ln_cpt_number	= cfs_cpt_number(cfs_cpt_tab);
-> +	the_lnet.ln_cpt_table = cfs_cpt_tab;
-> +	the_lnet.ln_cpt_number = cfs_cpt_number(cfs_cpt_tab);
->  
->  	LASSERT(the_lnet.ln_cpt_number > 0);
->  	if (the_lnet.ln_cpt_number > LNET_CPT_MAX) {
-> @@ -2409,7 +2412,7 @@ struct lnet_ni *
->  	if (!prev) {
->  		if (!net)
->  			net = list_entry(the_lnet.ln_nets.next, struct lnet_net,
-> -					net_list);
-> +					 net_list);
->  		ni = list_entry(net->net_ni_list.next, struct lnet_ni,
->  				ni_netlist);
->  
-> @@ -2455,7 +2458,6 @@ struct lnet_ni *
->  	cpt = lnet_net_lock_current();
->  
->  	ni = lnet_get_ni_idx_locked(idx);
-> -
->  	if (ni) {
->  		rc = 0;
->  		lnet_ni_lock(ni);
-> @@ -2483,7 +2485,6 @@ struct lnet_ni *
->  	cpt = lnet_net_lock_current();
->  
->  	ni = lnet_get_ni_idx_locked(cfg_ni->lic_idx);
-> -
->  	if (ni) {
->  		rc = 0;
->  		lnet_ni_lock(ni);
-> @@ -2705,7 +2706,7 @@ int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
->  	struct lnet_ni *ni;
->  	u32 net_id = LNET_NIDNET(conf->lic_nid);
->  	struct lnet_ping_buffer *pbuf;
-> -	struct lnet_handle_md  ping_mdh;
-> +	struct lnet_handle_md ping_mdh;
->  	int rc;
->  	int net_count;
->  	u32 addr;
-> @@ -2912,7 +2913,7 @@ u32 lnet_get_dlc_seq_locked(void)
->  {
->  	struct libcfs_ioctl_data *data = arg;
->  	struct lnet_ioctl_config_data *config;
-> -	struct lnet_process_id id = {0};
-> +	struct lnet_process_id id = { 0 };
->  	struct lnet_ni *ni;
->  	int rc;
->  
-> @@ -3357,7 +3358,7 @@ static int lnet_ping(struct lnet_process_id id, signed long timeout,
->  	int which;
->  	int unlinked = 0;
->  	int replied = 0;
-> -	const signed long a_long_time = 60*HZ;
-> +	const signed long a_long_time = 60 * HZ;
->  	struct lnet_ping_buffer *pbuf;
->  	struct lnet_process_id tmpid;
->  	int i;
-> @@ -3384,12 +3385,12 @@ static int lnet_ping(struct lnet_process_id id, signed long timeout,
->  	}
->  
->  	/* initialize md content */
-> -	md.start     = &pbuf->pb_info;
-> -	md.length    = LNET_PING_INFO_SIZE(n_ids);
-> +	md.start = &pbuf->pb_info;
-> +	md.length = LNET_PING_INFO_SIZE(n_ids);
->  	md.threshold = 2; /* GET/REPLY */
-> -	md.max_size  = 0;
-> -	md.options   = LNET_MD_TRUNCATE;
-> -	md.user_ptr  = NULL;
-> +	md.max_size = 0;
-> +	md.options = LNET_MD_TRUNCATE;
-> +	md.user_ptr = NULL;
->  	md.eq_handle = eqh;
->  
->  	rc = LNetMDBind(md, LNET_UNLINK, &mdh);
-> @@ -3401,7 +3402,6 @@ static int lnet_ping(struct lnet_process_id id, signed long timeout,
->  	rc = LNetGet(LNET_NID_ANY, mdh, id,
->  		     LNET_RESERVED_PORTAL,
->  		     LNET_PROTO_PING_MATCHBITS, 0);
-> -
->  	if (rc) {
->  		/* Don't CERROR; this could be deliberate! */
->  		rc2 = LNetMDUnlink(mdh);
-> @@ -3414,7 +3414,6 @@ static int lnet_ping(struct lnet_process_id id, signed long timeout,
->  
->  	do {
->  		/* MUST block for unlink to complete */
-> -
->  		rc2 = LNetEQPoll(&eqh, 1, timeout, !unlinked,
->  				 &event, &which);
->  
-> @@ -3510,13 +3509,13 @@ static int lnet_ping(struct lnet_process_id id, signed long timeout,
->  	}
->  	rc = pbuf->pb_info.pi_nnis;
->  
-> - fail_free_eq:
-> +fail_free_eq:
->  	rc2 = LNetEQFree(eqh);
->  	if (rc2)
->  		CERROR("rc2 %d\n", rc2);
->  	LASSERT(!rc2);
->  
-> - fail_ping_buffer_decref:
-> +fail_ping_buffer_decref:
->  	lnet_ping_buffer_decref(pbuf);
->  	return rc;
->  }
-> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-> index 16c42bf..ecf656b 100644
-> --- a/drivers/staging/lustre/lnet/lnet/config.c
-> +++ b/drivers/staging/lustre/lnet/lnet/config.c
-> @@ -38,15 +38,15 @@
->  #include <linux/lnet/lib-lnet.h>
->  #include <linux/inetdevice.h>
->  
-> -struct lnet_text_buf {	    /* tmp struct for parsing routes */
-> -	struct list_head ltb_list;	/* stash on lists */
-> -	int ltb_size;	/* allocated size */
-> -	char ltb_text[0];     /* text buffer */
-> +struct lnet_text_buf {		/* tmp struct for parsing routes */
-> +	struct list_head	ltb_list;	/* stash on lists */
-> +	int			ltb_size;	/* allocated size */
-> +	char			ltb_text[0];	/* text buffer */
+>  struct ptlrpc_connect_async_args {
+> -	 u64 pcaa_peer_committed;
+> +	u64 pcaa_peer_committed;
+>  	int pcaa_initial_connect;
 >  };
 >  
-> -static int lnet_tbnob;			/* track text buf allocation */
-> -#define LNET_MAX_TEXTBUF_NOB     (64 << 10)	/* bound allocation */
-> -#define LNET_SINGLE_TEXTBUF_NOB  (4 << 10)
-> +static int lnet_tbnob;		/* track text buf allocation */
-> +#define LNET_MAX_TEXTBUF_NOB	(64 << 10)	/* bound allocation */
-> +#define LNET_SINGLE_TEXTBUF_NOB	(4 << 10)
->  
->  #define SPACESTR " \t\v\r\n"
->  #define DELIMITERS ":()[]"
-> @@ -126,6 +126,7 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
->  lnet_ni_unique_ni(char *iface_list[LNET_INTERFACES_NUM], char *iface)
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+> index 2848f2f..f1f7d70 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+> @@ -1907,9 +1907,7 @@ static void *__req_capsule_get(struct req_capsule *pill,
+>  	void *value;
+>  	u32 len;
+>  	u32 offset;
+> -
+>  	void *(*getter)(struct lustre_msg *m, u32 n, u32 minlen);
+> -
+>  	static const char *rcl_names[RCL_NR] = {
+>  		[RCL_CLIENT] = "client",
+>  		[RCL_SERVER] = "server"
+> @@ -2176,7 +2174,6 @@ void req_capsule_extend(struct req_capsule *pill, const struct req_format *fmt)
 >  {
 >  	int i;
+>  	size_t j;
+> -
+>  	const struct req_format *old;
+>  
+>  	LASSERT(pill->rc_fmt);
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> index 92e3e0f..25858b8 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> @@ -42,115 +42,115 @@
+>  #include "ptlrpc_internal.h"
+>  
+>  static struct ll_rpc_opcode {
+> -	u32       opcode;
+> -	const char *opname;
+> +	u32				opcode;
+> +	const char			*opname;
+>  } ll_rpc_opcode_table[LUSTRE_MAX_OPCODES] = {
+> -	{ OST_REPLY,	"ost_reply" },
+> -	{ OST_GETATTR,      "ost_getattr" },
+> -	{ OST_SETATTR,      "ost_setattr" },
+> -	{ OST_READ,	 "ost_read" },
+> -	{ OST_WRITE,	"ost_write" },
+> -	{ OST_CREATE,       "ost_create" },
+> -	{ OST_DESTROY,      "ost_destroy" },
+> -	{ OST_GET_INFO,     "ost_get_info" },
+> -	{ OST_CONNECT,      "ost_connect" },
+> -	{ OST_DISCONNECT,   "ost_disconnect" },
+> -	{ OST_PUNCH,	"ost_punch" },
+> -	{ OST_OPEN,	 "ost_open" },
+> -	{ OST_CLOSE,	"ost_close" },
+> -	{ OST_STATFS,       "ost_statfs" },
+> -	{ 14,		NULL },    /* formerly OST_SAN_READ */
+> -	{ 15,		NULL },    /* formerly OST_SAN_WRITE */
+> -	{ OST_SYNC,	 "ost_sync" },
+> -	{ OST_SET_INFO,     "ost_set_info" },
+> -	{ OST_QUOTACHECK,   "ost_quotacheck" },
+> -	{ OST_QUOTACTL,     "ost_quotactl" },
+> -	{ OST_QUOTA_ADJUST_QUNIT, "ost_quota_adjust_qunit" },
+> -	{ OST_LADVISE,			"ost_ladvise" },
+> -	{ MDS_GETATTR,      "mds_getattr" },
+> -	{ MDS_GETATTR_NAME, "mds_getattr_lock" },
+> -	{ MDS_CLOSE,	"mds_close" },
+> -	{ MDS_REINT,	"mds_reint" },
+> -	{ MDS_READPAGE,     "mds_readpage" },
+> -	{ MDS_CONNECT,      "mds_connect" },
+> -	{ MDS_DISCONNECT,   "mds_disconnect" },
+> -	{ MDS_GET_ROOT,			"mds_get_root" },
+> -	{ MDS_STATFS,       "mds_statfs" },
+> -	{ MDS_PIN,	  "mds_pin" },
+> -	{ MDS_UNPIN,	"mds_unpin" },
+> -	{ MDS_SYNC,	 "mds_sync" },
+> -	{ MDS_DONE_WRITING, "mds_done_writing" },
+> -	{ MDS_SET_INFO,     "mds_set_info" },
+> -	{ MDS_QUOTACHECK,   "mds_quotacheck" },
+> -	{ MDS_QUOTACTL,     "mds_quotactl" },
+> -	{ MDS_GETXATTR,     "mds_getxattr" },
+> -	{ MDS_SETXATTR,     "mds_setxattr" },
+> -	{ MDS_WRITEPAGE,    "mds_writepage" },
+> -	{ MDS_IS_SUBDIR,    "mds_is_subdir" },
+> -	{ MDS_GET_INFO,     "mds_get_info" },
+> -	{ MDS_HSM_STATE_GET, "mds_hsm_state_get" },
+> -	{ MDS_HSM_STATE_SET, "mds_hsm_state_set" },
+> -	{ MDS_HSM_ACTION,   "mds_hsm_action" },
+> -	{ MDS_HSM_PROGRESS, "mds_hsm_progress" },
+> -	{ MDS_HSM_REQUEST,  "mds_hsm_request" },
+> -	{ MDS_HSM_CT_REGISTER, "mds_hsm_ct_register" },
+> -	{ MDS_HSM_CT_UNREGISTER, "mds_hsm_ct_unregister" },
+> -	{ MDS_SWAP_LAYOUTS,	"mds_swap_layouts" },
+> -	{ LDLM_ENQUEUE,     "ldlm_enqueue" },
+> -	{ LDLM_CONVERT,     "ldlm_convert" },
+> -	{ LDLM_CANCEL,      "ldlm_cancel" },
+> -	{ LDLM_BL_CALLBACK, "ldlm_bl_callback" },
+> -	{ LDLM_CP_CALLBACK, "ldlm_cp_callback" },
+> -	{ LDLM_GL_CALLBACK, "ldlm_gl_callback" },
+> -	{ LDLM_SET_INFO,    "ldlm_set_info" },
+> -	{ MGS_CONNECT,      "mgs_connect" },
+> -	{ MGS_DISCONNECT,   "mgs_disconnect" },
+> -	{ MGS_EXCEPTION,    "mgs_exception" },
+> -	{ MGS_TARGET_REG,   "mgs_target_reg" },
+> -	{ MGS_TARGET_DEL,   "mgs_target_del" },
+> -	{ MGS_SET_INFO,     "mgs_set_info" },
+> -	{ MGS_CONFIG_READ,  "mgs_config_read" },
+> -	{ OBD_PING,	 "obd_ping" },
+> -	{ OBD_LOG_CANCEL,	"llog_cancel" },
+> -	{ OBD_QC_CALLBACK,  "obd_quota_callback" },
+> -	{ OBD_IDX_READ,	    "dt_index_read" },
+> -	{ LLOG_ORIGIN_HANDLE_CREATE,	 "llog_origin_handle_open" },
+> -	{ LLOG_ORIGIN_HANDLE_NEXT_BLOCK, "llog_origin_handle_next_block" },
+> -	{ LLOG_ORIGIN_HANDLE_READ_HEADER, "llog_origin_handle_read_header" },
+> -	{ LLOG_ORIGIN_HANDLE_WRITE_REC,  "llog_origin_handle_write_rec" },
+> -	{ LLOG_ORIGIN_HANDLE_CLOSE,      "llog_origin_handle_close" },
+> -	{ LLOG_ORIGIN_CONNECT,	   "llog_origin_connect" },
+> -	{ LLOG_CATINFO,		  "llog_catinfo" },
+> -	{ LLOG_ORIGIN_HANDLE_PREV_BLOCK, "llog_origin_handle_prev_block" },
+> -	{ LLOG_ORIGIN_HANDLE_DESTROY,    "llog_origin_handle_destroy" },
+> -	{ QUOTA_DQACQ,      "quota_acquire" },
+> -	{ QUOTA_DQREL,      "quota_release" },
+> -	{ SEQ_QUERY,	"seq_query" },
+> -	{ SEC_CTX_INIT,     "sec_ctx_init" },
+> -	{ SEC_CTX_INIT_CONT, "sec_ctx_init_cont" },
+> -	{ SEC_CTX_FINI,     "sec_ctx_fini" },
+> -	{ FLD_QUERY,	"fld_query" },
+> -	{ FLD_READ,	"fld_read" },
+> +	{ OST_REPLY,				"ost_reply" },
+> +	{ OST_GETATTR,				"ost_getattr" },
+> +	{ OST_SETATTR,				"ost_setattr" },
+> +	{ OST_READ,				"ost_read" },
+> +	{ OST_WRITE,				"ost_write" },
+> +	{ OST_CREATE,				"ost_create" },
+> +	{ OST_DESTROY,				"ost_destroy" },
+> +	{ OST_GET_INFO,				"ost_get_info" },
+> +	{ OST_CONNECT,				"ost_connect" },
+> +	{ OST_DISCONNECT,			"ost_disconnect" },
+> +	{ OST_PUNCH,				"ost_punch" },
+> +	{ OST_OPEN,				"ost_open" },
+> +	{ OST_CLOSE,				"ost_close" },
+> +	{ OST_STATFS,				"ost_statfs" },
+> +	{ 14,					NULL },	/* formerly OST_SAN_READ */
+> +	{ 15,					NULL }, /* formerly OST_SAN_WRITE */
+> +	{ OST_SYNC,				"ost_sync" },
+> +	{ OST_SET_INFO,				"ost_set_info" },
+> +	{ OST_QUOTACHECK,			"ost_quotacheck" },
+> +	{ OST_QUOTACTL,				"ost_quotactl" },
+> +	{ OST_QUOTA_ADJUST_QUNIT,		"ost_quota_adjust_qunit" },
+> +	{ OST_LADVISE,				"ost_ladvise" },
+> +	{ MDS_GETATTR,				"mds_getattr" },
+> +	{ MDS_GETATTR_NAME,			"mds_getattr_lock" },
+> +	{ MDS_CLOSE,				"mds_close" },
+> +	{ MDS_REINT,				"mds_reint" },
+> +	{ MDS_READPAGE,				"mds_readpage" },
+> +	{ MDS_CONNECT,				"mds_connect" },
+> +	{ MDS_DISCONNECT,			"mds_disconnect" },
+> +	{ MDS_GET_ROOT,				"mds_get_root" },
+> +	{ MDS_STATFS,				"mds_statfs" },
+> +	{ MDS_PIN,				"mds_pin" },
+> +	{ MDS_UNPIN,				"mds_unpin" },
+> +	{ MDS_SYNC,				"mds_sync" },
+> +	{ MDS_DONE_WRITING,			"mds_done_writing" },
+> +	{ MDS_SET_INFO,				"mds_set_info" },
+> +	{ MDS_QUOTACHECK,			"mds_quotacheck" },
+> +	{ MDS_QUOTACTL,				"mds_quotactl" },
+> +	{ MDS_GETXATTR,				"mds_getxattr" },
+> +	{ MDS_SETXATTR,				"mds_setxattr" },
+> +	{ MDS_WRITEPAGE,			"mds_writepage" },
+> +	{ MDS_IS_SUBDIR,			"mds_is_subdir" },
+> +	{ MDS_GET_INFO,				"mds_get_info" },
+> +	{ MDS_HSM_STATE_GET,			"mds_hsm_state_get" },
+> +	{ MDS_HSM_STATE_SET,			"mds_hsm_state_set" },
+> +	{ MDS_HSM_ACTION,			"mds_hsm_action" },
+> +	{ MDS_HSM_PROGRESS,			"mds_hsm_progress" },
+> +	{ MDS_HSM_REQUEST,			"mds_hsm_request" },
+> +	{ MDS_HSM_CT_REGISTER,			"mds_hsm_ct_register" },
+> +	{ MDS_HSM_CT_UNREGISTER,		"mds_hsm_ct_unregister" },
+> +	{ MDS_SWAP_LAYOUTS,			"mds_swap_layouts" },
+> +	{ LDLM_ENQUEUE,				"ldlm_enqueue" },
+> +	{ LDLM_CONVERT,				"ldlm_convert" },
+> +	{ LDLM_CANCEL,				"ldlm_cancel" },
+> +	{ LDLM_BL_CALLBACK,			"ldlm_bl_callback" },
+> +	{ LDLM_CP_CALLBACK,			"ldlm_cp_callback" },
+> +	{ LDLM_GL_CALLBACK,			"ldlm_gl_callback" },
+> +	{ LDLM_SET_INFO,			"ldlm_set_info" },
+> +	{ MGS_CONNECT,				"mgs_connect" },
+> +	{ MGS_DISCONNECT,			"mgs_disconnect" },
+> +	{ MGS_EXCEPTION,			"mgs_exception" },
+> +	{ MGS_TARGET_REG,			"mgs_target_reg" },
+> +	{ MGS_TARGET_DEL,			"mgs_target_del" },
+> +	{ MGS_SET_INFO,				"mgs_set_info" },
+> +	{ MGS_CONFIG_READ,			"mgs_config_read" },
+> +	{ OBD_PING,				"obd_ping" },
+> +	{ OBD_LOG_CANCEL,			"llog_cancel" },
+> +	{ OBD_QC_CALLBACK,			"obd_quota_callback" },
+> +	{ OBD_IDX_READ,				"dt_index_read" },
+> +	{ LLOG_ORIGIN_HANDLE_CREATE,		 "llog_origin_handle_open" },
+> +	{ LLOG_ORIGIN_HANDLE_NEXT_BLOCK,	"llog_origin_handle_next_block" },
+> +	{ LLOG_ORIGIN_HANDLE_READ_HEADER,	"llog_origin_handle_read_header" },
+> +	{ LLOG_ORIGIN_HANDLE_WRITE_REC,		"llog_origin_handle_write_rec" },
+> +	{ LLOG_ORIGIN_HANDLE_CLOSE,		"llog_origin_handle_close" },
+> +	{ LLOG_ORIGIN_CONNECT,			"llog_origin_connect" },
+> +	{ LLOG_CATINFO,				"llog_catinfo" },
+> +	{ LLOG_ORIGIN_HANDLE_PREV_BLOCK,	"llog_origin_handle_prev_block" },
+> +	{ LLOG_ORIGIN_HANDLE_DESTROY,		"llog_origin_handle_destroy" },
+> +	{ QUOTA_DQACQ,				"quota_acquire" },
+> +	{ QUOTA_DQREL,				"quota_release" },
+> +	{ SEQ_QUERY,				"seq_query" },
+> +	{ SEC_CTX_INIT,				"sec_ctx_init" },
+> +	{ SEC_CTX_INIT_CONT,			"sec_ctx_init_cont" },
+> +	{ SEC_CTX_FINI,				"sec_ctx_fini" },
+> +	{ FLD_QUERY,				"fld_query" },
+> +	{ FLD_READ,				"fld_read" },
+>  };
+>  
+>  static struct ll_eopcode {
+> -	u32       opcode;
+> -	const char *opname;
+> +	u32			opcode;
+> +	const char		*opname;
+>  } ll_eopcode_table[EXTRA_LAST_OPC] = {
+> -	{ LDLM_GLIMPSE_ENQUEUE, "ldlm_glimpse_enqueue" },
+> -	{ LDLM_PLAIN_ENQUEUE,   "ldlm_plain_enqueue" },
+> -	{ LDLM_EXTENT_ENQUEUE,  "ldlm_extent_enqueue" },
+> -	{ LDLM_FLOCK_ENQUEUE,   "ldlm_flock_enqueue" },
+> -	{ LDLM_IBITS_ENQUEUE,   "ldlm_ibits_enqueue" },
+> -	{ MDS_REINT_SETATTR,    "mds_reint_setattr" },
+> -	{ MDS_REINT_CREATE,     "mds_reint_create" },
+> -	{ MDS_REINT_LINK,       "mds_reint_link" },
+> -	{ MDS_REINT_UNLINK,     "mds_reint_unlink" },
+> -	{ MDS_REINT_RENAME,     "mds_reint_rename" },
+> -	{ MDS_REINT_OPEN,       "mds_reint_open" },
+> -	{ MDS_REINT_SETXATTR,   "mds_reint_setxattr" },
+> -	{ BRW_READ_BYTES,       "read_bytes" },
+> -	{ BRW_WRITE_BYTES,      "write_bytes" },
+> +	{ LDLM_GLIMPSE_ENQUEUE,			"ldlm_glimpse_enqueue" },
+> +	{ LDLM_PLAIN_ENQUEUE,			"ldlm_plain_enqueue" },
+> +	{ LDLM_EXTENT_ENQUEUE,			"ldlm_extent_enqueue" },
+> +	{ LDLM_FLOCK_ENQUEUE,			"ldlm_flock_enqueue" },
+> +	{ LDLM_IBITS_ENQUEUE,			"ldlm_ibits_enqueue" },
+> +	{ MDS_REINT_SETATTR,			"mds_reint_setattr" },
+> +	{ MDS_REINT_CREATE,			"mds_reint_create" },
+> +	{ MDS_REINT_LINK,			"mds_reint_link" },
+> +	{ MDS_REINT_UNLINK,			"mds_reint_unlink" },
+> +	{ MDS_REINT_RENAME,			"mds_reint_rename" },
+> +	{ MDS_REINT_OPEN,			"mds_reint_open" },
+> +	{ MDS_REINT_SETXATTR,			"mds_reint_setxattr" },
+> +	{ BRW_READ_BYTES,			"read_bytes" },
+> +	{ BRW_WRITE_BYTES,			"write_bytes" },
+>  };
+>  
+>  const char *ll_opcode2str(u32 opcode)
+> @@ -450,13 +450,13 @@ static void nrs_policy_get_info_locked(struct ptlrpc_nrs_policy *policy,
+>  
+>  	memcpy(info->pi_name, policy->pol_desc->pd_name, NRS_POL_NAME_MAX);
+>  
+> -	info->pi_fallback    = !!(policy->pol_flags & PTLRPC_NRS_FL_FALLBACK);
+> -	info->pi_state	     = policy->pol_state;
+> +	info->pi_fallback = !!(policy->pol_flags & PTLRPC_NRS_FL_FALLBACK);
+> +	info->pi_state = policy->pol_state;
+>  	/**
+>  	 * XXX: These are accessed without holding
+>  	 * ptlrpc_service_part::scp_req_lock.
+>  	 */
+> -	info->pi_req_queued  = policy->pol_req_queued;
+> +	info->pi_req_queued = policy->pol_req_queued;
+>  	info->pi_req_started = policy->pol_req_started;
+>  }
+>  
+> @@ -788,18 +788,18 @@ struct ptlrpc_srh_iterator {
+>  /* convert position to sequence */
+>  #define PTLRPC_REQ_POS2SEQ(svc, pos)			\
+>  	((svc)->srv_cpt_bits == 0 ? (pos) :		\
+> -	 ((u64)(pos) << (svc)->srv_cpt_bits) |	\
+> +	 ((u64)(pos) << (svc)->srv_cpt_bits) |		\
+>  	 ((u64)(pos) >> (64 - (svc)->srv_cpt_bits)))
+>  
+>  static void *
+>  ptlrpc_lprocfs_svc_req_history_start(struct seq_file *s, loff_t *pos)
+>  {
+> -	struct ptlrpc_service		*svc = s->private;
+> -	struct ptlrpc_service_part	*svcpt;
+> -	struct ptlrpc_srh_iterator	*srhi;
+> -	unsigned int			cpt;
+> -	int				rc;
+> -	int				i;
+> +	struct ptlrpc_service *svc = s->private;
+> +	struct ptlrpc_service_part *svcpt;
+> +	struct ptlrpc_srh_iterator *srhi;
+> +	unsigned int cpt;
+> +	int rc;
+> +	int i;
+>  
+>  	if (sizeof(loff_t) != sizeof(u64)) { /* can't support */
+>  		CWARN("Failed to read request history because size of loff_t %d can't match size of u64\n",
+> @@ -940,10 +940,10 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+>  ptlrpc_lprocfs_svc_req_history_open(struct inode *inode, struct file *file)
+>  {
+>  	static const struct seq_operations sops = {
+> -		.start = ptlrpc_lprocfs_svc_req_history_start,
+> -		.stop  = ptlrpc_lprocfs_svc_req_history_stop,
+> -		.next  = ptlrpc_lprocfs_svc_req_history_next,
+> -		.show  = ptlrpc_lprocfs_svc_req_history_show,
+> +		.start	= ptlrpc_lprocfs_svc_req_history_start,
+> +		.stop	= ptlrpc_lprocfs_svc_req_history_stop,
+> +		.next	= ptlrpc_lprocfs_svc_req_history_next,
+> +		.show	= ptlrpc_lprocfs_svc_req_history_show,
+>  	};
+>  	struct seq_file *seqf;
+>  	int rc;
+> @@ -975,9 +975,9 @@ static int ptlrpc_lprocfs_timeouts_seq_show(struct seq_file *m, void *n)
+>  	}
+>  
+>  	ptlrpc_service_for_each_part(svcpt, i, svc) {
+> -		cur	= at_get(&svcpt->scp_at_estimate);
+> -		worst	= svcpt->scp_at_estimate.at_worst_ever;
+> -		worstt	= svcpt->scp_at_estimate.at_worst_time;
+> +		cur = at_get(&svcpt->scp_at_estimate);
+> +		worst = svcpt->scp_at_estimate.at_worst_ever;
+> +		worstt = svcpt->scp_at_estimate.at_worst_time;
+>  		s2dhms(&ts, ktime_get_real_seconds() - worstt);
+>  
+>  		seq_printf(m, "%10s : cur %3u  worst %3u (at %lld, "
+> @@ -1074,26 +1074,26 @@ void ptlrpc_ldebugfs_register_service(struct dentry *entry,
+>  				      struct ptlrpc_service *svc)
+>  {
+>  	struct lprocfs_vars lproc_vars[] = {
+> -		{.name       = "req_buffer_history_len",
+> -		 .fops	     = &ptlrpc_lprocfs_req_history_len_fops,
+> -		 .data       = svc},
+> -		{.name       = "req_buffer_history_max",
+> -		 .fops	     = &ptlrpc_lprocfs_req_history_max_fops,
+> -		 .data       = svc},
+> -		{.name       = "timeouts",
+> -		 .fops	     = &ptlrpc_lprocfs_timeouts_fops,
+> -		 .data       = svc},
+> -		{.name       = "nrs_policies",
+> -		 .fops	     = &ptlrpc_lprocfs_nrs_fops,
+> -		 .data	     = svc},
+> -		{NULL}
+> +		{ .name		= "req_buffer_history_len",
+> +		  .fops		= &ptlrpc_lprocfs_req_history_len_fops,
+> +		  .data		= svc },
+> +		{ .name		= "req_buffer_history_max",
+> +		  .fops		= &ptlrpc_lprocfs_req_history_max_fops,
+> +		  .data		= svc },
+> +		{ .name		= "timeouts",
+> +		  .fops		= &ptlrpc_lprocfs_timeouts_fops,
+> +		  .data		= svc },
+> +		{ .name		= "nrs_policies",
+> +		  .fops		= &ptlrpc_lprocfs_nrs_fops,
+> +		  .data		= svc },
+> +		{ NULL }
+>  	};
+>  	static const struct file_operations req_history_fops = {
+> -		.owner       = THIS_MODULE,
+> -		.open	= ptlrpc_lprocfs_svc_req_history_open,
+> -		.read	= seq_read,
+> -		.llseek      = seq_lseek,
+> -		.release     = lprocfs_seq_release,
+> +		.owner		= THIS_MODULE,
+> +		.open		= ptlrpc_lprocfs_svc_req_history_open,
+> +		.read		= seq_read,
+> +		.llseek		= seq_lseek,
+> +		.release	= lprocfs_seq_release,
+>  	};
+>  
+>  	ptlrpc_ldebugfs_register(entry, svc->srv_name,
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> index d3044a7..ea7a7f9 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> @@ -280,6 +280,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+>  		 * timeout lets us CWARN for visibility of sluggish LNDs
+>  		 */
+>  		int cnt = 0;
 > +
->  	for (i = 0; i < LNET_INTERFACES_NUM; i++) {
->  		if (iface_list[i] &&
->  		    strncmp(iface_list[i], iface, strlen(iface)) == 0)
-> @@ -554,7 +555,7 @@ struct lnet_ni *
->  		goto failed;
+>  		while (cnt < LONG_UNLINK &&
+>  		       (rc = wait_event_idle_timeout(*wq,
+>  						     !ptlrpc_client_bulk_active(req),
+> @@ -685,7 +686,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+>  	 * add the network latency for our local timeout.
+>  	 */
+>  	request->rq_deadline = request->rq_sent + request->rq_timeout +
+> -		ptlrpc_at_get_net_latency(request);
+> +			       ptlrpc_at_get_net_latency(request);
 >  
->  	return ni;
-> - failed:
-> +failed:
->  	lnet_ni_free(ni);
->  	return NULL;
->  }
-> @@ -743,9 +744,9 @@ struct lnet_ni *
->  					goto failed_syntax;
->  				}
->  				rc = cfs_expr_list_parse(elstr,
-> -							nistr - elstr + 1,
-> -							0, LNET_CPT_NUMBER - 1,
-> -							&ni_el);
-> +							 nistr - elstr + 1,
-> +							 0, LNET_CPT_NUMBER - 1,
-> +							 &ni_el);
->  				if (rc != 0) {
->  					str = elstr;
->  					goto failed_syntax;
-> @@ -812,9 +813,9 @@ struct lnet_ni *
->  	kfree(tokens);
->  	return nnets;
+>  	ptlrpc_pinger_sending_on_import(imp);
 >  
-> - failed_syntax:
-> +failed_syntax:
->  	lnet_syntax("networks", networks, (int)(str - tokens), strlen(str));
-> - failed:
-> +failed:
->  	/* free the net list and all the nis on each net */
->  	while (!list_empty(netlist)) {
->  		net = list_entry(netlist->next, struct lnet_net, net_list);
-> @@ -1038,7 +1039,7 @@ struct lnet_ni *
->  	list_splice(&pending, tbs->prev);
->  	return 1;
+> @@ -705,7 +706,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+>  	if (noreply)
+>  		goto out;
 >  
-> - failed:
-> +failed:
->  	lnet_free_text_bufs(&pending);
->  	return -EINVAL;
->  }
-> @@ -1093,7 +1094,6 @@ struct lnet_ni *
->  {
->  	/* static scratch buffer OK (single threaded) */
->  	static char cmd[LNET_SINGLE_TEXTBUF_NOB];
+> - cleanup_me:
+> +cleanup_me:
+>  	/* MEUnlink is safe; the PUT didn't even get off the ground, and
+>  	 * nobody apart from the PUT's target has the right nid+XID to
+>  	 * access the reply buffer.
+> @@ -715,7 +716,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+>  	/* UNLINKED callback called synchronously */
+>  	LASSERT(!request->rq_receiving_reply);
+>  
+> - cleanup_bulk:
+> +cleanup_bulk:
+>  	/* We do sync unlink here as there was no real transfer here so
+>  	 * the chance to have long unlink to sluggish net is smaller here.
+>  	 */
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs.c b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
+> index 248ba04..ef7dd5d 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/nrs.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
+> @@ -118,7 +118,6 @@ static int nrs_policy_stop_locked(struct ptlrpc_nrs_policy *policy)
+>  	/* Immediately make it invisible */
+>  	if (nrs->nrs_policy_primary == policy) {
+>  		nrs->nrs_policy_primary = NULL;
 > -
->  	struct list_head nets;
->  	struct list_head gateways;
->  	struct list_head *tmp1;
-> @@ -1226,9 +1226,9 @@ struct lnet_ni *
->  	myrc = 0;
->  	goto out;
+>  	} else {
+>  		LASSERT(nrs->nrs_policy_fallback == policy);
+>  		nrs->nrs_policy_fallback = NULL;
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+> index 10c2520..5383b68 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+> @@ -111,12 +111,12 @@ struct nrs_core {
+>  	 * Protects nrs_core::nrs_policies, serializes external policy
+>  	 * registration/unregistration, and NRS core lprocfs operations.
+>  	 */
+> -	struct mutex nrs_mutex;
+> +	struct mutex		nrs_mutex;
+>  	/**
+>  	 * List of all policy descriptors registered with NRS core; protected
+>  	 * by nrs_core::nrs_mutex.
+>  	 */
+> -	struct list_head nrs_policies;
+> +	struct list_head	nrs_policies;
 >  
-> - token_error:
-> +token_error:
->  	lnet_syntax("routes", cmd, (int)(token - str), strlen(token));
-> - out:
-> +out:
->  	lnet_free_text_bufs(&nets);
->  	lnet_free_text_bufs(&gateways);
->  	return myrc;
-> @@ -1298,7 +1298,6 @@ struct lnet_ni *
->  lnet_match_network_tokens(char *net_entry, u32 *ipaddrs, int nip)
+>  };
+>  
+> @@ -251,15 +251,15 @@ struct ptlrpc_reply_state *
+>  void ptlrpc_pinger_wake_up(void);
+>  
+>  /* sec_null.c */
+> -int  sptlrpc_null_init(void);
+> +int sptlrpc_null_init(void);
+>  void sptlrpc_null_fini(void);
+>  
+>  /* sec_plain.c */
+> -int  sptlrpc_plain_init(void);
+> +int sptlrpc_plain_init(void);
+>  void sptlrpc_plain_fini(void);
+>  
+>  /* sec_bulk.c */
+> -int  sptlrpc_enc_pool_init(void);
+> +int sptlrpc_enc_pool_init(void);
+>  void sptlrpc_enc_pool_fini(void);
+>  int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v);
+>  
+> @@ -277,11 +277,11 @@ void sptlrpc_conf_choose_flavor(enum lustre_sec_part from,
+>  				struct obd_uuid *target,
+>  				lnet_nid_t nid,
+>  				struct sptlrpc_flavor *sf);
+> -int  sptlrpc_conf_init(void);
+> +int sptlrpc_conf_init(void);
+>  void sptlrpc_conf_fini(void);
+>  
+>  /* sec.c */
+> -int  sptlrpc_init(void);
+> +int sptlrpc_init(void);
+>  void sptlrpc_fini(void);
+>  
+>  /* layout.c */
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> index e39c38a..f0ac296 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+> @@ -69,13 +69,13 @@
+>  
+>  /* One of these per CPT. */
+>  struct ptlrpcd {
+> -	int pd_size;
+> -	int pd_index;
+> -	int pd_cpt;
+> -	int pd_cursor;
+> -	int pd_nthreads;
+> -	int pd_groupsize;
+> -	struct ptlrpcd_ctl pd_threads[0];
+> +	int			pd_size;
+> +	int			pd_index;
+> +	int			pd_cpt;
+> +	int			pd_cursor;
+> +	int			pd_nthreads;
+> +	int			pd_groupsize;
+> +	struct ptlrpcd_ctl	pd_threads[0];
+>  };
+>  
+>  /*
+> @@ -171,9 +171,9 @@ void ptlrpcd_wake(struct ptlrpc_request *req)
+>  static struct ptlrpcd_ctl *
+>  ptlrpcd_select_pc(struct ptlrpc_request *req)
 >  {
->  	static char tokens[LNET_SINGLE_TEXTBUF_NOB];
-> -
->  	int matched = 0;
->  	int ntokens = 0;
->  	int len;
-> @@ -1451,7 +1450,6 @@ struct lnet_ni *
+> -	struct ptlrpcd	*pd;
+> -	int		cpt;
+> -	int		idx;
+> +	struct ptlrpcd *pd;
+> +	int cpt;
+> +	int idx;
+>  
+>  	if (req && req->rq_send_state != LUSTRE_IMP_FULL)
+>  		return &ptlrpcd_rcv;
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+> index ed769a4..af672ab 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+> @@ -119,6 +119,7 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+>  	 */
+>  	if (!req) {
+>  		struct ptlrpc_request *tmp;
+> +
+>  		list_for_each_entry_safe(tmp, pos, &imp->imp_replay_list,
+>  					 rq_replay_list) {
+>  			if (tmp->rq_transno > last_transno) {
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+> index 165082a..6dc7731 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+> @@ -171,7 +171,7 @@ u32 sptlrpc_name2flavor_base(const char *name)
+>  
+>  const char *sptlrpc_flavor2name_base(u32 flvr)
 >  {
->  	static char networks[LNET_SINGLE_TEXTBUF_NOB];
->  	static char source[LNET_SINGLE_TEXTBUF_NOB];
-> -
->  	struct list_head raw_entries;
->  	struct list_head matched_nets;
->  	struct list_head current_nets;
-> @@ -1549,7 +1547,7 @@ struct lnet_ni *
->  		count++;
->  	}
+> -	u32   base = SPTLRPC_FLVR_BASE(flvr);
+> +	u32 base = SPTLRPC_FLVR_BASE(flvr);
 >  
-> - out:
-> +out:
->  	lnet_free_text_bufs(&raw_entries);
->  	lnet_free_text_bufs(&matched_nets);
->  	lnet_free_text_bufs(&current_nets);
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-> index f085388..f500b49 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-> @@ -198,7 +198,7 @@
->  	lnet_res_lh_invalidate(&eq->eq_lh);
->  	list_del(&eq->eq_list);
->  	kfree(eq);
-> - out:
-> +out:
->  	lnet_eq_wait_unlock();
->  	lnet_res_unlock(LNET_LOCK_EX);
->  
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> index 639f67ed..92c6a34 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> @@ -489,7 +489,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  
->  		if (mlen) {
->  			niov = msg->msg_niov;
-> -			iov  = msg->msg_iov;
-> +			iov = msg->msg_iov;
->  			kiov = msg->msg_kiov;
->  
->  			LASSERT(niov > 0);
-> @@ -541,12 +541,12 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  		lnet_setpayloadbuffer(msg);
->  
->  	memset(&msg->msg_hdr, 0, sizeof(msg->msg_hdr));
-> -	msg->msg_hdr.type	   = cpu_to_le32(type);
-> +	msg->msg_hdr.type = cpu_to_le32(type);
->  	/* dest_nid will be overwritten by lnet_select_pathway() */
-> -	msg->msg_hdr.dest_nid       = cpu_to_le64(target.nid);
-> -	msg->msg_hdr.dest_pid       = cpu_to_le32(target.pid);
-> +	msg->msg_hdr.dest_nid = cpu_to_le64(target.nid);
-> +	msg->msg_hdr.dest_pid = cpu_to_le32(target.pid);
->  	/* src_nid will be set later */
-> -	msg->msg_hdr.src_pid	= cpu_to_le32(the_lnet.ln_pid);
-> +	msg->msg_hdr.src_pid = cpu_to_le32(the_lnet.ln_pid);
->  	msg->msg_hdr.payload_length = cpu_to_le32(len);
->  }
->  
-> @@ -635,7 +635,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	}
->  
->  	deadline = lp->lpni_last_alive +
-> -		lp->lpni_net->net_tunables.lct_peer_timeout;
-> +		   lp->lpni_net->net_tunables.lct_peer_timeout;
->  	alive = deadline > now;
->  
->  	/* Update obsolete lpni_alive except for routers assumed to be dead
-> @@ -911,7 +911,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+>  	if (base == SPTLRPC_FLVR_BASE(SPTLRPC_FLVR_NULL))
+>  		return "null";
+> @@ -365,7 +365,7 @@ int sptlrpc_req_get_ctx(struct ptlrpc_request *req)
 >  {
->  	struct lnet_peer_ni *txpeer = msg->msg_txpeer;
->  	struct lnet_msg *msg2;
-> -	struct lnet_ni	*txni = msg->msg_txni;
-> +	struct lnet_ni *txni = msg->msg_txni;
->  
->  	if (msg->msg_txcredit) {
->  		struct lnet_ni *ni = msg->msg_txni;
-> @@ -1044,7 +1044,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  lnet_return_rx_credits_locked(struct lnet_msg *msg)
->  {
->  	struct lnet_peer_ni *rxpeer = msg->msg_rxpeer;
-> -	struct lnet_ni	*rxni = msg->msg_rxni;
-> +	struct lnet_ni *rxni = msg->msg_rxni;
->  	struct lnet_msg *msg2;
->  
->  	if (msg->msg_rtrcredit) {
-> @@ -1796,7 +1796,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	/* if we still can't find a peer ni then we can't reach it */
->  	if (!best_lpni) {
->  		u32 net_id = peer_net ? peer_net->lpn_net_id :
-> -			LNET_NIDNET(dst_nid);
-> +					LNET_NIDNET(dst_nid);
->  
->  		lnet_net_unlock(cpt);
->  		LCONSOLE_WARN("no peer_ni found on peer net %s\n",
-> @@ -1912,7 +1912,6 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	}
->  
->  	rc = lnet_post_send_locked(msg, 0);
-> -
->  	if (!rc)
->  		CDEBUG(D_NET, "TRACE: %s(%s:%s) -> %s(%s:%s) : %s\n",
->  		       libcfs_nid2str(msg->msg_hdr.src_nid),
-> @@ -1931,8 +1930,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  int
->  lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
->  {
-> -	lnet_nid_t		dst_nid = msg->msg_target.nid;
-> -	int			rc;
-> +	lnet_nid_t dst_nid = msg->msg_target.nid;
+>  	struct obd_import *imp = req->rq_import;
+>  	struct ptlrpc_sec *sec;
+> -	int		rc;
 > +	int rc;
 >  
+>  	LASSERT(!req->rq_cli_ctx);
+>  	LASSERT(imp);
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> index 93dcb6d..74cfdd8 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> @@ -57,8 +57,8 @@
+>  #define POINTERS_PER_PAGE	(PAGE_SIZE / sizeof(void *))
+>  #define PAGES_PER_POOL		(POINTERS_PER_PAGE)
+>  
+> -#define IDLE_IDX_MAX	 (100)
+> -#define IDLE_IDX_WEIGHT	 (3)
+> +#define IDLE_IDX_MAX		(100)
+> +#define IDLE_IDX_WEIGHT		(3)
+>  
+>  #define CACHE_QUIESCENT_PERIOD  (20)
+>  
+> @@ -66,16 +66,16 @@
 >  	/*
->  	 * NB: rtr_nid is set to LNET_NID_ANY for all current use-cases,
-> @@ -2008,19 +2007,19 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	le32_to_cpus(&hdr->msg.put.offset);
+>  	 * constants
+>  	 */
+> -	unsigned long    epp_max_pages;   /* maximum pages can hold, const */
+> -	unsigned int     epp_max_pools;   /* number of pools, const */
+> +	unsigned long		epp_max_pages;	/* maximum pages can hold, const */
+> +	unsigned int		epp_max_pools;	/* number of pools, const */
 >  
->  	/* Primary peer NID. */
-> -	info.mi_id.nid	= msg->msg_initiator;
-> -	info.mi_id.pid	= hdr->src_pid;
-> -	info.mi_opc	= LNET_MD_OP_PUT;
-> -	info.mi_portal	= hdr->msg.put.ptl_index;
-> +	info.mi_id.nid = msg->msg_initiator;
-> +	info.mi_id.pid = hdr->src_pid;
-> +	info.mi_opc = LNET_MD_OP_PUT;
-> +	info.mi_portal = hdr->msg.put.ptl_index;
->  	info.mi_rlength	= hdr->payload_length;
->  	info.mi_roffset	= hdr->msg.put.offset;
-> -	info.mi_mbits	= hdr->msg.put.match_bits;
-> -	info.mi_cpt	= lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
-> +	info.mi_mbits = hdr->msg.put.match_bits;
-> +	info.mi_cpt = lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
+>  	/*
+>  	 * wait queue in case of not enough free pages.
+>  	 */
+> -	wait_queue_head_t      epp_waitq;       /* waiting threads */
+> -	unsigned int     epp_waitqlen;    /* wait queue length */
+> -	unsigned long    epp_pages_short; /* # of pages wanted of in-q users */
+> -	unsigned int     epp_growing:1;   /* during adding pages */
+> +	wait_queue_head_t	epp_waitq;	/* waiting threads */
+> +	unsigned int		epp_waitqlen;	/* wait queue length */
+> +	unsigned long		epp_pages_short; /* # of pages wanted of in-q users */
+> +	unsigned int		epp_growing:1;	/* during adding pages */
 >  
->  	msg->msg_rx_ready_delay = !ni->ni_net->net_lnd->lnd_eager_recv;
->  	ready_delay = msg->msg_rx_ready_delay;
+>  	/*
+>  	 * indicating how idle the pools are, from 0 to MAX_IDLE_IDX
+> @@ -84,36 +84,36 @@
+>  	 * is idled for a while but the idle_idx might still be low if no
+>  	 * activities happened in the pools.
+>  	 */
+> -	unsigned long    epp_idle_idx;
+> +	unsigned long		epp_idle_idx;
 >  
-> - again:
-> +again:
->  	rc = lnet_ptl_match_md(&info, msg);
->  	switch (rc) {
->  	default:
-> @@ -2069,17 +2068,17 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	le32_to_cpus(&hdr->msg.get.sink_length);
->  	le32_to_cpus(&hdr->msg.get.src_offset);
+>  	/* last shrink time due to mem tight */
+> -	time64_t         epp_last_shrink;
+> -	time64_t         epp_last_access;
+> +	time64_t		epp_last_shrink;
+> +	time64_t		epp_last_access;
 >  
-> -	source_id.nid   = hdr->src_nid;
-> -	source_id.pid   = hdr->src_pid;
-> +	source_id.nid = hdr->src_nid;
-> +	source_id.pid = hdr->src_pid;
->  	/* Primary peer NID */
-> -	info.mi_id.nid  = msg->msg_initiator;
-> -	info.mi_id.pid  = hdr->src_pid;
-> -	info.mi_opc     = LNET_MD_OP_GET;
-> -	info.mi_portal  = hdr->msg.get.ptl_index;
-> +	info.mi_id.nid = msg->msg_initiator;
-> +	info.mi_id.pid = hdr->src_pid;
-> +	info.mi_opc = LNET_MD_OP_GET;
-> +	info.mi_portal = hdr->msg.get.ptl_index;
->  	info.mi_rlength = hdr->msg.get.sink_length;
->  	info.mi_roffset = hdr->msg.get.src_offset;
-> -	info.mi_mbits   = hdr->msg.get.match_bits;
-> -	info.mi_cpt	= lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
-> +	info.mi_mbits = hdr->msg.get.match_bits;
-> +	info.mi_cpt = lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
+>  	/*
+>  	 * in-pool pages bookkeeping
+>  	 */
+> -	spinlock_t	 epp_lock;	   /* protect following fields */
+> -	unsigned long    epp_total_pages; /* total pages in pools */
+> -	unsigned long    epp_free_pages;  /* current pages available */
+> +	spinlock_t		epp_lock;	 /* protect following fields */
+> +	unsigned long		epp_total_pages; /* total pages in pools */
+> +	unsigned long		epp_free_pages;	 /* current pages available */
 >  
->  	rc = lnet_ptl_match_md(&info, msg);
->  	if (rc == LNET_MATCHMD_DROP) {
-> @@ -2128,7 +2127,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+>  	/*
+>  	 * statistics
+>  	 */
+> -	unsigned long    epp_st_max_pages;      /* # of pages ever reached */
+> -	unsigned int     epp_st_grows;	  /* # of grows */
+> -	unsigned int     epp_st_grow_fails;     /* # of add pages failures */
+> -	unsigned int     epp_st_shrinks;	/* # of shrinks */
+> -	unsigned long    epp_st_access;	 /* # of access */
+> -	unsigned long    epp_st_missings;       /* # of cache missing */
+> -	unsigned long    epp_st_lowfree;	/* lowest free pages reached */
+> -	unsigned int     epp_st_max_wqlen;      /* highest waitqueue length */
+> -	unsigned long       epp_st_max_wait;       /* in jiffies */
+> -	unsigned long	 epp_st_outofmem;	/* # of out of mem requests */
+> +	unsigned long		epp_st_max_pages;	/* # of pages ever reached */
+> +	unsigned int		epp_st_grows;		/* # of grows */
+> +	unsigned int		epp_st_grow_fails;	/* # of add pages failures */
+> +	unsigned int		epp_st_shrinks;		/* # of shrinks */
+> +	unsigned long		epp_st_access;		/* # of access */
+> +	unsigned long		epp_st_missings;	/* # of cache missing */
+> +	unsigned long		epp_st_lowfree;		/* lowest free pages reached */
+> +	unsigned int		epp_st_max_wqlen;	/* highest waitqueue length */
+> +	unsigned long		epp_st_max_wait;	/* in jiffies */
+> +	unsigned long		epp_st_outofmem;	/* # of out of mem requests */
+>  	/*
+>  	 * pointers to pools
+>  	 */
+> -	struct page    ***epp_pools;
+> +	struct page		***epp_pools;
+>  } page_pools;
+>  
+>  /*
+> @@ -394,9 +394,9 @@ static inline void enc_pools_free(void)
+>  }
+>  
+>  static struct shrinker pools_shrinker = {
+> -	.count_objects	= enc_pools_shrink_count,
+> -	.scan_objects	= enc_pools_shrink_scan,
+> -	.seeks		= DEFAULT_SEEKS,
+> +	.count_objects		= enc_pools_shrink_count,
+> +	.scan_objects		= enc_pools_shrink_scan,
+> +	.seeks			= DEFAULT_SEEKS,
+>  };
+>  
+>  int sptlrpc_enc_pool_init(void)
+> @@ -475,14 +475,14 @@ void sptlrpc_enc_pool_fini(void)
+>  }
+>  
+>  static int cfs_hash_alg_id[] = {
+> -	[BULK_HASH_ALG_NULL]	= CFS_HASH_ALG_NULL,
+> -	[BULK_HASH_ALG_ADLER32]	= CFS_HASH_ALG_ADLER32,
+> -	[BULK_HASH_ALG_CRC32]	= CFS_HASH_ALG_CRC32,
+> -	[BULK_HASH_ALG_MD5]	= CFS_HASH_ALG_MD5,
+> -	[BULK_HASH_ALG_SHA1]	= CFS_HASH_ALG_SHA1,
+> -	[BULK_HASH_ALG_SHA256]	= CFS_HASH_ALG_SHA256,
+> -	[BULK_HASH_ALG_SHA384]	= CFS_HASH_ALG_SHA384,
+> -	[BULK_HASH_ALG_SHA512]	= CFS_HASH_ALG_SHA512,
+> +	[BULK_HASH_ALG_NULL]		= CFS_HASH_ALG_NULL,
+> +	[BULK_HASH_ALG_ADLER32]		= CFS_HASH_ALG_ADLER32,
+> +	[BULK_HASH_ALG_CRC32]		= CFS_HASH_ALG_CRC32,
+> +	[BULK_HASH_ALG_MD5]		= CFS_HASH_ALG_MD5,
+> +	[BULK_HASH_ALG_SHA1]		= CFS_HASH_ALG_SHA1,
+> +	[BULK_HASH_ALG_SHA256]		= CFS_HASH_ALG_SHA256,
+> +	[BULK_HASH_ALG_SHA384]		= CFS_HASH_ALG_SHA384,
+> +	[BULK_HASH_ALG_SHA512]		= CFS_HASH_ALG_SHA512,
+>  };
+>  
+>  const char *sptlrpc_get_hash_name(u8 hash_alg)
+> @@ -498,7 +498,7 @@ u8 sptlrpc_get_hash_alg(const char *algname)
+>  int bulk_sec_desc_unpack(struct lustre_msg *msg, int offset, int swabbed)
 >  {
->  	void *private = msg->msg_private;
->  	struct lnet_hdr *hdr = &msg->msg_hdr;
-> -	struct lnet_process_id src = {0};
-> +	struct lnet_process_id src = { 0 };
->  	struct lnet_libmd *md;
->  	int rlength;
->  	int mlength;
-> @@ -2192,7 +2191,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  lnet_parse_ack(struct lnet_ni *ni, struct lnet_msg *msg)
->  {
->  	struct lnet_hdr *hdr = &msg->msg_hdr;
-> -	struct lnet_process_id src = {0};
-> +	struct lnet_process_id src = { 0 };
->  	struct lnet_libmd *md;
->  	int cpt;
+>  	struct ptlrpc_bulk_sec_desc *bsd;
+> -	int			  size = msg->lm_buflens[offset];
+> +	int size = msg->lm_buflens[offset];
 >  
-> @@ -2316,8 +2315,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  void
->  lnet_print_hdr(struct lnet_hdr *hdr)
->  {
-> -	struct lnet_process_id src = {0};
-> -	struct lnet_process_id dst = {0};
-> +	struct lnet_process_id src = { 0 };
-> +	struct lnet_process_id dst = { 0 };
->  	char *type_str = lnet_msgtyp2str(hdr->type);
+>  	bsd = lustre_msg_buf(msg, offset, sizeof(*bsd));
+>  	if (!bsd) {
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+> index 1844ada..54130ae 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+> @@ -408,19 +408,19 @@ static int sptlrpc_rule_set_choose(struct sptlrpc_rule_set *rset,
+>   **********************************/
 >  
->  	src.nid = hdr->src_nid;
-> @@ -2533,17 +2532,16 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  	/* for building message event */
->  	msg->msg_from = from_nid;
->  	if (!for_me) {
-> -		msg->msg_target.pid	= dest_pid;
-> -		msg->msg_target.nid	= dest_nid;
-> -		msg->msg_routing	= 1;
+>  struct sptlrpc_conf_tgt {
+> -	struct list_head	      sct_list;
+> -	char		    sct_name[MAX_OBD_NAME];
+> -	struct sptlrpc_rule_set sct_rset;
+> +	struct list_head		sct_list;
+> +	char				sct_name[MAX_OBD_NAME];
+> +	struct sptlrpc_rule_set		sct_rset;
+>  };
+>  
+>  struct sptlrpc_conf {
+> -	struct list_head	      sc_list;
+> -	char		    sc_fsname[MTI_NAME_MAXLEN];
+> -	unsigned int	    sc_modified;  /* modified during updating */
+> -	unsigned int	    sc_updated:1, /* updated copy from MGS */
+> -				sc_local:1;   /* local copy from target */
+> -	struct sptlrpc_rule_set sc_rset;      /* fs general rules */
+> -	struct list_head	      sc_tgts;      /* target-specific rules */
+> +	struct list_head		sc_list;
+> +	char				sc_fsname[MTI_NAME_MAXLEN];
+> +	unsigned int			sc_modified;	/* modified during updating */
+> +	unsigned int			sc_updated:1,	/* updated copy from MGS */
+> +					sc_local:1;	/* local copy from target */
+> +	struct sptlrpc_rule_set		sc_rset;	/* fs general rules */
+> +	struct list_head		sc_tgts;	/* target-specific rules */
+>  };
+>  
+>  static struct mutex sptlrpc_conf_lock;
+> @@ -801,7 +801,7 @@ void sptlrpc_conf_choose_flavor(enum lustre_sec_part from,
+>  	flavor_set_flags(sf, from, to, 1);
+>  }
+>  
+> -#define SEC_ADAPT_DELAY	 (10)
+> +#define SEC_ADAPT_DELAY		(10)
+>  
+>  /**
+>   * called by client devices, notify the sptlrpc config has changed and
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+> index 6933a53..df6ef4f 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+> @@ -277,8 +277,8 @@ int null_enlarge_reqbuf(struct ptlrpc_sec *sec,
+>  }
+>  
+>  static struct ptlrpc_svc_ctx null_svc_ctx = {
+> -	.sc_refcount    = ATOMIC_INIT(1),
+> -	.sc_policy      = &null_policy,
+> +	.sc_refcount	= ATOMIC_INIT(1),
+> +	.sc_policy	= &null_policy,
+>  };
+>  
+>  static
+> @@ -373,33 +373,33 @@ int null_authorize(struct ptlrpc_request *req)
+>  
+>  static struct ptlrpc_ctx_ops null_ctx_ops = {
+>  	.refresh		= null_ctx_refresh,
+> -	.sign		   = null_ctx_sign,
+> -	.verify		 = null_ctx_verify,
+> +	.sign			= null_ctx_sign,
+> +	.verify			= null_ctx_verify,
+>  };
+>  
+>  static struct ptlrpc_sec_cops null_sec_cops = {
+> -	.create_sec	     = null_create_sec,
+> -	.destroy_sec	    = null_destroy_sec,
+> -	.lookup_ctx	     = null_lookup_ctx,
+> +	.create_sec		= null_create_sec,
+> +	.destroy_sec		= null_destroy_sec,
+> +	.lookup_ctx		= null_lookup_ctx,
+>  	.flush_ctx_cache	= null_flush_ctx_cache,
+> -	.alloc_reqbuf	   = null_alloc_reqbuf,
+> -	.alloc_repbuf	   = null_alloc_repbuf,
+> -	.free_reqbuf	    = null_free_reqbuf,
+> -	.free_repbuf	    = null_free_repbuf,
+> -	.enlarge_reqbuf	 = null_enlarge_reqbuf,
+> +	.alloc_reqbuf		= null_alloc_reqbuf,
+> +	.alloc_repbuf		= null_alloc_repbuf,
+> +	.free_reqbuf		= null_free_reqbuf,
+> +	.free_repbuf		= null_free_repbuf,
+> +	.enlarge_reqbuf		= null_enlarge_reqbuf,
+>  };
+>  
+>  static struct ptlrpc_sec_sops null_sec_sops = {
+> -	.accept		 = null_accept,
+> -	.alloc_rs	       = null_alloc_rs,
+> -	.authorize	      = null_authorize,
+> +	.accept			= null_accept,
+> +	.alloc_rs		= null_alloc_rs,
+> +	.authorize		= null_authorize,
+>  	.free_rs		= null_free_rs,
+>  };
+>  
+>  static struct ptlrpc_sec_policy null_policy = {
+> -	.sp_owner	       = THIS_MODULE,
+> +	.sp_owner		= THIS_MODULE,
+>  	.sp_name		= "sec.null",
+> -	.sp_policy	      = SPTLRPC_POLICY_NULL,
+> +	.sp_policy		= SPTLRPC_POLICY_NULL,
+>  	.sp_cops		= &null_sec_cops,
+>  	.sp_sops		= &null_sec_sops,
+>  };
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+> index 0a31ff4..021bf7f 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+> @@ -46,9 +46,9 @@
+>  #include "ptlrpc_internal.h"
+>  
+>  struct plain_sec {
+> -	struct ptlrpc_sec       pls_base;
+> -	rwlock_t	    pls_lock;
+> -	struct ptlrpc_cli_ctx  *pls_ctx;
+> +	struct ptlrpc_sec	 pls_base;
+> +	rwlock_t		 pls_lock;
+> +	struct ptlrpc_cli_ctx	*pls_ctx;
+>  };
+>  
+>  static inline struct plain_sec *sec2plsec(struct ptlrpc_sec *sec)
+> @@ -65,15 +65,15 @@ static inline struct plain_sec *sec2plsec(struct ptlrpc_sec *sec)
+>  /*
+>   * for simplicity, plain policy rpc use fixed layout.
+>   */
+> -#define PLAIN_PACK_SEGMENTS	     (4)
+> +#define PLAIN_PACK_SEGMENTS	(4)
+>  
+> -#define PLAIN_PACK_HDR_OFF	      (0)
+> -#define PLAIN_PACK_MSG_OFF	      (1)
+> -#define PLAIN_PACK_USER_OFF	     (2)
+> -#define PLAIN_PACK_BULK_OFF	     (3)
+> +#define PLAIN_PACK_HDR_OFF	(0)
+> +#define PLAIN_PACK_MSG_OFF	(1)
+> +#define PLAIN_PACK_USER_OFF	(2)
+> +#define PLAIN_PACK_BULK_OFF	(3)
+>  
+> -#define PLAIN_FL_USER		   (0x01)
+> -#define PLAIN_FL_BULK		   (0x02)
+> +#define PLAIN_FL_USER		(0x01)
+> +#define PLAIN_FL_BULK		(0x02)
+>  
+>  struct plain_header {
+>  	u8	    ph_ver;	    /* 0 */
+> @@ -711,8 +711,8 @@ int plain_enlarge_reqbuf(struct ptlrpc_sec *sec,
+>   ****************************************/
+>  
+>  static struct ptlrpc_svc_ctx plain_svc_ctx = {
+> -	.sc_refcount    = ATOMIC_INIT(1),
+> -	.sc_policy      = &plain_policy,
+> +	.sc_refcount	= ATOMIC_INIT(1),
+> +	.sc_policy	= &plain_policy,
+>  };
+>  
+>  static
+> @@ -961,40 +961,40 @@ int plain_svc_wrap_bulk(struct ptlrpc_request *req,
+>  
+>  static struct ptlrpc_ctx_ops plain_ctx_ops = {
+>  	.refresh		= plain_ctx_refresh,
+> -	.validate	       = plain_ctx_validate,
+> -	.sign		   = plain_ctx_sign,
+> -	.verify		 = plain_ctx_verify,
+> -	.wrap_bulk	      = plain_cli_wrap_bulk,
+> -	.unwrap_bulk	    = plain_cli_unwrap_bulk,
+> +	.validate		= plain_ctx_validate,
+> +	.sign			= plain_ctx_sign,
+> +	.verify			= plain_ctx_verify,
+> +	.wrap_bulk		= plain_cli_wrap_bulk,
+> +	.unwrap_bulk		= plain_cli_unwrap_bulk,
+>  };
+>  
+>  static struct ptlrpc_sec_cops plain_sec_cops = {
+> -	.create_sec	     = plain_create_sec,
+> -	.destroy_sec	    = plain_destroy_sec,
+> -	.kill_sec	       = plain_kill_sec,
+> -	.lookup_ctx	     = plain_lookup_ctx,
+> -	.release_ctx	    = plain_release_ctx,
+> +	.create_sec		= plain_create_sec,
+> +	.destroy_sec		= plain_destroy_sec,
+> +	.kill_sec		= plain_kill_sec,
+> +	.lookup_ctx		= plain_lookup_ctx,
+> +	.release_ctx		= plain_release_ctx,
+>  	.flush_ctx_cache	= plain_flush_ctx_cache,
+> -	.alloc_reqbuf	   = plain_alloc_reqbuf,
+> -	.free_reqbuf	    = plain_free_reqbuf,
+> -	.alloc_repbuf	   = plain_alloc_repbuf,
+> -	.free_repbuf	    = plain_free_repbuf,
+> -	.enlarge_reqbuf	 = plain_enlarge_reqbuf,
+> +	.alloc_reqbuf		= plain_alloc_reqbuf,
+> +	.free_reqbuf		= plain_free_reqbuf,
+> +	.alloc_repbuf		= plain_alloc_repbuf,
+> +	.free_repbuf		= plain_free_repbuf,
+> +	.enlarge_reqbuf		= plain_enlarge_reqbuf,
+>  };
+>  
+>  static struct ptlrpc_sec_sops plain_sec_sops = {
+> -	.accept		 = plain_accept,
+> -	.alloc_rs	       = plain_alloc_rs,
+> -	.authorize	      = plain_authorize,
+> +	.accept			= plain_accept,
+> +	.alloc_rs		= plain_alloc_rs,
+> +	.authorize		= plain_authorize,
+>  	.free_rs		= plain_free_rs,
+> -	.unwrap_bulk	    = plain_svc_unwrap_bulk,
+> -	.wrap_bulk	      = plain_svc_wrap_bulk,
+> +	.unwrap_bulk		= plain_svc_unwrap_bulk,
+> +	.wrap_bulk		= plain_svc_wrap_bulk,
+>  };
+>  
+>  static struct ptlrpc_sec_policy plain_policy = {
+> -	.sp_owner	       = THIS_MODULE,
+> +	.sp_owner		= THIS_MODULE,
+>  	.sp_name		= "plain",
+> -	.sp_policy	      = SPTLRPC_POLICY_PLAIN,
+> +	.sp_policy		= SPTLRPC_POLICY_PLAIN,
+>  	.sp_cops		= &plain_sec_cops,
+>  	.sp_sops		= &plain_sec_sops,
+>  };
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> index 1030f65..5b97f2a 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> @@ -173,7 +173,7 @@
+>  	       svc->srv_name, i, svc->srv_buf_size, svcpt->scp_nrqbds_posted,
+>  	       svcpt->scp_nrqbds_total, rc);
+>  
+> - try_post:
+> +try_post:
+>  	if (post && rc == 0)
+>  		rc = ptlrpc_server_post_idle_rqbds(svcpt);
+>  
+> @@ -185,8 +185,8 @@
+>  struct ptlrpc_hr_thread {
+>  	int				hrt_id;		/* thread ID */
+>  	spinlock_t			hrt_lock;
+> -	wait_queue_head_t			hrt_waitq;
+> -	struct list_head			hrt_queue;	/* RS queue */
+> +	wait_queue_head_t		hrt_waitq;
+> +	struct list_head		hrt_queue;	/* RS queue */
+>  	struct ptlrpc_hr_partition	*hrt_partition;
+>  };
+>  
+> @@ -212,7 +212,7 @@ struct ptlrpc_hr_service {
+>  	/* CPU partition table, it's just cfs_cpt_tab for now */
+>  	struct cfs_cpt_table		*hr_cpt_table;
+>  	/** controller sleep waitq */
+> -	wait_queue_head_t			hr_waitq;
+> +	wait_queue_head_t		hr_waitq;
+>  	unsigned int			hr_stopping;
+>  	/** roundrobin rotor for non-affinity service */
+>  	unsigned int			hr_rotor;
+> @@ -236,7 +236,6 @@ struct ptlrpc_hr_service {
+>  	    svcpt->scp_service->srv_cptable == ptlrpc_hr.hr_cpt_table) {
+>  		/* directly match partition */
+>  		hrp = ptlrpc_hr.hr_partitions[svcpt->scp_cpt];
 > -
-> +		msg->msg_target.pid = dest_pid;
-> +		msg->msg_target.nid = dest_nid;
-> +		msg->msg_routing = 1;
 >  	} else {
->  		/* convert common msg->hdr fields to host byteorder */
-> -		msg->msg_hdr.type	= type;
-> -		msg->msg_hdr.src_nid	= src_nid;
-> +		msg->msg_hdr.type = type;
-> +		msg->msg_hdr.src_nid = src_nid;
->  		le32_to_cpus(&msg->msg_hdr.src_pid);
-> -		msg->msg_hdr.dest_nid	= dest_nid;
-> -		msg->msg_hdr.dest_pid	= dest_pid;
-> +		msg->msg_hdr.dest_nid = dest_nid;
-> +		msg->msg_hdr.dest_pid = dest_pid;
->  		msg->msg_hdr.payload_length = payload_length;
+>  		rotor = ptlrpc_hr.hr_rotor++;
+>  		rotor %= cfs_cpt_number(ptlrpc_hr.hr_cpt_table);
+> @@ -440,7 +439,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+>  		nthrs = max(tc->tc_nthrs_base,
+>  			    tc->tc_nthrs_max / svc->srv_ncpts);
 >  	}
->  
-> @@ -2609,11 +2607,11 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  		goto free_drop;
->  	return 0;
->  
-> - free_drop:
-> +free_drop:
->  	LASSERT(!msg->msg_md);
->  	lnet_finalize(msg, rc);
->  
-> - drop:
-> +drop:
->  	lnet_drop_message(ni, cpt, private, payload_length, type);
->  	return 0;
->  }
-> @@ -2623,7 +2621,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
->  lnet_drop_delayed_msg_list(struct list_head *head, char *reason)
->  {
->  	while (!list_empty(head)) {
-> -		struct lnet_process_id id = {0};
-> +		struct lnet_process_id id = { 0 };
->  		struct lnet_msg *msg;
->  
->  		msg = list_entry(head->next, struct lnet_msg, msg_list);
-> @@ -2887,7 +2885,7 @@ struct lnet_msg *
->  
->  	return msg;
->  
-> - drop:
-> +drop:
->  	cpt = lnet_cpt_of_nid(peer_id.nid, ni);
->  
->  	lnet_net_lock(cpt);
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-> index 7f58cfe..b9e9257 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-> @@ -44,9 +44,9 @@
->  {
->  	memset(ev, 0, sizeof(*ev));
->  
-> -	ev->status   = 0;
-> +	ev->status = 0;
->  	ev->unlinked = 1;
-> -	ev->type     = LNET_EVENT_UNLINK;
-> +	ev->type = LNET_EVENT_UNLINK;
->  	lnet_md_deconstruct(md, &ev->md);
->  	lnet_md2handle(&ev->md_handle, md);
->  }
-> @@ -58,7 +58,7 @@
->  lnet_build_msg_event(struct lnet_msg *msg, enum lnet_event_kind ev_type)
->  {
->  	struct lnet_hdr *hdr = &msg->msg_hdr;
-> -	struct lnet_event *ev  = &msg->msg_ev;
-> +	struct lnet_event *ev = &msg->msg_ev;
->  
->  	LASSERT(!msg->msg_routing);
->  
-> @@ -67,27 +67,27 @@
->  
->  	if (ev_type == LNET_EVENT_SEND) {
->  		/* event for active message */
-> -		ev->target.nid    = le64_to_cpu(hdr->dest_nid);
-> -		ev->target.pid    = le32_to_cpu(hdr->dest_pid);
-> +		ev->target.nid = le64_to_cpu(hdr->dest_nid);
-> +		ev->target.pid = le32_to_cpu(hdr->dest_pid);
->  		ev->initiator.nid = LNET_NID_ANY;
->  		ev->initiator.pid = the_lnet.ln_pid;
-> -		ev->source.nid	  = LNET_NID_ANY;
-> -		ev->source.pid    = the_lnet.ln_pid;
-> -		ev->sender        = LNET_NID_ANY;
-> +		ev->source.nid = LNET_NID_ANY;
-> +		ev->source.pid = the_lnet.ln_pid;
-> +		ev->sender = LNET_NID_ANY;
->  	} else {
->  		/* event for passive message */
-> -		ev->target.pid    = hdr->dest_pid;
-> -		ev->target.nid    = hdr->dest_nid;
-> +		ev->target.pid = hdr->dest_pid;
-> +		ev->target.nid = hdr->dest_nid;
->  		ev->initiator.pid = hdr->src_pid;
->  		/* Multi-Rail: resolve src_nid to "primary" peer NID */
->  		ev->initiator.nid = msg->msg_initiator;
->  		/* Multi-Rail: track source NID. */
-> -		ev->source.pid	  = hdr->src_pid;
-> -		ev->source.nid	  = hdr->src_nid;
-> -		ev->rlength       = hdr->payload_length;
-> -		ev->sender        = msg->msg_from;
-> -		ev->mlength       = msg->msg_wanted;
-> -		ev->offset        = msg->msg_offset;
-> +		ev->source.pid = hdr->src_pid;
-> +		ev->source.nid = hdr->src_nid;
-> +		ev->rlength = hdr->payload_length;
-> +		ev->sender = msg->msg_from;
-> +		ev->mlength = msg->msg_wanted;
-> +		ev->offset = msg->msg_offset;
->  	}
->  
->  	switch (ev_type) {
-> @@ -95,20 +95,20 @@
->  		LBUG();
->  
->  	case LNET_EVENT_PUT: /* passive PUT */
-> -		ev->pt_index   = hdr->msg.put.ptl_index;
-> +		ev->pt_index = hdr->msg.put.ptl_index;
->  		ev->match_bits = hdr->msg.put.match_bits;
-> -		ev->hdr_data   = hdr->msg.put.hdr_data;
-> +		ev->hdr_data = hdr->msg.put.hdr_data;
->  		return;
->  
->  	case LNET_EVENT_GET: /* passive GET */
-> -		ev->pt_index   = hdr->msg.get.ptl_index;
-> +		ev->pt_index = hdr->msg.get.ptl_index;
->  		ev->match_bits = hdr->msg.get.match_bits;
-> -		ev->hdr_data   = 0;
-> +		ev->hdr_data = 0;
->  		return;
->  
->  	case LNET_EVENT_ACK: /* ACK */
->  		ev->match_bits = hdr->msg.ack.match_bits;
-> -		ev->mlength    = hdr->msg.ack.mlength;
-> +		ev->mlength = hdr->msg.ack.mlength;
->  		return;
->  
->  	case LNET_EVENT_REPLY: /* REPLY */
-> @@ -116,21 +116,21 @@
->  
->  	case LNET_EVENT_SEND: /* active message */
->  		if (msg->msg_type == LNET_MSG_PUT) {
-> -			ev->pt_index   = le32_to_cpu(hdr->msg.put.ptl_index);
-> +			ev->pt_index = le32_to_cpu(hdr->msg.put.ptl_index);
->  			ev->match_bits = le64_to_cpu(hdr->msg.put.match_bits);
-> -			ev->offset     = le32_to_cpu(hdr->msg.put.offset);
-> -			ev->mlength    =
-> -			ev->rlength    = le32_to_cpu(hdr->payload_length);
-> -			ev->hdr_data   = le64_to_cpu(hdr->msg.put.hdr_data);
-> +			ev->offset = le32_to_cpu(hdr->msg.put.offset);
-> +			ev->mlength =
-> +			ev->rlength = le32_to_cpu(hdr->payload_length);
-> +			ev->hdr_data = le64_to_cpu(hdr->msg.put.hdr_data);
->  
->  		} else {
->  			LASSERT(msg->msg_type == LNET_MSG_GET);
-> -			ev->pt_index   = le32_to_cpu(hdr->msg.get.ptl_index);
-> +			ev->pt_index = le32_to_cpu(hdr->msg.get.ptl_index);
->  			ev->match_bits = le64_to_cpu(hdr->msg.get.match_bits);
-> -			ev->mlength    =
-> -			ev->rlength    = le32_to_cpu(hdr->msg.get.sink_length);
-> -			ev->offset     = le32_to_cpu(hdr->msg.get.src_offset);
-> -			ev->hdr_data   = 0;
-> +			ev->mlength =
-> +			ev->rlength = le32_to_cpu(hdr->msg.get.sink_length);
-> +			ev->offset = le32_to_cpu(hdr->msg.get.src_offset);
-> +			ev->hdr_data = 0;
->  		}
->  		return;
->  	}
-> @@ -140,7 +140,7 @@
->  lnet_msg_commit(struct lnet_msg *msg, int cpt)
->  {
->  	struct lnet_msg_container *container = the_lnet.ln_msg_containers[cpt];
-> -	struct lnet_counters *counters  = the_lnet.ln_counters[cpt];
-> +	struct lnet_counters *counters = the_lnet.ln_counters[cpt];
->  
->  	/* routed message can be committed for both receiving and sending */
->  	LASSERT(!msg->msg_tx_committed);
-> @@ -172,7 +172,7 @@
->  static void
->  lnet_msg_decommit_tx(struct lnet_msg *msg, int status)
->  {
-> -	struct lnet_counters	*counters;
-> +	struct lnet_counters *counters;
->  	struct lnet_event *ev = &msg->msg_ev;
->  
->  	LASSERT(msg->msg_tx_committed);
-> @@ -294,7 +294,7 @@
->  	if (ev->type == LNET_EVENT_PUT || ev->type == LNET_EVENT_REPLY)
->  		counters->recv_length += msg->msg_wanted;
->  
 > - out:
 > +out:
->  	lnet_return_rx_credits_locked(msg);
->  	msg->msg_rx_committed = 0;
->  }
-> @@ -375,7 +375,7 @@
+>  	nthrs = max(nthrs, tc->tc_nthrs_init);
+>  	svc->srv_nthrs_cpt_limit = nthrs;
+>  	svc->srv_nthrs_cpt_init = init;
+> @@ -459,7 +458,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+>  ptlrpc_service_part_init(struct ptlrpc_service *svc,
+>  			 struct ptlrpc_service_part *svcpt, int cpt)
+>  {
+> -	struct ptlrpc_at_array	*array;
+> +	struct ptlrpc_at_array *array;
+>  	int size;
+>  	int index;
+>  	int rc;
+> @@ -1125,7 +1124,6 @@ static int ptlrpc_at_send_early_reply(struct ptlrpc_request *req)
+>  		goto out_put;
 >  
->  	unlink = lnet_md_unlinkable(md);
->  	if (md->md_eq) {
-> -		msg->msg_ev.status   = status;
-> +		msg->msg_ev.status = status;
->  		msg->msg_ev.unlinked = unlink;
->  		lnet_eq_enqueue_event(md->md_eq, &msg->msg_ev);
->  	}
-> @@ -488,7 +488,7 @@
->  		lnet_res_unlock(cpt);
->  	}
->  
-> - again:
-> +again:
->  	rc = 0;
->  	if (!msg->msg_tx_committed && !msg->msg_rx_committed) {
->  		/* not committed to network yet */
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> index fa391ee..ea232c7 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> @@ -74,7 +74,7 @@
->  
->  	return 1;
->  
-> - match:
-> +match:
->  	if ((lnet_ptl_is_unique(ptl) && !unique) ||
->  	    (lnet_ptl_is_wildcard(ptl) && unique))
->  		return 0;
-> @@ -387,7 +387,7 @@ struct list_head *
->  		head = &mtable->mt_mhash[LNET_MT_HASH_IGNORE];
->  	else
->  		head = lnet_mt_match_head(mtable, info->mi_id, info->mi_mbits);
-> - again:
-> +again:
->  	/* NB: only wildcard portal needs to return LNET_MATCHMD_EXHAUSTED */
->  	if (lnet_ptl_is_wildcard(the_lnet.ln_portals[mtable->mt_portal]))
->  		exhausted = LNET_MATCHMD_EXHAUSTED;
-> @@ -634,9 +634,9 @@ struct list_head *
->  		       info->mi_mbits, info->mi_roffset, info->mi_rlength);
->  	}
->  	goto out0;
-> - out1:
-> +out1:
->  	lnet_res_unlock(mtable->mt_cpt);
-> - out0:
-> +out0:
->  	/* EXHAUSTED bit is only meaningful for internal functions */
->  	return rc & ~LNET_MATCHMD_EXHAUSTED;
->  }
-> @@ -678,7 +678,7 @@ struct list_head *
->  
->  	lnet_ptl_lock(ptl);
->  	head = &ptl->ptl_msg_stealing;
-> - again:
-> +again:
->  	list_for_each_entry_safe(msg, tmp, head, msg_list) {
->  		struct lnet_match_info info;
->  		struct lnet_hdr *hdr;
-> @@ -688,13 +688,13 @@ struct list_head *
->  
->  		hdr = &msg->msg_hdr;
->  		/* Multi-Rail: Primary peer NID */
-> -		info.mi_id.nid  = msg->msg_initiator;
-> -		info.mi_id.pid  = hdr->src_pid;
-> -		info.mi_opc     = LNET_MD_OP_PUT;
-> -		info.mi_portal  = hdr->msg.put.ptl_index;
-> +		info.mi_id.nid = msg->msg_initiator;
-> +		info.mi_id.pid = hdr->src_pid;
-> +		info.mi_opc = LNET_MD_OP_PUT;
-> +		info.mi_portal = hdr->msg.put.ptl_index;
->  		info.mi_rlength = hdr->payload_length;
->  		info.mi_roffset = hdr->msg.put.offset;
-> -		info.mi_mbits   = hdr->msg.put.match_bits;
-> +		info.mi_mbits = hdr->msg.put.match_bits;
->  
->  		rc = lnet_try_match_md(md, &info, msg);
->  
-> @@ -824,7 +824,7 @@ struct list_head *
->  	}
->  
->  	return 0;
-> - failed:
-> +failed:
->  	lnet_ptl_cleanup(ptl);
->  	return -ENOMEM;
->  }
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> index cff3d1e..095f9f5 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> @@ -50,8 +50,11 @@
->  	long jiffies_left = timeout * msecs_to_jiffies(MSEC_PER_SEC);
->  	unsigned long then;
->  	struct timeval tv;
-> -	struct kvec  iov = { .iov_base = buffer, .iov_len  = nob };
-> -	struct msghdr msg = {NULL,};
-> +	struct kvec iov = {
-> +		.iov_base = buffer,
-> +		.iov_len = nob
-> +	};
-> +	struct msghdr msg = { NULL, };
->  
->  	LASSERT(nob > 0);
->  	/*
-> @@ -102,9 +105,9 @@
->  	long jiffies_left = timeout * msecs_to_jiffies(MSEC_PER_SEC);
->  	unsigned long then;
->  	struct timeval tv;
-> -	struct kvec  iov = {
-> +	struct kvec iov = {
->  		.iov_base = buffer,
-> -		.iov_len  = nob
-> +		.iov_len = nob
->  	};
->  	struct msghdr msg = {
->  		.msg_flags = 0
-> diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-> index 4c08c74..f306569 100644
-> --- a/drivers/staging/lustre/lnet/lnet/module.c
-> +++ b/drivers/staging/lustre/lnet/lnet/module.c
-> @@ -52,7 +52,6 @@
->  
->  	if (!the_lnet.ln_niinit_self) {
->  		rc = try_module_get(THIS_MODULE);
+>  	rc = ptlrpc_send_reply(reqcopy, PTLRPC_REPLY_EARLY);
 > -
->  		if (rc != 1)
->  			goto out;
->  
-> @@ -229,7 +228,7 @@
->  }
->  
->  static struct notifier_block lnet_ioctl_handler = {
-> -	.notifier_call = lnet_ioctl,
-> +	.notifier_call		= lnet_ioctl,
->  };
->  
->  static int __init lnet_init(void)
-> diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
-> index e2c7468..4234ce1 100644
-> --- a/drivers/staging/lustre/lnet/lnet/net_fault.c
-> +++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
-> @@ -614,7 +614,6 @@ struct delay_daemon_data {
->  			rc = lnet_parse_local(ni, msg);
->  			if (!rc)
->  				continue;
-> -
->  		} else {
->  			lnet_net_lock(cpt);
->  			rc = lnet_parse_forward_locked(ni, msg);
-> diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-> index 0f2b75e..8f3d87c 100644
-> --- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
-> +++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-> @@ -60,8 +60,8 @@
->   * between getting its string and using it.
->   */
->  
-> -static char      libcfs_nidstrings[LNET_NIDSTR_COUNT][LNET_NIDSTR_SIZE];
-> -static int       libcfs_nidstring_idx;
-> +static char libcfs_nidstrings[LNET_NIDSTR_COUNT][LNET_NIDSTR_SIZE];
-> +static int libcfs_nidstring_idx;
->  
->  static DEFINE_SPINLOCK(libcfs_nidstring_lock);
->  
-> @@ -117,23 +117,23 @@ struct nidrange {
->  	 * Link to list of this structures which is built on nid range
->  	 * list parsing.
->  	 */
-> -	struct list_head nr_link;
-> +	struct list_head	nr_link;
->  	/**
->  	 * List head for addrrange::ar_link.
->  	 */
-> -	struct list_head nr_addrranges;
-> +	struct list_head	nr_addrranges;
->  	/**
->  	 * Flag indicating that *@<net> is found.
->  	 */
-> -	int nr_all;
-> +	int			nr_all;
->  	/**
->  	 * Pointer to corresponding element of libcfs_netstrfns.
->  	 */
-> -	struct netstrfns *nr_netstrfns;
-> +	struct netstrfns	*nr_netstrfns;
->  	/**
->  	 * Number of network. E.g. 5 if \<net\> is "elan5".
->  	 */
-> -	int nr_netnum;
-> +	int			nr_netnum;
->  };
->  
->  /**
-> @@ -143,11 +143,11 @@ struct addrrange {
->  	/**
->  	 * Link to nidrange::nr_addrranges.
->  	 */
-> -	struct list_head ar_link;
-> +	struct list_head	ar_link;
->  	/**
->  	 * List head for cfs_expr_list::el_list.
->  	 */
-> -	struct list_head ar_numaddr_ranges;
-> +	struct list_head	ar_numaddr_ranges;
->  };
->  
->  /**
-> @@ -471,8 +471,8 @@ static void cfs_ip_ar_min_max(struct addrrange *ar, u32 *min_nid,
->  	struct cfs_expr_list *el;
->  	struct cfs_range_expr *re;
->  	u32 tmp_ip_addr = 0;
-> -	unsigned int min_ip[4] = {0};
-> -	unsigned int max_ip[4] = {0};
-> +	unsigned int min_ip[4] = { 0 };
-> +	unsigned int max_ip[4] = { 0 };
->  	int re_count = 0;
->  
->  	list_for_each_entry(el, &ar->ar_numaddr_ranges, el_link) {
-> @@ -794,11 +794,11 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
->  static int
->  libcfs_ip_str2addr(const char *str, int nob, u32 *addr)
+>  	if (!rc) {
+>  		/* Adjust our own deadline to what we told the client */
+>  		req->rq_deadline = newdl;
+> @@ -1316,7 +1314,7 @@ static void ptlrpc_server_hpreq_fini(struct ptlrpc_request *req)
+>  static int ptlrpc_server_request_add(struct ptlrpc_service_part *svcpt,
+>  				     struct ptlrpc_request *req)
 >  {
-> -	unsigned int	a;
-> -	unsigned int	b;
-> -	unsigned int	c;
-> -	unsigned int	d;
-> -	int		n = nob; /* XscanfX */
-> +	unsigned int a;
-> +	unsigned int b;
-> +	unsigned int c;
-> +	unsigned int d;
-> +	int n = nob; /* XscanfX */
->  
->  	/* numeric IP? */
->  	if (sscanf(str, "%u.%u.%u.%u%n", &a, &b, &c, &d, &n) >= 4 &&
-> @@ -897,7 +897,7 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
->  static int
->  libcfs_num_str2addr(const char *str, int nob, u32 *addr)
->  {
-> -	int     n;
-> +	int n;
->  
->  	n = nob;
->  	if (sscanf(str, "0x%x%n", addr, &n) >= 1 && n == nob)
-> @@ -926,7 +926,7 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
->  libcfs_num_parse(char *str, int len, struct list_head *list)
->  {
->  	struct cfs_expr_list *el;
 > -	int	rc;
 > +	int rc;
 >  
->  	rc = cfs_expr_list_parse(str, len, 0, MAX_NUMERIC_VALUE, &el);
->  	if (!rc)
-> @@ -1049,7 +1049,7 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
->  static struct netstrfns *
->  libcfs_name2netstrfns(const char *name)
->  {
-> -	int    i;
-> +	int i;
->  
->  	for (i = 0; i < libcfs_nnetstrfns; i++)
->  		if (!strcmp(libcfs_netstrfns[i].nf_name, name))
-> @@ -1194,7 +1194,7 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
->  u32
->  libcfs_str2net(const char *str)
->  {
-> -	u32  net;
-> +	u32 net;
->  
->  	if (libcfs_str2net_internal(str, &net))
->  		return net;
-> diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-> index d807dd4..dfe1f3d 100644
-> --- a/drivers/staging/lustre/lnet/lnet/peer.c
-> +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-> @@ -586,8 +586,8 @@ void lnet_peer_uninit(void)
->  static struct lnet_peer_ni *
->  lnet_get_peer_ni_locked(struct lnet_peer_table *ptable, lnet_nid_t nid)
->  {
-> -	struct list_head	*peers;
-> -	struct lnet_peer_ni	*lp;
-> +	struct list_head *peers;
-> +	struct lnet_peer_ni *lp;
->  
->  	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
->  
-> @@ -1069,6 +1069,7 @@ struct lnet_peer_net *
->  lnet_peer_get_net_locked(struct lnet_peer *peer, u32 net_id)
->  {
->  	struct lnet_peer_net *peer_net;
-> +
->  	list_for_each_entry(peer_net, &peer->lp_peer_nets, lpn_peer_nets) {
->  		if (peer_net->lpn_net_id == net_id)
->  			return peer_net;
-> @@ -1088,9 +1089,9 @@ struct lnet_peer_net *
->   */
->  static int
->  lnet_peer_attach_peer_ni(struct lnet_peer *lp,
-> -				struct lnet_peer_net *lpn,
-> -				struct lnet_peer_ni *lpni,
-> -				unsigned int flags)
-> +			 struct lnet_peer_net *lpn,
-> +			 struct lnet_peer_ni *lpni,
-> +			 unsigned int flags)
->  {
->  	struct lnet_peer_table *ptable;
->  
-> @@ -2686,12 +2687,12 @@ static int lnet_peer_send_ping(struct lnet_peer *lp)
+>  	rc = ptlrpc_server_hpreq_init(svcpt, req);
+>  	if (rc < 0)
+> @@ -2412,7 +2410,7 @@ int ptlrpc_start_threads(struct ptlrpc_service *svc)
 >  	}
->  
->  	/* initialize md content */
-> -	md.start     = &pbuf->pb_info;
-> -	md.length    = LNET_PING_INFO_SIZE(nnis);
-> +	md.start = &pbuf->pb_info;
-> +	md.length = LNET_PING_INFO_SIZE(nnis);
->  	md.threshold = 2; /* GET/REPLY */
-> -	md.max_size  = 0;
-> -	md.options   = LNET_MD_TRUNCATE;
-> -	md.user_ptr  = lp;
-> +	md.max_size = 0;
-> +	md.options = LNET_MD_TRUNCATE;
-> +	md.user_ptr = lp;
->  	md.eq_handle = the_lnet.ln_dc_eqh;
->  
->  	rc = LNetMDBind(md, LNET_UNLINK, &lp->lp_ping_mdh);
-> @@ -2715,7 +2716,6 @@ static int lnet_peer_send_ping(struct lnet_peer *lp)
->  	rc = LNetGet(LNET_NID_ANY, lp->lp_ping_mdh, id,
->  		     LNET_RESERVED_PORTAL,
->  		     LNET_PROTO_PING_MATCHBITS, 0);
-> -
->  	if (rc)
->  		goto fail_unlink_md;
->  
-> @@ -2792,13 +2792,13 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
->  	lnet_net_unlock(cpt);
->  
->  	/* Push source MD */
-> -	md.start     = &pbuf->pb_info;
-> -	md.length    = LNET_PING_INFO_SIZE(pbuf->pb_nnis);
-> +	md.start = &pbuf->pb_info;
-> +	md.length = LNET_PING_INFO_SIZE(pbuf->pb_nnis);
->  	md.threshold = 2; /* Put/Ack */
-> -	md.max_size  = 0;
-> -	md.options   = 0;
-> +	md.max_size = 0;
-> +	md.options = 0;
->  	md.eq_handle = the_lnet.ln_dc_eqh;
-> -	md.user_ptr  = lp;
-> +	md.user_ptr = lp;
->  
->  	rc = LNetMDBind(md, LNET_UNLINK, &lp->lp_push_mdh);
->  	if (rc) {
-> @@ -2821,7 +2821,6 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
->  	rc = LNetPut(LNET_NID_ANY, lp->lp_push_mdh,
->  		     LNET_ACK_REQ, id, LNET_RESERVED_PORTAL,
->  		     LNET_PROTO_PING_MATCHBITS, 0, 0);
-> -
->  	if (rc)
->  		goto fail_unlink;
->  
-> @@ -3315,8 +3314,8 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
->  		goto out;
->  	}
->  
-> -	size = sizeof(nid) + sizeof(*lpni_info) + sizeof(*lpni_stats)
-> -		+ sizeof(*lpni_msg_stats);
-> +	size = sizeof(nid) + sizeof(*lpni_info) + sizeof(*lpni_stats) +
-> +	       sizeof(*lpni_msg_stats);
->  	size *= lp->lp_nnis;
->  	if (size > cfg->prcfg_size) {
->  		cfg->prcfg_size = size;
-> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-> index 22c88ec..463b123 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router.c
-> @@ -172,7 +172,7 @@
->  		notifylnd = lp->lpni_notifylnd;
->  
->  		lp->lpni_notifylnd = 0;
-> -		lp->lpni_notify    = 0;
-> +		lp->lpni_notify = 0;
->  
->  		if (notifylnd && ni->ni_net->net_lnd->lnd_notify) {
->  			spin_unlock(&lp->lpni_lock);
-> @@ -274,6 +274,7 @@ static void lnet_shuffle_seed(void)
->  	 * the NID for this node gives the most entropy in the low bits */
->  	while ((ni = lnet_get_next_ni_locked(NULL, ni))) {
->  		u32 lnd_type, seed;
-> +
->  		lnd_type = LNET_NETTYP(LNET_NIDNET(ni->ni_nid));
->  		if (lnd_type != LOLND) {
->  			seed = (LNET_NIDADDR(ni->ni_nid) | lnd_type);
-> @@ -386,7 +387,6 @@ static void lnet_shuffle_seed(void)
->  	/* Search for a duplicate route (it's a NOOP if it is) */
->  	add_route = 1;
->  	list_for_each_entry(route2, &rnet2->lrn_routes, lr_list) {
-> -
->  		if (route2->lr_gateway == route->lr_gateway) {
->  			add_route = 0;
->  			break;
-> @@ -501,7 +501,7 @@ static void lnet_shuffle_seed(void)
->  	else
->  		rn_list = lnet_net2rnethash(net);
->  
-> - again:
-> +again:
->  	list_for_each_entry(rnet, rn_list, lrn_list) {
->  		if (!(net == LNET_NIDNET(LNET_NID_ANY) ||
->  		      net == rnet->lrn_net))
-> @@ -601,10 +601,10 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  		list_for_each_entry(rnet, rn_list, lrn_list) {
->  			list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
->  				if (!idx--) {
-> -					*net      = rnet->lrn_net;
-> -					*hops     = route->lr_hops;
-> +					*net = rnet->lrn_net;
-> +					*hops = route->lr_hops;
->  					*priority = route->lr_priority;
-> -					*gateway  = route->lr_gateway->lpni_nid;
-> +					*gateway = route->lr_gateway->lpni_nid;
->  					*alive = lnet_is_route_alive(route);
->  					lnet_net_unlock(cpt);
->  					return 0;
-> @@ -648,7 +648,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  	struct lnet_ping_buffer *pbuf = rcd->rcd_pingbuffer;
->  	struct lnet_peer_ni *gw = rcd->rcd_gateway;
->  	struct lnet_route *rte;
-> -	int			nnis;
-> +	int nnis;
->  
->  	if (!gw->lpni_alive || !pbuf)
->  		return;
-> @@ -799,7 +799,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  	if (avoid_asym_router_failure && !event->status)
->  		lnet_parse_rc_info(rcd);
->  
-> - out:
-> +out:
->  	lnet_net_unlock(lp->lpni_cpt);
->  }
->  
-> @@ -1069,14 +1069,14 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  		id.pid = LNET_PID_LUSTRE;
->  		CDEBUG(D_NET, "Check: %s\n", libcfs_id2str(id));
->  
-> -		rtr->lpni_ping_notsent   = 1;
-> +		rtr->lpni_ping_notsent = 1;
->  		rtr->lpni_ping_timestamp = now;
->  
->  		mdh = rcd->rcd_mdh;
->  
->  		if (!rtr->lpni_ping_deadline) {
->  			rtr->lpni_ping_deadline = ktime_get_seconds() +
-> -						router_ping_timeout;
-> +						  router_ping_timeout;
->  		}
->  
->  		lnet_net_unlock(rtr->lpni_cpt);
-> @@ -1652,7 +1652,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
 >  
 >  	return 0;
->  
 > - failed:
 > +failed:
->  	lnet_rtrpools_free(0);
->  	return rc;
->  }
-> @@ -1797,8 +1797,8 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  		return -EINVAL;
->  	}
+>  	CERROR("cannot start %s thread #%d_%d: rc %d\n",
+>  	       svc->srv_thread_name, i, j, rc);
+>  	ptlrpc_stop_all_threads(svc);
+> @@ -2432,7 +2430,7 @@ int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait)
+>  	       svc->srv_name, svcpt->scp_cpt, svcpt->scp_nthrs_running,
+>  	       svc->srv_nthrs_cpt_init, svc->srv_nthrs_cpt_limit);
 >  
-> -	if (ni && !alive &&	     /* LND telling me she's down */
-> -	    !auto_down) {		       /* auto-down disabled */
-> +	if (ni && !alive &&	/* LND telling me she's down */
-> +	    !auto_down) {	/* auto-down disabled */
->  		CDEBUG(D_NET, "Auto-down disabled\n");
->  		return 0;
->  	}
-> diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> index e8cc70f..94ef441 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> @@ -66,8 +66,8 @@
->  #define LNET_PROC_HOFF_GET(pos)				\
->  	(int)((pos) & LNET_PROC_HOFF_MASK)
->  
-> -#define LNET_PROC_POS_MAKE(cpt, ver, hash, off)		\
-> -	(((((loff_t)(cpt)) & LNET_PROC_CPT_MASK) << LNET_PROC_VPOS_BITS) |   \
-> +#define LNET_PROC_POS_MAKE(cpt, ver, hash, off)				    \
-> +	(((((loff_t)(cpt)) & LNET_PROC_CPT_MASK) << LNET_PROC_VPOS_BITS) |  \
->  	((((loff_t)(ver)) & LNET_PROC_VER_MASK) << LNET_PROC_HPOS_BITS) |   \
->  	((((loff_t)(hash)) & LNET_PROC_HASH_MASK) << LNET_PROC_HOFF_BITS) | \
->  	((off) & LNET_PROC_HOFF_MASK))
-> @@ -91,7 +91,6 @@ static int proc_lnet_stats(struct ctl_table *table, int write,
->  	}
->  
->  	/* read */
-> -
->  	ctrs = kzalloc(sizeof(*ctrs), GFP_NOFS);
->  	if (!ctrs)
->  		return -ENOMEM;
-> @@ -395,8 +394,8 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
->  	struct lnet_peer_table *ptable;
->  	char *tmpstr = NULL;
->  	char *s;
-> -	int cpt  = LNET_PROC_CPT_GET(*ppos);
-> -	int ver  = LNET_PROC_VER_GET(*ppos);
-> +	int cpt = LNET_PROC_CPT_GET(*ppos);
-> +	int ver = LNET_PROC_VER_GET(*ppos);
->  	int hash = LNET_PROC_HASH_GET(*ppos);
->  	int hoff = LNET_PROC_HOFF_GET(*ppos);
->  	int rc = 0;
-> @@ -456,7 +455,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
->  		struct lnet_peer_ni *peer;
->  		struct list_head *p;
->  		int skip;
 > - again:
 > +again:
->  		p = NULL;
->  		peer = NULL;
->  		skip = hoff - 1;
-> @@ -630,7 +629,7 @@ static int proc_lnet_buffers(struct ctl_table *table, int write,
->  		lnet_net_unlock(LNET_LOCK_EX);
->  	}
+>  	if (unlikely(svc->srv_is_stopping))
+>  		return -ESRCH;
 >  
-> - out:
-> +out:
->  	len = s - tmpstr;
->  
->  	if (pos >= min_t(int, len, strlen(tmpstr)))
-> @@ -787,9 +786,9 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
->  }
->  
->  struct lnet_portal_rotors {
-> -	int pr_value;
-> -	const char *pr_name;
-> -	const char *pr_desc;
-> +	int		 pr_value;
-> +	const char	*pr_name;
-> +	const char	*pr_desc;
->  };
->  
->  static struct lnet_portal_rotors	portal_rotors[] = {
-> @@ -890,39 +889,39 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
->  	 * to go via /proc for portability.
->  	 */
->  	{
-> -		.procname     = "stats",
-> -		.mode         = 0644,
-> -		.proc_handler = &proc_lnet_stats,
-> +		.procname	= "stats",
-> +		.mode		= 0644,
-> +		.proc_handler	= &proc_lnet_stats,
->  	},
->  	{
-> -		.procname     = "routes",
-> -		.mode         = 0444,
-> -		.proc_handler = &proc_lnet_routes,
-> +		.procname	= "routes",
-> +		.mode		= 0444,
-> +		.proc_handler	= &proc_lnet_routes,
->  	},
->  	{
-> -		.procname     = "routers",
-> -		.mode         = 0444,
-> -		.proc_handler = &proc_lnet_routers,
-> +		.procname	= "routers",
-> +		.mode		= 0444,
-> +		.proc_handler	= &proc_lnet_routers,
->  	},
->  	{
-> -		.procname     = "peers",
-> -		.mode         = 0644,
-> -		.proc_handler = &proc_lnet_peers,
-> +		.procname	= "peers",
-> +		.mode		= 0644,
-> +		.proc_handler	= &proc_lnet_peers,
->  	},
->  	{
-> -		.procname     = "buffers",
-> -		.mode         = 0444,
-> -		.proc_handler = &proc_lnet_buffers,
-> +		.procname	= "buffers",
-> +		.mode		= 0444,
-> +		.proc_handler	= &proc_lnet_buffers,
->  	},
->  	{
-> -		.procname     = "nis",
-> -		.mode         = 0644,
-> -		.proc_handler = &proc_lnet_nis,
-> +		.procname	= "nis",
-> +		.mode		= 0644,
-> +		.proc_handler	= &proc_lnet_nis,
->  	},
->  	{
-> -		.procname     = "portal_rotor",
-> -		.mode         = 0644,
-> -		.proc_handler = &proc_lnet_portal_rotor,
-> +		.procname	= "portal_rotor",
-> +		.mode		= 0644,
-> +		.proc_handler	= &proc_lnet_portal_rotor,
->  	},
->  	{
->  	}
 > -- 
 > 1.8.3.1
 -------------- next part --------------
@@ -1804,4 +1213,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190204/a8d5ab01/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190204/e62771ca/attachment-0001.sig>
