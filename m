@@ -1,72 +1,49 @@
-From: Leonel Ochoa <lochoa@whamcloud.com>
-Date: Mon, 4 Feb 2019 18:26:42 +0000
-Subject: [lustre-devel] Maloo Unscheduled Maintenance
-In-Reply-To: <6DF7A165-B104-4A84-92F3-85770D7D7D7A@ddn.com>
-References: <6DF7A165-B104-4A84-92F3-85770D7D7D7A@ddn.com>
-Message-ID: <4DCFCF25-8AC4-47B0-9D1F-EB62AEBE0598@ddn.com>
+From: Degremont, Aurelien <degremoa@amazon.com>
+Date: Tue, 5 Feb 2019 17:09:23 +0000
+Subject: [lustre-devel] Run acceptance tests on client side only
+In-Reply-To: <10A6B545-A2DD-4DB7-A8DE-6FFE2D174A6A@whamcloud.com>
+References: <9E0B8A72-3AFF-4141-8E94-28AF402B0CC9@amazon.com>
+ <10A6B545-A2DD-4DB7-A8DE-6FFE2D174A6A@whamcloud.com>
+Message-ID: <61A33E81-F7E8-450B-A3A5-81D52B4A1E95@amazon.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-FINAL UPDATE:
-The Maloo server has been running nominally since last week, results data is available going back to Jan 2017, the remaining sub test and test log results from 2016 will be ingested overnight
+Thanks Andreas for this info.
+I will look at the scripts and see if we want to go deeper in this direction.
 
-Lee Ochoa
-lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
+Aur?lien
 
+?Le 04/02/2019 08:37, ? Andreas Dilger ? <adilger@whamcloud.com> a ?crit :
 
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Leonel Ochoa <lochoa@whamcloud.com>
-Date: Thursday, January 31, 2019 at 17:44
-To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] Maloo Unscheduled Maintenance
-
-UPDATE:
-
-At this point we?re all caught up with all sessions that were pending. If you notice a session missing between 1/19 and now, or a missing gerrit score please feel free to reach out and we can work on troubleshooting missing results/scores.
-At this point the only missing data is sub tests and test logs EARLIER than 1/19, this will populate slowly and I?ll announce once they?re all ingested.
-
-
-Lee Ochoa
-lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
-
-
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Leonel Ochoa <lochoa@whamcloud.com>
-Date: Wednesday, January 30, 2019 at 21:49
-To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] Maloo Unscheduled Maintenance
-
-UPDATE:
-
-Maloo is back up?but not fully restored yet. For the time being you?ll notice the following things:
-
-  1.  Test queue pages DO show accurate state of ongoing tests in Autotest
-  2.  The main test session page is missing results from 1/19 ? 1/30, these results will start getting ingested from oldest to newest, please be patient and all results will eventually show up
-  3.  For test sessions EARLIER than 1/19, sub test and test log pages are missing and will slowly populate, also from oldest to newest, also please be patient
-I?ll be sending periodic updates as we fill in the missing data
-
-Lee Ochoa
-lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
-
-
-From: Leonel Ochoa <lochoa@whamcloud.com>
-Date: Tuesday, January 29, 2019 at 14:12
-To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: Maloo Unscheduled Maintenance
-
-NOTICE TO ALL MALOO USERS
-
-The Maloo web server has been down since yesterday 1/28 due to unscheduled maintenance, at present we expect the downtime to last all of today 1/29 and possibly tomorrow 1/30 as well. Once service has been restored we?ll post a notification to this mailing list.
-
-Gerrit can still receive patches and Autotest will continue to run test sessions while Maloo remains offline, once the server is back up all pending results and gerrit +/- notifications (from Maloo) will be sent for all completed tests.
-
-Thank you for your patience.
-
-Lee Ochoa
-lochoa at whamcloud.com<mailto:lochoa@whamcloud.com>
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190204/2402664d/attachment-0001.html>
+    On Jan 30, 2019, at 07:53, Degremont, Aurelien <degremoa@amazon.com> wrote:
+    > 
+    > Hello
+    >  
+    > I?m trying to run test suites without having access to servers.
+    > A lot of tests in acc-sm assume that servers are reachable. Is there way to automatically skip these tests?
+    >  
+    > Does somebody has a smart way to run acc-sm?
+    
+    Aurelien,
+    at one time in the past it was possible to run sanity and runtests only on the client by setting "CLIENTONLY=yes". However, this isn't commonly used so is likely missing from a bunch of subtests.
+    
+    There are also checks in some subtests "remote_mds_nodsh" and/or "remote_ost_nodsh" to skip tests that depend on remote access to the servers when the MDS is not accessible from the client.  This is not _exactly_ the same as CLIENTONLY in that they are still run if the MDS/OSS are running on the same node as the client.
+    
+    If running tests in this manner is of interest to you, patches would be welcome to add test skips as needed to get this working again.
+    
+    Cheers, Andreas
+    ---
+    Andreas Dilger
+    Principal Lustre Architect
+    Whamcloud
+    
+    
+    
+    
+    
+    
+    
+    
