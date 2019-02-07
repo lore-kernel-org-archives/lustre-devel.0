@@ -1,117 +1,283 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 07 Feb 2019 11:03:33 +1100
-Subject: [lustre-devel] [PATCH 14/21] lustre: make ccc_users in
- cl_client_cache a refcount_t
+Subject: [lustre-devel] [PATCH 15/21] lustre: obdclass: char
+ obd_ioctl_getdata type.
 In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
-Message-ID: <154949781324.10620.6961645123977299300.stgit@noble.brown>
+Message-ID: <154949781327.10620.2294752316778817915.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-As this is used as a refcount, it should be declared
-as one.
+Instead of having obd_ioctl_getdata() return the allocated
+data as a "char *", return it as it really is,
+ struct obd_ioctl_data *
+
+This avoids the need for extra variables and casts.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h |    2 +-
- drivers/staging/lustre/lustre/llite/lproc_llite.c |    2 +-
- drivers/staging/lustre/lustre/obdclass/cl_page.c  |    6 +++---
- drivers/staging/lustre/lustre/osc/osc_page.c      |    4 ++--
- drivers/staging/lustre/lustre/osc/osc_request.c   |    2 +-
- 5 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lustre/include/obd_class.h  |    3 ++-
+ drivers/staging/lustre/lustre/llite/dir.c          |   17 +++++------------
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    8 +++-----
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   15 ++++++---------
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   18 ++++++++----------
+ 5 files changed, 24 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index c2273c3100e8..05be85306663 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -2181,7 +2181,7 @@ struct cl_client_cache {
- 	 * # of client cache refcount
- 	 * # of users (OSCs) + 2 (held by llite and lov)
- 	 */
--	atomic_t		ccc_users;
-+	refcount_t		ccc_users;
- 	/**
- 	 * # of threads are doing shrinking
- 	 */
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 001bed90f4da..8215296dc15d 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -467,7 +467,7 @@ static int ll_max_cached_mb_seq_show(struct seq_file *m, void *v)
- 		   "used_mb: %ld\n"
- 		   "unused_mb: %ld\n"
- 		   "reclaim_count: %u\n",
--		   atomic_read(&cache->ccc_users),
-+		   refcount_read(&cache->ccc_users),
- 		   max_cached_mb,
- 		   max_cached_mb - unused_mb,
- 		   unused_mb,
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index f0ece7e9a4ac..7dcd3aff229f 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -960,7 +960,7 @@ struct cl_client_cache *cl_cache_init(unsigned long lru_page_max)
- 		return NULL;
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index 30b3e2c69f83..32d4ab6e78a0 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -1697,6 +1697,7 @@ struct root_squash_info {
+ };
  
- 	/* Initialize cache data */
--	atomic_set(&cache->ccc_users, 1);
-+	refcount_set(&cache->ccc_users, 1);
- 	cache->ccc_lru_max = lru_page_max;
- 	atomic_long_set(&cache->ccc_lru_left, lru_page_max);
- 	spin_lock_init(&cache->ccc_lru_lock);
-@@ -978,7 +978,7 @@ EXPORT_SYMBOL(cl_cache_init);
-  */
- void cl_cache_incref(struct cl_client_cache *cache)
+ /* linux-module.c */
+-int obd_ioctl_getdata(char **buf, int *len, void __user *arg);
++struct obd_ioctl_data;
++int obd_ioctl_getdata(struct obd_ioctl_data **data, int *len, void __user *arg);
+ 
+ #endif /* __LINUX_OBD_CLASS_H */
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index fd1af4a5cdad..0c49244eaee8 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1130,13 +1130,11 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case IOC_MDC_LOOKUP: {
+ 		int namelen, len = 0;
+-		char *buf = NULL;
+ 		char *filename;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc)
+ 			return rc;
+-		data = (void *)buf;
+ 
+ 		filename = data->ioc_inlbuf1;
+ 		namelen = strlen(filename);
+@@ -1155,12 +1153,11 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			goto out_free;
+ 		}
+ out_free:
+-		kvfree(buf);
++		kvfree(data);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SETSTRIPE: {
+ 		struct lmv_user_md  *lum;
+-		char *buf = NULL;
+ 		char *filename;
+ 		int namelen = 0;
+ 		int lumlen = 0;
+@@ -1168,11 +1165,10 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		int len;
+ 		int rc;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc)
+ 			return rc;
+ 
+-		data = (void *)buf;
+ 		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 		    data->ioc_inllen1 == 0 || data->ioc_inllen2 == 0) {
+ 			rc = -EINVAL;
+@@ -1205,7 +1201,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #endif
+ 		rc = ll_dir_setdirstripe(dentry, lum, filename, mode);
+ lmv_out_free:
+-		kvfree(buf);
++		kvfree(data);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SET_DEFAULT_STRIPE: {
+@@ -1651,18 +1647,16 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		return rc;
+ 	}
+ 	case LL_IOC_MIGRATE: {
+-		char *buf = NULL;
+ 		const char *filename;
+ 		int namelen = 0;
+ 		int len;
+ 		int rc;
+ 		int mdtidx;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc < 0)
+ 			return rc;
+ 
+-		data = (struct obd_ioctl_data *)buf;
+ 		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 		    !data->ioc_inllen1 || !data->ioc_inllen2) {
+ 			rc = -EINVAL;
+@@ -1684,7 +1678,6 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		rc = ll_migrate(inode, file, mdtidx, filename, namelen - 1);
+ migrate_free:
+-		kvfree(buf);
+ 
+ 		return rc;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 8e09fdd7a96e..e2417cd5aaed 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2295,7 +2295,6 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
  {
--	atomic_inc(&cache->ccc_users);
-+	refcount_inc(&cache->ccc_users);
- }
- EXPORT_SYMBOL(cl_cache_incref);
+ 	struct ll_sb_info *sbi = NULL;
+ 	struct obd_export *exp;
+-	char *buf = NULL;
+ 	struct obd_ioctl_data *data = NULL;
+ 	u32 type;
+ 	int len = 0, rc;
+@@ -2311,11 +2310,10 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ 		goto out_statfs;
+ 	}
  
-@@ -989,7 +989,7 @@ EXPORT_SYMBOL(cl_cache_incref);
-  */
- void cl_cache_decref(struct cl_client_cache *cache)
+-	rc = obd_ioctl_getdata(&buf, &len, arg);
++	rc = obd_ioctl_getdata(&data, &len, arg);
+ 	if (rc)
+ 		goto out_statfs;
+ 
+-	data = (void *)buf;
+ 	if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 	    !data->ioc_pbuf1 || !data->ioc_pbuf2) {
+ 		rc = -EINVAL;
+@@ -2340,11 +2338,11 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ 		goto out_statfs;
+ 	}
+ 
+-	rc = obd_iocontrol(IOC_OBD_STATFS, exp, len, buf, NULL);
++	rc = obd_iocontrol(IOC_OBD_STATFS, exp, len, data, NULL);
+ 	if (rc)
+ 		goto out_statfs;
+ out_statfs:
+-	kvfree(buf);
++	kvfree(data);
+ 	return rc;
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 04d0a9ed1d05..fd769c39b482 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -1039,27 +1039,24 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 	case OBD_IOC_LOV_GET_CONFIG: {
+ 		struct obd_ioctl_data *data;
+ 		struct lov_desc *desc;
+-		char *buf = NULL;
+ 		u32 *genp;
+ 
+ 		len = 0;
+-		if (obd_ioctl_getdata(&buf, &len, uarg))
++		if (obd_ioctl_getdata(&data, &len, uarg))
+ 			return -EINVAL;
+ 
+-		data = (struct obd_ioctl_data *)buf;
+-
+ 		if (sizeof(*desc) > data->ioc_inllen1) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+ 		if (sizeof(uuidp->uuid) * count > data->ioc_inllen2) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+ 		if (sizeof(u32) * count > data->ioc_inllen3) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+@@ -1076,9 +1073,9 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 			*genp = lov->lov_tgts[i]->ltd_gen;
+ 		}
+ 
+-		if (copy_to_user(uarg, buf, len))
++		if (copy_to_user(uarg, data, len))
+ 			rc = -EFAULT;
+-		kvfree(buf);
++		kvfree(data);
+ 		break;
+ 	}
+ 	case OBD_IOC_QUOTACTL: {
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index b859ab19b9f6..2ef4fd41cdd0 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -230,7 +230,7 @@ static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+ }
+ 
+ /* buffer MUST be at least the size of obd_ioctl_hdr */
+-int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
++int obd_ioctl_getdata(struct obd_ioctl_data **datap, int *len, void __user *arg)
  {
--	if (atomic_dec_and_test(&cache->ccc_users))
-+	if (refcount_dec_and_test(&cache->ccc_users))
- 		kfree(cache);
+ 	struct obd_ioctl_data *data;
+ 	struct obd_ioctl_hdr hdr;
+@@ -262,16 +262,16 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
+ 	 * obdfilter-survey is an example, which relies on ioctl. So we'd
+ 	 * better avoid vmalloc on ioctl path. LU-66
+ 	 */
+-	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
+-	if (!*buf) {
++	data = kvzalloc(hdr.ioc_len, GFP_KERNEL);
++	if (!data) {
+ 		CERROR("Cannot allocate control buffer of len %d\n",
+ 		       hdr.ioc_len);
+ 		return -EINVAL;
+ 	}
+ 	*len = hdr.ioc_len;
+-	data = (struct obd_ioctl_data *)*buf;
++	*datap = data;
+ 
+-	if (copy_from_user(*buf, arg, hdr.ioc_len)) {
++	if (copy_from_user(data, arg, hdr.ioc_len)) {
+ 		err = -EFAULT;
+ 		goto free_buf;
+ 	}
+@@ -308,14 +308,13 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
+ 	return 0;
+ 
+ free_buf:
+-	kvfree(*buf);
++	kvfree(data);
+ 	return err;
  }
- EXPORT_SYMBOL(cl_cache_decref);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index 135bfe5e1b37..ce911b82512d 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -346,7 +346,7 @@ static int osc_cache_too_much(struct client_obd *cli)
- 	long pages = atomic_long_read(&cli->cl_lru_in_list);
- 	unsigned long budget;
+ EXPORT_SYMBOL(obd_ioctl_getdata);
  
--	budget = cache->ccc_lru_max / (atomic_read(&cache->ccc_users) - 2);
-+	budget = cache->ccc_lru_max / (refcount_read(&cache->ccc_users) - 2);
+ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ {
+-	char *buf = NULL;
+ 	struct obd_ioctl_data *data;
+ 	struct libcfs_debug_ioctl_data *debug_data;
+ 	struct obd_device *obd = NULL;
+@@ -330,11 +329,10 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 	}
  
- 	/* if it's going to run out LRU slots, we should free some, but not
- 	 * too much to maintain fairness among OSCs.
-@@ -707,7 +707,7 @@ static long osc_lru_reclaim(struct client_obd *cli, unsigned long npages)
- 	cache->ccc_lru_shrinkers++;
- 	list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
+ 	CDEBUG(D_IOCTL, "cmd = %x\n", cmd);
+-	if (obd_ioctl_getdata(&buf, &len, (void __user *)arg)) {
++	if (obd_ioctl_getdata(&data, &len, (void __user *)arg)) {
+ 		CERROR("OBD ioctl: data error\n");
+ 		return -EINVAL;
+ 	}
+-	data = (struct obd_ioctl_data *)buf;
  
--	max_scans = atomic_read(&cache->ccc_users) - 2;
-+	max_scans = refcount_read(&cache->ccc_users) - 2;
- 	while (--max_scans > 0 &&
- 	       (cli = list_first_entry_or_null(&cache->ccc_lru,
- 					       struct client_obd,
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 9e72fa8f68b3..0dfc506f6d01 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -2959,7 +2959,7 @@ static int osc_cleanup(struct obd_device *obd)
+ 	switch (cmd) {
+ 	case OBD_IOC_PROCESS_CFG: {
+@@ -545,7 +543,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 	}
  
- 	/* lru cleanup */
- 	if (cli->cl_cache) {
--		LASSERT(atomic_read(&cli->cl_cache->ccc_users) > 0);
-+		LASSERT(refcount_read(&cli->cl_cache->ccc_users) > 0);
- 		spin_lock(&cli->cl_cache->ccc_lru_lock);
- 		list_del_init(&cli->cl_lru_osc);
- 		spin_unlock(&cli->cl_cache->ccc_lru_lock);
+  out:
+-	kvfree(buf);
++	kvfree(data);
+ 	return err;
+ } /* class_handle_ioctl */
+ 
