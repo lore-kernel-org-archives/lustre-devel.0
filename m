@@ -1,110 +1,137 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 07 Feb 2019 11:03:32 +1100
-Subject: [lustre-devel] [PATCH 00/21] lustre: Assorted cleanups for obdclass
-Message-ID: <154949776249.10620.1215070753973826063.stgit@noble.brown>
+Subject: [lustre-devel] [PATCH 01/21] lustre: obdclass: discard csi_end_io
+In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
+References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
+Message-ID: <154949781233.10620.15965903498344624062.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I've been reading through obdclass and writing patches as I go.
-I'm not done yet, but this patch set to big enough to send for
-review.
+The csi_end_io field in "struct cl_sync_io" is always
+set to cl_sync_io_end(), which is a tiny function.
+This indirection doesn't help clarity, so remove it.
 
-NeilBrown
+Inline the function in the one place where ->csi_end_io()
+is called, and discard the field.
 
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/include/cl_object.h |    7 +-----
+ drivers/staging/lustre/lustre/obdclass/cl_io.c    |   26 ++++++---------------
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c  |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_lock.c      |    2 +-
+ 4 files changed, 10 insertions(+), 27 deletions(-)
 
-NeilBrown (21):
-      lustre: obdclass: discard csi_end_io
-      lustre: obd_class: remove csi_barrier from struct cl_sync_io
-      lustre: obdclass: use list_sort() to sort a list.
-      lustre: use list*entry macros in place of container_of()
-      lustre: use list_first_entry() in lustre subdirectory.
-      lustre: use list_first_entry() in lnet/lnet subdirectory.
-      lustre: use list_first_entry() in lnet/klnds subdirectory.
-      lustre: use list_first_entry() throughout
-      lustre: use list_last_entry() throughout
-      lustre: obdclass: use cl_object_for_each where appropriate
-      lustre: cl_object: remove vestigial debugging.
-      lustre: cl_page.c: remove PINVRNT()
-      lustre: make cp_ref in cl_page a refcount_t
-      lustre: make ccc_users in cl_client_cache a refcount_t
-      lustre: obdclass: char obd_ioctl_getdata type.
-      lustre: obdclass: normalize a switch statement.
-      lustre: obdclass: result of try_module_get() should not be ignored.
-      lustre: move debug.c from obdclass to obdecho
-      lustre: obdclass: avoid races in class_register_type()
-      lustre: obdclass: fix module load locking.
-      lustre: make exp_refcount in obd_export a refcount_t
-
-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   19 ++-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   61 ++++++-----
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    9 +-
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   79 +++++++-------
- .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |    4 -
- drivers/staging/lustre/lnet/libcfs/libcfs_string.c |   12 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  111 ++++++++++----------
- drivers/staging/lustre/lnet/lnet/config.c          |   22 ++--
- drivers/staging/lustre/lnet/lnet/lib-move.c        |   53 +++++-----
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |   16 +--
- drivers/staging/lustre/lnet/lnet/lib-ptl.c         |    7 +
- drivers/staging/lustre/lnet/lnet/net_fault.c       |   24 ++--
- drivers/staging/lustre/lnet/lnet/nidstrings.c      |    9 +-
- drivers/staging/lustre/lnet/lnet/peer.c            |   24 ++--
- drivers/staging/lustre/lnet/lnet/router.c          |   13 +-
- drivers/staging/lustre/lnet/selftest/conrpc.c      |    5 -
- drivers/staging/lustre/lnet/selftest/console.c     |   39 +++----
- drivers/staging/lustre/lnet/selftest/framework.c   |   44 ++++----
- drivers/staging/lustre/lnet/selftest/rpc.c         |   27 ++---
- drivers/staging/lustre/lnet/selftest/timer.c       |    4 -
- drivers/staging/lustre/lustre/include/cl_object.h  |   19 +--
- .../staging/lustre/lustre/include/lustre_debug.h   |   52 ---------
- .../staging/lustre/lustre/include/lustre_export.h  |    2 
- drivers/staging/lustre/lustre/include/obd.h        |    1 
- drivers/staging/lustre/lustre/include/obd_class.h  |    3 -
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   10 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 -
- drivers/staging/lustre/lustre/llite/dir.c          |   17 +--
- .../staging/lustre/lustre/llite/llite_internal.h   |    2 
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    8 +
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |    2 
- drivers/staging/lustre/lustre/llite/statahead.c    |   23 ++--
- drivers/staging/lustre/lustre/llite/vvp_page.c     |    9 +-
- drivers/staging/lustre/lustre/lov/lov_io.c         |    9 +-
- drivers/staging/lustre/lustre/lov/lov_obd.c        |   15 +--
- drivers/staging/lustre/lustre/lov/lov_page.c       |    3 -
- drivers/staging/lustre/lustre/obdclass/Makefile    |    2 
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |   91 ++++------------
- drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    5 -
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  110 ++++++++------------
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |   77 ++++----------
- drivers/staging/lustre/lustre/obdclass/class_obd.c |   32 ++----
- drivers/staging/lustre/lustre/obdclass/debug.c     |   96 -----------------
- drivers/staging/lustre/lustre/obdclass/genops.c    |   90 ++++++++++------
- drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +
- .../staging/lustre/lustre/obdclass/lustre_peer.c   |    5 -
- drivers/staging/lustre/lustre/obdecho/Makefile     |    2 
- drivers/staging/lustre/lustre/obdecho/debug.c      |   96 +++++++++++++++++
- .../staging/lustre/lustre/obdecho/echo_client.c    |    3 -
- .../staging/lustre/lustre/obdecho/echo_internal.h  |    4 +
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   17 ++-
- drivers/staging/lustre/lustre/osc/osc_lock.c       |    7 +
- drivers/staging/lustre/lustre/osc/osc_page.c       |   21 ++--
- drivers/staging/lustre/lustre/osc/osc_request.c    |   11 +-
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   14 +--
- drivers/staging/lustre/lustre/ptlrpc/layout.c      |    1 
- drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c    |    6 +
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    4 -
- drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    6 +
- drivers/staging/lustre/lustre/ptlrpc/service.c     |   68 ++++++------
- 60 files changed, 689 insertions(+), 847 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/lustre_debug.h
- delete mode 100644 drivers/staging/lustre/lustre/obdclass/debug.c
- create mode 100644 drivers/staging/lustre/lustre/obdecho/debug.c
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+index b8ae41de7192..71ba73cdbb5e 100644
+--- a/drivers/staging/lustre/lustre/include/cl_object.h
++++ b/drivers/staging/lustre/lustre/include/cl_object.h
+@@ -2395,18 +2395,13 @@ struct cl_sync_io {
+ 	atomic_t		csi_barrier;
+ 	/** completion to be signaled when transfer is complete. */
+ 	wait_queue_head_t	csi_waitq;
+-	/** callback to invoke when this IO is finished */
+-	void			(*csi_end_io)(const struct lu_env *,
+-					      struct cl_sync_io *);
+ };
+ 
+-void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
+-		     void (*end)(const struct lu_env *, struct cl_sync_io *));
++void cl_sync_io_init(struct cl_sync_io *anchor, int nr);
+ int  cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		     long timeout);
+ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		     int ioret);
+-void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor);
+ 
+ /** @} cl_sync_io */
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 09fd45d5394a..e9ad055f84b8 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -668,7 +668,7 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
+ 		pg->cp_sync_io = anchor;
+ 	}
+ 
+-	cl_sync_io_init(anchor, queue->c2_qin.pl_nr, &cl_sync_io_end);
++	cl_sync_io_init(anchor, queue->c2_qin.pl_nr);
+ 	rc = cl_io_submit_rw(env, io, iot, queue);
+ 	if (rc == 0) {
+ 		/*
+@@ -1039,31 +1039,16 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_object *obj,
+ }
+ EXPORT_SYMBOL(cl_req_attr_set);
+ 
+-/* cl_sync_io_callback assumes the caller must call cl_sync_io_wait() to
+- * wait for the IO to finish.
+- */
+-void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor)
+-{
+-	wake_up_all(&anchor->csi_waitq);
+-
+-	/* it's safe to nuke or reuse anchor now */
+-	atomic_set(&anchor->csi_barrier, 0);
+-}
+-EXPORT_SYMBOL(cl_sync_io_end);
+-
+ /**
+  * Initialize synchronous io wait anchor
+  */
+-void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
+-		     void (*end)(const struct lu_env *, struct cl_sync_io *))
++void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
+ {
+ 	memset(anchor, 0, sizeof(*anchor));
+ 	init_waitqueue_head(&anchor->csi_waitq);
+ 	atomic_set(&anchor->csi_sync_nr, nr);
+ 	atomic_set(&anchor->csi_barrier, nr > 0);
+ 	anchor->csi_sync_rc = 0;
+-	anchor->csi_end_io = end;
+-	LASSERT(end);
+ }
+ EXPORT_SYMBOL(cl_sync_io_init);
+ 
+@@ -1120,8 +1105,11 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+ 	 */
+ 	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
+ 	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
+-		LASSERT(anchor->csi_end_io);
+-		anchor->csi_end_io(env, anchor);
++
++		wake_up_all(&anchor->csi_waitq);
++		/* it's safe to nuke or reuse anchor now */
++		atomic_set(&anchor->csi_barrier, 0);
++
+ 		/* Can't access anchor any more */
+ 	}
+ }
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+index d7bcb8c203dd..8133d992cc73 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+@@ -189,7 +189,7 @@ int cl_lock_request(const struct lu_env *env, struct cl_io *io,
+ 
+ 	if ((enq_flags & CEF_ASYNC) && !(enq_flags & CEF_AGL)) {
+ 		anchor = &cl_env_info(env)->clt_anchor;
+-		cl_sync_io_init(anchor, 1, cl_sync_io_end);
++		cl_sync_io_init(anchor, 1);
+ 	}
+ 
+ 	rc = cl_lock_enqueue(env, io, lock, anchor);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
+index 5a1717c7d132..da8c3978fab8 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_lock.c
++++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
+@@ -877,7 +877,7 @@ static int osc_lock_enqueue_wait(const struct lu_env *env,
+ 			continue;
+ 
+ 		/* wait for conflicting lock to be canceled */
+-		cl_sync_io_init(waiter, 1, cl_sync_io_end);
++		cl_sync_io_init(waiter, 1);
+ 		oscl->ols_owner = waiter;
+ 
+ 		spin_lock(&tmp_oscl->ols_lock);
