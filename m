@@ -1,171 +1,152 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 07 Feb 2019 11:03:33 +1100
-Subject: [lustre-devel] [PATCH 21/21] lustre: make exp_refcount in
- obd_export a refcount_t
-In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Thu, 7 Feb 2019 00:20:08 +0000
+Subject: [lustre-devel] [PATCH 01/21] lustre: obdclass: discard
+ csi_end_io
+In-Reply-To: <154949781233.10620.15965903498344624062.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
-Message-ID: <154949781349.10620.3269248433038576631.stgit@noble.brown>
+ <154949781233.10620.15965903498344624062.stgit@noble.brown>
+Message-ID: <F54945DD-A0FF-4130-AA4C-DE30F000D918@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-As this is used as a refcount, it should be declared
-as one.
+On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
+> 
+> The csi_end_io field in "struct cl_sync_io" is always
+> set to cl_sync_io_end(), which is a tiny function.
+> This indirection doesn't help clarity, so remove it.
+> 
+> Inline the function in the one place where ->csi_end_io()
+> is called, and discard the field.
+> 
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-Signed-off-by: NeilBrown <neilb@suse.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+
+> ---
+> drivers/staging/lustre/lustre/include/cl_object.h |    7 +-----
+> drivers/staging/lustre/lustre/obdclass/cl_io.c    |   26 ++++++---------------
+> drivers/staging/lustre/lustre/obdclass/cl_lock.c  |    2 +-
+> drivers/staging/lustre/lustre/osc/osc_lock.c      |    2 +-
+> 4 files changed, 10 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+> index b8ae41de7192..71ba73cdbb5e 100644
+> --- a/drivers/staging/lustre/lustre/include/cl_object.h
+> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
+> @@ -2395,18 +2395,13 @@ struct cl_sync_io {
+> 	atomic_t		csi_barrier;
+> 	/** completion to be signaled when transfer is complete. */
+> 	wait_queue_head_t	csi_waitq;
+> -	/** callback to invoke when this IO is finished */
+> -	void			(*csi_end_io)(const struct lu_env *,
+> -					      struct cl_sync_io *);
+> };
+> 
+> -void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
+> -		     void (*end)(const struct lu_env *, struct cl_sync_io *));
+> +void cl_sync_io_init(struct cl_sync_io *anchor, int nr);
+> int  cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+> 		     long timeout);
+> void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+> 		     int ioret);
+> -void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor);
+> 
+> /** @} cl_sync_io */
+> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> index 09fd45d5394a..e9ad055f84b8 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> @@ -668,7 +668,7 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
+> 		pg->cp_sync_io = anchor;
+> 	}
+> 
+> -	cl_sync_io_init(anchor, queue->c2_qin.pl_nr, &cl_sync_io_end);
+> +	cl_sync_io_init(anchor, queue->c2_qin.pl_nr);
+> 	rc = cl_io_submit_rw(env, io, iot, queue);
+> 	if (rc == 0) {
+> 		/*
+> @@ -1039,31 +1039,16 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_object *obj,
+> }
+> EXPORT_SYMBOL(cl_req_attr_set);
+> 
+> -/* cl_sync_io_callback assumes the caller must call cl_sync_io_wait() to
+> - * wait for the IO to finish.
+> - */
+> -void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor)
+> -{
+> -	wake_up_all(&anchor->csi_waitq);
+> -
+> -	/* it's safe to nuke or reuse anchor now */
+> -	atomic_set(&anchor->csi_barrier, 0);
+> -}
+> -EXPORT_SYMBOL(cl_sync_io_end);
+> -
+> /**
+>  * Initialize synchronous io wait anchor
+>  */
+> -void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
+> -		     void (*end)(const struct lu_env *, struct cl_sync_io *))
+> +void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
+> {
+> 	memset(anchor, 0, sizeof(*anchor));
+> 	init_waitqueue_head(&anchor->csi_waitq);
+> 	atomic_set(&anchor->csi_sync_nr, nr);
+> 	atomic_set(&anchor->csi_barrier, nr > 0);
+> 	anchor->csi_sync_rc = 0;
+> -	anchor->csi_end_io = end;
+> -	LASSERT(end);
+> }
+> EXPORT_SYMBOL(cl_sync_io_init);
+> 
+> @@ -1120,8 +1105,11 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+> 	 */
+> 	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
+> 	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
+> -		LASSERT(anchor->csi_end_io);
+> -		anchor->csi_end_io(env, anchor);
+> +
+> +		wake_up_all(&anchor->csi_waitq);
+> +		/* it's safe to nuke or reuse anchor now */
+> +		atomic_set(&anchor->csi_barrier, 0);
+> +
+> 		/* Can't access anchor any more */
+> 	}
+> }
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> index d7bcb8c203dd..8133d992cc73 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> @@ -189,7 +189,7 @@ int cl_lock_request(const struct lu_env *env, struct cl_io *io,
+> 
+> 	if ((enq_flags & CEF_ASYNC) && !(enq_flags & CEF_AGL)) {
+> 		anchor = &cl_env_info(env)->clt_anchor;
+> -		cl_sync_io_init(anchor, 1, cl_sync_io_end);
+> +		cl_sync_io_init(anchor, 1);
+> 	}
+> 
+> 	rc = cl_lock_enqueue(env, io, lock, anchor);
+> diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
+> index 5a1717c7d132..da8c3978fab8 100644
+> --- a/drivers/staging/lustre/lustre/osc/osc_lock.c
+> +++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
+> @@ -877,7 +877,7 @@ static int osc_lock_enqueue_wait(const struct lu_env *env,
+> 			continue;
+> 
+> 		/* wait for conflicting lock to be canceled */
+> -		cl_sync_io_init(waiter, 1, cl_sync_io_end);
+> +		cl_sync_io_init(waiter, 1);
+> 		oscl->ols_owner = waiter;
+> 
+> 		spin_lock(&tmp_oscl->ols_lock);
+> 
+> 
+
+Cheers, Andreas
 ---
- .../staging/lustre/lustre/include/lustre_export.h  |    2 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   10 +++++-----
- drivers/staging/lustre/lustre/obdclass/genops.c    |   15 ++++++++-------
- .../staging/lustre/lustre/obdecho/echo_client.c    |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 ++--
- 5 files changed, 17 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
-index 63fa656eb7ba..fb34e0b7de35 100644
---- a/drivers/staging/lustre/lustre/include/lustre_export.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_export.h
-@@ -67,7 +67,7 @@ struct obd_export {
- 	 * what export they are talking to.
- 	 */
- 	struct portals_handle		exp_handle;
--	atomic_t			exp_refcount;
-+	refcount_t			exp_refcount;
- 	/**
- 	 * Set of counters below is to track where export references are
- 	 * kept. The exp_rpc_count is used for reconnect handling also,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index cea0e22d064b..f2433dc0e558 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1998,7 +1998,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 				   ldlm_lockname[lock->l_req_mode],
- 				   lock->l_flags, nid,
- 				   lock->l_remote_handle.cookie,
--				   exp ? atomic_read(&exp->exp_refcount) : -99,
-+				   exp ? refcount_read(&exp->exp_refcount) : -99,
- 				   lock->l_pid, lock->l_callback_timeout,
- 				   lock->l_lvb_type);
- 		va_end(args);
-@@ -2024,7 +2024,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 				   lock->l_req_extent.end,
- 				   lock->l_flags, nid,
- 				   lock->l_remote_handle.cookie,
--				   exp ? atomic_read(&exp->exp_refcount) : -99,
-+				   exp ? refcount_read(&exp->exp_refcount) : -99,
- 				   lock->l_pid, lock->l_callback_timeout,
- 				   lock->l_lvb_type);
- 		break;
-@@ -2046,7 +2046,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 				   lock->l_policy_data.l_flock.end,
- 				   lock->l_flags, nid,
- 				   lock->l_remote_handle.cookie,
--				   exp ? atomic_read(&exp->exp_refcount) : -99,
-+				   exp ? refcount_read(&exp->exp_refcount) : -99,
- 				   lock->l_pid, lock->l_callback_timeout);
- 		break;
- 
-@@ -2065,7 +2065,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 				   ldlm_typename[resource->lr_type],
- 				   lock->l_flags, nid,
- 				   lock->l_remote_handle.cookie,
--				   exp ? atomic_read(&exp->exp_refcount) : -99,
-+				   exp ? refcount_read(&exp->exp_refcount) : -99,
- 				   lock->l_pid, lock->l_callback_timeout,
- 				   lock->l_lvb_type);
- 		break;
-@@ -2084,7 +2084,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 				   ldlm_typename[resource->lr_type],
- 				   lock->l_flags, nid,
- 				   lock->l_remote_handle.cookie,
--				   exp ? atomic_read(&exp->exp_refcount) : -99,
-+				   exp ? refcount_read(&exp->exp_refcount) : -99,
- 				   lock->l_pid, lock->l_callback_timeout,
- 				   lock->l_lvb_type);
- 		break;
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index dad21d9fa328..39919f1c5b71 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -757,7 +757,7 @@ static void class_export_destroy(struct obd_export *exp)
- {
- 	struct obd_device *obd = exp->exp_obd;
- 
--	LASSERT_ATOMIC_ZERO(&exp->exp_refcount);
-+	LASSERT(refcount_read(&exp->exp_refcount) == 0);
- 	LASSERT(obd);
- 
- 	CDEBUG(D_IOCTL, "destroying export %p/%s for %s\n", exp,
-@@ -793,20 +793,21 @@ static struct portals_handle_ops export_handle_ops = {
- 
- struct obd_export *class_export_get(struct obd_export *exp)
- {
--	atomic_inc(&exp->exp_refcount);
-+	refcount_inc(&exp->exp_refcount);
- 	CDEBUG(D_INFO, "GETting export %p : new refcount %d\n", exp,
--	       atomic_read(&exp->exp_refcount));
-+	       refcount_read(&exp->exp_refcount));
- 	return exp;
- }
- EXPORT_SYMBOL(class_export_get);
- 
- void class_export_put(struct obd_export *exp)
- {
--	LASSERT_ATOMIC_GT_LT(&exp->exp_refcount, 0, LI_POISON);
-+	LASSERT(refcount_read(&exp->exp_refcount) >  0);
-+	LASSERT(refcount_read(&exp->exp_refcount) < LI_POISON);
- 	CDEBUG(D_INFO, "PUTting export %p : new refcount %d\n", exp,
--	       atomic_read(&exp->exp_refcount) - 1);
-+	       refcount_read(&exp->exp_refcount) - 1);
- 
--	if (atomic_dec_and_test(&exp->exp_refcount)) {
-+	if (refcount_dec_and_test(&exp->exp_refcount)) {
- 		struct obd_device *obd = exp->exp_obd;
- 
- 		CDEBUG(D_IOCTL, "final put %p/%s\n",
-@@ -856,7 +857,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
- 
- 	export->exp_conn_cnt = 0;
- 	/* 2 = class_handle_hash + last */
--	atomic_set(&export->exp_refcount, 2);
-+	refcount_set(&export->exp_refcount, 2);
- 	atomic_set(&export->exp_rpc_count, 0);
- 	atomic_set(&export->exp_cb_count, 0);
- 	atomic_set(&export->exp_locks_count, 0);
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index 1b7d98c649b6..317123fd27cb 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -1638,7 +1638,7 @@ static int echo_client_cleanup(struct obd_device *obddev)
- 		return -EBUSY;
- 	}
- 
--	LASSERT(atomic_read(&ec->ec_exp->exp_refcount) > 0);
-+	LASSERT(refcount_read(&ec->ec_exp->exp_refcount) > 0);
- 	rc = obd_disconnect(ec->ec_exp);
- 	if (rc != 0)
- 		CERROR("fail to disconnect device: %d\n", rc);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 35a59e5a5e9d..b7d44fc21d73 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -1697,7 +1697,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
- 	       (request->rq_export ?
- 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
- 	       (request->rq_export ?
--		atomic_read(&request->rq_export->exp_refcount) : -99),
-+		refcount_read(&request->rq_export->exp_refcount) : -99),
- 	       lustre_msg_get_status(request->rq_reqmsg), request->rq_xid,
- 	       libcfs_id2str(request->rq_peer),
- 	       lustre_msg_get_opc(request->rq_reqmsg));
-@@ -1741,7 +1741,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
- 	       (request->rq_export ?
- 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
- 	       (request->rq_export ?
--		atomic_read(&request->rq_export->exp_refcount) : -99),
-+		refcount_read(&request->rq_export->exp_refcount) : -99),
- 	       lustre_msg_get_status(request->rq_reqmsg),
- 	       request->rq_xid,
- 	       libcfs_id2str(request->rq_peer),
+Andreas Dilger
+Principal Lustre Architect
+Whamcloud
