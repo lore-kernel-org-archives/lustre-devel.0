@@ -1,98 +1,127 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 07 Feb 2019 11:03:32 +1100
-Subject: [lustre-devel] [PATCH 03/21] lustre: obdclass: use list_sort() to
- sort a list.
+Subject: [lustre-devel] [PATCH 04/21] lustre: use list*entry macros in place
+ of container_of()
 In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
-Message-ID: <154949781252.10620.13626213918115345779.stgit@noble.brown>
+Message-ID: <154949781267.10620.8365663638954760207.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Rather than a bespoke bubble-sort, use list_sort() to
-sort this linked list.
+There are a number of places that use container_of() but where
+list_first_entry(), or list_last_entry() make the meaning more clear.
+So change them over.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/cl_io.c |   51 +++++-------------------
- 1 file changed, 10 insertions(+), 41 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |    4 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |   13 ++++++++-----
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +++----
+ 5 files changed, 17 insertions(+), 15 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 85c5047f4ba2..74c7644d6ef8 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -987,8 +987,8 @@ struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
+ {
+ 	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
+ 	LASSERT(!list_empty(ldlm_namespace_list(client)));
+-	return container_of(ldlm_namespace_list(client)->next,
+-		struct ldlm_namespace, ns_list_chain);
++	return list_first_entry(ldlm_namespace_list(client),
++				struct ldlm_namespace, ns_list_chain);
+ }
+ 
+ /** Create and initialize new resource. */
 diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-index beac7e8bc92a..7bf02350f19d 100644
+index 7bf02350f19d..34b4e63e7d1a 100644
 --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
 +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-@@ -42,6 +42,7 @@
- #include <obd_support.h>
- #include <lustre_fid.h>
- #include <linux/list.h>
-+#include <linux/list_sort.h>
- #include <linux/sched.h>
- #include <cl_object.h>
- #include "cl_internal.h"
-@@ -213,9 +214,15 @@ int cl_io_rw_init(const struct lu_env *env, struct cl_io *io,
- }
- EXPORT_SYMBOL(cl_io_rw_init);
+@@ -93,8 +93,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(cl_io_invariant(io));
  
--static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
--			      const struct cl_lock_descr *d1)
-+static int cl_lock_descr_cmp(void *priv,
-+			     struct list_head *a, struct list_head *b)
- {
-+	const struct cl_io_lock_link *l0 = list_entry(a, struct cl_io_lock_link, cill_linkage);
-+	const struct cl_io_lock_link *l1 = list_entry(b, struct cl_io_lock_link, cill_linkage);
-+
-+	const struct cl_lock_descr *d0 = &l0->cill_descr;
-+	const struct cl_lock_descr *d1 = &l1->cill_descr;
-+
- 	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
- 			  lu_object_fid(&d1->cld_obj->co_lu));
- }
-@@ -225,45 +232,7 @@ static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
-  */
- static void cl_io_locks_sort(struct cl_io *io)
- {
--	int done = 0;
--
--	/* hidden treasure: bubble sort for now. */
--	do {
--		struct cl_io_lock_link *curr;
--		struct cl_io_lock_link *prev;
--		struct cl_io_lock_link *temp;
--
--		done = 1;
--		prev = NULL;
--
--		list_for_each_entry_safe(curr, temp,
--					 &io->ci_lockset.cls_todo,
--					 cill_linkage) {
--			if (prev) {
--				switch (cl_lock_descr_sort(&prev->cill_descr,
--							   &curr->cill_descr)) {
--				case 0:
--					/*
--					 * IMPOSSIBLE: Identical locks are
--					 *	     already removed at
--					 *	     this point.
--					 */
--				default:
--					LBUG();
--				case 1:
--					list_move_tail(&curr->cill_linkage,
--						       &prev->cill_linkage);
--					done = 0;
--					continue; /* don't change prev: it's
--						   * still "previous"
--						   */
--				case -1: /* already in order */
--					break;
--				}
--			}
--			prev = curr;
--		}
--	} while (!done);
-+	list_sort(NULL, &io->ci_lockset.cls_todo, cl_lock_descr_cmp);
- }
+ 	while (!list_empty(&io->ci_layers)) {
+-		slice = container_of(io->ci_layers.prev, struct cl_io_slice,
+-				     cis_linkage);
++		slice = list_last_entry(&io->ci_layers, struct cl_io_slice,
++					cis_linkage);
+ 		list_del_init(&slice->cis_linkage);
+ 		if (slice->cis_iop->op[io->ci_type].cio_fini)
+ 			slice->cis_iop->op[io->ci_type].cio_fini(env, slice);
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index 05d784ae7a6c..f724b2d62df1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -649,8 +649,8 @@ static struct lu_env *cl_env_obtain(void *debug)
+ 	if (cl_envs[cpu].cec_count > 0) {
+ 		int rc;
  
- static void cl_lock_descr_merge(struct cl_lock_descr *d0,
+-		cle = container_of(cl_envs[cpu].cec_envs.next, struct cl_env,
+-				   ce_linkage);
++		cle = list_first_entry(&cl_envs[cpu].cec_envs, struct cl_env,
++				       ce_linkage);
+ 		list_del_init(&cle->ce_linkage);
+ 		cl_envs[cpu].cec_count--;
+ 		read_unlock(&cl_envs[cpu].cec_guard);
+@@ -748,9 +748,12 @@ unsigned int cl_env_cache_purge(unsigned int nr)
+ 
+ 	for_each_possible_cpu(i) {
+ 		write_lock(&cl_envs[i].cec_guard);
+-		for (; !list_empty(&cl_envs[i].cec_envs) && nr > 0; --nr) {
+-			cle = container_of(cl_envs[i].cec_envs.next,
+-					   struct cl_env, ce_linkage);
++		for (; nr >0 &&
++			     (cle = list_first_entry_or_null(
++				     &cl_envs[i].cec_envs,
++				     struct cl_env,
++				     ce_linkage)) != NULL;
++		     --nr) {
+ 			list_del_init(&cle->ce_linkage);
+ 			LASSERT(cl_envs[i].cec_count > 0);
+ 			cl_envs[i].cec_count--;
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index b1b4dc7ea22f..d025ea55818f 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -690,8 +690,8 @@ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
+ 	const struct cl_page_slice *slice;
+ 	int result;
+ 
+-	slice = container_of(pg->cp_layers.next,
+-			     const struct cl_page_slice, cpl_linkage);
++	slice = list_first_entry(&pg->cp_layers,
++				 const struct cl_page_slice, cpl_linkage);
+ 	PASSERT(env, pg, slice->cpl_ops->cpo_is_vmlocked);
+ 	/*
+ 	 * Call ->cpo_is_vmlocked() directly instead of going through
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 3bd48748f46c..639c298b6a90 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -349,7 +349,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
+ 		 * lives as long as possible and ->loo_object_free() methods
+ 		 * can look at its contents.
+ 		 */
+-		o = container_of(splice.prev, struct lu_object, lo_linkage);
++		o = list_last_entry(&splice, struct lu_object, lo_linkage);
+ 		list_del_init(&o->lo_linkage);
+ 		o->lo_ops->loo_object_free(env, o);
+ 	}
+@@ -432,9 +432,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
+ 		 * Free everything on the dispose list. This is safe against
+ 		 * races due to the reasons described in lu_object_put().
+ 		 */
+-		while (!list_empty(&dispose)) {
+-			h = container_of(dispose.next,
+-					 struct lu_object_header, loh_lru);
++		while ((h = list_first_entry_or_null(
++				&dispose, struct lu_object_header, loh_lru)) != NULL) {
+ 			list_del_init(&h->loh_lru);
+ 			lu_object_free(env, lu_object_top(h));
+ 			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
