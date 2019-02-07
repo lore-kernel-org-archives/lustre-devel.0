@@ -1,84 +1,110 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 07 Feb 2019 11:03:33 +1100
-Subject: [lustre-devel] [PATCH 19/21] lustre: obdclass: avoid races in
- class_register_type()
+Subject: [lustre-devel] [PATCH 20/21] lustre: obdclass: fix module load
+ locking.
 In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
-Message-ID: <154949781342.10620.11880180011933935219.stgit@noble.brown>
+Message-ID: <154949781345.10620.8278067573811049130.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-If there are two parallel attempts to register the
-same class name, it could get registered twice.
-So re-check after allocation to make sure the name is
-still unique.
+Safe module loading requires that we try_module_get() in a context
+where the module cannot be unloaded, typically prodected by
+a spinlock that module-unload has to take.
+This doesn't currently happen in class_get_type().
+
+There is a per-type spinlock, but it is almost entirely unused, and
+cannot be used to protect the module from being unloaded.
+
+So discard ->obd_type_lock, and ensure that __class_search_type() and
+try_module_get() are both called while obd_types_lock is held - this
+prevent class_unregister_type() from completing (so the 'type' won't get
+freed.  That is always called from a module-unload function - if it
+has got that far, try_module_get() will fail.
+
+So also check the return status of try_module_get().
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/genops.c |   29 +++++++++++++++--------
- 1 file changed, 19 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h     |    1 -
+ drivers/staging/lustre/lustre/obdclass/genops.c |   24 ++++++++++++++---------
+ 2 files changed, 15 insertions(+), 10 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 171d2c214be6..463ab680b524 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -106,7 +106,6 @@ struct obd_type {
+ 	char			*typ_name;
+ 	int			 typ_refcnt;
+ 	struct lu_device_type	*typ_lu;
+-	spinlock_t		 obd_type_lock;
+ 	struct kobject		*typ_kobj;
+ };
+ 
 diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 382eaf519a79..a174f538dd0d 100644
+index a174f538dd0d..dad21d9fa328 100644
 --- a/drivers/staging/lustre/lustre/obdclass/genops.c
 +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -86,17 +86,23 @@ static void obd_device_free(struct obd_device *obd)
- 	kmem_cache_free(obd_device_cachep, obd);
- }
+@@ -109,35 +109,42 @@ static struct obd_type *class_search_type(const char *name)
  
--static struct obd_type *class_search_type(const char *name)
-+static struct obd_type *__class_search_type(const char *name)
+ static struct obd_type *class_get_type(const char *name)
  {
- 	struct obd_type *type;
- 
--	spin_lock(&obd_types_lock);
- 	list_for_each_entry(type, &obd_types, typ_chain) {
--		if (strcmp(type->typ_name, name) == 0) {
--			spin_unlock(&obd_types_lock);
-+		if (strcmp(type->typ_name, name) == 0)
- 			return type;
--		}
- 	}
-+	return NULL;
-+}
-+
-+static struct obd_type *class_search_type(const char *name)
-+{
+-	struct obd_type *type = class_search_type(name);
 +	struct obd_type *type;
 +
 +	spin_lock(&obd_types_lock);
 +	type = __class_search_type(name);
- 	spin_unlock(&obd_types_lock);
- 	return NULL;
- }
-@@ -214,19 +220,22 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 	if (ldt) {
- 		type->typ_lu = ldt;
- 		rc = lu_device_type_init(ldt);
--		if (rc != 0) {
--			kobject_put(type->typ_kobj);
-+		if (rc != 0)
- 			goto failed;
--		}
+ 
+ 	if (!type) {
+ 		const char *modname = name;
+ 
++		spin_unlock(&obd_types_lock);
+ 		if (!request_module("%s", modname)) {
+ 			CDEBUG(D_INFO, "Loaded module '%s'\n", modname);
+-			type = class_search_type(name);
+ 		} else {
+ 			LCONSOLE_ERROR_MSG(0x158, "Can't load module '%s'\n",
+ 					   modname);
+ 		}
++		spin_lock(&obd_types_lock);
++		type = __class_search_type(name);
  	}
+ 	if (type) {
+-		spin_lock(&type->obd_type_lock);
+-		type->typ_refcnt++;
+-		try_module_get(type->typ_dt_ops->owner);
+-		spin_unlock(&type->obd_type_lock);
++		if (try_module_get(type->typ_dt_ops->owner))
++			type->typ_refcnt++;
++		else
++			type = NULL;
+ 	}
++	spin_unlock(&obd_types_lock);
+ 	return type;
+ }
  
-+	INIT_LIST_HEAD(&type->typ_chain);
- 	spin_lock(&obd_types_lock);
--	list_add(&type->typ_chain, &obd_types);
-+	if (__class_search_type(name) == NULL)
-+		list_add(&type->typ_chain, &obd_types);
- 	spin_unlock(&obd_types_lock);
+ void class_put_type(struct obd_type *type)
+ {
+ 	LASSERT(type);
+-	spin_lock(&type->obd_type_lock);
++	spin_lock(&obd_types_lock);
++	LASSERT(type->typ_refcnt > 0);
+ 	type->typ_refcnt--;
+ 	module_put(type->typ_dt_ops->owner);
+-	spin_unlock(&type->obd_type_lock);
++	spin_unlock(&obd_types_lock);
+ }
  
--	return 0;
-+	if (!list_empty(&type->typ_chain))
-+		return 0;
+ static void class_sysfs_release(struct kobject *kobj)
+@@ -206,7 +213,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	if (md_ops)
+ 		*type->typ_md_ops = *md_ops;
+ 	strcpy(type->typ_name, name);
+-	spin_lock_init(&type->obd_type_lock);
  
- failed:
-+	if (!IS_ERR_OR_NULL(type->typ_kobj))
-+		kobject_put(type->typ_kobj);
- 	kfree(type->typ_name);
- 	kfree(type->typ_md_ops);
- 	kfree(type->typ_dt_ops);
+ 	type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
+ 						     debugfs_lustre_root);
