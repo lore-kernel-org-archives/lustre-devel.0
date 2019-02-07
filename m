@@ -1,110 +1,171 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 07 Feb 2019 11:03:33 +1100
-Subject: [lustre-devel] [PATCH 20/21] lustre: obdclass: fix module load
- locking.
+Subject: [lustre-devel] [PATCH 21/21] lustre: make exp_refcount in
+ obd_export a refcount_t
 In-Reply-To: <154949776249.10620.1215070753973826063.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
-Message-ID: <154949781345.10620.8278067573811049130.stgit@noble.brown>
+Message-ID: <154949781349.10620.3269248433038576631.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Safe module loading requires that we try_module_get() in a context
-where the module cannot be unloaded, typically prodected by
-a spinlock that module-unload has to take.
-This doesn't currently happen in class_get_type().
-
-There is a per-type spinlock, but it is almost entirely unused, and
-cannot be used to protect the module from being unloaded.
-
-So discard ->obd_type_lock, and ensure that __class_search_type() and
-try_module_get() are both called while obd_types_lock is held - this
-prevent class_unregister_type() from completing (so the 'type' won't get
-freed.  That is always called from a module-unload function - if it
-has got that far, try_module_get() will fail.
-
-So also check the return status of try_module_get().
+As this is used as a refcount, it should be declared
+as one.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/obd.h     |    1 -
- drivers/staging/lustre/lustre/obdclass/genops.c |   24 ++++++++++++++---------
- 2 files changed, 15 insertions(+), 10 deletions(-)
+ .../staging/lustre/lustre/include/lustre_export.h  |    2 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   10 +++++-----
+ drivers/staging/lustre/lustre/obdclass/genops.c    |   15 ++++++++-------
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 ++--
+ 5 files changed, 17 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 171d2c214be6..463ab680b524 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -106,7 +106,6 @@ struct obd_type {
- 	char			*typ_name;
- 	int			 typ_refcnt;
- 	struct lu_device_type	*typ_lu;
--	spinlock_t		 obd_type_lock;
- 	struct kobject		*typ_kobj;
- };
+diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
+index 63fa656eb7ba..fb34e0b7de35 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_export.h
++++ b/drivers/staging/lustre/lustre/include/lustre_export.h
+@@ -67,7 +67,7 @@ struct obd_export {
+ 	 * what export they are talking to.
+ 	 */
+ 	struct portals_handle		exp_handle;
+-	atomic_t			exp_refcount;
++	refcount_t			exp_refcount;
+ 	/**
+ 	 * Set of counters below is to track where export references are
+ 	 * kept. The exp_rpc_count is used for reconnect handling also,
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index cea0e22d064b..f2433dc0e558 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1998,7 +1998,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				   ldlm_lockname[lock->l_req_mode],
+ 				   lock->l_flags, nid,
+ 				   lock->l_remote_handle.cookie,
+-				   exp ? atomic_read(&exp->exp_refcount) : -99,
++				   exp ? refcount_read(&exp->exp_refcount) : -99,
+ 				   lock->l_pid, lock->l_callback_timeout,
+ 				   lock->l_lvb_type);
+ 		va_end(args);
+@@ -2024,7 +2024,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				   lock->l_req_extent.end,
+ 				   lock->l_flags, nid,
+ 				   lock->l_remote_handle.cookie,
+-				   exp ? atomic_read(&exp->exp_refcount) : -99,
++				   exp ? refcount_read(&exp->exp_refcount) : -99,
+ 				   lock->l_pid, lock->l_callback_timeout,
+ 				   lock->l_lvb_type);
+ 		break;
+@@ -2046,7 +2046,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				   lock->l_policy_data.l_flock.end,
+ 				   lock->l_flags, nid,
+ 				   lock->l_remote_handle.cookie,
+-				   exp ? atomic_read(&exp->exp_refcount) : -99,
++				   exp ? refcount_read(&exp->exp_refcount) : -99,
+ 				   lock->l_pid, lock->l_callback_timeout);
+ 		break;
  
+@@ -2065,7 +2065,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				   ldlm_typename[resource->lr_type],
+ 				   lock->l_flags, nid,
+ 				   lock->l_remote_handle.cookie,
+-				   exp ? atomic_read(&exp->exp_refcount) : -99,
++				   exp ? refcount_read(&exp->exp_refcount) : -99,
+ 				   lock->l_pid, lock->l_callback_timeout,
+ 				   lock->l_lvb_type);
+ 		break;
+@@ -2084,7 +2084,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				   ldlm_typename[resource->lr_type],
+ 				   lock->l_flags, nid,
+ 				   lock->l_remote_handle.cookie,
+-				   exp ? atomic_read(&exp->exp_refcount) : -99,
++				   exp ? refcount_read(&exp->exp_refcount) : -99,
+ 				   lock->l_pid, lock->l_callback_timeout,
+ 				   lock->l_lvb_type);
+ 		break;
 diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index a174f538dd0d..dad21d9fa328 100644
+index dad21d9fa328..39919f1c5b71 100644
 --- a/drivers/staging/lustre/lustre/obdclass/genops.c
 +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -109,35 +109,42 @@ static struct obd_type *class_search_type(const char *name)
- 
- static struct obd_type *class_get_type(const char *name)
+@@ -757,7 +757,7 @@ static void class_export_destroy(struct obd_export *exp)
  {
--	struct obd_type *type = class_search_type(name);
-+	struct obd_type *type;
-+
-+	spin_lock(&obd_types_lock);
-+	type = __class_search_type(name);
+ 	struct obd_device *obd = exp->exp_obd;
  
- 	if (!type) {
- 		const char *modname = name;
+-	LASSERT_ATOMIC_ZERO(&exp->exp_refcount);
++	LASSERT(refcount_read(&exp->exp_refcount) == 0);
+ 	LASSERT(obd);
  
-+		spin_unlock(&obd_types_lock);
- 		if (!request_module("%s", modname)) {
- 			CDEBUG(D_INFO, "Loaded module '%s'\n", modname);
--			type = class_search_type(name);
- 		} else {
- 			LCONSOLE_ERROR_MSG(0x158, "Can't load module '%s'\n",
- 					   modname);
- 		}
-+		spin_lock(&obd_types_lock);
-+		type = __class_search_type(name);
- 	}
- 	if (type) {
--		spin_lock(&type->obd_type_lock);
--		type->typ_refcnt++;
--		try_module_get(type->typ_dt_ops->owner);
--		spin_unlock(&type->obd_type_lock);
-+		if (try_module_get(type->typ_dt_ops->owner))
-+			type->typ_refcnt++;
-+		else
-+			type = NULL;
- 	}
-+	spin_unlock(&obd_types_lock);
- 	return type;
- }
+ 	CDEBUG(D_IOCTL, "destroying export %p/%s for %s\n", exp,
+@@ -793,20 +793,21 @@ static struct portals_handle_ops export_handle_ops = {
  
- void class_put_type(struct obd_type *type)
+ struct obd_export *class_export_get(struct obd_export *exp)
  {
- 	LASSERT(type);
--	spin_lock(&type->obd_type_lock);
-+	spin_lock(&obd_types_lock);
-+	LASSERT(type->typ_refcnt > 0);
- 	type->typ_refcnt--;
- 	module_put(type->typ_dt_ops->owner);
--	spin_unlock(&type->obd_type_lock);
-+	spin_unlock(&obd_types_lock);
+-	atomic_inc(&exp->exp_refcount);
++	refcount_inc(&exp->exp_refcount);
+ 	CDEBUG(D_INFO, "GETting export %p : new refcount %d\n", exp,
+-	       atomic_read(&exp->exp_refcount));
++	       refcount_read(&exp->exp_refcount));
+ 	return exp;
  }
+ EXPORT_SYMBOL(class_export_get);
  
- static void class_sysfs_release(struct kobject *kobj)
-@@ -206,7 +213,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 	if (md_ops)
- 		*type->typ_md_ops = *md_ops;
- 	strcpy(type->typ_name, name);
--	spin_lock_init(&type->obd_type_lock);
+ void class_export_put(struct obd_export *exp)
+ {
+-	LASSERT_ATOMIC_GT_LT(&exp->exp_refcount, 0, LI_POISON);
++	LASSERT(refcount_read(&exp->exp_refcount) >  0);
++	LASSERT(refcount_read(&exp->exp_refcount) < LI_POISON);
+ 	CDEBUG(D_INFO, "PUTting export %p : new refcount %d\n", exp,
+-	       atomic_read(&exp->exp_refcount) - 1);
++	       refcount_read(&exp->exp_refcount) - 1);
  
- 	type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
- 						     debugfs_lustre_root);
+-	if (atomic_dec_and_test(&exp->exp_refcount)) {
++	if (refcount_dec_and_test(&exp->exp_refcount)) {
+ 		struct obd_device *obd = exp->exp_obd;
+ 
+ 		CDEBUG(D_IOCTL, "final put %p/%s\n",
+@@ -856,7 +857,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+ 
+ 	export->exp_conn_cnt = 0;
+ 	/* 2 = class_handle_hash + last */
+-	atomic_set(&export->exp_refcount, 2);
++	refcount_set(&export->exp_refcount, 2);
+ 	atomic_set(&export->exp_rpc_count, 0);
+ 	atomic_set(&export->exp_cb_count, 0);
+ 	atomic_set(&export->exp_locks_count, 0);
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index 1b7d98c649b6..317123fd27cb 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -1638,7 +1638,7 @@ static int echo_client_cleanup(struct obd_device *obddev)
+ 		return -EBUSY;
+ 	}
+ 
+-	LASSERT(atomic_read(&ec->ec_exp->exp_refcount) > 0);
++	LASSERT(refcount_read(&ec->ec_exp->exp_refcount) > 0);
+ 	rc = obd_disconnect(ec->ec_exp);
+ 	if (rc != 0)
+ 		CERROR("fail to disconnect device: %d\n", rc);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 35a59e5a5e9d..b7d44fc21d73 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -1697,7 +1697,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       (request->rq_export ?
+ 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
+ 	       (request->rq_export ?
+-		atomic_read(&request->rq_export->exp_refcount) : -99),
++		refcount_read(&request->rq_export->exp_refcount) : -99),
+ 	       lustre_msg_get_status(request->rq_reqmsg), request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
+ 	       lustre_msg_get_opc(request->rq_reqmsg));
+@@ -1741,7 +1741,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       (request->rq_export ?
+ 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
+ 	       (request->rq_export ?
+-		atomic_read(&request->rq_export->exp_refcount) : -99),
++		refcount_read(&request->rq_export->exp_refcount) : -99),
+ 	       lustre_msg_get_status(request->rq_reqmsg),
+ 	       request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
