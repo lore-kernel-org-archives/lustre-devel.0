@@ -1,28 +1,28 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 8 Feb 2019 06:02:30 +0000
-Subject: [lustre-devel] [PATCH 18/21] lustre: move debug.c from obdclass
- to obdecho
-In-Reply-To: <154949781337.10620.11481546344215316629.stgit@noble.brown>
+Date: Fri, 8 Feb 2019 06:41:14 +0000
+Subject: [lustre-devel] [PATCH 19/21] lustre: obdclass: avoid races in
+ class_register_type()
+In-Reply-To: <154949781342.10620.11880180011933935219.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781337.10620.11481546344215316629.stgit@noble.brown>
-Message-ID: <9603E88A-ECFC-4D98-90D7-2E90E59DD93D@whamcloud.com>
+ <154949781342.10620.11880180011933935219.stgit@noble.brown>
+Message-ID: <36A43FA1-9CD0-4A9A-BDA4-A184F04B54BE@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-
 On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
 > 
-> The functions defined in debug.c are only used in
-> obdecho, so move it there, and make the functions local
-> to that unit.
-> This allows lustre_debug.h to be removed.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> If there are two parallel attempts to register the
+> same class name, it could get registered twice.
+> So re-check after allocation to make sure the name is
+> still unique.
 
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+The patch itself seems reasonable, but I don't see how this
+scenario could ever happen?  class_register_type() is only
+called once per device type from the module init code, and
+I don't think it is possible to insert the same module twice?
 
 Cheers, Andreas
 ---
