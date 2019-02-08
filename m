@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 8 Feb 2019 00:25:02 +0000
-Subject: [lustre-devel] [PATCH 04/21] lustre: use list*entry macros in
- place of container_of()
-In-Reply-To: <154949781267.10620.8365663638954760207.stgit@noble.brown>
+Date: Fri, 8 Feb 2019 00:31:37 +0000
+Subject: [lustre-devel] [PATCH 05/21] lustre: use list_first_entry() in
+ lustre subdirectory.
+In-Reply-To: <154949781279.10620.5804477141390456723.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781267.10620.8365663638954760207.stgit@noble.brown>
-Message-ID: <688B6498-5053-4A9C-988C-D2292006801C@whamcloud.com>
+ <154949781279.10620.5804477141390456723.stgit@noble.brown>
+Message-ID: <06F9EA63-3FD8-4BE3-A27C-1AE9BB65A97F@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,131 +14,49 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
 > 
-> There are a number of places that use container_of() but where
-> list_first_entry(), or list_last_entry() make the meaning more clear.
-> So change them over.
+> Convert
+>  list_entry(foo->next .....)
+> to
+>  list_first_entry(foo, ....)
+> 
+> in 'lustre'
+> 
+> In several cases the call is combined with
+> a list_empty() test and list_first_entry_or_null() is used
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
-Interesting, all these new helpers that I wasn't aware of.  IMHO, the common
-list_* implementation in the kernel is really a major win for code efficiency
-and bug avoidance if used properly.
+One question below:
+
+> @@ -912,9 +913,9 @@ static int ll_agl_thread(void *arg)
+> 
+> 	spin_lock(&plli->lli_agl_lock);
+> 	sai->sai_agl_valid = 0;
+> -	while (!list_empty(&sai->sai_agls)) {
+> -		clli = list_entry(sai->sai_agls.next,
+> -				  struct ll_inode_info, lli_agl_list);
+> +	while ((clli = list_first_entry_or_null(&sai->sai_agls,
+> +						struct ll_inode_info,
+> +						lli_agl_list)) != NULL) {
+
+Lustre coding style used to require explicit comparisons against NULL or 0
+to avoid subtle bugs when developers treat pointers like booleans, so I'm
+not against this, but the kernel style is to not do this, like:
+
+	while ((clli = list_first_entry_or_null(&sai->sai_agls,
+						struct ll_inode_info,
+						lli_agl_list))) {
+
+Will there be grief when this is pushed upstream?  In that case, it might
+be better to just use the implicit "!= NULL" and avoid the complaints.
+
+Either way, the technical aspects of the patch are OK, so:
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
-> ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 ++--
-> drivers/staging/lustre/lustre/obdclass/cl_io.c     |    4 ++--
-> drivers/staging/lustre/lustre/obdclass/cl_object.c |   13 ++++++++-----
-> drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
-> drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +++----
-> 5 files changed, 17 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> index 85c5047f4ba2..74c7644d6ef8 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> @@ -987,8 +987,8 @@ struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
-> {
-> 	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
-> 	LASSERT(!list_empty(ldlm_namespace_list(client)));
-> -	return container_of(ldlm_namespace_list(client)->next,
-> -		struct ldlm_namespace, ns_list_chain);
-> +	return list_first_entry(ldlm_namespace_list(client),
-> +				struct ldlm_namespace, ns_list_chain);
-> }
-> 
-> /** Create and initialize new resource. */
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> index 7bf02350f19d..34b4e63e7d1a 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> @@ -93,8 +93,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
-> 	LINVRNT(cl_io_invariant(io));
-> 
-> 	while (!list_empty(&io->ci_layers)) {
-> -		slice = container_of(io->ci_layers.prev, struct cl_io_slice,
-> -				     cis_linkage);
-> +		slice = list_last_entry(&io->ci_layers, struct cl_io_slice,
-> +					cis_linkage);
-> 		list_del_init(&slice->cis_linkage);
-> 		if (slice->cis_iop->op[io->ci_type].cio_fini)
-> 			slice->cis_iop->op[io->ci_type].cio_fini(env, slice);
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> index 05d784ae7a6c..f724b2d62df1 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> @@ -649,8 +649,8 @@ static struct lu_env *cl_env_obtain(void *debug)
-> 	if (cl_envs[cpu].cec_count > 0) {
-> 		int rc;
-> 
-> -		cle = container_of(cl_envs[cpu].cec_envs.next, struct cl_env,
-> -				   ce_linkage);
-> +		cle = list_first_entry(&cl_envs[cpu].cec_envs, struct cl_env,
-> +				       ce_linkage);
-> 		list_del_init(&cle->ce_linkage);
-> 		cl_envs[cpu].cec_count--;
-> 		read_unlock(&cl_envs[cpu].cec_guard);
-> @@ -748,9 +748,12 @@ unsigned int cl_env_cache_purge(unsigned int nr)
-> 
-> 	for_each_possible_cpu(i) {
-> 		write_lock(&cl_envs[i].cec_guard);
-> -		for (; !list_empty(&cl_envs[i].cec_envs) && nr > 0; --nr) {
-> -			cle = container_of(cl_envs[i].cec_envs.next,
-> -					   struct cl_env, ce_linkage);
-> +		for (; nr >0 &&
-> +			     (cle = list_first_entry_or_null(
-> +				     &cl_envs[i].cec_envs,
-> +				     struct cl_env,
-> +				     ce_linkage)) != NULL;
-> +		     --nr) {
-> 			list_del_init(&cle->ce_linkage);
-> 			LASSERT(cl_envs[i].cec_count > 0);
-> 			cl_envs[i].cec_count--;
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> index b1b4dc7ea22f..d025ea55818f 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> @@ -690,8 +690,8 @@ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
-> 	const struct cl_page_slice *slice;
-> 	int result;
-> 
-> -	slice = container_of(pg->cp_layers.next,
-> -			     const struct cl_page_slice, cpl_linkage);
-> +	slice = list_first_entry(&pg->cp_layers,
-> +				 const struct cl_page_slice, cpl_linkage);
-> 	PASSERT(env, pg, slice->cpl_ops->cpo_is_vmlocked);
-> 	/*
-> 	 * Call ->cpo_is_vmlocked() directly instead of going through
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> index 3bd48748f46c..639c298b6a90 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> @@ -349,7 +349,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
-> 		 * lives as long as possible and ->loo_object_free() methods
-> 		 * can look at its contents.
-> 		 */
-> -		o = container_of(splice.prev, struct lu_object, lo_linkage);
-> +		o = list_last_entry(&splice, struct lu_object, lo_linkage);
-> 		list_del_init(&o->lo_linkage);
-> 		o->lo_ops->loo_object_free(env, o);
-> 	}
-> @@ -432,9 +432,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
-> 		 * Free everything on the dispose list. This is safe against
-> 		 * races due to the reasons described in lu_object_put().
-> 		 */
-> -		while (!list_empty(&dispose)) {
-> -			h = container_of(dispose.next,
-> -					 struct lu_object_header, loh_lru);
-> +		while ((h = list_first_entry_or_null(
-> +				&dispose, struct lu_object_header, loh_lru)) != NULL) {
-> 			list_del_init(&h->loh_lru);
-> 			lu_object_free(env, lu_object_top(h));
-> 			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
-> 
-> 
 
 Cheers, Andreas
 ---
 Andreas Dilger
-CTO Whamcloud
+Principal Lustre Architect
+Whamcloud
