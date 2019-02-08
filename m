@@ -1,10 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 8 Feb 2019 05:43:36 +0000
-Subject: [lustre-devel] [PATCH 12/21] lustre: cl_page.c: remove PINVRNT()
-In-Reply-To: <154949781317.10620.17224594880512218856.stgit@noble.brown>
+Date: Fri, 8 Feb 2019 05:45:26 +0000
+Subject: [lustre-devel] [PATCH 13/21] lustre: make cp_ref in cl_page a
+ refcount_t
+In-Reply-To: <154949781321.10620.15836497514344103445.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781317.10620.17224594880512218856.stgit@noble.brown>
-Message-ID: <95F5F7CE-B5F6-4D4C-9860-E075D321B154@whamcloud.com>
+ <154949781321.10620.15836497514344103445.stgit@noble.brown>
+Message-ID: <E8AA934C-CF76-4E6A-A780-9A245C7379B2@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,8 +14,8 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
 > 
-> This macro does nothing (it once was like 'assert'),
-> so remove it.
+> As this is used as a refcount, it should be declared
+> as one.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
