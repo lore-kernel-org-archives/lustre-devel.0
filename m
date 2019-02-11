@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 11 Feb 2019 01:32:38 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 04/21] lustre: use list*entry macros in
- place of container_of()
-In-Reply-To: <154949781267.10620.8365663638954760207.stgit@noble.brown>
+Date: Mon, 11 Feb 2019 01:45:00 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 05/21] lustre: use list_first_entry() in
+ lustre subdirectory.
+In-Reply-To: <154949781279.10620.5804477141390456723.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781267.10620.8365663638954760207.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902110057200.24975@casper.infradead.org>
+ <154949781279.10620.5804477141390456723.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902110132500.24975@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,126 +13,203 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> There are a number of places that use container_of() but where
-> list_first_entry(), or list_last_entry() make the meaning more clear.
-> So change them over.
+> Convert
+>   list_entry(foo->next .....)
+> to
+>   list_first_entry(foo, ....)
+> 
+> in 'lustre'
+> 
+> In several cases the call is combined with
+> a list_empty() test and list_first_entry_or_null() is used
 
-I have to say normally the patches you see genernally use the basic
-functionality of the linux list implementation. I wonder if a deep
-dive on LUG's developers day would be a good idea.
+Nak. One of the changes below breaks things.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 ++--
->  drivers/staging/lustre/lustre/obdclass/cl_io.c     |    4 ++--
->  drivers/staging/lustre/lustre/obdclass/cl_object.c |   13 ++++++++-----
->  drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
->  drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +++----
->  5 files changed, 17 insertions(+), 15 deletions(-)
+>  drivers/staging/lustre/lustre/include/cl_object.h  |    2 -
+>  drivers/staging/lustre/lustre/llite/statahead.c    |   23 ++++----
+>  drivers/staging/lustre/lustre/lov/lov_io.c         |    9 +--
+>  drivers/staging/lustre/lustre/obdclass/cl_page.c   |    9 +--
+>  drivers/staging/lustre/lustre/obdclass/genops.c    |   22 ++++---
+>  .../staging/lustre/lustre/obdclass/lustre_peer.c   |    5 +-
+>  drivers/staging/lustre/lustre/osc/osc_cache.c      |   17 +++---
+>  drivers/staging/lustre/lustre/osc/osc_lock.c       |    5 +-
+>  drivers/staging/lustre/lustre/osc/osc_page.c       |   17 +++---
+>  drivers/staging/lustre/lustre/osc/osc_request.c    |    8 +--
+>  drivers/staging/lustre/lustre/ptlrpc/client.c      |    8 +--
+>  drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c    |    6 +-
+>  .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    4 +
+>  drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    6 +-
+>  drivers/staging/lustre/lustre/ptlrpc/service.c     |   59 ++++++++++----------
+>  15 files changed, 101 insertions(+), 99 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> index 85c5047f4ba2..74c7644d6ef8 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> @@ -987,8 +987,8 @@ struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
+> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+> index 13d79810dd39..53fd8d469e55 100644
+> --- a/drivers/staging/lustre/lustre/include/cl_object.h
+> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
+> @@ -2335,7 +2335,7 @@ static inline struct cl_page *cl_page_list_last(struct cl_page_list *plist)
+>  static inline struct cl_page *cl_page_list_first(struct cl_page_list *plist)
 >  {
->  	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
->  	LASSERT(!list_empty(ldlm_namespace_list(client)));
-> -	return container_of(ldlm_namespace_list(client)->next,
-> -		struct ldlm_namespace, ns_list_chain);
-> +	return list_first_entry(ldlm_namespace_list(client),
-> +				struct ldlm_namespace, ns_list_chain);
+>  	LASSERT(plist->pl_nr > 0);
+> -	return list_entry(plist->pl_pages.next, struct cl_page, cp_batch);
+> +	return list_first_entry(&plist->pl_pages, struct cl_page, cp_batch);
 >  }
 >  
->  /** Create and initialize new resource. */
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> index 7bf02350f19d..34b4e63e7d1a 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> @@ -93,8 +93,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
->  	LINVRNT(cl_io_invariant(io));
+>  /**
+
+...
+
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> index 5b97f2a1fea1..a69736dfe8b7 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> @@ -299,9 +299,9 @@ ptlrpc_server_post_idle_rqbds(struct ptlrpc_service_part *svcpt)
+>  			return posted;
+>  		}
 >  
->  	while (!list_empty(&io->ci_layers)) {
-> -		slice = container_of(io->ci_layers.prev, struct cl_io_slice,
-> -				     cis_linkage);
-> +		slice = list_last_entry(&io->ci_layers, struct cl_io_slice,
-> +					cis_linkage);
->  		list_del_init(&slice->cis_linkage);
->  		if (slice->cis_iop->op[io->ci_type].cio_fini)
->  			slice->cis_iop->op[io->ci_type].cio_fini(env, slice);
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> index 05d784ae7a6c..f724b2d62df1 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> @@ -649,8 +649,8 @@ static struct lu_env *cl_env_obtain(void *debug)
->  	if (cl_envs[cpu].cec_count > 0) {
->  		int rc;
+> -		rqbd = list_entry(svcpt->scp_rqbd_idle.next,
+> -				  struct ptlrpc_request_buffer_desc,
+> -				  rqbd_list);
+> +		rqbd = list_first_entry(&svcpt->scp_rqbd_idle,
+> +					struct ptlrpc_request_buffer_desc,
+> +					rqbd_list);
+>  		list_del(&rqbd->rqbd_list);
 >  
-> -		cle = container_of(cl_envs[cpu].cec_envs.next, struct cl_env,
-> -				   ce_linkage);
-> +		cle = list_first_entry(&cl_envs[cpu].cec_envs, struct cl_env,
-> +				       ce_linkage);
->  		list_del_init(&cle->ce_linkage);
->  		cl_envs[cpu].cec_count--;
->  		read_unlock(&cl_envs[cpu].cec_guard);
-> @@ -748,9 +748,12 @@ unsigned int cl_env_cache_purge(unsigned int nr)
->  
->  	for_each_possible_cpu(i) {
->  		write_lock(&cl_envs[i].cec_guard);
-> -		for (; !list_empty(&cl_envs[i].cec_envs) && nr > 0; --nr) {
-> -			cle = container_of(cl_envs[i].cec_envs.next,
-> -					   struct cl_env, ce_linkage);
-> +		for (; nr >0 &&
-> +			     (cle = list_first_entry_or_null(
-> +				     &cl_envs[i].cec_envs,
-> +				     struct cl_env,
-> +				     ce_linkage)) != NULL;
-> +		     --nr) {
->  			list_del_init(&cle->ce_linkage);
->  			LASSERT(cl_envs[i].cec_count > 0);
->  			cl_envs[i].cec_count--;
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> index b1b4dc7ea22f..d025ea55818f 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> @@ -690,8 +690,8 @@ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
->  	const struct cl_page_slice *slice;
->  	int result;
->  
-> -	slice = container_of(pg->cp_layers.next,
-> -			     const struct cl_page_slice, cpl_linkage);
-> +	slice = list_first_entry(&pg->cp_layers,
-> +				 const struct cl_page_slice, cpl_linkage);
->  	PASSERT(env, pg, slice->cpl_ops->cpo_is_vmlocked);
->  	/*
->  	 * Call ->cpo_is_vmlocked() directly instead of going through
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> index 3bd48748f46c..639c298b6a90 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> @@ -349,7 +349,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
->  		 * lives as long as possible and ->loo_object_free() methods
->  		 * can look at its contents.
+>  		/* assume we will post successfully */
+> @@ -769,9 +769,9 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
+>  		 * I expect only about 1 or 2 rqbds need to be recycled here
 >  		 */
-> -		o = container_of(splice.prev, struct lu_object, lo_linkage);
-> +		o = list_last_entry(&splice, struct lu_object, lo_linkage);
->  		list_del_init(&o->lo_linkage);
->  		o->lo_ops->loo_object_free(env, o);
+>  		while (svcpt->scp_hist_nrqbds > svc->srv_hist_nrqbds_cpt_max) {
+> -			rqbd = list_entry(svcpt->scp_hist_rqbds.next,
+> -					  struct ptlrpc_request_buffer_desc,
+> -					  rqbd_list);
+> +			rqbd = list_first_entry(&svcpt->scp_hist_rqbds,
+> +						struct ptlrpc_request_buffer_desc,
+> +						rqbd_list);
+>  
+>  			list_del(&rqbd->rqbd_list);
+>  			svcpt->scp_hist_nrqbds--;
+> @@ -1240,9 +1240,9 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+>  	/* we took additional refcount so entries can't be deleted from list, no
+>  	 * locking is needed
+>  	 */
+> -	while (!list_empty(&work_list)) {
+> -		rq = list_entry(work_list.next, struct ptlrpc_request,
+> -				rq_timed_list);
+> +	while ((rq = list_first_entry_or_null(&work_list,
+> +					      struct ptlrpc_request,
+> +					      rq_timed_list)) != NULL) {
+>  		list_del_init(&rq->rq_timed_list);
+>  
+>  		if (ptlrpc_at_send_early_reply(rq) == 0)
+> @@ -1485,8 +1485,8 @@ ptlrpc_server_handle_req_in(struct ptlrpc_service_part *svcpt,
+>  		return 0;
 >  	}
-> @@ -432,9 +432,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
->  		 * Free everything on the dispose list. This is safe against
->  		 * races due to the reasons described in lu_object_put().
+>  
+> -	req = list_entry(svcpt->scp_req_incoming.next,
+> -			 struct ptlrpc_request, rq_list);
+> +	req = list_first_entry(&svcpt->scp_req_incoming,
+> +			       struct ptlrpc_request, rq_list);
+>  	list_del_init(&req->rq_list);
+>  	svcpt->scp_nreqs_incoming--;
+>  	/* Consider this still a "queued" request as far as stats are
+> @@ -2345,9 +2345,9 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
+>  
+>  	wake_up_all(&svcpt->scp_waitq);
+>  
+> -	while (!list_empty(&svcpt->scp_threads)) {
+> -		thread = list_entry(svcpt->scp_threads.next,
+> -				    struct ptlrpc_thread, t_link);
+> +	while ((thread = list_first_entry_or_null(&svcpt->scp_threads,
+> +						  struct ptlrpc_thread,
+> +						  t_link)) != NULL) {
+>  		if (thread_is_stopped(thread)) {
+>  			list_del(&thread->t_link);
+>  			list_add(&thread->t_link, &zombie);
+> @@ -2365,9 +2365,9 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
+>  
+>  	spin_unlock(&svcpt->scp_lock);
+>  
+> -	while (!list_empty(&zombie)) {
+> -		thread = list_entry(zombie.next,
+> -				    struct ptlrpc_thread, t_link);
+> +	while ((thread = list_first_entry(&zombie,
+> +					  struct ptlrpc_thread,
+> +					  t_link)) != NULL) {
+>  		list_del(&thread->t_link);
+>  		kfree(thread);
+>  	}
+
+The above change causes sanity tests 77j: client only supporting ADLER32
+to fail with:
+
+2019-02-07 18:38:26 [ 4346.464550] Lustre: Unmounted lustre-client
+2019-02-07 18:38:26 [ 4346.471990] BUG: unable to handle kernel paging 
+request at ffffeb02001c89c8
+2019-02-07 18:38:26 [ 4346.480489] #PF error: [normal kernel read fault]
+2019-02-07 18:38:26 [ 4346.486719] PGD 0 P4D 0
+2019-02-07 18:38:26 [ 4346.490758] Oops: 0000 [#1] PREEMPT SMP PTI
+2019-02-07 18:38:26 [ 4346.496420] CPU: 0 PID: 2478 Comm: kworker/0:1 
+Tainted: G        WC        5.0.0-rc4+ #1
+2019-02-07 18:38:26 [ 4346.505976] Hardware name: Supermicro 
+SYS-6028TR-HTFR/X10DRT-HIBF, BIOS 2.0b 08/12/2016
+2019-02-07 18:38:26 [ 4346.515461] Workqueue: obd_zombid 
+obd_zombie_imp_cull [obdclass]
+2019-02-07 18:38:26 [ 4346.522917] RIP: 0010:kfree+0x52/0x1b0
+
+
+> @@ -2707,9 +2707,9 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
+>  			break;
+>  
+>  		spin_lock(&svcpt->scp_rep_lock);
+> -		while (!list_empty(&svcpt->scp_rep_active)) {
+> -			rs = list_entry(svcpt->scp_rep_active.next,
+> -					struct ptlrpc_reply_state, rs_list);
+> +		while ((rs = list_first_entry_or_null(&svcpt->scp_rep_active,
+> +						      struct ptlrpc_reply_state,
+> +						      rs_list)) != NULL) {
+>  			spin_lock(&rs->rs_lock);
+>  			ptlrpc_schedule_difficult_reply(rs);
+>  			spin_unlock(&rs->rs_lock);
+> @@ -2720,10 +2720,9 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
+>  		 * all unlinked) and no service threads, so I'm the only
+>  		 * thread noodling the request queue now
 >  		 */
-> -		while (!list_empty(&dispose)) {
-> -			h = container_of(dispose.next,
-> -					 struct lu_object_header, loh_lru);
-> +		while ((h = list_first_entry_or_null(
-> +				&dispose, struct lu_object_header, loh_lru)) != NULL) {
->  			list_del_init(&h->loh_lru);
->  			lu_object_free(env, lu_object_top(h));
->  			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
+> -		while (!list_empty(&svcpt->scp_req_incoming)) {
+> -			req = list_entry(svcpt->scp_req_incoming.next,
+> -					 struct ptlrpc_request, rq_list);
+> -
+> +		while ((req = list_first_entry_or_null(&svcpt->scp_req_incoming,
+> +						       struct ptlrpc_request,
+> +						       rq_list)) != NULL) {
+>  			list_del(&req->rq_list);
+>  			svcpt->scp_nreqs_incoming--;
+>  			ptlrpc_server_finish_request(svcpt, req);
+> @@ -2747,17 +2746,17 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
+>  		 */
+>  
+>  		while (!list_empty(&svcpt->scp_rqbd_idle)) {
+> -			rqbd = list_entry(svcpt->scp_rqbd_idle.next,
+> -					  struct ptlrpc_request_buffer_desc,
+> -					  rqbd_list);
+> +			rqbd = list_first_entry(&svcpt->scp_rqbd_idle,
+> +						struct ptlrpc_request_buffer_desc,
+> +						rqbd_list);
+>  			ptlrpc_free_rqbd(rqbd);
+>  		}
+>  		ptlrpc_wait_replies(svcpt);
+>  
+>  		while (!list_empty(&svcpt->scp_rep_idle)) {
+> -			rs = list_entry(svcpt->scp_rep_idle.next,
+> -					struct ptlrpc_reply_state,
+> -					rs_list);
+> +			rs = list_first_entry(&svcpt->scp_rep_idle,
+> +					      struct ptlrpc_reply_state,
+> +					      rs_list);
+>  			list_del(&rs->rs_list);
+>  			kvfree(rs);
+>  		}
 > 
 > 
 > 
