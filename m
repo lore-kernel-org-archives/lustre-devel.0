@@ -1,116 +1,138 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 12:09:59 +1100
-Subject: [lustre-devel] [PATCH 02/21] lustre: obd_class: remove
- csi_barrier from struct cl_sync_io
-In-Reply-To: <alpine.LFD.2.21.1902110026180.24975@casper.infradead.org>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 11 Feb 2019 01:32:38 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 04/21] lustre: use list*entry macros in
+ place of container_of()
+In-Reply-To: <154949781267.10620.8365663638954760207.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781242.10620.4427066512247634121.stgit@noble.brown>
- <alpine.LFD.2.21.1902110026180.24975@casper.infradead.org>
-Message-ID: <87bm3jgmfs.fsf@notabene.neil.brown.name>
+ <154949781267.10620.8365663638954760207.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902110057200.24975@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Feb 11 2019, James Simmons wrote:
 
->> This flag is used to ensure that structure isn't freed before
->> the wakeup completes.  The same can be achieved using the
->> csi_waitq.lock and calling wake_up_all_locked().
->>
->
-> Reviewed-by: James Simmons <jsimmons@infradead.org>
->
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>  drivers/staging/lustre/lustre/include/cl_object.h |    2 --
->>  drivers/staging/lustre/lustre/obdclass/cl_io.c    |   16 +++++++---------
->>  2 files changed, 7 insertions(+), 11 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
->> index 71ba73cdbb5e..13d79810dd39 100644
->> --- a/drivers/staging/lustre/lustre/include/cl_object.h
->> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
->> @@ -2391,8 +2391,6 @@ struct cl_sync_io {
->>  	atomic_t		csi_sync_nr;
->>  	/** error code. */
->>  	int			csi_sync_rc;
->> -	/** barrier of destroy this structure */
->> -	atomic_t		csi_barrier;
->>  	/** completion to be signaled when transfer is complete. */
->>  	wait_queue_head_t	csi_waitq;
->>  };
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> index e9ad055f84b8..beac7e8bc92a 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> @@ -1047,7 +1047,6 @@ void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
->>  	memset(anchor, 0, sizeof(*anchor));
->>  	init_waitqueue_head(&anchor->csi_waitq);
->>  	atomic_set(&anchor->csi_sync_nr, nr);
->> -	atomic_set(&anchor->csi_barrier, nr > 0);
->>  	anchor->csi_sync_rc = 0;
->>  }
->>  EXPORT_SYMBOL(cl_sync_io_init);
->> @@ -1080,11 +1079,10 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
->>  	} else {
->>  		rc = anchor->csi_sync_rc;
->>  	}
->> +	/* We take the lock to ensure that cl_sync_io_note() has finished */
->> +	spin_lock(&anchor->csi_waitq.lock);
->
-> I don't think I every seen any use the internal lock for the wait_queue
-> in such a method. Most creative approach.
+> There are a number of places that use container_of() but where
+> list_first_entry(), or list_last_entry() make the meaning more clear.
+> So change them over.
 
-You need to get more :-)
+I have to say normally the patches you see genernally use the basic
+functionality of the linux list implementation. I wonder if a deep
+dive on LUG's developers day would be a good idea.
 
-There is a macro
-   wait_event_interruptible_locked()
-which explicitly supports this model.  Only used 4 times in the kernel
-so not very popular yet.
-The various forms of wake_up_locked are used a bit more often.
-I don't remember where I first saw it.
-It is a neat idea!
-
-Thanks,
-NeilBrown
-
-
-
->
->>  	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
->> -
->> -	/* wait until cl_sync_io_note() has done wakeup */
->> -	while (unlikely(atomic_read(&anchor->csi_barrier) != 0))
->> -		cpu_relax();
->> +	spin_unlock(&anchor->csi_waitq.lock);
->>  
->>  	return rc;
->>  }
->> @@ -1104,11 +1102,11 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
->>  	 * IO.
->>  	 */
->>  	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
->> -	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
->> +	if (atomic_dec_and_lock(&anchor->csi_sync_nr,
->> +				&anchor->csi_waitq.lock)) {
->>  
->> -		wake_up_all(&anchor->csi_waitq);
->> -		/* it's safe to nuke or reuse anchor now */
->> -		atomic_set(&anchor->csi_barrier, 0);
->> +		wake_up_all_locked(&anchor->csi_waitq);
->> +		spin_unlock(&anchor->csi_waitq.lock);
->>  
->>  		/* Can't access anchor any more */
->>  	}
->> 
->> 
->> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/19836194/attachment.sig>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 ++--
+>  drivers/staging/lustre/lustre/obdclass/cl_io.c     |    4 ++--
+>  drivers/staging/lustre/lustre/obdclass/cl_object.c |   13 ++++++++-----
+>  drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
+>  drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +++----
+>  5 files changed, 17 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> index 85c5047f4ba2..74c7644d6ef8 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> @@ -987,8 +987,8 @@ struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
+>  {
+>  	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
+>  	LASSERT(!list_empty(ldlm_namespace_list(client)));
+> -	return container_of(ldlm_namespace_list(client)->next,
+> -		struct ldlm_namespace, ns_list_chain);
+> +	return list_first_entry(ldlm_namespace_list(client),
+> +				struct ldlm_namespace, ns_list_chain);
+>  }
+>  
+>  /** Create and initialize new resource. */
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> index 7bf02350f19d..34b4e63e7d1a 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> @@ -93,8 +93,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
+>  	LINVRNT(cl_io_invariant(io));
+>  
+>  	while (!list_empty(&io->ci_layers)) {
+> -		slice = container_of(io->ci_layers.prev, struct cl_io_slice,
+> -				     cis_linkage);
+> +		slice = list_last_entry(&io->ci_layers, struct cl_io_slice,
+> +					cis_linkage);
+>  		list_del_init(&slice->cis_linkage);
+>  		if (slice->cis_iop->op[io->ci_type].cio_fini)
+>  			slice->cis_iop->op[io->ci_type].cio_fini(env, slice);
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> index 05d784ae7a6c..f724b2d62df1 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> @@ -649,8 +649,8 @@ static struct lu_env *cl_env_obtain(void *debug)
+>  	if (cl_envs[cpu].cec_count > 0) {
+>  		int rc;
+>  
+> -		cle = container_of(cl_envs[cpu].cec_envs.next, struct cl_env,
+> -				   ce_linkage);
+> +		cle = list_first_entry(&cl_envs[cpu].cec_envs, struct cl_env,
+> +				       ce_linkage);
+>  		list_del_init(&cle->ce_linkage);
+>  		cl_envs[cpu].cec_count--;
+>  		read_unlock(&cl_envs[cpu].cec_guard);
+> @@ -748,9 +748,12 @@ unsigned int cl_env_cache_purge(unsigned int nr)
+>  
+>  	for_each_possible_cpu(i) {
+>  		write_lock(&cl_envs[i].cec_guard);
+> -		for (; !list_empty(&cl_envs[i].cec_envs) && nr > 0; --nr) {
+> -			cle = container_of(cl_envs[i].cec_envs.next,
+> -					   struct cl_env, ce_linkage);
+> +		for (; nr >0 &&
+> +			     (cle = list_first_entry_or_null(
+> +				     &cl_envs[i].cec_envs,
+> +				     struct cl_env,
+> +				     ce_linkage)) != NULL;
+> +		     --nr) {
+>  			list_del_init(&cle->ce_linkage);
+>  			LASSERT(cl_envs[i].cec_count > 0);
+>  			cl_envs[i].cec_count--;
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> index b1b4dc7ea22f..d025ea55818f 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> @@ -690,8 +690,8 @@ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
+>  	const struct cl_page_slice *slice;
+>  	int result;
+>  
+> -	slice = container_of(pg->cp_layers.next,
+> -			     const struct cl_page_slice, cpl_linkage);
+> +	slice = list_first_entry(&pg->cp_layers,
+> +				 const struct cl_page_slice, cpl_linkage);
+>  	PASSERT(env, pg, slice->cpl_ops->cpo_is_vmlocked);
+>  	/*
+>  	 * Call ->cpo_is_vmlocked() directly instead of going through
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> index 3bd48748f46c..639c298b6a90 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> @@ -349,7 +349,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
+>  		 * lives as long as possible and ->loo_object_free() methods
+>  		 * can look at its contents.
+>  		 */
+> -		o = container_of(splice.prev, struct lu_object, lo_linkage);
+> +		o = list_last_entry(&splice, struct lu_object, lo_linkage);
+>  		list_del_init(&o->lo_linkage);
+>  		o->lo_ops->loo_object_free(env, o);
+>  	}
+> @@ -432,9 +432,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
+>  		 * Free everything on the dispose list. This is safe against
+>  		 * races due to the reasons described in lu_object_put().
+>  		 */
+> -		while (!list_empty(&dispose)) {
+> -			h = container_of(dispose.next,
+> -					 struct lu_object_header, loh_lru);
+> +		while ((h = list_first_entry_or_null(
+> +				&dispose, struct lu_object_header, loh_lru)) != NULL) {
+>  			list_del_init(&h->loh_lru);
+>  			lu_object_free(env, lu_object_top(h));
+>  			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
+> 
+> 
+> 
