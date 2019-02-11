@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 11:48:47 +1100
-Subject: [lustre-devel] [PATCH 11/21] lustre: cl_object: remove
- vestigial debugging.
-In-Reply-To: <DFCE73D5-4057-4BEC-8133-A0934BD18DFC@whamcloud.com>
+Date: Mon, 11 Feb 2019 11:52:39 +1100
+Subject: [lustre-devel] [PATCH 15/21] lustre: obdclass: char
+ obd_ioctl_getdata type.
+In-Reply-To: <3F216582-D826-4002-8F8D-A27488E24B02@whamcloud.com>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781313.10620.6363156783936746853.stgit@noble.brown>
- <DFCE73D5-4057-4BEC-8133-A0934BD18DFC@whamcloud.com>
-Message-ID: <87mun3gnf4.fsf@notabene.neil.brown.name>
+ <154949781327.10620.2294752316778817915.stgit@noble.brown>
+ <3F216582-D826-4002-8F8D-A27488E24B02@whamcloud.com>
+Message-ID: <87k1i7gn8o.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,105 +17,58 @@ On Fri, Feb 08 2019, Andreas Dilger wrote:
 
 > On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
 >> 
->> cl_env_inc() and cl_env_dec() don't do anything,
->> so discard them.
+>> Instead of having obd_ioctl_getdata() return the allocated
+>> data as a "char *", return it as it really is,
+>> struct obd_ioctl_data *
+>> 
+>> This avoids the need for extra variables and casts.
 >> 
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >
-> It looks like these were being used for debugging page allocations,
-> wrapped under CONFIG_DEBUG_PAGESTATE_TRACKING, but that was dropped
-> from the upstream kernel.  It looks like you could also delete
-> cs_page_inc() and cs_page_dec() along with enum cache_stat_item,
-> since they are also wrapped under the same CONFIG value.
-
-cs_page_inc/dec were never in driver/staging.
-CS_PAGE_INC/DEC were for a while, but were removed nearly 4 years ago.
-
-Commit 76c807210aea ("staging: lustre: cl_page: delete empty macros")
-
+> Most of the patch looks like a no-op, except at one part below:
 >
-> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+>> @@ -1651,18 +1647,16 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+>> 		return rc;
+>> 	}
+>> 	case LL_IOC_MIGRATE: {
+>> -		char *buf = NULL;
+>> 		const char *filename;
+>> 		int namelen = 0;
+>> 		int len;
+>> 		int rc;
+>> 		int mdtidx;
+>> 
+>> -		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
+>> +		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+>> 		if (rc < 0)
+>> 			return rc;
+>> 
+>> -		data = (struct obd_ioctl_data *)buf;
+>> 		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+>> 		    !data->ioc_inllen1 || !data->ioc_inllen2) {
+>> 			rc = -EINVAL;
+>> @@ -1684,7 +1678,6 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+>> 
+>> 		rc = ll_migrate(inode, file, mdtidx, filename, namelen - 1);
+>> migrate_free:
+>> -		kvfree(buf);
+>
+> This removes the call to kvfree(buf) but it isn't clear why, since the rest of
+> the patch is mostly variable renaming?
 
-Thanks,
+Thanks for catching that!  It should be:
+
+ migrate_free:
+-               kvfree(buf);
++               kvfree(data);
+ 
+of course.  Fixed now.
+
 NeilBrown
-
->
->> ---
->> drivers/staging/lustre/lustre/obdclass/cl_object.c |   15 ---------------
->> 1 file changed, 15 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> index d71a680660da..1e704078664e 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> @@ -565,14 +565,6 @@ struct cl_env {
->> 	void		       *ce_debug;
->> };
->> 
->> -static void cl_env_inc(enum cache_stats_item item)
->> -{
->> -}
->> -
->> -static void cl_env_dec(enum cache_stats_item item)
->> -{
->> -}
->> -
->> static void cl_env_init0(struct cl_env *cle, void *debug)
->> {
->> 	LASSERT(cle->ce_ref == 0);
->> @@ -581,7 +573,6 @@ static void cl_env_init0(struct cl_env *cle, void *debug)
->> 
->> 	cle->ce_ref = 1;
->> 	cle->ce_debug = debug;
->> -	cl_env_inc(CS_busy);
->> }
->> 
->> static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> @@ -611,9 +602,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> 		if (rc != 0) {
->> 			kmem_cache_free(cl_env_kmem, cle);
->> 			env = ERR_PTR(rc);
->> -		} else {
->> -			cl_env_inc(CS_create);
->> -			cl_env_inc(CS_total);
->> 		}
->> 	} else {
->> 		env = ERR_PTR(-ENOMEM);
->> @@ -623,7 +611,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> 
->> static void cl_env_fini(struct cl_env *cle)
->> {
->> -	cl_env_dec(CS_total);
->> 	lu_context_fini(&cle->ce_lu.le_ctx);
->> 	lu_context_fini(&cle->ce_ses);
->> 	kmem_cache_free(cl_env_kmem, cle);
->> @@ -782,7 +769,6 @@ void cl_env_put(struct lu_env *env, u16 *refcheck)
->> 	if (--cle->ce_ref == 0) {
->> 		int cpu = get_cpu();
->> 
->> -		cl_env_dec(CS_busy);
->> 		cle->ce_debug = NULL;
->> 		cl_env_exit(cle);
->> 		/*
->> @@ -903,7 +889,6 @@ void cl_env_percpu_put(struct lu_env *env)
->> 	cle->ce_ref--;
->> 	LASSERT(cle->ce_ref == 0);
->> 
->> -	cl_env_dec(CS_busy);
->> 	cle->ce_debug = NULL;
->> 
->> 	put_cpu();
->> 
->> 
->
-> Cheers, Andreas
-> ---
-> Andreas Dilger
-> CTO Whamcloud
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/f6ced620/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/9eda8de4/attachment.sig>
