@@ -1,91 +1,99 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 11 Feb 2019 00:34:45 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 02/21] lustre: obd_class: remove
- csi_barrier from struct cl_sync_io
-In-Reply-To: <154949781242.10620.4427066512247634121.stgit@noble.brown>
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 11 Feb 2019 11:34:55 +1100
+Subject: [lustre-devel] [PATCH 07/21] lustre: use list_first_entry() in
+ lnet/klnds subdirectory.
+In-Reply-To: <1F487FF7-BF02-4FD7-9026-51CBD34610FE@whamcloud.com>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781242.10620.4427066512247634121.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902110026180.24975@casper.infradead.org>
+ <154949781297.10620.13452862524706335326.stgit@noble.brown>
+ <1F487FF7-BF02-4FD7-9026-51CBD34610FE@whamcloud.com>
+Message-ID: <87sgwvgo28.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Fri, Feb 08 2019, Andreas Dilger wrote:
 
-> This flag is used to ensure that structure isn't freed before
-> the wakeup completes.  The same can be achieved using the
-> csi_waitq.lock and calling wake_up_all_locked().
+> On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
+>> 
+>> Convert
+>>  list_entry(foo->next .....)
+>> to
+>>  list_first_entry(foo, ....)
+>> 
+>> in 'lnet/klnds
+>> 
+>> In several cases the call is combined with a list_empty() test and
+>> list_first_entry_or_null() is used
+>> 
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> 
+>> @@ -1853,8 +1855,9 @@ static void kiblnd_destroy_pool_list(struct list_head *head)
+>> {
+>> 	struct kib_pool *pool;
+>> 
+>> -	while (!list_empty(head)) {
+>> -		pool = list_entry(head->next, struct kib_pool, po_list);
+>> +	while ((pool = list_first_entry_or_null(head,
+>> +						struct kib_pool,
+>> +						po_list)) != NULL) {
+>> 		list_del(&pool->po_list);
+>> 
+>> 		LASSERT(pool->po_owner);
+>> @@ -1869,7 +1872,7 @@ static void kiblnd_fail_poolset(struct kib_poolset *ps, struct list_head *zombie
+>> 
+>> 	spin_lock(&ps->ps_lock);
+>> 	while (!list_empty(&ps->ps_pool_list)) {
+>> -		struct kib_pool *po = list_entry(ps->ps_pool_list.next,
+>> +		struct kib_pool *po = list_first_entry(&ps->ps_pool_list,
+>> 					    struct kib_pool, po_list);
+>> 		po->po_failed = 1;
+>> 		list_del(&po->po_list);
+>
+> Why not use the same style as elsewhere in the code:
+>
+> 	while ((po = list_first_entry_or_null(&ps->ps_pool_list,
+> 					      struct kib_pool,
+> 					      po_list)) != NULL) {
 >
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+No good reason - just fatigue probably.  I could automate most of
+finding these, but automating the fixing of them didn't quite seem
+worth the effort.  Maybe I should play with coccinelle...
 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/include/cl_object.h |    2 --
->  drivers/staging/lustre/lustre/obdclass/cl_io.c    |   16 +++++++---------
->  2 files changed, 7 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-> index 71ba73cdbb5e..13d79810dd39 100644
-> --- a/drivers/staging/lustre/lustre/include/cl_object.h
-> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
-> @@ -2391,8 +2391,6 @@ struct cl_sync_io {
->  	atomic_t		csi_sync_nr;
->  	/** error code. */
->  	int			csi_sync_rc;
-> -	/** barrier of destroy this structure */
-> -	atomic_t		csi_barrier;
->  	/** completion to be signaled when transfer is complete. */
->  	wait_queue_head_t	csi_waitq;
->  };
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> index e9ad055f84b8..beac7e8bc92a 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> @@ -1047,7 +1047,6 @@ void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
->  	memset(anchor, 0, sizeof(*anchor));
->  	init_waitqueue_head(&anchor->csi_waitq);
->  	atomic_set(&anchor->csi_sync_nr, nr);
-> -	atomic_set(&anchor->csi_barrier, nr > 0);
->  	anchor->csi_sync_rc = 0;
->  }
->  EXPORT_SYMBOL(cl_sync_io_init);
-> @@ -1080,11 +1079,10 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
->  	} else {
->  		rc = anchor->csi_sync_rc;
->  	}
-> +	/* We take the lock to ensure that cl_sync_io_note() has finished */
-> +	spin_lock(&anchor->csi_waitq.lock);
+I've merged:
 
-I don't think I every seen any use the internal lock for the wait_queue
-in such a method. Most creative approach.
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index df6b1b134709..d67a197e718d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1867,13 +1867,15 @@ static void kiblnd_destroy_pool_list(struct list_head *head)
+ 
+ static void kiblnd_fail_poolset(struct kib_poolset *ps, struct list_head *zombies)
+ {
++	struct kib_pool *po;
++
+ 	if (!ps->ps_net) /* initialized? */
+ 		return;
+ 
+ 	spin_lock(&ps->ps_lock);
+-	while (!list_empty(&ps->ps_pool_list)) {
+-		struct kib_pool *po = list_first_entry(&ps->ps_pool_list,
+-					    struct kib_pool, po_list);
++	while ((po = list_first_entry_or_null(&ps->ps_pool_list,
++					      struct kib_pool,
++					      po_list)) == NULL) {
+ 		po->po_failed = 1;
+ 		list_del(&po->po_list);
+ 		if (!po->po_allocated)
 
->  	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
-> -
-> -	/* wait until cl_sync_io_note() has done wakeup */
-> -	while (unlikely(atomic_read(&anchor->csi_barrier) != 0))
-> -		cpu_relax();
-> +	spin_unlock(&anchor->csi_waitq.lock);
->  
->  	return rc;
->  }
-> @@ -1104,11 +1102,11 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
->  	 * IO.
->  	 */
->  	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
-> -	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
-> +	if (atomic_dec_and_lock(&anchor->csi_sync_nr,
-> +				&anchor->csi_waitq.lock)) {
->  
-> -		wake_up_all(&anchor->csi_waitq);
-> -		/* it's safe to nuke or reuse anchor now */
-> -		atomic_set(&anchor->csi_barrier, 0);
-> +		wake_up_all_locked(&anchor->csi_waitq);
-> +		spin_unlock(&anchor->csi_waitq.lock);
->  
->  		/* Can't access anchor any more */
->  	}
-> 
-> 
-> 
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/bc4f596b/attachment.sig>
