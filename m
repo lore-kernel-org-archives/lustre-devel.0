@@ -1,125 +1,134 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 14:25:33 +1100
-Subject: [lustre-devel] [PATCH 11/21] lustre: cl_object: remove
- vestigial debugging.
-In-Reply-To: <alpine.LFD.2.21.1902110157410.24975@casper.infradead.org>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 11 Feb 2019 04:00:42 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 13/21] lustre: make cp_ref in cl_page a
+ refcount_t
+In-Reply-To: <154949781321.10620.15836497514344103445.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781313.10620.6363156783936746853.stgit@noble.brown>
- <alpine.LFD.2.21.1902110157410.24975@casper.infradead.org>
-Message-ID: <87wom7f1le.fsf@notabene.neil.brown.name>
+ <154949781321.10620.15836497514344103445.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902110359370.5690@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Feb 11 2019, James Simmons wrote:
 
->> cl_env_inc() and cl_env_dec() don't do anything,
->> so discard them.
->
-> I don't know about this one. I saw Andreas response as well. 
-> So this was apart of "LU-744 obdclass: revise stats for cl_object cache"
-> In the end it was turned off by default in the OpenSFS branch since it
-> made performance take a hit. To enable in OpenSFS branch you have to run
-> ./configure --enable-pgstate-track. We have a few like this for Lustre so
-> I was going to bring this up. Do we want to remove this work for both the
-> upstream client as well as OpenSFS tree or properly implement this by
-> making it a Kconfig option when CONFIG_LUSTRE_DEBUG_EXPENSIVE_CHECK is
-> enabled? Its just a matter of porting OpenSFS commit 
-> 5cae09a2409dcd396a1ee7be1eca7d3bbf77365e
->
-> What do you think?
+> As this is used as a refcount, it should be declared
+> as one.
 
-How useful are these stats?
-Stats that are never compiled in aren't likely to tell you much :-)
-
-Has any thought been given to per-cpu stats counting?  That seems to be
-the preferred approach for high-frequency accounting.
-
-I think having a CONFIG option to enable expensive consistency checks is
-a good idea - developers will enable it when they don't care about
-performance.
-Having a CONFIG option for expensive performance stats seems... weird.
-Who would use it, and how meaningful would the number be?
-
-NeilBrown
-
-
->
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>  drivers/staging/lustre/lustre/obdclass/cl_object.c |   15 ---------------
->>  1 file changed, 15 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> index d71a680660da..1e704078664e 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> @@ -565,14 +565,6 @@ struct cl_env {
->>  	void		       *ce_debug;
->>  };
->>  
->> -static void cl_env_inc(enum cache_stats_item item)
->> -{
->> -}
->> -
->> -static void cl_env_dec(enum cache_stats_item item)
->> -{
->> -}
->> -
->>  static void cl_env_init0(struct cl_env *cle, void *debug)
->>  {
->>  	LASSERT(cle->ce_ref == 0);
->> @@ -581,7 +573,6 @@ static void cl_env_init0(struct cl_env *cle, void *debug)
->>  
->>  	cle->ce_ref = 1;
->>  	cle->ce_debug = debug;
->> -	cl_env_inc(CS_busy);
->>  }
->>  
->>  static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> @@ -611,9 +602,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->>  		if (rc != 0) {
->>  			kmem_cache_free(cl_env_kmem, cle);
->>  			env = ERR_PTR(rc);
->> -		} else {
->> -			cl_env_inc(CS_create);
->> -			cl_env_inc(CS_total);
->>  		}
->>  	} else {
->>  		env = ERR_PTR(-ENOMEM);
->> @@ -623,7 +611,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->>  
->>  static void cl_env_fini(struct cl_env *cle)
->>  {
->> -	cl_env_dec(CS_total);
->>  	lu_context_fini(&cle->ce_lu.le_ctx);
->>  	lu_context_fini(&cle->ce_ses);
->>  	kmem_cache_free(cl_env_kmem, cle);
->> @@ -782,7 +769,6 @@ void cl_env_put(struct lu_env *env, u16 *refcheck)
->>  	if (--cle->ce_ref == 0) {
->>  		int cpu = get_cpu();
->>  
->> -		cl_env_dec(CS_busy);
->>  		cle->ce_debug = NULL;
->>  		cl_env_exit(cle);
->>  		/*
->> @@ -903,7 +889,6 @@ void cl_env_percpu_put(struct lu_env *env)
->>  	cle->ce_ref--;
->>  	LASSERT(cle->ce_ref == 0);
->>  
->> -	cl_env_dec(CS_busy);
->>  	cle->ce_debug = NULL;
->>  
->>  	put_cpu();
->> 
->> 
->> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/2862da0b/attachment.sig>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/include/cl_object.h |    4 ++--
+>  drivers/staging/lustre/lustre/llite/vvp_page.c    |    9 +++++----
+>  drivers/staging/lustre/lustre/obdclass/cl_page.c  |   14 +++++++-------
+>  3 files changed, 14 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+> index bf7678aed6bf..c2273c3100e8 100644
+> --- a/drivers/staging/lustre/lustre/include/cl_object.h
+> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
+> @@ -717,7 +717,7 @@ enum cl_page_type {
+>   */
+>  struct cl_page {
+>  	/** Reference counter. */
+> -	atomic_t			 cp_ref;
+> +	refcount_t			 cp_ref;
+>  	/** An object this page is a part of. Immutable after creation. */
+>  	struct cl_object		*cp_obj;
+>  	/** vmpage */
+> @@ -1021,7 +1021,7 @@ static inline struct page *cl_page_vmpage(struct cl_page *page)
+>   */
+>  static inline bool __page_in_use(const struct cl_page *page, int refc)
+>  {
+> -	return (atomic_read(&page->cp_ref) > refc + 1);
+> +	return (refcount_read(&page->cp_ref) > refc + 1);
+>  }
+>  
+>  /**
+> diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
+> index 77bf923f2578..ec0d93313f55 100644
+> --- a/drivers/staging/lustre/lustre/llite/vvp_page.c
+> +++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
+> @@ -157,15 +157,16 @@ static void vvp_page_delete(const struct lu_env *env,
+>  	struct inode *inode = vmpage->mapping->host;
+>  	struct cl_object *obj = slice->cpl_obj;
+>  	struct cl_page *page = slice->cpl_page;
+> -	int refc;
+>  
+>  	LASSERT(PageLocked(vmpage));
+>  	LASSERT((struct cl_page *)vmpage->private == page);
+>  	LASSERT(inode == vvp_object_inode(obj));
+>  
+>  	/* Drop the reference count held in vvp_page_init */
+> -	refc = atomic_dec_return(&page->cp_ref);
+> -	LASSERTF(refc >= 1, "page = %p, refc = %d\n", page, refc);
+> +	if (refcount_dec_and_test(&page->cp_ref)) {
+> +		/* It mustn't reach zero here! */
+> +		LASSERTF(0, "page = %p, refc reached zero\n", page);
+> +	}
+>  
+>  	ClearPagePrivate(vmpage);
+>  	vmpage->private = 0;
+> @@ -507,7 +508,7 @@ int vvp_page_init(const struct lu_env *env, struct cl_object *obj,
+>  
+>  	if (page->cp_type == CPT_CACHEABLE) {
+>  		/* in cache, decref in vvp_page_delete */
+> -		atomic_inc(&page->cp_ref);
+> +		refcount_inc(&page->cp_ref);
+>  		SetPagePrivate(vmpage);
+>  		vmpage->private = (unsigned long)page;
+>  		cl_page_slice_add(page, &vpg->vpg_cl, obj, index,
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> index 31ded52e0499..f0ece7e9a4ac 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> @@ -67,8 +67,8 @@ static void __cl_page_delete(const struct lu_env *env, struct cl_page *pg);
+>   */
+>  static void cl_page_get_trust(struct cl_page *page)
+>  {
+> -	LASSERT(atomic_read(&page->cp_ref) > 0);
+> -	atomic_inc(&page->cp_ref);
+> +	LASSERT(refcount_read(&page->cp_ref) > 0);
+> +	refcount_inc(&page->cp_ref);
+>  }
+>  
+>  /**
+> @@ -135,7 +135,7 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
+>  	if (page) {
+>  		int result = 0;
+>  
+> -		atomic_set(&page->cp_ref, 1);
+> +		refcount_set(&page->cp_ref, 1);
+>  		page->cp_obj = o;
+>  		cl_object_get(o);
+>  		lu_object_ref_add_at(&o->co_lu, &page->cp_obj_ref, "cl_page",
+> @@ -310,12 +310,12 @@ EXPORT_SYMBOL(cl_page_get);
+>  void cl_page_put(const struct lu_env *env, struct cl_page *page)
+>  {
+>  	CL_PAGE_HEADER(D_TRACE, env, page, "%d\n",
+> -		       atomic_read(&page->cp_ref));
+> +		       refcount_read(&page->cp_ref));
+>  
+> -	if (atomic_dec_and_test(&page->cp_ref)) {
+> +	if (refcount_dec_and_test(&page->cp_ref)) {
+>  		LASSERT(page->cp_state == CPS_FREEING);
+>  
+> -		LASSERT(atomic_read(&page->cp_ref) == 0);
+> +		LASSERT(refcount_read(&page->cp_ref) == 0);
+>  		PASSERT(env, page, !page->cp_owner);
+>  		PASSERT(env, page, list_empty(&page->cp_batch));
+>  		/*
+> @@ -869,7 +869,7 @@ void cl_page_header_print(const struct lu_env *env, void *cookie,
+>  {
+>  	(*printer)(env, cookie,
+>  		   "page@%p[%d %p %d %d %p]\n",
+> -		   pg, atomic_read(&pg->cp_ref), pg->cp_obj,
+> +		   pg, refcount_read(&pg->cp_ref), pg->cp_obj,
+>  		   pg->cp_state, pg->cp_type,
+>  		   pg->cp_owner);
+>  }
+> 
+> 
+> 
