@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 12:05:16 +1100
-Subject: [lustre-devel] [PATCH 03/21] lustre: obdclass: use list_sort()
- to sort a list.
-In-Reply-To: <alpine.LFD.2.21.1902110037220.24975@casper.infradead.org>
+Date: Mon, 11 Feb 2019 12:09:59 +1100
+Subject: [lustre-devel] [PATCH 02/21] lustre: obd_class: remove
+ csi_barrier from struct cl_sync_io
+In-Reply-To: <alpine.LFD.2.21.1902110026180.24975@casper.infradead.org>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781252.10620.13626213918115345779.stgit@noble.brown>
- <alpine.LFD.2.21.1902110037220.24975@casper.infradead.org>
-Message-ID: <87ef8fgmnn.fsf@notabene.neil.brown.name>
+ <154949781242.10620.4427066512247634121.stgit@noble.brown>
+ <alpine.LFD.2.21.1902110026180.24975@casper.infradead.org>
+Message-ID: <87bm3jgmfs.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,215 +15,102 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, Feb 11 2019, James Simmons wrote:
 
->> Rather than a bespoke bubble-sort, use list_sort() to
->> sort this linked list.
+>> This flag is used to ensure that structure isn't freed before
+>> the wakeup completes.  The same can be achieved using the
+>> csi_waitq.lock and calling wake_up_all_locked().
+>>
 >
 > Reviewed-by: James Simmons <jsimmons@infradead.org>
->  
+>
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >> ---
->>  drivers/staging/lustre/lustre/obdclass/cl_io.c |   51 +++++-------------------
->>  1 file changed, 10 insertions(+), 41 deletions(-)
+>>  drivers/staging/lustre/lustre/include/cl_object.h |    2 --
+>>  drivers/staging/lustre/lustre/obdclass/cl_io.c    |   16 +++++++---------
+>>  2 files changed, 7 insertions(+), 11 deletions(-)
 >> 
+>> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+>> index 71ba73cdbb5e..13d79810dd39 100644
+>> --- a/drivers/staging/lustre/lustre/include/cl_object.h
+>> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
+>> @@ -2391,8 +2391,6 @@ struct cl_sync_io {
+>>  	atomic_t		csi_sync_nr;
+>>  	/** error code. */
+>>  	int			csi_sync_rc;
+>> -	/** barrier of destroy this structure */
+>> -	atomic_t		csi_barrier;
+>>  	/** completion to be signaled when transfer is complete. */
+>>  	wait_queue_head_t	csi_waitq;
+>>  };
 >> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> index beac7e8bc92a..7bf02350f19d 100644
+>> index e9ad055f84b8..beac7e8bc92a 100644
 >> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
 >> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> @@ -42,6 +42,7 @@
->>  #include <obd_support.h>
->>  #include <lustre_fid.h>
->>  #include <linux/list.h>
->> +#include <linux/list_sort.h>
->>  #include <linux/sched.h>
->>  #include <cl_object.h>
->>  #include "cl_internal.h"
->> @@ -213,9 +214,15 @@ int cl_io_rw_init(const struct lu_env *env, struct cl_io *io,
+>> @@ -1047,7 +1047,6 @@ void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
+>>  	memset(anchor, 0, sizeof(*anchor));
+>>  	init_waitqueue_head(&anchor->csi_waitq);
+>>  	atomic_set(&anchor->csi_sync_nr, nr);
+>> -	atomic_set(&anchor->csi_barrier, nr > 0);
+>>  	anchor->csi_sync_rc = 0;
 >>  }
->>  EXPORT_SYMBOL(cl_io_rw_init);
->>  
->> -static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
->> -			      const struct cl_lock_descr *d1)
->> +static int cl_lock_descr_cmp(void *priv,
->> +			     struct list_head *a, struct list_head *b)
->>  {
->> +	const struct cl_io_lock_link *l0 = list_entry(a, struct cl_io_lock_link, cill_linkage);
->> +	const struct cl_io_lock_link *l1 = list_entry(b, struct cl_io_lock_link, cill_linkage);
->> +
->> +	const struct cl_lock_descr *d0 = &l0->cill_descr;
->> +	const struct cl_lock_descr *d1 = &l1->cill_descr;
->> +
->>  	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
->>  			  lu_object_fid(&d1->cld_obj->co_lu));
->>  }
->> @@ -225,45 +232,7 @@ static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
->>   */
->>  static void cl_io_locks_sort(struct cl_io *io)
->>  {
->> -	int done = 0;
->> -
->> -	/* hidden treasure: bubble sort for now. */
->> -	do {
->> -		struct cl_io_lock_link *curr;
->> -		struct cl_io_lock_link *prev;
->> -		struct cl_io_lock_link *temp;
->> -
->> -		done = 1;
->> -		prev = NULL;
->> -
->> -		list_for_each_entry_safe(curr, temp,
->> -					 &io->ci_lockset.cls_todo,
->> -					 cill_linkage) {
->> -			if (prev) {
->> -				switch (cl_lock_descr_sort(&prev->cill_descr,
->> -							   &curr->cill_descr)) {
->> -				case 0:
->> -					/*
->> -					 * IMPOSSIBLE: Identical locks are
->> -					 *	     already removed at
->> -					 *	     this point.
->> -					 */
->> -				default:
->> -					LBUG();
->> -				case 1:
->> -					list_move_tail(&curr->cill_linkage,
->> -						       &prev->cill_linkage);
->> -					done = 0;
->> -					continue; /* don't change prev: it's
->> -						   * still "previous"
->> -						   */
->> -				case -1: /* already in order */
->> -					break;
->> -				}
->> -			}
->> -			prev = curr;
->> -		}
->> -	} while (!done);
->> +	list_sort(NULL, &io->ci_lockset.cls_todo, cl_lock_descr_cmp);
->>  }
+>>  EXPORT_SYMBOL(cl_sync_io_init);
+>> @@ -1080,11 +1079,10 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+>>  	} else {
+>>  		rc = anchor->csi_sync_rc;
+>>  	}
+>> +	/* We take the lock to ensure that cl_sync_io_note() has finished */
+>> +	spin_lock(&anchor->csi_waitq.lock);
 >
-> While this fine cl_io_locks_sort() is discussed in one comment in 
-> cl_object.h and used once in cl_io.c. We could remove this one line
-> function completely and update the comment in cl_object.h.
->
+> I don't think I every seen any use the internal lock for the wait_queue
+> in such a method. Most creative approach.
 
-Excellent idea.  New patch is below.
+You need to get more :-)
+
+There is a macro
+   wait_event_interruptible_locked()
+which explicitly supports this model.  Only used 4 times in the kernel
+so not very popular yet.
+The various forms of wake_up_locked are used a bit more often.
+I don't remember where I first saw it.
+It is a neat idea!
+
 Thanks,
 NeilBrown
 
-From: NeilBrown <neilb@suse.com>
-Subject: [PATCH] lustre: obdclass: use list_sort() to sort a list.
 
-Rather than a bespoke bubble-sort, use list_sort() to
-sort this linked list.
 
-As this would become a 1-line function that is only called once,
-call list_sort() directly from the one call site.
-
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/obdclass/cl_io.c | 63 ++++++--------------------
- 1 file changed, 14 insertions(+), 49 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-index 5191fba8bbc0..c8a99b61ecd2 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-@@ -42,6 +42,7 @@
- #include <obd_support.h>
- #include <lustre_fid.h>
- #include <linux/list.h>
-+#include <linux/list_sort.h>
- #include <linux/sched.h>
- #include <cl_object.h>
- #include "cl_internal.h"
-@@ -213,57 +214,17 @@ int cl_io_rw_init(const struct lu_env *env, struct cl_io *io,
- }
- EXPORT_SYMBOL(cl_io_rw_init);
- 
--static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
--			      const struct cl_lock_descr *d1)
-+static int cl_lock_descr_cmp(void *priv,
-+			     struct list_head *a, struct list_head *b)
- {
--	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
--			  lu_object_fid(&d1->cld_obj->co_lu));
--}
-+	const struct cl_io_lock_link *l0 = list_entry(a, struct cl_io_lock_link, cill_linkage);
-+	const struct cl_io_lock_link *l1 = list_entry(b, struct cl_io_lock_link, cill_linkage);
- 
--/*
-- * Sort locks in lexicographical order of their (fid, start-offset) pairs.
-- */
--static void cl_io_locks_sort(struct cl_io *io)
--{
--	int done = 0;
-+	const struct cl_lock_descr *d0 = &l0->cill_descr;
-+	const struct cl_lock_descr *d1 = &l1->cill_descr;
- 
--	/* hidden treasure: bubble sort for now. */
--	do {
--		struct cl_io_lock_link *curr;
--		struct cl_io_lock_link *prev;
--		struct cl_io_lock_link *temp;
--
--		done = 1;
--		prev = NULL;
--
--		list_for_each_entry_safe(curr, temp,
--					 &io->ci_lockset.cls_todo,
--					 cill_linkage) {
--			if (prev) {
--				switch (cl_lock_descr_sort(&prev->cill_descr,
--							   &curr->cill_descr)) {
--				case 0:
--					/*
--					 * IMPOSSIBLE: Identical locks are
--					 *	     already removed at
--					 *	     this point.
--					 */
--				default:
--					LBUG();
--				case 1:
--					list_move_tail(&curr->cill_linkage,
--						       &prev->cill_linkage);
--					done = 0;
--					continue; /* don't change prev: it's
--						   * still "previous"
--						   */
--				case -1: /* already in order */
--					break;
--				}
--			}
--			prev = curr;
--		}
--	} while (!done);
-+	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
-+			  lu_object_fid(&d1->cld_obj->co_lu));
- }
- 
- static void cl_lock_descr_merge(struct cl_lock_descr *d0,
-@@ -347,7 +308,11 @@ int cl_io_lock(const struct lu_env *env, struct cl_io *io)
- 	}
- 
- 	if (result == 0) {
--		cl_io_locks_sort(io);
-+		/*
-+		 * Sort locks in lexicographical order of their (fid,
-+		 * start-offset) pairs to avoid deadlocks.
-+		 */
-+		list_sort(NULL, &io->ci_lockset.cls_todo, cl_lock_descr_cmp);
- 		result = cl_lockset_lock(env, io, &io->ci_lockset);
- 	}
- 	if (result != 0)
--- 
-2.14.0.rc0.dirty
-
+>
+>>  	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
+>> -
+>> -	/* wait until cl_sync_io_note() has done wakeup */
+>> -	while (unlikely(atomic_read(&anchor->csi_barrier) != 0))
+>> -		cpu_relax();
+>> +	spin_unlock(&anchor->csi_waitq.lock);
+>>  
+>>  	return rc;
+>>  }
+>> @@ -1104,11 +1102,11 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+>>  	 * IO.
+>>  	 */
+>>  	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
+>> -	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
+>> +	if (atomic_dec_and_lock(&anchor->csi_sync_nr,
+>> +				&anchor->csi_waitq.lock)) {
+>>  
+>> -		wake_up_all(&anchor->csi_waitq);
+>> -		/* it's safe to nuke or reuse anchor now */
+>> -		atomic_set(&anchor->csi_barrier, 0);
+>> +		wake_up_all_locked(&anchor->csi_waitq);
+>> +		spin_unlock(&anchor->csi_waitq.lock);
+>>  
+>>  		/* Can't access anchor any more */
+>>  	}
+>> 
+>> 
+>> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/b7a2ccca/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/19836194/attachment.sig>
