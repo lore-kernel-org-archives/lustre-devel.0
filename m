@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 14:14:15 +1100
-Subject: [lustre-devel] [PATCH 04/21] lustre: use list*entry macros in
- place of container_of()
-In-Reply-To: <alpine.LFD.2.21.1902110057200.24975@casper.infradead.org>
+Date: Mon, 11 Feb 2019 14:19:47 +1100
+Subject: [lustre-devel] [PATCH 10/21] lustre: obdclass: use
+ cl_object_for_each where appropriate
+In-Reply-To: <alpine.LFD.2.21.1902110155130.24975@casper.infradead.org>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781267.10620.8365663638954760207.stgit@noble.brown>
- <alpine.LFD.2.21.1902110057200.24975@casper.infradead.org>
-Message-ID: <8736ovggoo.fsf@notabene.neil.brown.name>
+ <154949781310.10620.8883358407999258821.stgit@noble.brown>
+ <alpine.LFD.2.21.1902110155130.24975@casper.infradead.org>
+Message-ID: <87zhr3f1v0.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,19 +15,24 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, Feb 11 2019, James Simmons wrote:
 
->> There are a number of places that use container_of() but where
->> list_first_entry(), or list_last_entry() make the meaning more clear.
->> So change them over.
+>> There are various places which have a list_for_each_entry()
+>> where cl_object_for_each (or .._reverse) is more appropriate.
+>> 
+>> Several of these re-use the 'obj' function parameter as a loop
+>> iterator, which is a little confusing.
+>> 
+>> Change these to use cl_object_for_each{_reverse}, and where needed,
+>> introduce a new iterator variable 'o'.
 >
-> I have to say normally the patches you see genernally use the basic
-> functionality of the linux list implementation. I wonder if a deep
-> dive on LUG's developers day would be a good idea.
+> Surprised the reverse wasn't done in that the cl_* macro was
+> removed :-) 
 
-It is possible to take the "new macro for subtly different case"
-exercise too far, though in this particular case, I think using
-replacing container_of with list_entry is a clear win.
+Hmmm.... maybe .....
+But
+   ->co_lu.lo_header->loh_layers
 
-Maybe a broader discussion would help
+is sufficiently scary looking that hiding it in a macro seems like a
+good idea.
 
 >
 > Reviewed-by: James Simmons <jsimmons@infradead.org>
@@ -35,117 +40,253 @@ Maybe a broader discussion would help
 Thanks,
 NeilBrown
 
+
 >  
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >> ---
->>  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    4 ++--
->>  drivers/staging/lustre/lustre/obdclass/cl_io.c     |    4 ++--
->>  drivers/staging/lustre/lustre/obdclass/cl_object.c |   13 ++++++++-----
->>  drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
->>  drivers/staging/lustre/lustre/obdclass/lu_object.c |    7 +++----
->>  5 files changed, 17 insertions(+), 15 deletions(-)
+>>  drivers/staging/lustre/lustre/lov/lov_page.c       |    3 -
+>>  drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    3 -
+>>  drivers/staging/lustre/lustre/obdclass/cl_object.c |   82 +++++++++-----------
+>>  drivers/staging/lustre/lustre/obdclass/cl_page.c   |   11 +--
+>>  4 files changed, 44 insertions(+), 55 deletions(-)
 >> 
->> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
->> index 85c5047f4ba2..74c7644d6ef8 100644
->> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
->> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
->> @@ -987,8 +987,8 @@ struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
->>  {
->>  	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
->>  	LASSERT(!list_empty(ldlm_namespace_list(client)));
->> -	return container_of(ldlm_namespace_list(client)->next,
->> -		struct ldlm_namespace, ns_list_chain);
->> +	return list_first_entry(ldlm_namespace_list(client),
->> +				struct ldlm_namespace, ns_list_chain);
->>  }
+>> diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+>> index 08485a95ec01..e64b350601d2 100644
+>> --- a/drivers/staging/lustre/lustre/lov/lov_page.c
+>> +++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+>> @@ -103,8 +103,7 @@ int lov_page_init_composite(const struct lu_env *env, struct cl_object *obj,
+>>  		return PTR_ERR(sub);
 >>  
->>  /** Create and initialize new resource. */
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> index 7bf02350f19d..34b4e63e7d1a 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> @@ -93,8 +93,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
->>  	LINVRNT(cl_io_invariant(io));
+>>  	subobj = lovsub2cl(r0->lo_sub[stripe]);
+>> -	list_for_each_entry(o, &subobj->co_lu.lo_header->loh_layers,
+>> -			    co_lu.lo_linkage) {
+>> +	cl_object_for_each(o, subobj) {
+>>  		if (o->co_ops->coo_page_init) {
+>>  			rc = o->co_ops->coo_page_init(sub->sub_env, o, page,
+>>  						      cl_index(subobj, suboff));
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+>> index 8133d992cc73..fc5976d8b37b 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+>> @@ -103,8 +103,7 @@ int cl_lock_init(const struct lu_env *env, struct cl_lock *lock,
+>>  	LASSERT(obj);
 >>  
->>  	while (!list_empty(&io->ci_layers)) {
->> -		slice = container_of(io->ci_layers.prev, struct cl_io_slice,
->> -				     cis_linkage);
->> +		slice = list_last_entry(&io->ci_layers, struct cl_io_slice,
->> +					cis_linkage);
->>  		list_del_init(&slice->cis_linkage);
->>  		if (slice->cis_iop->op[io->ci_type].cio_fini)
->>  			slice->cis_iop->op[io->ci_type].cio_fini(env, slice);
+>>  	INIT_LIST_HEAD(&lock->cll_layers);
+>> -	list_for_each_entry(scan, &obj->co_lu.lo_header->loh_layers,
+>> -			    co_lu.lo_linkage) {
+>> +	cl_object_for_each(scan, obj) {
+>>  		result = scan->co_ops->coo_lock_init(env, scan, lock, io);
+>>  		if (result != 0) {
+>>  			cl_lock_fini(env, lock);
 >> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> index 05d784ae7a6c..f724b2d62df1 100644
+>> index f724b2d62df1..d71a680660da 100644
 >> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
 >> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> @@ -649,8 +649,8 @@ static struct lu_env *cl_env_obtain(void *debug)
->>  	if (cl_envs[cpu].cec_count > 0) {
->>  		int rc;
->>  
->> -		cle = container_of(cl_envs[cpu].cec_envs.next, struct cl_env,
->> -				   ce_linkage);
->> +		cle = list_first_entry(&cl_envs[cpu].cec_envs, struct cl_env,
->> +				       ce_linkage);
->>  		list_del_init(&cle->ce_linkage);
->>  		cl_envs[cpu].cec_count--;
->>  		read_unlock(&cl_envs[cpu].cec_guard);
->> @@ -748,9 +748,12 @@ unsigned int cl_env_cache_purge(unsigned int nr)
->>  
->>  	for_each_possible_cpu(i) {
->>  		write_lock(&cl_envs[i].cec_guard);
->> -		for (; !list_empty(&cl_envs[i].cec_envs) && nr > 0; --nr) {
->> -			cle = container_of(cl_envs[i].cec_envs.next,
->> -					   struct cl_env, ce_linkage);
->> +		for (; nr >0 &&
->> +			     (cle = list_first_entry_or_null(
->> +				     &cl_envs[i].cec_envs,
->> +				     struct cl_env,
->> +				     ce_linkage)) != NULL;
->> +		     --nr) {
->>  			list_del_init(&cle->ce_linkage);
->>  			LASSERT(cl_envs[i].cec_count > 0);
->>  			cl_envs[i].cec_count--;
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
->> index b1b4dc7ea22f..d025ea55818f 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
->> @@ -690,8 +690,8 @@ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
->>  	const struct cl_page_slice *slice;
+>> @@ -190,16 +190,15 @@ EXPORT_SYMBOL(cl_object_attr_unlock);
+>>  int cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
+>>  		       struct cl_attr *attr)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
 >>  	int result;
 >>  
->> -	slice = container_of(pg->cp_layers.next,
->> -			     const struct cl_page_slice, cpl_linkage);
->> +	slice = list_first_entry(&pg->cp_layers,
->> +				 const struct cl_page_slice, cpl_linkage);
->>  	PASSERT(env, pg, slice->cpl_ops->cpo_is_vmlocked);
->>  	/*
->>  	 * Call ->cpo_is_vmlocked() directly instead of going through
->> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> index 3bd48748f46c..639c298b6a90 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
->> @@ -349,7 +349,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
->>  		 * lives as long as possible and ->loo_object_free() methods
->>  		 * can look at its contents.
->>  		 */
->> -		o = container_of(splice.prev, struct lu_object, lo_linkage);
->> +		o = list_last_entry(&splice, struct lu_object, lo_linkage);
->>  		list_del_init(&o->lo_linkage);
->>  		o->lo_ops->loo_object_free(env, o);
+>>  	assert_spin_locked(cl_object_attr_guard(obj));
+>>  
+>> -	top = obj->co_lu.lo_header;
+>>  	result = 0;
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_attr_get) {
+>> -			result = obj->co_ops->coo_attr_get(env, obj, attr);
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_attr_get) {
+>> +			result = o->co_ops->coo_attr_get(env, o, attr);
+>>  			if (result != 0) {
+>>  				if (result > 0)
+>>  					result = 0;
+>> @@ -221,17 +220,16 @@ EXPORT_SYMBOL(cl_object_attr_get);
+>>  int cl_object_attr_update(const struct lu_env *env, struct cl_object *obj,
+>>  			  const struct cl_attr *attr, unsigned int v)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
+>>  	int result;
+>>  
+>>  	assert_spin_locked(cl_object_attr_guard(obj));
+>>  
+>> -	top = obj->co_lu.lo_header;
+>>  	result = 0;
+>> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_attr_update) {
+>> -			result = obj->co_ops->coo_attr_update(env, obj, attr,
+>> -							      v);
+>> +	cl_object_for_each_reverse(o, obj) {
+>> +		if (o->co_ops->coo_attr_update) {
+>> +			result = o->co_ops->coo_attr_update(env, o, attr,
+>> +							    v);
+>>  			if (result != 0) {
+>>  				if (result > 0)
+>>  					result = 0;
+>> @@ -254,19 +252,18 @@ EXPORT_SYMBOL(cl_object_attr_update);
+>>  int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
+>>  		      struct ost_lvb *lvb)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
+>>  	int result;
+>>  
+>> -	top = obj->co_lu.lo_header;
+>>  	result = 0;
+>> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_glimpse) {
+>> -			result = obj->co_ops->coo_glimpse(env, obj, lvb);
+>> +	cl_object_for_each_reverse(o, obj) {
+>> +		if (o->co_ops->coo_glimpse) {
+>> +			result = o->co_ops->coo_glimpse(env, o, lvb);
+>>  			if (result != 0)
+>>  				break;
+>>  		}
 >>  	}
->> @@ -432,9 +432,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
->>  		 * Free everything on the dispose list. This is safe against
->>  		 * races due to the reasons described in lu_object_put().
->>  		 */
->> -		while (!list_empty(&dispose)) {
->> -			h = container_of(dispose.next,
->> -					 struct lu_object_header, loh_lru);
->> +		while ((h = list_first_entry_or_null(
->> +				&dispose, struct lu_object_header, loh_lru)) != NULL) {
->>  			list_del_init(&h->loh_lru);
->>  			lu_object_free(env, lu_object_top(h));
->>  			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
+>> -	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(top),
+>> +	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(obj->co_lu.lo_header),
+>>  			 "size: %llu mtime: %llu atime: %llu ctime: %llu blocks: %llu\n",
+>>  			 lvb->lvb_size, lvb->lvb_mtime, lvb->lvb_atime,
+>>  			 lvb->lvb_ctime, lvb->lvb_blocks);
+>> @@ -280,14 +277,13 @@ EXPORT_SYMBOL(cl_object_glimpse);
+>>  int cl_conf_set(const struct lu_env *env, struct cl_object *obj,
+>>  		const struct cl_object_conf *conf)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
+>>  	int result;
+>>  
+>> -	top = obj->co_lu.lo_header;
+>>  	result = 0;
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_conf_set) {
+>> -			result = obj->co_ops->coo_conf_set(env, obj, conf);
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_conf_set) {
+>> +			result = o->co_ops->coo_conf_set(env, o, conf);
+>>  			if (result != 0)
+>>  				break;
+>>  		}
+>> @@ -301,13 +297,11 @@ EXPORT_SYMBOL(cl_conf_set);
+>>   */
+>>  int cl_object_prune(const struct lu_env *env, struct cl_object *obj)
+>>  {
+>> -	struct lu_object_header *top;
+>>  	struct cl_object *o;
+>>  	int result;
+>>  
+>> -	top = obj->co_lu.lo_header;
+>>  	result = 0;
+>> -	list_for_each_entry(o, &top->loh_layers, co_lu.lo_linkage) {
+>> +	cl_object_for_each(o, obj) {
+>>  		if (o->co_ops->coo_prune) {
+>>  			result = o->co_ops->coo_prune(env, o);
+>>  			if (result != 0)
+>> @@ -325,14 +319,13 @@ EXPORT_SYMBOL(cl_object_prune);
+>>  int cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
+>>  			struct lov_user_md __user *uarg, size_t size)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
+>>  	int result = 0;
+>>  
+>> -	top = obj->co_lu.lo_header;
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_getstripe) {
+>> -			result = obj->co_ops->coo_getstripe(env, obj, uarg,
+>> -							    size);
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_getstripe) {
+>> +			result = o->co_ops->coo_getstripe(env, o, uarg,
+>> +							  size);
+>>  			if (result)
+>>  				break;
+>>  		}
+>> @@ -357,14 +350,13 @@ int cl_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+>>  		     struct ll_fiemap_info_key *key,
+>>  		     struct fiemap *fiemap, size_t *buflen)
+>>  {
+>> -	struct lu_object_header *top;
+>> +	struct cl_object *o;
+>>  	int result = 0;
+>>  
+>> -	top = obj->co_lu.lo_header;
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_fiemap) {
+>> -			result = obj->co_ops->coo_fiemap(env, obj, key, fiemap,
+>> -							 buflen);
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_fiemap) {
+>> +			result = o->co_ops->coo_fiemap(env, o, key, fiemap,
+>> +						       buflen);
+>>  			if (result)
+>>  				break;
+>>  		}
+>> @@ -376,11 +368,11 @@ EXPORT_SYMBOL(cl_object_fiemap);
+>>  int cl_object_layout_get(const struct lu_env *env, struct cl_object *obj,
+>>  			 struct cl_layout *cl)
+>>  {
+>> -	struct lu_object_header *top = obj->co_lu.lo_header;
+>> +	struct cl_object *o;
+>>  
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_layout_get)
+>> -			return obj->co_ops->coo_layout_get(env, obj, cl);
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_layout_get)
+>> +			return o->co_ops->coo_layout_get(env, o, cl);
+>>  	}
+>>  
+>>  	return -EOPNOTSUPP;
+>> @@ -389,12 +381,12 @@ EXPORT_SYMBOL(cl_object_layout_get);
+>>  
+>>  loff_t cl_object_maxbytes(struct cl_object *obj)
+>>  {
+>> -	struct lu_object_header *top = obj->co_lu.lo_header;
+>> +	struct cl_object *o;
+>>  	loff_t maxbytes = LLONG_MAX;
+>>  
+>> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+>> -		if (obj->co_ops->coo_maxbytes)
+>> -			maxbytes = min_t(loff_t, obj->co_ops->coo_maxbytes(obj),
+>> +	cl_object_for_each(o, obj) {
+>> +		if (o->co_ops->coo_maxbytes)
+>> +			maxbytes = min_t(loff_t, o->co_ops->coo_maxbytes(o),
+>>  					 maxbytes);
+>>  	}
+>>  
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+>> index 057318deaa4e..7d00a9233a3b 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+>> @@ -132,7 +132,7 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
+>>  			      enum cl_page_type type)
+>>  {
+>>  	struct cl_page *page;
+>> -	struct lu_object_header *head;
+>> +	struct cl_object *o2;
+>>  
+>>  	page = kzalloc(cl_object_header(o)->coh_page_bufsize, GFP_NOFS);
+>>  	if (page) {
+>> @@ -149,11 +149,10 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
+>>  		INIT_LIST_HEAD(&page->cp_layers);
+>>  		INIT_LIST_HEAD(&page->cp_batch);
+>>  		lu_ref_init(&page->cp_reference);
+>> -		head = o->co_lu.lo_header;
+>> -		list_for_each_entry(o, &head->loh_layers, co_lu.lo_linkage) {
+>> -			if (o->co_ops->coo_page_init) {
+>> -				result = o->co_ops->coo_page_init(env, o, page,
+>> -								  ind);
+>> +		cl_object_for_each(o2, o) {
+>> +			if (o2->co_ops->coo_page_init) {
+>> +				result = o2->co_ops->coo_page_init(env, o2, page,
+>> +								   ind);
+>>  				if (result != 0) {
+>>  					__cl_page_delete(env, page);
+>>  					cl_page_free(env, page);
 >> 
 >> 
 >> 
@@ -155,4 +296,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/b5cb43a0/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/0b2e036b/attachment.sig>
