@@ -1,99 +1,109 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 11 Feb 2019 11:34:55 +1100
-Subject: [lustre-devel] [PATCH 07/21] lustre: use list_first_entry() in
- lnet/klnds subdirectory.
-In-Reply-To: <1F487FF7-BF02-4FD7-9026-51CBD34610FE@whamcloud.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 11 Feb 2019 00:39:53 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 03/21] lustre: obdclass: use list_sort()
+ to sort a list.
+In-Reply-To: <154949781252.10620.13626213918115345779.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781297.10620.13452862524706335326.stgit@noble.brown>
- <1F487FF7-BF02-4FD7-9026-51CBD34610FE@whamcloud.com>
-Message-ID: <87sgwvgo28.fsf@notabene.neil.brown.name>
+ <154949781252.10620.13626213918115345779.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902110037220.24975@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Feb 08 2019, Andreas Dilger wrote:
 
-> On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
->> 
->> Convert
->>  list_entry(foo->next .....)
->> to
->>  list_first_entry(foo, ....)
->> 
->> in 'lnet/klnds
->> 
->> In several cases the call is combined with a list_empty() test and
->> list_first_entry_or_null() is used
->> 
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> 
->> @@ -1853,8 +1855,9 @@ static void kiblnd_destroy_pool_list(struct list_head *head)
->> {
->> 	struct kib_pool *pool;
->> 
->> -	while (!list_empty(head)) {
->> -		pool = list_entry(head->next, struct kib_pool, po_list);
->> +	while ((pool = list_first_entry_or_null(head,
->> +						struct kib_pool,
->> +						po_list)) != NULL) {
->> 		list_del(&pool->po_list);
->> 
->> 		LASSERT(pool->po_owner);
->> @@ -1869,7 +1872,7 @@ static void kiblnd_fail_poolset(struct kib_poolset *ps, struct list_head *zombie
->> 
->> 	spin_lock(&ps->ps_lock);
->> 	while (!list_empty(&ps->ps_pool_list)) {
->> -		struct kib_pool *po = list_entry(ps->ps_pool_list.next,
->> +		struct kib_pool *po = list_first_entry(&ps->ps_pool_list,
->> 					    struct kib_pool, po_list);
->> 		po->po_failed = 1;
->> 		list_del(&po->po_list);
->
-> Why not use the same style as elsewhere in the code:
->
-> 	while ((po = list_first_entry_or_null(&ps->ps_pool_list,
-> 					      struct kib_pool,
-> 					      po_list)) != NULL) {
->
+> Rather than a bespoke bubble-sort, use list_sort() to
+> sort this linked list.
 
-No good reason - just fatigue probably.  I could automate most of
-finding these, but automating the fixing of them didn't quite seem
-worth the effort.  Maybe I should play with coccinelle...
-
-I've merged:
-
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index df6b1b134709..d67a197e718d 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1867,13 +1867,15 @@ static void kiblnd_destroy_pool_list(struct list_head *head)
+Reviewed-by: James Simmons <jsimmons@infradead.org>
  
- static void kiblnd_fail_poolset(struct kib_poolset *ps, struct list_head *zombies)
- {
-+	struct kib_pool *po;
-+
- 	if (!ps->ps_net) /* initialized? */
- 		return;
- 
- 	spin_lock(&ps->ps_lock);
--	while (!list_empty(&ps->ps_pool_list)) {
--		struct kib_pool *po = list_first_entry(&ps->ps_pool_list,
--					    struct kib_pool, po_list);
-+	while ((po = list_first_entry_or_null(&ps->ps_pool_list,
-+					      struct kib_pool,
-+					      po_list)) == NULL) {
- 		po->po_failed = 1;
- 		list_del(&po->po_list);
- 		if (!po->po_allocated)
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/obdclass/cl_io.c |   51 +++++-------------------
+>  1 file changed, 10 insertions(+), 41 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> index beac7e8bc92a..7bf02350f19d 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> @@ -42,6 +42,7 @@
+>  #include <obd_support.h>
+>  #include <lustre_fid.h>
+>  #include <linux/list.h>
+> +#include <linux/list_sort.h>
+>  #include <linux/sched.h>
+>  #include <cl_object.h>
+>  #include "cl_internal.h"
+> @@ -213,9 +214,15 @@ int cl_io_rw_init(const struct lu_env *env, struct cl_io *io,
+>  }
+>  EXPORT_SYMBOL(cl_io_rw_init);
+>  
+> -static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
+> -			      const struct cl_lock_descr *d1)
+> +static int cl_lock_descr_cmp(void *priv,
+> +			     struct list_head *a, struct list_head *b)
+>  {
+> +	const struct cl_io_lock_link *l0 = list_entry(a, struct cl_io_lock_link, cill_linkage);
+> +	const struct cl_io_lock_link *l1 = list_entry(b, struct cl_io_lock_link, cill_linkage);
+> +
+> +	const struct cl_lock_descr *d0 = &l0->cill_descr;
+> +	const struct cl_lock_descr *d1 = &l1->cill_descr;
+> +
+>  	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
+>  			  lu_object_fid(&d1->cld_obj->co_lu));
+>  }
+> @@ -225,45 +232,7 @@ static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
+>   */
+>  static void cl_io_locks_sort(struct cl_io *io)
+>  {
+> -	int done = 0;
+> -
+> -	/* hidden treasure: bubble sort for now. */
+> -	do {
+> -		struct cl_io_lock_link *curr;
+> -		struct cl_io_lock_link *prev;
+> -		struct cl_io_lock_link *temp;
+> -
+> -		done = 1;
+> -		prev = NULL;
+> -
+> -		list_for_each_entry_safe(curr, temp,
+> -					 &io->ci_lockset.cls_todo,
+> -					 cill_linkage) {
+> -			if (prev) {
+> -				switch (cl_lock_descr_sort(&prev->cill_descr,
+> -							   &curr->cill_descr)) {
+> -				case 0:
+> -					/*
+> -					 * IMPOSSIBLE: Identical locks are
+> -					 *	     already removed at
+> -					 *	     this point.
+> -					 */
+> -				default:
+> -					LBUG();
+> -				case 1:
+> -					list_move_tail(&curr->cill_linkage,
+> -						       &prev->cill_linkage);
+> -					done = 0;
+> -					continue; /* don't change prev: it's
+> -						   * still "previous"
+> -						   */
+> -				case -1: /* already in order */
+> -					break;
+> -				}
+> -			}
+> -			prev = curr;
+> -		}
+> -	} while (!done);
+> +	list_sort(NULL, &io->ci_lockset.cls_todo, cl_lock_descr_cmp);
+>  }
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190211/bc4f596b/attachment.sig>
+While this fine cl_io_locks_sort() is discussed in one comment in 
+cl_object.h and used once in cl_io.c. We could remove this one line
+function completely and update the comment in cl_object.h.
+
+>  static void cl_lock_descr_merge(struct cl_lock_descr *d0,
+> 
+> 
+> 
