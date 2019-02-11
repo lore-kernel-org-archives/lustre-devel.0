@@ -1,178 +1,335 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 11 Feb 2019 04:18:05 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 21/21] lustre: make exp_refcount in
- obd_export a refcount_t
-In-Reply-To: <154949781349.10620.3269248433038576631.stgit@noble.brown>
+Date: Mon, 11 Feb 2019 04:19:27 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 10/21] lustre: obdclass: use
+ cl_object_for_each where appropriate
+In-Reply-To: <87pnrzgnp5.fsf@notabene.neil.brown.name>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781349.10620.3269248433038576631.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902110417570.5690@casper.infradead.org>
+ <154949781310.10620.8883358407999258821.stgit@noble.brown>
+ <D0699499-2DE2-4430-94B6-81FE876793A2@whamcloud.com>
+ <87pnrzgnp5.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1902110419010.5690@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+> On Fri, Feb 08 2019, Andreas Dilger wrote:
+> 
+> > On Feb 6, 2019, at 17:03, NeilBrown <neilb@suse.com> wrote:
+> >> 
+> >> There are various places which have a list_for_each_entry()
+> >> where cl_object_for_each (or .._reverse) is more appropriate.
+> >> 
+> >> Several of these re-use the 'obj' function parameter as a loop
+> >> iterator, which is a little confusing.
+> >> 
+> >> Change these to use cl_object_for_each{_reverse}, and where needed,
+> >> introduce a new iterator variable 'o'.
+> >> 
+> >> Signed-off-by: NeilBrown <neilb@suse.com>
+> >> ---
+> >> drivers/staging/lustre/lustre/lov/lov_page.c       |    3 -
+> >> drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    3 -
+> >> drivers/staging/lustre/lustre/obdclass/cl_object.c |   82 +++++++++-----------
+> >> drivers/staging/lustre/lustre/obdclass/cl_page.c   |   11 +--
+> >> 4 files changed, 44 insertions(+), 55 deletions(-)
+> >> 
+> >> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> >> index f724b2d62df1..d71a680660da 100644
+> >> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> >> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> >> @@ -190,16 +190,15 @@ EXPORT_SYMBOL(cl_object_attr_unlock);
+> >> int cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
+> >> 		       struct cl_attr *attr)
+> >> {
+> >> -	struct lu_object_header *top;
+> >> +	struct cl_object *o;
+> >> 	int result;
+> >> 
+> >> 	assert_spin_locked(cl_object_attr_guard(obj));
+> >> 
+> >> -	top = obj->co_lu.lo_header;
+> >> 	result = 0;
+> >
+> > May as well move the "result = 0" initialization to the declaration for
+> > all of these?  Another 5 fewer lines of code under your belt.
+> 
+> Yes, that seem good. New patch below.
+> Thanks,
+> NeilBrown
+> 
+> 
+> From: NeilBrown <neilb@suse.com>
+> Subject: [PATCH] lustre: obdclass: use cl_object_for_each where appropriate
+> 
+> There are various places which have a list_for_each_entry()
+> where cl_object_for_each (or .._reverse) is more appropriate.
+> 
+> Several of these re-use the 'obj' function parameter as a loop
+> iterator, which is a little confusing.
+> 
+> Change these to use cl_object_for_each{_reverse}, and where needed,
+> introduce a new iterator variable 'o'.
+> 
+> To further clean up these function, move initializtion of 'result'
+> to the variable declaration.
 
-> As this is used as a refcount, it should be declared
-> as one.
+Good with this version as well.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/lustre/include/lustre_export.h  |    2 +-
->  drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   10 +++++-----
->  drivers/staging/lustre/lustre/obdclass/genops.c    |   15 ++++++++-------
->  .../staging/lustre/lustre/obdecho/echo_client.c    |    2 +-
->  drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 ++--
->  5 files changed, 17 insertions(+), 16 deletions(-)
+>  drivers/staging/lustre/lustre/lov/lov_page.c       |  3 +-
+>  drivers/staging/lustre/lustre/obdclass/cl_lock.c   |  3 +-
+>  drivers/staging/lustre/lustre/obdclass/cl_object.c | 97 ++++++++++------------
+>  drivers/staging/lustre/lustre/obdclass/cl_page.c   | 11 ++-
+>  4 files changed, 49 insertions(+), 65 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
-> index 63fa656eb7ba..fb34e0b7de35 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_export.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_export.h
-> @@ -67,7 +67,7 @@ struct obd_export {
->  	 * what export they are talking to.
->  	 */
->  	struct portals_handle		exp_handle;
-> -	atomic_t			exp_refcount;
-> +	refcount_t			exp_refcount;
->  	/**
->  	 * Set of counters below is to track where export references are
->  	 * kept. The exp_rpc_count is used for reconnect handling also,
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> index cea0e22d064b..f2433dc0e558 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> @@ -1998,7 +1998,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
->  				   ldlm_lockname[lock->l_req_mode],
->  				   lock->l_flags, nid,
->  				   lock->l_remote_handle.cookie,
-> -				   exp ? atomic_read(&exp->exp_refcount) : -99,
-> +				   exp ? refcount_read(&exp->exp_refcount) : -99,
->  				   lock->l_pid, lock->l_callback_timeout,
->  				   lock->l_lvb_type);
->  		va_end(args);
-> @@ -2024,7 +2024,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
->  				   lock->l_req_extent.end,
->  				   lock->l_flags, nid,
->  				   lock->l_remote_handle.cookie,
-> -				   exp ? atomic_read(&exp->exp_refcount) : -99,
-> +				   exp ? refcount_read(&exp->exp_refcount) : -99,
->  				   lock->l_pid, lock->l_callback_timeout,
->  				   lock->l_lvb_type);
->  		break;
-> @@ -2046,7 +2046,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
->  				   lock->l_policy_data.l_flock.end,
->  				   lock->l_flags, nid,
->  				   lock->l_remote_handle.cookie,
-> -				   exp ? atomic_read(&exp->exp_refcount) : -99,
-> +				   exp ? refcount_read(&exp->exp_refcount) : -99,
->  				   lock->l_pid, lock->l_callback_timeout);
->  		break;
+> diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+> index 08485a95ec01..e64b350601d2 100644
+> --- a/drivers/staging/lustre/lustre/lov/lov_page.c
+> +++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+> @@ -103,8 +103,7 @@ int lov_page_init_composite(const struct lu_env *env, struct cl_object *obj,
+>  		return PTR_ERR(sub);
 >  
-> @@ -2065,7 +2065,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
->  				   ldlm_typename[resource->lr_type],
->  				   lock->l_flags, nid,
->  				   lock->l_remote_handle.cookie,
-> -				   exp ? atomic_read(&exp->exp_refcount) : -99,
-> +				   exp ? refcount_read(&exp->exp_refcount) : -99,
->  				   lock->l_pid, lock->l_callback_timeout,
->  				   lock->l_lvb_type);
->  		break;
-> @@ -2084,7 +2084,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
->  				   ldlm_typename[resource->lr_type],
->  				   lock->l_flags, nid,
->  				   lock->l_remote_handle.cookie,
-> -				   exp ? atomic_read(&exp->exp_refcount) : -99,
-> +				   exp ? refcount_read(&exp->exp_refcount) : -99,
->  				   lock->l_pid, lock->l_callback_timeout,
->  				   lock->l_lvb_type);
->  		break;
-> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-> index dad21d9fa328..39919f1c5b71 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-> @@ -757,7 +757,7 @@ static void class_export_destroy(struct obd_export *exp)
+>  	subobj = lovsub2cl(r0->lo_sub[stripe]);
+> -	list_for_each_entry(o, &subobj->co_lu.lo_header->loh_layers,
+> -			    co_lu.lo_linkage) {
+> +	cl_object_for_each(o, subobj) {
+>  		if (o->co_ops->coo_page_init) {
+>  			rc = o->co_ops->coo_page_init(sub->sub_env, o, page,
+>  						      cl_index(subobj, suboff));
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> index 8133d992cc73..fc5976d8b37b 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+> @@ -103,8 +103,7 @@ int cl_lock_init(const struct lu_env *env, struct cl_lock *lock,
+>  	LASSERT(obj);
+>  
+>  	INIT_LIST_HEAD(&lock->cll_layers);
+> -	list_for_each_entry(scan, &obj->co_lu.lo_header->loh_layers,
+> -			    co_lu.lo_linkage) {
+> +	cl_object_for_each(scan, obj) {
+>  		result = scan->co_ops->coo_lock_init(env, scan, lock, io);
+>  		if (result != 0) {
+>  			cl_lock_fini(env, lock);
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> index f724b2d62df1..43bf1a422635 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+> @@ -190,16 +190,14 @@ EXPORT_SYMBOL(cl_object_attr_unlock);
+>  int cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
+>  		       struct cl_attr *attr)
 >  {
->  	struct obd_device *obd = exp->exp_obd;
+> -	struct lu_object_header *top;
+> -	int result;
+> +	struct cl_object *o;
+> +	int result = 0;
 >  
-> -	LASSERT_ATOMIC_ZERO(&exp->exp_refcount);
-> +	LASSERT(refcount_read(&exp->exp_refcount) == 0);
->  	LASSERT(obd);
+>  	assert_spin_locked(cl_object_attr_guard(obj));
 >  
->  	CDEBUG(D_IOCTL, "destroying export %p/%s for %s\n", exp,
-> @@ -793,20 +793,21 @@ static struct portals_handle_ops export_handle_ops = {
->  
->  struct obd_export *class_export_get(struct obd_export *exp)
+> -	top = obj->co_lu.lo_header;
+> -	result = 0;
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_attr_get) {
+> -			result = obj->co_ops->coo_attr_get(env, obj, attr);
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_attr_get) {
+> +			result = o->co_ops->coo_attr_get(env, o, attr);
+>  			if (result != 0) {
+>  				if (result > 0)
+>  					result = 0;
+> @@ -221,17 +219,15 @@ EXPORT_SYMBOL(cl_object_attr_get);
+>  int cl_object_attr_update(const struct lu_env *env, struct cl_object *obj,
+>  			  const struct cl_attr *attr, unsigned int v)
 >  {
-> -	atomic_inc(&exp->exp_refcount);
-> +	refcount_inc(&exp->exp_refcount);
->  	CDEBUG(D_INFO, "GETting export %p : new refcount %d\n", exp,
-> -	       atomic_read(&exp->exp_refcount));
-> +	       refcount_read(&exp->exp_refcount));
->  	return exp;
->  }
->  EXPORT_SYMBOL(class_export_get);
+> -	struct lu_object_header *top;
+> -	int result;
+> +	struct cl_object *o;
+> +	int result = 0;
 >  
->  void class_export_put(struct obd_export *exp)
+>  	assert_spin_locked(cl_object_attr_guard(obj));
+>  
+> -	top = obj->co_lu.lo_header;
+> -	result = 0;
+> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_attr_update) {
+> -			result = obj->co_ops->coo_attr_update(env, obj, attr,
+> -							      v);
+> +	cl_object_for_each_reverse(o, obj) {
+> +		if (o->co_ops->coo_attr_update) {
+> +			result = o->co_ops->coo_attr_update(env, o, attr,
+> +							    v);
+>  			if (result != 0) {
+>  				if (result > 0)
+>  					result = 0;
+> @@ -254,19 +250,17 @@ EXPORT_SYMBOL(cl_object_attr_update);
+>  int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
+>  		      struct ost_lvb *lvb)
 >  {
-> -	LASSERT_ATOMIC_GT_LT(&exp->exp_refcount, 0, LI_POISON);
-> +	LASSERT(refcount_read(&exp->exp_refcount) >  0);
-> +	LASSERT(refcount_read(&exp->exp_refcount) < LI_POISON);
->  	CDEBUG(D_INFO, "PUTting export %p : new refcount %d\n", exp,
-> -	       atomic_read(&exp->exp_refcount) - 1);
-> +	       refcount_read(&exp->exp_refcount) - 1);
+> -	struct lu_object_header *top;
+> -	int result;
+> +	struct cl_object *o;
+> +	int result = 0;
 >  
-> -	if (atomic_dec_and_test(&exp->exp_refcount)) {
-> +	if (refcount_dec_and_test(&exp->exp_refcount)) {
->  		struct obd_device *obd = exp->exp_obd;
+> -	top = obj->co_lu.lo_header;
+> -	result = 0;
+> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_glimpse) {
+> -			result = obj->co_ops->coo_glimpse(env, obj, lvb);
+> +	cl_object_for_each_reverse(o, obj) {
+> +		if (o->co_ops->coo_glimpse) {
+> +			result = o->co_ops->coo_glimpse(env, o, lvb);
+>  			if (result != 0)
+>  				break;
+>  		}
+>  	}
+> -	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(top),
+> +	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(obj->co_lu.lo_header),
+>  			 "size: %llu mtime: %llu atime: %llu ctime: %llu blocks: %llu\n",
+>  			 lvb->lvb_size, lvb->lvb_mtime, lvb->lvb_atime,
+>  			 lvb->lvb_ctime, lvb->lvb_blocks);
+> @@ -280,14 +274,12 @@ EXPORT_SYMBOL(cl_object_glimpse);
+>  int cl_conf_set(const struct lu_env *env, struct cl_object *obj,
+>  		const struct cl_object_conf *conf)
+>  {
+> -	struct lu_object_header *top;
+> -	int result;
+> +	struct cl_object *o;
+> +	int result = 0;
 >  
->  		CDEBUG(D_IOCTL, "final put %p/%s\n",
-> @@ -856,7 +857,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+> -	top = obj->co_lu.lo_header;
+> -	result = 0;
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_conf_set) {
+> -			result = obj->co_ops->coo_conf_set(env, obj, conf);
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_conf_set) {
+> +			result = o->co_ops->coo_conf_set(env, o, conf);
+>  			if (result != 0)
+>  				break;
+>  		}
+> @@ -301,13 +293,10 @@ EXPORT_SYMBOL(cl_conf_set);
+>   */
+>  int cl_object_prune(const struct lu_env *env, struct cl_object *obj)
+>  {
+> -	struct lu_object_header *top;
+>  	struct cl_object *o;
+> -	int result;
+> +	int result = 0;
 >  
->  	export->exp_conn_cnt = 0;
->  	/* 2 = class_handle_hash + last */
-> -	atomic_set(&export->exp_refcount, 2);
-> +	refcount_set(&export->exp_refcount, 2);
->  	atomic_set(&export->exp_rpc_count, 0);
->  	atomic_set(&export->exp_cb_count, 0);
->  	atomic_set(&export->exp_locks_count, 0);
-> diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> index 1b7d98c649b6..317123fd27cb 100644
-> --- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> +++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> @@ -1638,7 +1638,7 @@ static int echo_client_cleanup(struct obd_device *obddev)
->  		return -EBUSY;
+> -	top = obj->co_lu.lo_header;
+> -	result = 0;
+> -	list_for_each_entry(o, &top->loh_layers, co_lu.lo_linkage) {
+> +	cl_object_for_each(o, obj) {
+>  		if (o->co_ops->coo_prune) {
+>  			result = o->co_ops->coo_prune(env, o);
+>  			if (result != 0)
+> @@ -325,14 +314,13 @@ EXPORT_SYMBOL(cl_object_prune);
+>  int cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
+>  			struct lov_user_md __user *uarg, size_t size)
+>  {
+> -	struct lu_object_header *top;
+> +	struct cl_object *o;
+>  	int result = 0;
+>  
+> -	top = obj->co_lu.lo_header;
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_getstripe) {
+> -			result = obj->co_ops->coo_getstripe(env, obj, uarg,
+> -							    size);
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_getstripe) {
+> +			result = o->co_ops->coo_getstripe(env, o, uarg,
+> +							  size);
+>  			if (result)
+>  				break;
+>  		}
+> @@ -357,14 +345,13 @@ int cl_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+>  		     struct ll_fiemap_info_key *key,
+>  		     struct fiemap *fiemap, size_t *buflen)
+>  {
+> -	struct lu_object_header *top;
+> +	struct cl_object *o;
+>  	int result = 0;
+>  
+> -	top = obj->co_lu.lo_header;
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_fiemap) {
+> -			result = obj->co_ops->coo_fiemap(env, obj, key, fiemap,
+> -							 buflen);
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_fiemap) {
+> +			result = o->co_ops->coo_fiemap(env, o, key, fiemap,
+> +						       buflen);
+>  			if (result)
+>  				break;
+>  		}
+> @@ -376,11 +363,11 @@ EXPORT_SYMBOL(cl_object_fiemap);
+>  int cl_object_layout_get(const struct lu_env *env, struct cl_object *obj,
+>  			 struct cl_layout *cl)
+>  {
+> -	struct lu_object_header *top = obj->co_lu.lo_header;
+> +	struct cl_object *o;
+>  
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_layout_get)
+> -			return obj->co_ops->coo_layout_get(env, obj, cl);
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_layout_get)
+> +			return o->co_ops->coo_layout_get(env, o, cl);
 >  	}
 >  
-> -	LASSERT(atomic_read(&ec->ec_exp->exp_refcount) > 0);
-> +	LASSERT(refcount_read(&ec->ec_exp->exp_refcount) > 0);
->  	rc = obd_disconnect(ec->ec_exp);
->  	if (rc != 0)
->  		CERROR("fail to disconnect device: %d\n", rc);
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> index 35a59e5a5e9d..b7d44fc21d73 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> @@ -1697,7 +1697,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
->  	       (request->rq_export ?
->  		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
->  	       (request->rq_export ?
-> -		atomic_read(&request->rq_export->exp_refcount) : -99),
-> +		refcount_read(&request->rq_export->exp_refcount) : -99),
->  	       lustre_msg_get_status(request->rq_reqmsg), request->rq_xid,
->  	       libcfs_id2str(request->rq_peer),
->  	       lustre_msg_get_opc(request->rq_reqmsg));
-> @@ -1741,7 +1741,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
->  	       (request->rq_export ?
->  		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
->  	       (request->rq_export ?
-> -		atomic_read(&request->rq_export->exp_refcount) : -99),
-> +		refcount_read(&request->rq_export->exp_refcount) : -99),
->  	       lustre_msg_get_status(request->rq_reqmsg),
->  	       request->rq_xid,
->  	       libcfs_id2str(request->rq_peer),
-> 
+>  	return -EOPNOTSUPP;
+> @@ -389,12 +376,12 @@ EXPORT_SYMBOL(cl_object_layout_get);
+>  
+>  loff_t cl_object_maxbytes(struct cl_object *obj)
+>  {
+> -	struct lu_object_header *top = obj->co_lu.lo_header;
+> +	struct cl_object *o;
+>  	loff_t maxbytes = LLONG_MAX;
+>  
+> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+> -		if (obj->co_ops->coo_maxbytes)
+> -			maxbytes = min_t(loff_t, obj->co_ops->coo_maxbytes(obj),
+> +	cl_object_for_each(o, obj) {
+> +		if (o->co_ops->coo_maxbytes)
+> +			maxbytes = min_t(loff_t, o->co_ops->coo_maxbytes(o),
+>  					 maxbytes);
+>  	}
+>  
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> index 057318deaa4e..7d00a9233a3b 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> @@ -132,7 +132,7 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
+>  			      enum cl_page_type type)
+>  {
+>  	struct cl_page *page;
+> -	struct lu_object_header *head;
+> +	struct cl_object *o2;
+>  
+>  	page = kzalloc(cl_object_header(o)->coh_page_bufsize, GFP_NOFS);
+>  	if (page) {
+> @@ -149,11 +149,10 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
+>  		INIT_LIST_HEAD(&page->cp_layers);
+>  		INIT_LIST_HEAD(&page->cp_batch);
+>  		lu_ref_init(&page->cp_reference);
+> -		head = o->co_lu.lo_header;
+> -		list_for_each_entry(o, &head->loh_layers, co_lu.lo_linkage) {
+> -			if (o->co_ops->coo_page_init) {
+> -				result = o->co_ops->coo_page_init(env, o, page,
+> -								  ind);
+> +		cl_object_for_each(o2, o) {
+> +			if (o2->co_ops->coo_page_init) {
+> +				result = o2->co_ops->coo_page_init(env, o2, page,
+> +								   ind);
+>  				if (result != 0) {
+>  					__cl_page_delete(env, page);
+>  					cl_page_free(env, page);
+> -- 
+> 2.14.0.rc0.dirty
 > 
 > 
