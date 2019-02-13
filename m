@@ -1,154 +1,117 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 13 Feb 2019 11:29:59 +1100
-Subject: [lustre-devel] [PATCH 11/21] lustre: cl_object: remove
- vestigial debugging.
-In-Reply-To: <alpine.LFD.2.21.1902130011290.28026@casper.infradead.org>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 13 Feb 2019 01:53:59 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 20/21] lustre: obdclass: fix module load
+ locking.
+In-Reply-To: <154949781345.10620.8278067573811049130.stgit@noble.brown>
 References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781313.10620.6363156783936746853.stgit@noble.brown>
- <alpine.LFD.2.21.1902110157410.24975@casper.infradead.org>
- <87wom7f1le.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1902120504270.3631@casper.infradead.org>
- <87ftssfyh0.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1902130011290.28026@casper.infradead.org>
-Message-ID: <877ee4fs3c.fsf@notabene.neil.brown.name>
+ <154949781345.10620.8278067573811049130.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902130153240.28026@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Feb 13 2019, James Simmons wrote:
 
->> >> >> cl_env_inc() and cl_env_dec() don't do anything,
->> >> >> so discard them.
->> >> >
->> >> > I don't know about this one. I saw Andreas response as well. 
->> >> > So this was apart of "LU-744 obdclass: revise stats for cl_object cache"
->> >> > In the end it was turned off by default in the OpenSFS branch since it
->> >> > made performance take a hit. To enable in OpenSFS branch you have to run
->> >> > ./configure --enable-pgstate-track. We have a few like this for Lustre so
->> >> > I was going to bring this up. Do we want to remove this work for both the
->> >> > upstream client as well as OpenSFS tree or properly implement this by
->> >> > making it a Kconfig option when CONFIG_LUSTRE_DEBUG_EXPENSIVE_CHECK is
->> >> > enabled? Its just a matter of porting OpenSFS commit 
->> >> > 5cae09a2409dcd396a1ee7be1eca7d3bbf77365e
->> >> >
->> >> > What do you think?
->> >> 
->> >> How useful are these stats?
->> >> Stats that are never compiled in aren't likely to tell you much :-)
->> >> 
->> >> Has any thought been given to per-cpu stats counting?  That seems to be
->> >> the preferred approach for high-frequency accounting.
->> >> 
->> >> I think having a CONFIG option to enable expensive consistency checks is
->> >> a good idea - developers will enable it when they don't care about
->> >> performance.
->> >> Having a CONFIG option for expensive performance stats seems... weird.
->> >> Who would use it, and how meaningful would the number be?
->> >
->> > Which per-cpu stats are you talking about?
->> 
->> include/linux/percpu_counter.h I guess - or something similar.
->
-> Ouch 4K per counter. This would crush our clients. Does this scale well?
-> I also looked at the page counter which also atomic counting orientated.
-> I expect that too also to struggle. The page counter don't match as well
-> as what these cl_page stats monitor.
+> Safe module loading requires that we try_module_get() in a context
+> where the module cannot be unloaded, typically prodected by
+> a spinlock that module-unload has to take.
+> This doesn't currently happen in class_get_type().
+> 
+> There is a per-type spinlock, but it is almost entirely unused, and
+> cannot be used to protect the module from being unloaded.
+> 
+> So discard ->obd_type_lock, and ensure that __class_search_type() and
+> try_module_get() are both called while obd_types_lock is held - this
+> prevent class_unregister_type() from completing (so the 'type' won't get
+> freed.  That is always called from a module-unload function - if it
+> has got that far, try_module_get() will fail.
+> 
+> So also check the return status of try_module_get().
 
-Why?  How many counters are there?
-enum cl_page_state defines 5 per "site".
-enum cache_stats_item defines 5, which  think are global.
-That makes 4, to order of 16K.  That isn't all that much.
-
-NeilBrown
-
-
->
->> >                                             I know perf can do this kind of
->> > profiling with performance counters but I don't think you can use those
->> > with cl_pages specifically. I know the lustre developers really dislike
->> > trace point but this could be one of those cases where it makes sense.
->> >  
->> >> NeilBrown
->> >> 
->> >> 
->> >> >
->> >> >> Signed-off-by: NeilBrown <neilb@suse.com>
->> >> >> ---
->> >> >>  drivers/staging/lustre/lustre/obdclass/cl_object.c |   15 ---------------
->> >> >>  1 file changed, 15 deletions(-)
->> >> >> 
->> >> >> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> >> >> index d71a680660da..1e704078664e 100644
->> >> >> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> >> >> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
->> >> >> @@ -565,14 +565,6 @@ struct cl_env {
->> >> >>  	void		       *ce_debug;
->> >> >>  };
->> >> >>  
->> >> >> -static void cl_env_inc(enum cache_stats_item item)
->> >> >> -{
->> >> >> -}
->> >> >> -
->> >> >> -static void cl_env_dec(enum cache_stats_item item)
->> >> >> -{
->> >> >> -}
->> >> >> -
->> >> >>  static void cl_env_init0(struct cl_env *cle, void *debug)
->> >> >>  {
->> >> >>  	LASSERT(cle->ce_ref == 0);
->> >> >> @@ -581,7 +573,6 @@ static void cl_env_init0(struct cl_env *cle, void *debug)
->> >> >>  
->> >> >>  	cle->ce_ref = 1;
->> >> >>  	cle->ce_debug = debug;
->> >> >> -	cl_env_inc(CS_busy);
->> >> >>  }
->> >> >>  
->> >> >>  static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> >> >> @@ -611,9 +602,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> >> >>  		if (rc != 0) {
->> >> >>  			kmem_cache_free(cl_env_kmem, cle);
->> >> >>  			env = ERR_PTR(rc);
->> >> >> -		} else {
->> >> >> -			cl_env_inc(CS_create);
->> >> >> -			cl_env_inc(CS_total);
->> >> >>  		}
->> >> >>  	} else {
->> >> >>  		env = ERR_PTR(-ENOMEM);
->> >> >> @@ -623,7 +611,6 @@ static struct lu_env *cl_env_new(u32 ctx_tags, u32 ses_tags, void *debug)
->> >> >>  
->> >> >>  static void cl_env_fini(struct cl_env *cle)
->> >> >>  {
->> >> >> -	cl_env_dec(CS_total);
->> >> >>  	lu_context_fini(&cle->ce_lu.le_ctx);
->> >> >>  	lu_context_fini(&cle->ce_ses);
->> >> >>  	kmem_cache_free(cl_env_kmem, cle);
->> >> >> @@ -782,7 +769,6 @@ void cl_env_put(struct lu_env *env, u16 *refcheck)
->> >> >>  	if (--cle->ce_ref == 0) {
->> >> >>  		int cpu = get_cpu();
->> >> >>  
->> >> >> -		cl_env_dec(CS_busy);
->> >> >>  		cle->ce_debug = NULL;
->> >> >>  		cl_env_exit(cle);
->> >> >>  		/*
->> >> >> @@ -903,7 +889,6 @@ void cl_env_percpu_put(struct lu_env *env)
->> >> >>  	cle->ce_ref--;
->> >> >>  	LASSERT(cle->ce_ref == 0);
->> >> >>  
->> >> >> -	cl_env_dec(CS_busy);
->> >> >>  	cle->ce_debug = NULL;
->> >> >>  
->> >> >>  	put_cpu();
->> >> >> 
->> >> >> 
->> >> >> 
->> >> 
->> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190213/97d7afdd/attachment.sig>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/include/obd.h     |    1 -
+>  drivers/staging/lustre/lustre/obdclass/genops.c |   24 ++++++++++++++---------
+>  2 files changed, 15 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+> index 171d2c214be6..463ab680b524 100644
+> --- a/drivers/staging/lustre/lustre/include/obd.h
+> +++ b/drivers/staging/lustre/lustre/include/obd.h
+> @@ -106,7 +106,6 @@ struct obd_type {
+>  	char			*typ_name;
+>  	int			 typ_refcnt;
+>  	struct lu_device_type	*typ_lu;
+> -	spinlock_t		 obd_type_lock;
+>  	struct kobject		*typ_kobj;
+>  };
+>  
+> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+> index a174f538dd0d..dad21d9fa328 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+> @@ -109,35 +109,42 @@ static struct obd_type *class_search_type(const char *name)
+>  
+>  static struct obd_type *class_get_type(const char *name)
+>  {
+> -	struct obd_type *type = class_search_type(name);
+> +	struct obd_type *type;
+> +
+> +	spin_lock(&obd_types_lock);
+> +	type = __class_search_type(name);
+>  
+>  	if (!type) {
+>  		const char *modname = name;
+>  
+> +		spin_unlock(&obd_types_lock);
+>  		if (!request_module("%s", modname)) {
+>  			CDEBUG(D_INFO, "Loaded module '%s'\n", modname);
+> -			type = class_search_type(name);
+>  		} else {
+>  			LCONSOLE_ERROR_MSG(0x158, "Can't load module '%s'\n",
+>  					   modname);
+>  		}
+> +		spin_lock(&obd_types_lock);
+> +		type = __class_search_type(name);
+>  	}
+>  	if (type) {
+> -		spin_lock(&type->obd_type_lock);
+> -		type->typ_refcnt++;
+> -		try_module_get(type->typ_dt_ops->owner);
+> -		spin_unlock(&type->obd_type_lock);
+> +		if (try_module_get(type->typ_dt_ops->owner))
+> +			type->typ_refcnt++;
+> +		else
+> +			type = NULL;
+>  	}
+> +	spin_unlock(&obd_types_lock);
+>  	return type;
+>  }
+>  
+>  void class_put_type(struct obd_type *type)
+>  {
+>  	LASSERT(type);
+> -	spin_lock(&type->obd_type_lock);
+> +	spin_lock(&obd_types_lock);
+> +	LASSERT(type->typ_refcnt > 0);
+>  	type->typ_refcnt--;
+>  	module_put(type->typ_dt_ops->owner);
+> -	spin_unlock(&type->obd_type_lock);
+> +	spin_unlock(&obd_types_lock);
+>  }
+>  
+>  static void class_sysfs_release(struct kobject *kobj)
+> @@ -206,7 +213,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+>  	if (md_ops)
+>  		*type->typ_md_ops = *md_ops;
+>  	strcpy(type->typ_name, name);
+> -	spin_lock_init(&type->obd_type_lock);
+>  
+>  	type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
+>  						     debugfs_lustre_root);
+> 
+> 
+> 
