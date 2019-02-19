@@ -1,157 +1,284 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 19 Feb 2019 11:09:04 +1100
-Subject: [lustre-devel] [PATCH 00/37] More lustre patches from obdclass
-Message-ID: <155053473693.24125.6976971762921761309.stgit@noble.brown>
+Subject: [lustre-devel] [PATCH 01/37] lustre: obdclass: char
+ obd_ioctl_getdata type.
+In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
+References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
+Message-ID: <155053494481.24125.17153359714439231322.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-These patches are all a result of my reading of obdclass code,
-though some of them extend will beyond obdclass.
-One has been posted already but was buggy, another few replace
-an earlier patch which, as James pointed out, didn't really
-go far enough.
+Instead of having obd_ioctl_getdata() return the allocated
+data as a "char *", return it as it really is,
+ struct obd_ioctl_data *
 
-I've done some testing (and found a bug) but haven't completed a full
-test run yet.  So both comments and testing most welcome.
+This avoids the need for extra variables and casts.
 
-NeilBrown
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/include/obd_class.h  |    3 ++-
+ drivers/staging/lustre/lustre/llite/dir.c          |   18 ++++++------------
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    8 +++-----
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   15 ++++++---------
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   18 ++++++++----------
+ 5 files changed, 25 insertions(+), 37 deletions(-)
 
-NeilBrown (37):
-      lustre: obdclass: char obd_ioctl_getdata type.
-      lustre: llite: don't use class_setup_tunables()
-      lustre: embed typ_kobj if obd_type
-      lustre: collect all resource releasing for obj_type.
-      lustre: obd_type: use typ_kobj.name as typ_name
-      lustre: obd_type: discard obd_types linked list.
-      lustre: obd_type: discard obd_type_lock
-      lustre: obdclass: don't copy ops structures in to new type.
-      lustre: obdclass: fix module load locking.
-      lustre: kernelcomm: pass correct gfp_t to kmalloc.
-      lustre: kernelcomm: make libcfs_kkuc_msg_put static.
-      lustre: remove unused function in linkea.
-      lustre: llog: remove lgh_hdr_lock.
-      lustre: llog: change lgh_refcount to struct kref.
-      lustre: llog_obd: Convert loc_refcount to refcount_t
-      lustre: obdclass: typo: Banlance -> Balance
-      lustre: simplify lprocfs_read_frac_helper.
-      lustre: obdclass: discard lprocfs_single/seq_release
-      lustre: discard lprocfs_strnstr()
-      lustre: convert rsi_sem to a spinlock.
-      lustre: remove several MAX_STRING_SIZE defines.
-      lustre: lprocfs: use log2.h macros instead of shift loop.
-      lustre: prefer to use tabs for alignment.
-      lustre: lu_object: remove extra newline from debug printing.
-      lustre: deprecate libcfs_debug_vmsg2
-      lustre: remove libcfs_debug_vmsg2
-      lustre: discard lu_ref
-      lustre: remove scope and source from class_incref and class_decref.
-      lustre: handles: discard h_owner in favour of h_ops
-      lustre: handle: move refcount into the lustre_handle.
-      lustre: discard OBD_FREE_RCU
-      lustre: portals_handle: rename ops to owner
-      lustre: portals_handle: remove locking from class_handle2object()
-      lustre: portals_handle: use hlist for hash lists.
-      lustre: portals_handle: discard h_lock.
-      lustre: remove unused fields from struct obd_device
-      lustre: obd_sysfs: error-check value stored in jobid_var
-
-
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |    2 
- .../lustre/include/linux/libcfs/libcfs_crypto.h    |   10 -
- .../lustre/include/linux/libcfs/libcfs_debug.h     |   35 +-
- .../lustre/include/linux/libcfs/libcfs_fail.h      |   12 -
- .../lustre/include/linux/libcfs/libcfs_hash.h      |   24 +
- .../lustre/include/linux/libcfs/libcfs_private.h   |    2 
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    4 
- .../staging/lustre/include/linux/lnet/socklnd.h    |    2 
- .../lustre/include/uapi/linux/lnet/libcfs_debug.h  |  124 +++----
- .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |   56 +--
- .../lustre/include/uapi/linux/lnet/lnet-types.h    |   10 -
- .../lustre/include/uapi/linux/lnet/lnetst.h        |   14 -
- .../lustre/include/uapi/linux/lnet/nidstr.h        |    6 
- .../include/uapi/linux/lustre/lustre_fiemap.h      |    2 
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  350 +++++++++----------
- .../lustre/include/uapi/linux/lustre/lustre_user.h |  378 ++++++++++----------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |   60 ++-
- .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |   32 +-
- drivers/staging/lustre/lnet/libcfs/tracefile.c     |   63 +--
- drivers/staging/lustre/lnet/libcfs/tracefile.h     |    2 
- drivers/staging/lustre/lnet/lnet/nidstrings.c      |    4 
- drivers/staging/lustre/lnet/selftest/timer.c       |    8 
- drivers/staging/lustre/lustre/fld/lproc_fld.c      |    2 
- drivers/staging/lustre/lustre/include/cl_object.h  |    6 
- .../staging/lustre/lustre/include/lprocfs_status.h |    7 
- drivers/staging/lustre/lustre/include/lu_object.h  |   45 --
- drivers/staging/lustre/lustre/include/lu_ref.h     |  178 ---------
- drivers/staging/lustre/lustre/include/lustre_dlm.h |   26 -
- .../staging/lustre/lustre/include/lustre_export.h  |    1 
- .../staging/lustre/lustre/include/lustre_handles.h |   22 -
- .../staging/lustre/lustre/include/lustre_import.h  |    8 
- .../lustre/lustre/include/lustre_kernelcomm.h      |    1 
- .../staging/lustre/lustre/include/lustre_linkea.h  |    8 
- drivers/staging/lustre/lustre/include/lustre_log.h |   21 -
- drivers/staging/lustre/lustre/include/lustre_net.h |    4 
- drivers/staging/lustre/lustre/include/obd.h        |   62 +--
- drivers/staging/lustre/lustre/include/obd_class.h  |   18 -
- .../staging/lustre/lustre/include/obd_support.h    |   10 -
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    2 
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  252 ++++++-------
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   12 -
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   12 -
- drivers/staging/lustre/lustre/llite/dir.c          |   18 -
- drivers/staging/lustre/lustre/llite/file.c         |    2 
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    2 
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   20 -
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |   10 -
- drivers/staging/lustre/lustre/llite/rw.c           |    6 
- drivers/staging/lustre/lustre/llite/rw26.c         |    6 
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |   20 -
- drivers/staging/lustre/lustre/llite/vvp_internal.h |    2 
- drivers/staging/lustre/lustre/llite/vvp_io.c       |    5 
- drivers/staging/lustre/lustre/llite/xattr.c        |    2 
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    6 
- drivers/staging/lustre/lustre/lov/lov_ea.c         |    2 
- drivers/staging/lustre/lustre/lov/lov_obd.c        |   43 +-
- drivers/staging/lustre/lustre/lov/lov_object.c     |    2 
- drivers/staging/lustre/lustre/lov/lovsub_dev.c     |    1 
- drivers/staging/lustre/lustre/lov/lproc_lov.c      |    2 
- drivers/staging/lustre/lustre/mdc/mdc_reint.c      |    2 
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |   32 +-
- drivers/staging/lustre/lustre/obdclass/Makefile    |    2 
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |    8 
- drivers/staging/lustre/lustre/obdclass/cl_object.c |    2 
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |    5 
- drivers/staging/lustre/lustre/obdclass/class_obd.c |   19 -
- drivers/staging/lustre/lustre/obdclass/genops.c    |  258 ++++++--------
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |    5 
- drivers/staging/lustre/lustre/obdclass/linkea.c    |  150 --------
- drivers/staging/lustre/lustre/obdclass/llog.c      |   17 -
- drivers/staging/lustre/lustre/obdclass/llog_obd.c  |   14 -
- .../lustre/lustre/obdclass/lprocfs_status.c        |  102 +----
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   46 +-
- drivers/staging/lustre/lustre/obdclass/lu_ref.c    |   45 --
- .../lustre/lustre/obdclass/lustre_handles.c        |   59 +--
- .../staging/lustre/lustre/obdclass/obd_config.c    |   20 -
- drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |   27 +
- .../staging/lustre/lustre/obdecho/echo_client.c    |    4 
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   12 -
- drivers/staging/lustre/lustre/osc/osc_lock.c       |    2 
- drivers/staging/lustre/lustre/osc/osc_page.c       |    2 
- drivers/staging/lustre/lustre/osc/osc_request.c    |   44 +-
- drivers/staging/lustre/lustre/ptlrpc/client.c      |    2 
- .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    2 
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |   42 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |    2 
- 88 files changed, 1077 insertions(+), 1904 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/lu_ref.h
- delete mode 100644 drivers/staging/lustre/lustre/obdclass/lu_ref.c
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index 30b3e2c69f83..32d4ab6e78a0 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -1697,6 +1697,7 @@ struct root_squash_info {
+ };
+ 
+ /* linux-module.c */
+-int obd_ioctl_getdata(char **buf, int *len, void __user *arg);
++struct obd_ioctl_data;
++int obd_ioctl_getdata(struct obd_ioctl_data **data, int *len, void __user *arg);
+ 
+ #endif /* __LINUX_OBD_CLASS_H */
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index fd1af4a5cdad..17bb6185ba87 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1130,13 +1130,11 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case IOC_MDC_LOOKUP: {
+ 		int namelen, len = 0;
+-		char *buf = NULL;
+ 		char *filename;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc)
+ 			return rc;
+-		data = (void *)buf;
+ 
+ 		filename = data->ioc_inlbuf1;
+ 		namelen = strlen(filename);
+@@ -1155,12 +1153,11 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			goto out_free;
+ 		}
+ out_free:
+-		kvfree(buf);
++		kvfree(data);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SETSTRIPE: {
+ 		struct lmv_user_md  *lum;
+-		char *buf = NULL;
+ 		char *filename;
+ 		int namelen = 0;
+ 		int lumlen = 0;
+@@ -1168,11 +1165,10 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		int len;
+ 		int rc;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc)
+ 			return rc;
+ 
+-		data = (void *)buf;
+ 		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 		    data->ioc_inllen1 == 0 || data->ioc_inllen2 == 0) {
+ 			rc = -EINVAL;
+@@ -1205,7 +1201,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #endif
+ 		rc = ll_dir_setdirstripe(dentry, lum, filename, mode);
+ lmv_out_free:
+-		kvfree(buf);
++		kvfree(data);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SET_DEFAULT_STRIPE: {
+@@ -1651,18 +1647,16 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		return rc;
+ 	}
+ 	case LL_IOC_MIGRATE: {
+-		char *buf = NULL;
+ 		const char *filename;
+ 		int namelen = 0;
+ 		int len;
+ 		int rc;
+ 		int mdtidx;
+ 
+-		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		rc = obd_ioctl_getdata(&data, &len, (void __user *)arg);
+ 		if (rc < 0)
+ 			return rc;
+ 
+-		data = (struct obd_ioctl_data *)buf;
+ 		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 		    !data->ioc_inllen1 || !data->ioc_inllen2) {
+ 			rc = -EINVAL;
+@@ -1684,7 +1678,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		rc = ll_migrate(inode, file, mdtidx, filename, namelen - 1);
+ migrate_free:
+-		kvfree(buf);
++		kvfree(data);
+ 
+ 		return rc;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 8e09fdd7a96e..e2417cd5aaed 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2295,7 +2295,6 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ {
+ 	struct ll_sb_info *sbi = NULL;
+ 	struct obd_export *exp;
+-	char *buf = NULL;
+ 	struct obd_ioctl_data *data = NULL;
+ 	u32 type;
+ 	int len = 0, rc;
+@@ -2311,11 +2310,10 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ 		goto out_statfs;
+ 	}
+ 
+-	rc = obd_ioctl_getdata(&buf, &len, arg);
++	rc = obd_ioctl_getdata(&data, &len, arg);
+ 	if (rc)
+ 		goto out_statfs;
+ 
+-	data = (void *)buf;
+ 	if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 	    !data->ioc_pbuf1 || !data->ioc_pbuf2) {
+ 		rc = -EINVAL;
+@@ -2340,11 +2338,11 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ 		goto out_statfs;
+ 	}
+ 
+-	rc = obd_iocontrol(IOC_OBD_STATFS, exp, len, buf, NULL);
++	rc = obd_iocontrol(IOC_OBD_STATFS, exp, len, data, NULL);
+ 	if (rc)
+ 		goto out_statfs;
+ out_statfs:
+-	kvfree(buf);
++	kvfree(data);
+ 	return rc;
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 04d0a9ed1d05..fd769c39b482 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -1039,27 +1039,24 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 	case OBD_IOC_LOV_GET_CONFIG: {
+ 		struct obd_ioctl_data *data;
+ 		struct lov_desc *desc;
+-		char *buf = NULL;
+ 		u32 *genp;
+ 
+ 		len = 0;
+-		if (obd_ioctl_getdata(&buf, &len, uarg))
++		if (obd_ioctl_getdata(&data, &len, uarg))
+ 			return -EINVAL;
+ 
+-		data = (struct obd_ioctl_data *)buf;
+-
+ 		if (sizeof(*desc) > data->ioc_inllen1) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+ 		if (sizeof(uuidp->uuid) * count > data->ioc_inllen2) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+ 		if (sizeof(u32) * count > data->ioc_inllen3) {
+-			kvfree(buf);
++			kvfree(data);
+ 			return -EINVAL;
+ 		}
+ 
+@@ -1076,9 +1073,9 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 			*genp = lov->lov_tgts[i]->ltd_gen;
+ 		}
+ 
+-		if (copy_to_user(uarg, buf, len))
++		if (copy_to_user(uarg, data, len))
+ 			rc = -EFAULT;
+-		kvfree(buf);
++		kvfree(data);
+ 		break;
+ 	}
+ 	case OBD_IOC_QUOTACTL: {
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 2ee6b96f4830..b8fc74044fe3 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -229,7 +229,7 @@ static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+ }
+ 
+ /* buffer MUST be at least the size of obd_ioctl_hdr */
+-int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
++int obd_ioctl_getdata(struct obd_ioctl_data **datap, int *len, void __user *arg)
+ {
+ 	struct obd_ioctl_data *data;
+ 	struct obd_ioctl_hdr hdr;
+@@ -261,16 +261,16 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
+ 	 * obdfilter-survey is an example, which relies on ioctl. So we'd
+ 	 * better avoid vmalloc on ioctl path. LU-66
+ 	 */
+-	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
+-	if (!*buf) {
++	data = kvzalloc(hdr.ioc_len, GFP_KERNEL);
++	if (!data) {
+ 		CERROR("Cannot allocate control buffer of len %d\n",
+ 		       hdr.ioc_len);
+ 		return -EINVAL;
+ 	}
+ 	*len = hdr.ioc_len;
+-	data = (struct obd_ioctl_data *)*buf;
++	*datap = data;
+ 
+-	if (copy_from_user(*buf, arg, hdr.ioc_len)) {
++	if (copy_from_user(data, arg, hdr.ioc_len)) {
+ 		err = -EFAULT;
+ 		goto free_buf;
+ 	}
+@@ -307,14 +307,13 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
+ 	return 0;
+ 
+ free_buf:
+-	kvfree(*buf);
++	kvfree(data);
+ 	return err;
+ }
+ EXPORT_SYMBOL(obd_ioctl_getdata);
+ 
+ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ {
+-	char *buf = NULL;
+ 	struct obd_ioctl_data *data;
+ 	struct libcfs_debug_ioctl_data *debug_data;
+ 	struct obd_device *obd = NULL;
+@@ -329,11 +328,10 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 	}
+ 
+ 	CDEBUG(D_IOCTL, "cmd = %x\n", cmd);
+-	if (obd_ioctl_getdata(&buf, &len, (void __user *)arg)) {
++	if (obd_ioctl_getdata(&data, &len, (void __user *)arg)) {
+ 		CERROR("OBD ioctl: data error\n");
+ 		return -EINVAL;
+ 	}
+-	data = (struct obd_ioctl_data *)buf;
+ 
+ 	switch (cmd) {
+ 	case OBD_IOC_PROCESS_CFG: {
+@@ -542,7 +540,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 	}
+ 
+  out:
+-	kvfree(buf);
++	kvfree(data);
+ 	return err;
+ } /* class_handle_ioctl */
+ 
