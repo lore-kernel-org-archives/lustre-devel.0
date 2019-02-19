@@ -1,126 +1,118 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 19 Feb 2019 11:09:05 +1100
-Subject: [lustre-devel] [PATCH 20/37] lustre: convert rsi_sem to a spinlock.
+Subject: [lustre-devel] [PATCH 21/37] lustre: remove several MAX_STRING_SIZE
+ defines.
 In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-Message-ID: <155053494585.24125.10207641299012244855.stgit@noble.brown>
+Message-ID: <155053494593.24125.427229089746560574.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This lock is never held over code that sleeps, and is
-only ever held for short periods of time.
-So a simple spinlock is best.
+Some of these are unused.
+One is used in a minimal way where it is easier to use
+an explicit number.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/obd_class.h  |    3 +--
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    6 +++---
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |    4 ++--
- .../lustre/lustre/obdclass/lprocfs_status.c        |    8 ++++----
- 4 files changed, 10 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    2 --
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    6 ++----
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |    4 ----
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    2 --
+ .../lustre/lustre/obdclass/lprocfs_status.c        |    2 --
+ 5 files changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 7c2e248a8110..dd480501d7df 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1688,12 +1688,11 @@ void statfs_pack(struct obd_statfs *osfs, struct kstatfs *sfs);
- void statfs_unpack(struct kstatfs *sfs, struct obd_statfs *osfs);
- 
- /* root squash info */
--struct rw_semaphore;
- struct root_squash_info {
- 	uid_t			rsi_uid;
- 	gid_t			rsi_gid;
- 	struct list_head	rsi_nosquash_nids;
--	struct rw_semaphore	rsi_sem;
-+	spinlock_t		rsi_lock;	/* protects rsi_nosquash_nids */
- };
- 
- /* linux-module.c */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index e2417cd5aaed..d97abbfddccf 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -130,7 +130,7 @@ static struct ll_sb_info *ll_init_sbi(void)
- 	sbi->ll_squash.rsi_uid = 0;
- 	sbi->ll_squash.rsi_gid = 0;
- 	INIT_LIST_HEAD(&sbi->ll_squash.rsi_nosquash_nids);
--	init_rwsem(&sbi->ll_squash.rsi_sem);
-+	spin_lock_init(&sbi->ll_squash.rsi_lock);
- 
- 	return sbi;
- }
-@@ -2578,7 +2578,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
- 	int i;
- 
- 	/* Update norootsquash flag */
--	down_write(&squash->rsi_sem);
-+	spin_lock(&squash->rsi_lock);
- 	if (list_empty(&squash->rsi_nosquash_nids)) {
- 		spin_lock(&sbi->ll_lock);
- 		sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
-@@ -2606,7 +2606,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
- 			sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
- 		spin_unlock(&sbi->ll_lock);
- 	}
--	up_write(&squash->rsi_sem);
-+	spin_unlock(&squash->rsi_lock);
- }
- 
- /**
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 78ec0fa65c58..db2fbf1f3a50 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -1133,7 +1133,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
- 	struct root_squash_info *squash = &sbi->ll_squash;
- 	int len;
- 
--	down_read(&squash->rsi_sem);
-+	spin_lock(&squash->rsi_lock);
- 	if (!list_empty(&squash->rsi_nosquash_nids)) {
- 		len = cfs_print_nidlist(m->buf + m->count, m->size - m->count,
- 					&squash->rsi_nosquash_nids);
-@@ -1142,7 +1142,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
- 	} else {
- 		seq_puts(m, "NONE\n");
- 	}
--	up_read(&squash->rsi_sem);
-+	spin_unlock(&squash->rsi_lock);
- 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 74c7644d6ef8..261857e4540d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -392,8 +392,6 @@ static int ldlm_namespace_debugfs_register(struct ldlm_namespace *ns)
  	return 0;
  }
+ 
+-#undef MAX_STRING_SIZE
+-
+ struct ldlm_resource *ldlm_resource_getref(struct ldlm_resource *res)
+ {
+ 	LASSERT(res);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index d97abbfddccf..fda6d9b07952 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -906,8 +906,6 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	memset(lli->lli_jobid, 0, LUSTRE_JOBID_SIZE);
+ }
+ 
+-#define MAX_STRING_SIZE 128
+-
+ int ll_fill_super(struct super_block *sb)
+ {
+ 	struct lustre_profile *lprof = NULL;
+@@ -916,7 +914,7 @@ int ll_fill_super(struct super_block *sb)
+ 	char *dt = NULL, *md = NULL;
+ 	char *profilenm = get_profile_name(sb);
+ 	struct config_llog_instance *cfg;
+-	char name[MAX_STRING_SIZE];
++	char name[128];
+ 	char *ptr;
+ 	int len;
+ 	int err;
+@@ -960,7 +958,7 @@ int ll_fill_super(struct super_block *sb)
+ 		len -= 7;
+ 
+ 	/* Mount info */
+-	snprintf(name, MAX_STRING_SIZE, "%.*s-%px", len,
++	snprintf(name, sizeof(name), "%.*s-%px", len,
+ 		 lsi->lsi_lmd->lmd_profile, sb);
+ 
+ 	/* Call ll_debugsfs_register_super() before lustre_process_log()
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index db2fbf1f3a50..5ed703d7bb1e 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -1187,8 +1187,6 @@ static struct lprocfs_vars lprocfs_llite_obd_vars[] = {
+ 	{ NULL }
+ };
+ 
+-#define MAX_STRING_SIZE 128
+-
+ static struct attribute *llite_attrs[] = {
+ 	&lustre_attr_blocksize.attr,
+ 	&lustre_attr_stat_blocksize.attr,
+@@ -1434,8 +1432,6 @@ void ll_debugfs_unregister_super(struct super_block *sb)
+ 	lprocfs_free_stats(&sbi->ll_stats);
+ }
+ 
+-#undef MAX_STRING_SIZE
+-
+ #define pct(a, b) (b ? a * 100 / b : 0)
+ 
+ static void ll_display_extents_info(struct ll_rw_extents_info *io_extents,
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 35dff0e96bf7..138e124bd05e 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -273,8 +273,6 @@ static int lmv_init_ea_size(struct obd_export *exp, u32 easize, u32 def_easize)
+ 	return rc;
+ }
+ 
+-#define MAX_STRING_SIZE 128
+-
+ static int lmv_connect_mdc(struct obd_device *obd, struct lmv_tgt_desc *tgt)
+ {
+ 	struct lmv_obd *lmv = &obd->u.lmv;
 diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index 27d73c95403d..aed33068ff3c 100644
+index aed33068ff3c..a179b0d6979e 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -1720,10 +1720,10 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
- 	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
- 	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
- 		/* empty string is special case */
--		down_write(&squash->rsi_sem);
-+		spin_lock(&squash->rsi_lock);
- 		if (!list_empty(&squash->rsi_nosquash_nids))
- 			cfs_free_nidlist(&squash->rsi_nosquash_nids);
--		up_write(&squash->rsi_sem);
-+		spin_unlock(&squash->rsi_lock);
- 		LCONSOLE_INFO("%s: nosquash_nids is cleared\n", name);
- 		kfree(kernbuf);
- 		return count;
-@@ -1740,11 +1740,11 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
- 	kfree(kernbuf);
- 	kernbuf = NULL;
+@@ -271,8 +271,6 @@ static int lprocfs_no_percpu_stats;
+ module_param(lprocfs_no_percpu_stats, int, 0644);
+ MODULE_PARM_DESC(lprocfs_no_percpu_stats, "Do not alloc percpu data for lprocfs stats");
  
--	down_write(&squash->rsi_sem);
-+	spin_lock(&squash->rsi_lock);
- 	if (!list_empty(&squash->rsi_nosquash_nids))
- 		cfs_free_nidlist(&squash->rsi_nosquash_nids);
- 	list_splice(&tmp, &squash->rsi_nosquash_nids);
--	up_write(&squash->rsi_sem);
-+	spin_unlock(&squash->rsi_lock);
+-#define MAX_STRING_SIZE 128
+-
+ /* lprocfs API calls */
  
- 	return count;
- 
+ static const struct file_operations lprocfs_generic_fops = { };
