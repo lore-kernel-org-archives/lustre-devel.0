@@ -1,126 +1,411 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 19 Feb 2019 11:09:06 +1100
-Subject: [lustre-devel] [PATCH 29/37] lustre: handles: discard h_owner in
- favour of h_ops
+Subject: [lustre-devel] [PATCH 30/37] lustre: handle: move refcount into the
+ lustre_handle.
 In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-Message-ID: <155053494646.24125.10155576042684274174.stgit@noble.brown>
+Message-ID: <155053494654.24125.18407080080202016099.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-lustre_handles  assigned a  64bit  unique identifier  (a 'cookie')  to
-objects of  various types and  stored them  in a hash  table, allowing
-them to be accessed by the cookie.
-
-The is a facility for type checking by recording an 'owner' for each
-object, and checking the owner on lookup.  Unfortunately this is not
-used - owner is always zero.
-
-Eahc object also contains an h_ops pointer which can be used to
-reliably identify an owner.
-
-So discard h_owner, pass and 'ops' pointer to class_handle2object(),
-and only return objects for which the h_ops matches.
+Every object with a lustre_handle has (and must have) a refcount.
+The lustre_handles code needs a call-out to increment this.
+To simplify things, move the refcount into the lustre_handle
+and discard the call-out.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/lustre_handles.h |    7 +++----
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    2 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |    3 ++-
- .../lustre/lustre/obdclass/lustre_handles.c        |    6 +++---
- 4 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    6 ---
+ .../staging/lustre/lustre/include/lustre_export.h  |    1 
+ .../staging/lustre/lustre/include/lustre_handles.h |    2 -
+ .../staging/lustre/lustre/include/lustre_import.h  |    2 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   35 ++++++----------
+ drivers/staging/lustre/lustre/obdclass/genops.c    |   44 +++++++-------------
+ .../lustre/lustre/obdclass/lustre_handles.c        |    2 -
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    2 -
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 +-
+ 9 files changed, 35 insertions(+), 63 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 6c0371ef056c..19c0f74b7c04 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -589,12 +589,6 @@ struct ldlm_lock {
+ 	 * Must be first in the structure.
+ 	 */
+ 	struct portals_handle		l_handle;
+-	/**
+-	 * Lock reference count.
+-	 * This is how many users have pointers to actual structure, so that
+-	 * we do not accidentally free lock structure that is in use.
+-	 */
+-	atomic_t			l_refc;
+ 	/**
+ 	 * Internal spinlock protects l_resource.  We should hold this lock
+ 	 * first before taking res_lock.
+diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
+index fb34e0b7de35..d05323313f55 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_export.h
++++ b/drivers/staging/lustre/lustre/include/lustre_export.h
+@@ -67,7 +67,6 @@ struct obd_export {
+ 	 * what export they are talking to.
+ 	 */
+ 	struct portals_handle		exp_handle;
+-	refcount_t			exp_refcount;
+ 	/**
+ 	 * Set of counters below is to track where export references are
+ 	 * kept. The exp_rpc_count is used for reconnect handling also,
 diff --git a/drivers/staging/lustre/lustre/include/lustre_handles.h b/drivers/staging/lustre/lustre/include/lustre_handles.h
-index 683680891e4c..9a4b1a821e7b 100644
+index 9a4b1a821e7b..7e868aecff0e 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_handles.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_handles.h
-@@ -65,8 +65,7 @@ struct portals_handle_ops {
- struct portals_handle {
+@@ -46,7 +46,6 @@
+ #include <linux/types.h>
+ 
+ struct portals_handle_ops {
+-	void (*hop_addref)(void *object);
+ 	void (*hop_free)(void *object, int size);
+ };
+ 
+@@ -66,6 +65,7 @@ struct portals_handle {
  	struct list_head		h_link;
  	u64				h_cookie;
--	const void			*h_owner;
--	struct portals_handle_ops	*h_ops;
-+	const struct portals_handle_ops	*h_ops;
+ 	const struct portals_handle_ops	*h_ops;
++	refcount_t			h_ref;
  
  	/* newly added fields to handle the RCU issue. -jxiong */
  	struct rcu_head			h_rcu;
-@@ -79,9 +78,9 @@ struct portals_handle {
- 
- /* Add a handle to the hash table */
- void class_handle_hash(struct portals_handle *,
--		       struct portals_handle_ops *ops);
-+		       const struct portals_handle_ops *ops);
- void class_handle_unhash(struct portals_handle *);
--void *class_handle2object(u64 cookie, const void *owner);
-+void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
- void class_handle_free_cb(struct rcu_head *rcu);
- int class_handle_init(void);
- void class_handle_cleanup(void);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_import.h b/drivers/staging/lustre/lustre/include/lustre_import.h
+index 31b3881fb6c9..ab7e1d94f4b2 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_import.h
++++ b/drivers/staging/lustre/lustre/include/lustre_import.h
+@@ -154,8 +154,6 @@ struct import_state_hist {
+ struct obd_import {
+ 	/** Local handle (== id) for this import. */
+ 	struct portals_handle		imp_handle;
+-	/** Reference counter */
+-	atomic_t			imp_refcount;
+ 	struct lustre_handle		imp_dlm_handle; /* client's ldlm export */
+ 	/** Currently active connection */
+ 	struct ptlrpc_connection       *imp_connection;
 diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index 60a6ec2f7136..248331153c68 100644
+index 248331153c68..7864f9a7ef90 100644
 --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -503,7 +503,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
+@@ -148,7 +148,7 @@ EXPORT_SYMBOL(ldlm_it2str);
+  */
+ struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock)
+ {
+-	atomic_inc(&lock->l_refc);
++	refcount_inc(&lock->l_handle.h_ref);
+ 	return lock;
+ }
+ EXPORT_SYMBOL(ldlm_lock_get);
+@@ -161,8 +161,8 @@ EXPORT_SYMBOL(ldlm_lock_get);
+ void ldlm_lock_put(struct ldlm_lock *lock)
+ {
+ 	LASSERT(lock->l_resource != LP_POISON);
+-	LASSERT(atomic_read(&lock->l_refc) > 0);
+-	if (atomic_dec_and_test(&lock->l_refc)) {
++	LASSERT(refcount_read(&lock->l_handle.h_ref) > 0);
++	if (refcount_dec_and_test(&lock->l_handle.h_ref)) {
+ 		struct ldlm_resource *res;
  
- 	LASSERT(handle);
+ 		LDLM_DEBUG(lock,
+@@ -349,12 +349,6 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
+ 		LDLM_LOCK_RELEASE(lock);
+ }
  
--	lock = class_handle2object(handle->cookie, NULL);
-+	lock = class_handle2object(handle->cookie, &lock_handle_ops);
- 	if (!lock)
- 		return NULL;
+-/* this is called by portals_handle2object with the handle lock taken */
+-static void lock_handle_addref(void *lock)
+-{
+-	LDLM_LOCK_GET((struct ldlm_lock *)lock);
+-}
+-
+ static void lock_handle_free(void *lock, int size)
+ {
+ 	LASSERT(size == sizeof(struct ldlm_lock));
+@@ -362,7 +356,6 @@ static void lock_handle_free(void *lock, int size)
+ }
  
+ static struct portals_handle_ops lock_handle_ops = {
+-	.hop_addref = lock_handle_addref,
+ 	.hop_free   = lock_handle_free,
+ };
+ 
+@@ -387,7 +380,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
+ 	spin_lock_init(&lock->l_lock);
+ 	lock->l_resource = resource;
+ 
+-	atomic_set(&lock->l_refc, 2);
++	refcount_set(&lock->l_handle.h_ref, 2);
+ 	INIT_LIST_HEAD(&lock->l_res_link);
+ 	INIT_LIST_HEAD(&lock->l_lru);
+ 	INIT_LIST_HEAD(&lock->l_pending_chain);
+@@ -1974,13 +1967,13 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 &vaf,
+ 				 lock,
+ 				 lock->l_handle.h_cookie,
+-				 atomic_read(&lock->l_refc),
++				 refcount_read(&lock->l_handle.h_ref),
+ 				 lock->l_readers, lock->l_writers,
+ 				 ldlm_lockname[lock->l_granted_mode],
+ 				 ldlm_lockname[lock->l_req_mode],
+ 				 lock->l_flags, nid,
+ 				 lock->l_remote_handle.cookie,
+-				 exp ? refcount_read(&exp->exp_refcount) : -99,
++				 exp ? refcount_read(&exp->exp_handle.h_ref) : -99,
+ 				 lock->l_pid, lock->l_callback_timeout,
+ 				 lock->l_lvb_type);
+ 		va_end(args);
+@@ -1994,7 +1987,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 &vaf,
+ 				 ldlm_lock_to_ns_name(lock), lock,
+ 				 lock->l_handle.h_cookie,
+-				 atomic_read(&lock->l_refc),
++				 refcount_read(&lock->l_handle.h_ref),
+ 				 lock->l_readers, lock->l_writers,
+ 				 ldlm_lockname[lock->l_granted_mode],
+ 				 ldlm_lockname[lock->l_req_mode],
+@@ -2007,7 +2000,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 lock->l_req_extent.end,
+ 				 lock->l_flags, nid,
+ 				 lock->l_remote_handle.cookie,
+-				 exp ? refcount_read(&exp->exp_refcount) : -99,
++				 exp ? refcount_read(&exp->exp_handle.h_ref) : -99,
+ 				 lock->l_pid, lock->l_callback_timeout,
+ 				 lock->l_lvb_type);
+ 		break;
+@@ -2018,7 +2011,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 &vaf,
+ 				 ldlm_lock_to_ns_name(lock), lock,
+ 				 lock->l_handle.h_cookie,
+-				 atomic_read(&lock->l_refc),
++				 refcount_read(&lock->l_handle.h_ref),
+ 				 lock->l_readers, lock->l_writers,
+ 				 ldlm_lockname[lock->l_granted_mode],
+ 				 ldlm_lockname[lock->l_req_mode],
+@@ -2030,7 +2023,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 lock->l_policy_data.l_flock.end,
+ 				 lock->l_flags, nid,
+ 				 lock->l_remote_handle.cookie,
+-				 exp ? refcount_read(&exp->exp_refcount) : -99,
++				 exp ? refcount_read(&exp->exp_handle.h_ref) : -99,
+ 				 lock->l_pid, lock->l_callback_timeout);
+ 		break;
+ 
+@@ -2040,7 +2033,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 &vaf,
+ 				 ldlm_lock_to_ns_name(lock),
+ 				 lock, lock->l_handle.h_cookie,
+-				 atomic_read(&lock->l_refc),
++				 refcount_read(&lock->l_handle.h_ref),
+ 				 lock->l_readers, lock->l_writers,
+ 				 ldlm_lockname[lock->l_granted_mode],
+ 				 ldlm_lockname[lock->l_req_mode],
+@@ -2050,7 +2043,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 ldlm_typename[resource->lr_type],
+ 				 lock->l_flags, nid,
+ 				 lock->l_remote_handle.cookie,
+-				 exp ? refcount_read(&exp->exp_refcount) : -99,
++				 exp ? refcount_read(&exp->exp_handle.h_ref) : -99,
+ 				 lock->l_pid, lock->l_callback_timeout,
+ 				 lock->l_lvb_type);
+ 		break;
+@@ -2061,7 +2054,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 &vaf,
+ 				 ldlm_lock_to_ns_name(lock),
+ 				 lock, lock->l_handle.h_cookie,
+-				 atomic_read(&lock->l_refc),
++				 refcount_read(&lock->l_handle.h_ref),
+ 				 lock->l_readers, lock->l_writers,
+ 				 ldlm_lockname[lock->l_granted_mode],
+ 				 ldlm_lockname[lock->l_req_mode],
+@@ -2070,7 +2063,7 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
+ 				 ldlm_typename[resource->lr_type],
+ 				 lock->l_flags, nid,
+ 				 lock->l_remote_handle.cookie,
+-				 exp ? refcount_read(&exp->exp_refcount) : -99,
++				 exp ? refcount_read(&exp->exp_handle.h_ref) : -99,
+ 				 lock->l_pid, lock->l_callback_timeout,
+ 				 lock->l_lvb_type);
+ 		break;
 diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index fc7985a2922c..b5fce96e43f7 100644
+index b5fce96e43f7..4b1e14957a66 100644
 --- a/drivers/staging/lustre/lustre/obdclass/genops.c
 +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -674,6 +674,7 @@ int obd_init_caches(void)
- 	return -ENOMEM;
+@@ -719,7 +719,7 @@ static void class_export_destroy(struct obd_export *exp)
+ {
+ 	struct obd_device *obd = exp->exp_obd;
+ 
+-	LASSERT(refcount_read(&exp->exp_refcount) == 0);
++	LASSERT(refcount_read(&exp->exp_handle.h_ref) == 0);
+ 	LASSERT(obd);
+ 
+ 	CDEBUG(D_IOCTL, "destroying export %p/%s for %s\n", exp,
+@@ -743,33 +743,27 @@ static void class_export_destroy(struct obd_export *exp)
+ 	OBD_FREE_RCU(exp, sizeof(*exp), &exp->exp_handle);
  }
  
-+static struct portals_handle_ops export_handle_ops;
- /* map connection to client */
- struct obd_export *class_conn2export(struct lustre_handle *conn)
+-static void export_handle_addref(void *export)
+-{
+-	class_export_get(export);
+-}
+-
+ static struct portals_handle_ops export_handle_ops = {
+-	.hop_addref	= export_handle_addref,
+ 	.hop_free	= NULL,
+ };
+ 
+ struct obd_export *class_export_get(struct obd_export *exp)
  {
-@@ -690,7 +691,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
+-	refcount_inc(&exp->exp_refcount);
++	refcount_inc(&exp->exp_handle.h_ref);
+ 	CDEBUG(D_INFO, "GETting export %p : new refcount %d\n", exp,
+-	       refcount_read(&exp->exp_refcount));
++	       refcount_read(&exp->exp_handle.h_ref));
+ 	return exp;
+ }
+ EXPORT_SYMBOL(class_export_get);
+ 
+ void class_export_put(struct obd_export *exp)
+ {
+-	LASSERT(refcount_read(&exp->exp_refcount) >  0);
+-	LASSERT(refcount_read(&exp->exp_refcount) < LI_POISON);
++	LASSERT(refcount_read(&exp->exp_handle.h_ref) >  0);
++	LASSERT(refcount_read(&exp->exp_handle.h_ref) < LI_POISON);
+ 	CDEBUG(D_INFO, "PUTting export %p : new refcount %d\n", exp,
+-	       refcount_read(&exp->exp_refcount) - 1);
++	       refcount_read(&exp->exp_handle.h_ref) - 1);
+ 
+-	if (refcount_dec_and_test(&exp->exp_refcount)) {
++	if (refcount_dec_and_test(&exp->exp_handle.h_ref)) {
+ 		struct obd_device *obd = exp->exp_obd;
+ 
+ 		CDEBUG(D_IOCTL, "final put %p/%s\n",
+@@ -819,7 +813,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+ 
+ 	export->exp_conn_cnt = 0;
+ 	/* 2 = class_handle_hash + last */
+-	refcount_set(&export->exp_refcount, 2);
++	refcount_set(&export->exp_handle.h_ref, 2);
+ 	atomic_set(&export->exp_rpc_count, 0);
+ 	atomic_set(&export->exp_cb_count, 0);
+ 	atomic_set(&export->exp_locks_count, 0);
+@@ -922,7 +916,7 @@ static void class_import_destroy(struct obd_import *imp)
+ 	CDEBUG(D_IOCTL, "destroying import %p for %s\n", imp,
+ 	       imp->imp_obd->obd_name);
+ 
+-	LASSERT_ATOMIC_ZERO(&imp->imp_refcount);
++	LASSERT(refcount_read(&imp->imp_handle.h_ref) == 0);
+ 
+ 	ptlrpc_put_connection_superhack(imp->imp_connection);
+ 
+@@ -939,21 +933,15 @@ static void class_import_destroy(struct obd_import *imp)
+ 	OBD_FREE_RCU(imp, sizeof(*imp), &imp->imp_handle);
+ }
+ 
+-static void import_handle_addref(void *import)
+-{
+-	class_import_get(import);
+-}
+-
+ static struct portals_handle_ops import_handle_ops = {
+-	.hop_addref	= import_handle_addref,
+ 	.hop_free	= NULL,
+ };
+ 
+ struct obd_import *class_import_get(struct obd_import *import)
+ {
+-	atomic_inc(&import->imp_refcount);
++	refcount_inc(&import->imp_handle.h_ref);
+ 	CDEBUG(D_INFO, "import %p refcount=%d obd=%s\n", import,
+-	       atomic_read(&import->imp_refcount),
++	       refcount_read(&import->imp_handle.h_ref),
+ 	       import->imp_obd->obd_name);
+ 	return import;
+ }
+@@ -961,19 +949,19 @@ EXPORT_SYMBOL(class_import_get);
+ 
+ void class_import_put(struct obd_import *imp)
+ {
+-	LASSERT_ATOMIC_GT_LT(&imp->imp_refcount, 0, LI_POISON);
++	LASSERT(refcount_read(&imp->imp_handle.h_ref) > 0);
+ 
+ 	CDEBUG(D_INFO, "import %p refcount=%d obd=%s\n", imp,
+-	       atomic_read(&imp->imp_refcount) - 1,
++	       refcount_read(&imp->imp_handle.h_ref) - 1,
+ 	       imp->imp_obd->obd_name);
+ 
+-	if (atomic_dec_and_test(&imp->imp_refcount)) {
++	if (refcount_dec_and_test(&imp->imp_handle.h_ref)) {
+ 		CDEBUG(D_INFO, "final put import %p\n", imp);
+ 		obd_zombie_import_add(imp);
  	}
  
- 	CDEBUG(D_INFO, "looking for export cookie %#llx\n", conn->cookie);
--	export = class_handle2object(conn->cookie, NULL);
-+	export = class_handle2object(conn->cookie, &export_handle_ops);
- 	return export;
+ 	/* catch possible import put race */
+-	LASSERT_ATOMIC_GE_LT(&imp->imp_refcount, 0, LI_POISON);
++	LASSERT(refcount_read(&imp->imp_handle.h_ref) >= 0);
  }
- EXPORT_SYMBOL(class_conn2export);
+ EXPORT_SYMBOL(class_import_put);
+ 
+@@ -1023,7 +1011,7 @@ struct obd_import *class_new_import(struct obd_device *obd)
+ 	init_waitqueue_head(&imp->imp_recovery_waitq);
+ 	INIT_WORK(&imp->imp_zombie_work, obd_zombie_imp_cull);
+ 
+-	atomic_set(&imp->imp_refcount, 2);
++	refcount_set(&imp->imp_handle.h_ref, 2);
+ 	atomic_set(&imp->imp_unregistering, 0);
+ 	atomic_set(&imp->imp_inflight, 0);
+ 	atomic_set(&imp->imp_replay_inflight, 0);
 diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-index 0674afb0059f..32b70d613f71 100644
+index 32b70d613f71..5c722d336c21 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-@@ -59,7 +59,7 @@ static struct handle_bucket {
-  * global (per-node) hash-table.
-  */
- void class_handle_hash(struct portals_handle *h,
--		       struct portals_handle_ops *ops)
-+		       const struct portals_handle_ops *ops)
- {
- 	struct handle_bucket *bucket;
- 
-@@ -132,7 +132,7 @@ void class_handle_unhash(struct portals_handle *h)
- }
- EXPORT_SYMBOL(class_handle_unhash);
- 
--void *class_handle2object(u64 cookie, const void *owner)
-+void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
- {
- 	struct handle_bucket *bucket;
- 	struct portals_handle *h;
-@@ -147,7 +147,7 @@ void *class_handle2object(u64 cookie, const void *owner)
- 
- 	rcu_read_lock();
- 	list_for_each_entry_rcu(h, &bucket->head, h_link) {
--		if (h->h_cookie != cookie || h->h_owner != owner)
-+		if (h->h_cookie != cookie || h->h_ops != ops)
- 			continue;
+@@ -152,7 +152,7 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
  
  		spin_lock(&h->h_lock);
+ 		if (likely(h->h_in != 0)) {
+-			h->h_ops->hop_addref(h);
++			refcount_inc(&h->h_ref);
+ 			retval = h;
+ 		}
+ 		spin_unlock(&h->h_lock);
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index baf34c85c4b5..6f00eee6170a 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -1638,7 +1638,7 @@ static int echo_client_cleanup(struct obd_device *obddev)
+ 		return -EBUSY;
+ 	}
+ 
+-	LASSERT(refcount_read(&ec->ec_exp->exp_refcount) > 0);
++	LASSERT(refcount_read(&ec->ec_exp->exp_handle.h_ref) > 0);
+ 	rc = obd_disconnect(ec->ec_exp);
+ 	if (rc != 0)
+ 		CERROR("fail to disconnect device: %d\n", rc);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index eda921cce8f5..88a81ab2feb8 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -1697,7 +1697,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       (request->rq_export ?
+ 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
+ 	       (request->rq_export ?
+-		refcount_read(&request->rq_export->exp_refcount) : -99),
++		refcount_read(&request->rq_export->exp_handle.h_ref) : -99),
+ 	       lustre_msg_get_status(request->rq_reqmsg), request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
+ 	       lustre_msg_get_opc(request->rq_reqmsg));
+@@ -1741,7 +1741,7 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       (request->rq_export ?
+ 		(char *)request->rq_export->exp_client_uuid.uuid : "0"),
+ 	       (request->rq_export ?
+-		refcount_read(&request->rq_export->exp_refcount) : -99),
++		refcount_read(&request->rq_export->exp_handle.h_ref) : -99),
+ 	       lustre_msg_get_status(request->rq_reqmsg),
+ 	       request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
