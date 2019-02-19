@@ -1,68 +1,118 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 19 Feb 2019 11:09:07 +1100
-Subject: [lustre-devel] [PATCH 35/37] lustre: portals_handle: discard h_lock.
+Subject: [lustre-devel] [PATCH 36/37] lustre: remove unused fields from
+ struct obd_device
 In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-Message-ID: <155053494690.24125.10261783071575748633.stgit@noble.brown>
+Message-ID: <155053494709.24125.7232156100089136403.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The h_lock spinlock is now only taken while bucket->lock
-is held.  As a handle is associated with precisely one bucket,
-this means that h_lock can never be contended, so it isn't needed.
+One field is set but never access.
+Another is accessed but never set.
+Other are never mentioned at all.
 
-So discard h_lock.
+Also remove the comment
+	/* use separate field as it is set in interrupt to don't mess with
+	 * protection of other bits using _bh lock
+	 */
 
-Also discard and increasingly irrelevant comment in the declaration
-of struct portals_handle.
+This is not correct - were it used, obd_recovery_expired would be part
+of the same 'unsigned long' as the other fields.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/lustre_handles.h |    3 ---
- .../lustre/lustre/obdclass/lustre_handles.c        |    7 -------
- 2 files changed, 10 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h        |   33 +++++++-------------
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |    4 +-
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |    1 -
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    1 -
+ 4 files changed, 14 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_handles.h b/drivers/staging/lustre/lustre/include/lustre_handles.h
-index 17aee8ea63ac..d07b0a498bff 100644
---- a/drivers/staging/lustre/lustre/include/lustre_handles.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_handles.h
-@@ -62,10 +62,7 @@ struct portals_handle {
- 	u64				h_cookie;
- 	void				*h_owner;
- 	refcount_t			h_ref;
--
--	/* newly added fields to handle the RCU issue. -jxiong */
- 	struct rcu_head			h_rcu;
--	spinlock_t			h_lock;
- };
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index f7f4db0481b2..c2716e7c1c58 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -538,27 +538,18 @@ struct obd_device {
+ 	char			 obd_name[MAX_OBD_NAME];
  
- /* handles.c */
-diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-index 78c1ca52fc77..88a65a19785c 100644
---- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-@@ -85,7 +85,6 @@ void class_handle_hash(struct portals_handle *h, void *owner)
- 	spin_unlock(&handle_base_lock);
+ 	/* bitfield modification is protected by obd_dev_lock */
+-	unsigned long obd_attached:1,      /* finished attach */
+-		      obd_set_up:1,	/* finished setup */
+-		      obd_version_recov:1, /* obd uses version checking */
+-		      obd_replayable:1,/* recovery is enabled; inform clients */
+-		      obd_no_transno:1,  /* no committed-transno notification */
+-		      obd_no_recov:1,      /* fail instead of retry messages */
+-		      obd_stopping:1,      /* started cleanup */
+-		      obd_starting:1,      /* started setup */
+-		      obd_force:1,	 /* cleanup with > 0 obd refcount */
+-		      obd_fail:1,	 /* cleanup with failover */
+-		      obd_no_conn:1,       /* deny new connections */
+-		      obd_inactive:1,      /* device active/inactive
+-					    * (for sysfs status only!!)
+-					    */
+-		      obd_no_ir:1,	 /* no imperative recovery. */
+-		      obd_process_conf:1,  /* device is processing mgs config */
+-		      obd_checksum_dump:1; /* dump pages upon cksum error */
+-	/* use separate field as it is set in interrupt to don't mess with
+-	 * protection of other bits using _bh lock
+-	 */
+-	unsigned long obd_recovery_expired:1;
++	unsigned long obd_attached:1,	  /* finished attach */
++		      obd_set_up:1,	  /* finished setup */
++		      obd_no_recov:1,	  /* fail instead of retry messages */
++		      obd_stopping:1,	  /* started cleanup */
++		      obd_starting:1,	  /* started setup */
++		      obd_force:1,	  /* cleanup with > 0 obd refcount */
++		      obd_fail:1,	  /* cleanup with failover */
++		      obd_inactive:1,	  /* device active/inactive
++					   * (for sysfs status only!!)
++					   */
++		      obd_process_conf:1;/* device is processing mgs config */
++
+ 	/* uuid-export hash body */
+ 	struct rhashtable	 obd_uuid_hash;
+ 	wait_queue_head_t	 obd_refcount_waitq;
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index ec872e8ae9be..a91724013773 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -991,10 +991,10 @@ static int mgc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 		if (vallen != sizeof(int))
+ 			return -EINVAL;
+ 		value = *(int *)val;
+-		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:or%d:%s\n",
++		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:%s\n",
+ 		       imp->imp_obd->obd_name, value,
+ 		       imp->imp_deactive, imp->imp_invalid,
+-		       imp->imp_replayable, imp->imp_obd->obd_replayable,
++		       imp->imp_replayable,
+ 		       ptlrpc_import_state_name(imp->imp_state));
+ 		/* Resurrect if we previously died */
+ 		if ((imp->imp_state != LUSTRE_IMP_FULL &&
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index b8fc74044fe3..1fcbda128a58 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -525,7 +525,6 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 		}
+ 		CDEBUG(D_HA, "%s: disabling committed-transno notification\n",
+ 		       obd->obd_name);
+-		obd->obd_no_transno = 1;
+ 		err = 0;
+ 		break;
  
- 	h->h_owner = owner;
--	spin_lock_init(&h->h_lock);
- 
- 	bucket = &handle_hash[h->h_cookie & HANDLE_HASH_MASK];
- 	spin_lock(&bucket->lock);
-@@ -108,13 +107,7 @@ static void class_handle_unhash_nolock(struct portals_handle *h)
- 	CDEBUG(D_INFO, "removing object %p with handle %#llx from hash\n",
- 	       h, h->h_cookie);
- 
--	spin_lock(&h->h_lock);
--	if (hlist_unhashed(&h->h_link)) {
--		spin_unlock(&h->h_lock);
--		return;
--	}
- 	hlist_del_init_rcu(&h->h_link);
--	spin_unlock(&h->h_lock);
- }
- 
- void class_handle_unhash(struct portals_handle *h)
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 776f251e9f43..79071b0d38ef 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -487,7 +487,6 @@ static int class_cleanup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 				LCONSOLE_WARN("Failing over %s\n",
+ 					      obd->obd_name);
+ 				obd->obd_fail = 1;
+-				obd->obd_no_transno = 1;
+ 				obd->obd_no_recov = 1;
+ 				if (OBP(obd, iocontrol)) {
+ 					obd_iocontrol(OBD_IOC_SYNC,
