@@ -1,116 +1,57 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 19 Feb 2019 11:09:05 +1100
-Subject: [lustre-devel] [PATCH 18/37] lustre: obdclass: discard
- lprocfs_single/seq_release
+Subject: [lustre-devel] [PATCH 19/37] lustre: discard lprocfs_strnstr()
 In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-Message-ID: <155053494576.24125.8952974091192338899.stgit@noble.brown>
+Message-ID: <155053494582.24125.9057041272800982944.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Neither lprocfs_single_release() or lprocfs_seq_release()
-add any value to single_release() or seq_release() which
-they wrap.
-So just use the base functions and discard the wrapper.
+This is identical to strnstr() in lib/string.h,
+so just use that.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/lprocfs_status.h |    7 ++-----
- drivers/staging/lustre/lustre/lov/lproc_lov.c      |    2 +-
- .../lustre/lustre/obdclass/lprocfs_status.c        |   14 +-------------
- .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    2 +-
- 4 files changed, 5 insertions(+), 20 deletions(-)
+ .../lustre/lustre/obdclass/lprocfs_status.c        |   19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index d69f395e3d52..8565c28f08ee 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -502,9 +502,6 @@ unsigned long lprocfs_oh_sum(struct obd_histogram *oh);
- void lprocfs_stats_collect(struct lprocfs_stats *stats, int idx,
- 			   struct lprocfs_counter *cnt);
- 
--int lprocfs_single_release(struct inode *inode, struct file *file);
--int lprocfs_seq_release(struct inode *inode, struct file *file);
--
- /* write the name##_seq_show function, call LPROC_SEQ_FOPS_RO for read-only
-  * proc entries; otherwise, you will define name##_seq_write function also for
-  * a read-write proc entry, and then call LPROC_SEQ_SEQ instead. Finally,
-@@ -521,7 +518,7 @@ static const struct file_operations name##_fops = {			\
- 	.read    = seq_read,						\
- 	.write   = custom_seq_write,					\
- 	.llseek  = seq_lseek,						\
--	.release = lprocfs_single_release,				\
-+	.release = single_release,					\
- }
- 
- #define LPROC_SEQ_FOPS_RO(name)	 __LPROC_SEQ_FOPS(name, NULL)
-@@ -563,7 +560,7 @@ static const struct file_operations name##_fops = {			\
- 	static const struct file_operations name##_##type##_fops = {	\
- 		.open	= name##_##type##_open,				\
- 		.write	= name##_##type##_write,			\
--		.release = lprocfs_single_release,			\
-+		.release = single_release,				\
- 	}
- 
- struct lustre_attr {
-diff --git a/drivers/staging/lustre/lustre/lov/lproc_lov.c b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-index fc53f2386c39..cfb274498d30 100644
---- a/drivers/staging/lustre/lustre/lov/lproc_lov.c
-+++ b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-@@ -264,7 +264,7 @@ static const struct file_operations lov_debugfs_target_fops = {
- 	.open		= lov_target_seq_open,
- 	.read		= seq_read,
- 	.llseek		= seq_lseek,
--	.release	= lprocfs_seq_release,
-+	.release	= seq_release,
- };
- 
- static struct attribute *lov_attrs[] = {
 diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index bd24e48f6145..76d298337e95 100644
+index 76d298337e95..27d73c95403d 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -273,18 +273,6 @@ MODULE_PARM_DESC(lprocfs_no_percpu_stats, "Do not alloc percpu data for lprocfs
+@@ -1552,22 +1552,6 @@ int lprocfs_write_frac_u64_helper(const char __user *buffer,
+ }
+ EXPORT_SYMBOL(lprocfs_write_frac_u64_helper);
  
- #define MAX_STRING_SIZE 128
- 
--int lprocfs_single_release(struct inode *inode, struct file *file)
+-static char *lprocfs_strnstr(const char *s1, const char *s2, size_t len)
 -{
--	return single_release(inode, file);
--}
--EXPORT_SYMBOL(lprocfs_single_release);
+-	size_t l2;
 -
--int lprocfs_seq_release(struct inode *inode, struct file *file)
--{
--	return seq_release(inode, file);
+-	l2 = strlen(s2);
+-	if (!l2)
+-		return (char *)s1;
+-	while (len >= l2) {
+-		len--;
+-		if (!memcmp(s1, s2, l2))
+-			return (char *)s1;
+-		s1++;
+-	}
+-	return NULL;
 -}
--EXPORT_SYMBOL(lprocfs_seq_release);
 -
- /* lprocfs API calls */
+ /**
+  * Find the string \a name in the input \a buffer, and return a pointer to the
+  * value immediately following \a name, reducing \a count appropriately.
+@@ -1579,8 +1563,7 @@ char *lprocfs_find_named_value(const char *buffer, const char *name,
+ 	char *val;
+ 	size_t buflen = *count;
  
- static const struct file_operations lprocfs_generic_fops = { };
-@@ -1331,7 +1319,7 @@ const struct file_operations lprocfs_stats_seq_fops = {
- 	.read		= seq_read,
- 	.write		= lprocfs_stats_seq_write,
- 	.llseek		= seq_lseek,
--	.release	= lprocfs_seq_release,
-+	.release	= seq_release,
- };
- EXPORT_SYMBOL_GPL(lprocfs_stats_seq_fops);
+-	/* there is no strnstr() in rhel5 and ubuntu kernels */
+-	val = lprocfs_strnstr(buffer, name, buflen);
++	val = strnstr(buffer, name, buflen);
+ 	if (!val)
+ 		return (char *)buffer;
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-index 25858b8f6cbd..d09bddaf88ba 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -1093,7 +1093,7 @@ void ptlrpc_ldebugfs_register_service(struct dentry *entry,
- 		.open		= ptlrpc_lprocfs_svc_req_history_open,
- 		.read		= seq_read,
- 		.llseek		= seq_lseek,
--		.release	= lprocfs_seq_release,
-+		.release	= seq_release,
- 	};
- 
- 	ptlrpc_ldebugfs_register(entry, svc->srv_name,
