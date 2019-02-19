@@ -1,292 +1,157 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 15 Feb 2019 18:15:08 +0000
-Subject: [lustre-devel] [PATCH 10/21] lustre: obdclass: use
- cl_object_for_each where appropriate
-In-Reply-To: <87pnrzgnp5.fsf@notabene.neil.brown.name>
-References: <154949776249.10620.1215070753973826063.stgit@noble.brown>
- <154949781310.10620.8883358407999258821.stgit@noble.brown>
- <D0699499-2DE2-4430-94B6-81FE876793A2@whamcloud.com>
- <87pnrzgnp5.fsf@notabene.neil.brown.name>
-Message-ID: <78025893-9DAF-46C1-A407-D979BA5D2057@whamcloud.com>
+From: NeilBrown <neilb@suse.com>
+Date: Tue, 19 Feb 2019 11:09:04 +1100
+Subject: [lustre-devel] [PATCH 00/37] More lustre patches from obdclass
+Message-ID: <155053473693.24125.6976971762921761309.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Feb 10, 2019, at 17:42, NeilBrown <neilb@suse.com> wrote:
-> From: NeilBrown <neilb@suse.com>
-> Subject: [PATCH] lustre: obdclass: use cl_object_for_each where appropriate
-> 
-> There are various places which have a list_for_each_entry()
-> where cl_object_for_each (or .._reverse) is more appropriate.
-> 
-> Several of these re-use the 'obj' function parameter as a loop
-> iterator, which is a little confusing.
-> 
-> Change these to use cl_object_for_each{_reverse}, and where needed,
-> introduce a new iterator variable 'o'.
-> 
-> To further clean up these function, move initializtion of 'result'
-> to the variable declaration.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+These patches are all a result of my reading of obdclass code,
+though some of them extend will beyond obdclass.
+One has been posted already but was buggy, another few replace
+an earlier patch which, as James pointed out, didn't really
+go far enough.
 
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+I've done some testing (and found a bug) but haven't completed a full
+test run yet.  So both comments and testing most welcome.
 
-> ---
-> drivers/staging/lustre/lustre/lov/lov_page.c       |  3 +-
-> drivers/staging/lustre/lustre/obdclass/cl_lock.c   |  3 +-
-> drivers/staging/lustre/lustre/obdclass/cl_object.c | 97 ++++++++++------------
-> drivers/staging/lustre/lustre/obdclass/cl_page.c   | 11 ++-
-> 4 files changed, 49 insertions(+), 65 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
-> index 08485a95ec01..e64b350601d2 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_page.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_page.c
-> @@ -103,8 +103,7 @@ int lov_page_init_composite(const struct lu_env *env, struct cl_object *obj,
-> 		return PTR_ERR(sub);
-> 
-> 	subobj = lovsub2cl(r0->lo_sub[stripe]);
-> -	list_for_each_entry(o, &subobj->co_lu.lo_header->loh_layers,
-> -			    co_lu.lo_linkage) {
-> +	cl_object_for_each(o, subobj) {
-> 		if (o->co_ops->coo_page_init) {
-> 			rc = o->co_ops->coo_page_init(sub->sub_env, o, page,
-> 						      cl_index(subobj, suboff));
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> index 8133d992cc73..fc5976d8b37b 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> @@ -103,8 +103,7 @@ int cl_lock_init(const struct lu_env *env, struct cl_lock *lock,
-> 	LASSERT(obj);
-> 
-> 	INIT_LIST_HEAD(&lock->cll_layers);
-> -	list_for_each_entry(scan, &obj->co_lu.lo_header->loh_layers,
-> -			    co_lu.lo_linkage) {
-> +	cl_object_for_each(scan, obj) {
-> 		result = scan->co_ops->coo_lock_init(env, scan, lock, io);
-> 		if (result != 0) {
-> 			cl_lock_fini(env, lock);
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> index f724b2d62df1..43bf1a422635 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-> @@ -190,16 +190,14 @@ EXPORT_SYMBOL(cl_object_attr_unlock);
-> int cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
-> 		       struct cl_attr *attr)
-> {
-> -	struct lu_object_header *top;
-> -	int result;
-> +	struct cl_object *o;
-> +	int result = 0;
-> 
-> 	assert_spin_locked(cl_object_attr_guard(obj));
-> 
-> -	top = obj->co_lu.lo_header;
-> -	result = 0;
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_attr_get) {
-> -			result = obj->co_ops->coo_attr_get(env, obj, attr);
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_attr_get) {
-> +			result = o->co_ops->coo_attr_get(env, o, attr);
-> 			if (result != 0) {
-> 				if (result > 0)
-> 					result = 0;
-> @@ -221,17 +219,15 @@ EXPORT_SYMBOL(cl_object_attr_get);
-> int cl_object_attr_update(const struct lu_env *env, struct cl_object *obj,
-> 			  const struct cl_attr *attr, unsigned int v)
-> {
-> -	struct lu_object_header *top;
-> -	int result;
-> +	struct cl_object *o;
-> +	int result = 0;
-> 
-> 	assert_spin_locked(cl_object_attr_guard(obj));
-> 
-> -	top = obj->co_lu.lo_header;
-> -	result = 0;
-> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_attr_update) {
-> -			result = obj->co_ops->coo_attr_update(env, obj, attr,
-> -							      v);
-> +	cl_object_for_each_reverse(o, obj) {
-> +		if (o->co_ops->coo_attr_update) {
-> +			result = o->co_ops->coo_attr_update(env, o, attr,
-> +							    v);
-> 			if (result != 0) {
-> 				if (result > 0)
-> 					result = 0;
-> @@ -254,19 +250,17 @@ EXPORT_SYMBOL(cl_object_attr_update);
-> int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
-> 		      struct ost_lvb *lvb)
-> {
-> -	struct lu_object_header *top;
-> -	int result;
-> +	struct cl_object *o;
-> +	int result = 0;
-> 
-> -	top = obj->co_lu.lo_header;
-> -	result = 0;
-> -	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_glimpse) {
-> -			result = obj->co_ops->coo_glimpse(env, obj, lvb);
-> +	cl_object_for_each_reverse(o, obj) {
-> +		if (o->co_ops->coo_glimpse) {
-> +			result = o->co_ops->coo_glimpse(env, o, lvb);
-> 			if (result != 0)
-> 				break;
-> 		}
-> 	}
-> -	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(top),
-> +	LU_OBJECT_HEADER(D_DLMTRACE, env, lu_object_top(obj->co_lu.lo_header),
-> 			 "size: %llu mtime: %llu atime: %llu ctime: %llu blocks: %llu\n",
-> 			 lvb->lvb_size, lvb->lvb_mtime, lvb->lvb_atime,
-> 			 lvb->lvb_ctime, lvb->lvb_blocks);
-> @@ -280,14 +274,12 @@ EXPORT_SYMBOL(cl_object_glimpse);
-> int cl_conf_set(const struct lu_env *env, struct cl_object *obj,
-> 		const struct cl_object_conf *conf)
-> {
-> -	struct lu_object_header *top;
-> -	int result;
-> +	struct cl_object *o;
-> +	int result = 0;
-> 
-> -	top = obj->co_lu.lo_header;
-> -	result = 0;
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_conf_set) {
-> -			result = obj->co_ops->coo_conf_set(env, obj, conf);
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_conf_set) {
-> +			result = o->co_ops->coo_conf_set(env, o, conf);
-> 			if (result != 0)
-> 				break;
-> 		}
-> @@ -301,13 +293,10 @@ EXPORT_SYMBOL(cl_conf_set);
->  */
-> int cl_object_prune(const struct lu_env *env, struct cl_object *obj)
-> {
-> -	struct lu_object_header *top;
-> 	struct cl_object *o;
-> -	int result;
-> +	int result = 0;
-> 
-> -	top = obj->co_lu.lo_header;
-> -	result = 0;
-> -	list_for_each_entry(o, &top->loh_layers, co_lu.lo_linkage) {
-> +	cl_object_for_each(o, obj) {
-> 		if (o->co_ops->coo_prune) {
-> 			result = o->co_ops->coo_prune(env, o);
-> 			if (result != 0)
-> @@ -325,14 +314,13 @@ EXPORT_SYMBOL(cl_object_prune);
-> int cl_object_getstripe(const struct lu_env *env, struct cl_object *obj,
-> 			struct lov_user_md __user *uarg, size_t size)
-> {
-> -	struct lu_object_header *top;
-> +	struct cl_object *o;
-> 	int result = 0;
-> 
-> -	top = obj->co_lu.lo_header;
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_getstripe) {
-> -			result = obj->co_ops->coo_getstripe(env, obj, uarg,
-> -							    size);
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_getstripe) {
-> +			result = o->co_ops->coo_getstripe(env, o, uarg,
-> +							  size);
-> 			if (result)
-> 				break;
-> 		}
-> @@ -357,14 +345,13 @@ int cl_object_fiemap(const struct lu_env *env, struct cl_object *obj,
-> 		     struct ll_fiemap_info_key *key,
-> 		     struct fiemap *fiemap, size_t *buflen)
-> {
-> -	struct lu_object_header *top;
-> +	struct cl_object *o;
-> 	int result = 0;
-> 
-> -	top = obj->co_lu.lo_header;
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_fiemap) {
-> -			result = obj->co_ops->coo_fiemap(env, obj, key, fiemap,
-> -							 buflen);
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_fiemap) {
-> +			result = o->co_ops->coo_fiemap(env, o, key, fiemap,
-> +						       buflen);
-> 			if (result)
-> 				break;
-> 		}
-> @@ -376,11 +363,11 @@ EXPORT_SYMBOL(cl_object_fiemap);
-> int cl_object_layout_get(const struct lu_env *env, struct cl_object *obj,
-> 			 struct cl_layout *cl)
-> {
-> -	struct lu_object_header *top = obj->co_lu.lo_header;
-> +	struct cl_object *o;
-> 
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_layout_get)
-> -			return obj->co_ops->coo_layout_get(env, obj, cl);
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_layout_get)
-> +			return o->co_ops->coo_layout_get(env, o, cl);
-> 	}
-> 
-> 	return -EOPNOTSUPP;
-> @@ -389,12 +376,12 @@ EXPORT_SYMBOL(cl_object_layout_get);
-> 
-> loff_t cl_object_maxbytes(struct cl_object *obj)
-> {
-> -	struct lu_object_header *top = obj->co_lu.lo_header;
-> +	struct cl_object *o;
-> 	loff_t maxbytes = LLONG_MAX;
-> 
-> -	list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
-> -		if (obj->co_ops->coo_maxbytes)
-> -			maxbytes = min_t(loff_t, obj->co_ops->coo_maxbytes(obj),
-> +	cl_object_for_each(o, obj) {
-> +		if (o->co_ops->coo_maxbytes)
-> +			maxbytes = min_t(loff_t, o->co_ops->coo_maxbytes(o),
-> 					 maxbytes);
-> 	}
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> index 057318deaa4e..7d00a9233a3b 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-> @@ -132,7 +132,7 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
-> 			      enum cl_page_type type)
-> {
-> 	struct cl_page *page;
-> -	struct lu_object_header *head;
-> +	struct cl_object *o2;
-> 
-> 	page = kzalloc(cl_object_header(o)->coh_page_bufsize, GFP_NOFS);
-> 	if (page) {
-> @@ -149,11 +149,10 @@ struct cl_page *cl_page_alloc(const struct lu_env *env,
-> 		INIT_LIST_HEAD(&page->cp_layers);
-> 		INIT_LIST_HEAD(&page->cp_batch);
-> 		lu_ref_init(&page->cp_reference);
-> -		head = o->co_lu.lo_header;
-> -		list_for_each_entry(o, &head->loh_layers, co_lu.lo_linkage) {
-> -			if (o->co_ops->coo_page_init) {
-> -				result = o->co_ops->coo_page_init(env, o, page,
-> -								  ind);
-> +		cl_object_for_each(o2, o) {
-> +			if (o2->co_ops->coo_page_init) {
-> +				result = o2->co_ops->coo_page_init(env, o2, page,
-> +								   ind);
-> 				if (result != 0) {
-> 					__cl_page_delete(env, page);
-> 					cl_page_free(env, page);
-> -- 
-> 2.14.0.rc0.dirty
+NeilBrown
 
-Cheers, Andreas
 ---
-Andreas Dilger
-CTO Whamcloud
+
+NeilBrown (37):
+      lustre: obdclass: char obd_ioctl_getdata type.
+      lustre: llite: don't use class_setup_tunables()
+      lustre: embed typ_kobj if obd_type
+      lustre: collect all resource releasing for obj_type.
+      lustre: obd_type: use typ_kobj.name as typ_name
+      lustre: obd_type: discard obd_types linked list.
+      lustre: obd_type: discard obd_type_lock
+      lustre: obdclass: don't copy ops structures in to new type.
+      lustre: obdclass: fix module load locking.
+      lustre: kernelcomm: pass correct gfp_t to kmalloc.
+      lustre: kernelcomm: make libcfs_kkuc_msg_put static.
+      lustre: remove unused function in linkea.
+      lustre: llog: remove lgh_hdr_lock.
+      lustre: llog: change lgh_refcount to struct kref.
+      lustre: llog_obd: Convert loc_refcount to refcount_t
+      lustre: obdclass: typo: Banlance -> Balance
+      lustre: simplify lprocfs_read_frac_helper.
+      lustre: obdclass: discard lprocfs_single/seq_release
+      lustre: discard lprocfs_strnstr()
+      lustre: convert rsi_sem to a spinlock.
+      lustre: remove several MAX_STRING_SIZE defines.
+      lustre: lprocfs: use log2.h macros instead of shift loop.
+      lustre: prefer to use tabs for alignment.
+      lustre: lu_object: remove extra newline from debug printing.
+      lustre: deprecate libcfs_debug_vmsg2
+      lustre: remove libcfs_debug_vmsg2
+      lustre: discard lu_ref
+      lustre: remove scope and source from class_incref and class_decref.
+      lustre: handles: discard h_owner in favour of h_ops
+      lustre: handle: move refcount into the lustre_handle.
+      lustre: discard OBD_FREE_RCU
+      lustre: portals_handle: rename ops to owner
+      lustre: portals_handle: remove locking from class_handle2object()
+      lustre: portals_handle: use hlist for hash lists.
+      lustre: portals_handle: discard h_lock.
+      lustre: remove unused fields from struct obd_device
+      lustre: obd_sysfs: error-check value stored in jobid_var
+
+
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       |    2 
+ .../lustre/include/linux/libcfs/libcfs_crypto.h    |   10 -
+ .../lustre/include/linux/libcfs/libcfs_debug.h     |   35 +-
+ .../lustre/include/linux/libcfs/libcfs_fail.h      |   12 -
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |   24 +
+ .../lustre/include/linux/libcfs/libcfs_private.h   |    2 
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |    4 
+ .../staging/lustre/include/linux/lnet/socklnd.h    |    2 
+ .../lustre/include/uapi/linux/lnet/libcfs_debug.h  |  124 +++----
+ .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |   56 +--
+ .../lustre/include/uapi/linux/lnet/lnet-types.h    |   10 -
+ .../lustre/include/uapi/linux/lnet/lnetst.h        |   14 -
+ .../lustre/include/uapi/linux/lnet/nidstr.h        |    6 
+ .../include/uapi/linux/lustre/lustre_fiemap.h      |    2 
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  350 +++++++++----------
+ .../lustre/include/uapi/linux/lustre/lustre_user.h |  378 ++++++++++----------
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |   60 ++-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |   32 +-
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     |   63 +--
+ drivers/staging/lustre/lnet/libcfs/tracefile.h     |    2 
+ drivers/staging/lustre/lnet/lnet/nidstrings.c      |    4 
+ drivers/staging/lustre/lnet/selftest/timer.c       |    8 
+ drivers/staging/lustre/lustre/fld/lproc_fld.c      |    2 
+ drivers/staging/lustre/lustre/include/cl_object.h  |    6 
+ .../staging/lustre/lustre/include/lprocfs_status.h |    7 
+ drivers/staging/lustre/lustre/include/lu_object.h  |   45 --
+ drivers/staging/lustre/lustre/include/lu_ref.h     |  178 ---------
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |   26 -
+ .../staging/lustre/lustre/include/lustre_export.h  |    1 
+ .../staging/lustre/lustre/include/lustre_handles.h |   22 -
+ .../staging/lustre/lustre/include/lustre_import.h  |    8 
+ .../lustre/lustre/include/lustre_kernelcomm.h      |    1 
+ .../staging/lustre/lustre/include/lustre_linkea.h  |    8 
+ drivers/staging/lustre/lustre/include/lustre_log.h |   21 -
+ drivers/staging/lustre/lustre/include/lustre_net.h |    4 
+ drivers/staging/lustre/lustre/include/obd.h        |   62 +--
+ drivers/staging/lustre/lustre/include/obd_class.h  |   18 -
+ .../staging/lustre/lustre/include/obd_support.h    |   10 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    2 
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  252 ++++++-------
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   12 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   12 -
+ drivers/staging/lustre/lustre/llite/dir.c          |   18 -
+ drivers/staging/lustre/lustre/llite/file.c         |    2 
+ drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    2 
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   20 -
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |   10 -
+ drivers/staging/lustre/lustre/llite/rw.c           |    6 
+ drivers/staging/lustre/lustre/llite/rw26.c         |    6 
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |   20 -
+ drivers/staging/lustre/lustre/llite/vvp_internal.h |    2 
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |    5 
+ drivers/staging/lustre/lustre/llite/xattr.c        |    2 
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    6 
+ drivers/staging/lustre/lustre/lov/lov_ea.c         |    2 
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   43 +-
+ drivers/staging/lustre/lustre/lov/lov_object.c     |    2 
+ drivers/staging/lustre/lustre/lov/lovsub_dev.c     |    1 
+ drivers/staging/lustre/lustre/lov/lproc_lov.c      |    2 
+ drivers/staging/lustre/lustre/mdc/mdc_reint.c      |    2 
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |   32 +-
+ drivers/staging/lustre/lustre/obdclass/Makefile    |    2 
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |    8 
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |    2 
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |    5 
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   19 -
+ drivers/staging/lustre/lustre/obdclass/genops.c    |  258 ++++++--------
+ .../staging/lustre/lustre/obdclass/kernelcomm.c    |    5 
+ drivers/staging/lustre/lustre/obdclass/linkea.c    |  150 --------
+ drivers/staging/lustre/lustre/obdclass/llog.c      |   17 -
+ drivers/staging/lustre/lustre/obdclass/llog_obd.c  |   14 -
+ .../lustre/lustre/obdclass/lprocfs_status.c        |  102 +----
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   46 +-
+ drivers/staging/lustre/lustre/obdclass/lu_ref.c    |   45 --
+ .../lustre/lustre/obdclass/lustre_handles.c        |   59 +--
+ .../staging/lustre/lustre/obdclass/obd_config.c    |   20 -
+ drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |   27 +
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    4 
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   12 -
+ drivers/staging/lustre/lustre/osc/osc_lock.c       |    2 
+ drivers/staging/lustre/lustre/osc/osc_page.c       |    2 
+ drivers/staging/lustre/lustre/osc/osc_request.c    |   44 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |    2 
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    2 
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |   42 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |    2 
+ 88 files changed, 1077 insertions(+), 1904 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/include/lu_ref.h
+ delete mode 100644 drivers/staging/lustre/lustre/obdclass/lu_ref.c
+
+--
+Signature
