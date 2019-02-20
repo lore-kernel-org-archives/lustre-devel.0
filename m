@@ -1,62 +1,30 @@
-From: NeilBrown <neilb@suse.com>
-Date: Tue, 19 Feb 2019 11:09:07 +1100
-Subject: [lustre-devel] [PATCH 37/37] lustre: obd_sysfs: error-check value
- stored in jobid_var
-In-Reply-To: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
-Message-ID: <155053494716.24125.12637812266850199400.stgit@noble.brown>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 20 Feb 2019 17:59:38 +0000 (GMT)
+Subject: [lustre-devel] Lustre interval tree problems
+Message-ID: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The jobid_var sysfs attribute only has 3 meaningful values.
-Other values cause lustre_get_jobid() to return an error
-which is uniformly ignored.
 
-To improve usability and resilience, check that the value
-written is acceptable before storing it.
+With the port of the interval tree work to the OpenSFS branch several 
+problems have been pointed out in the implementation which impacts
+performance and the memory footprint in some cases.
 
-Signed-off-by: NeilBrown <neilb@suse.com>
+The biggest issues is the ability to add duplicate locks. The reason
+the original implementation avoided adding duplicate locks was to
+avoid the extra compares being done with the same type of locks.
+Especially in the case of the range lock where you can end up with
+many duplicate read locks [0-EOF]. Comparing with 1000s of identical
+read locks will have an impact. Their is teh question of the memory
+foot print in this case as well. I believe this is the case with the
+ldlm locks as well since the ability to skip large lock amounts if
+not matching has been lost.
 
----
- drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |   21 ++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-index 57a6f2c2da1c..69ccc6a55947 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-@@ -216,16 +216,25 @@ static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
- 			       const char *buffer,
- 			       size_t count)
- {
-+	static char *valid[] = {
-+		JOBSTATS_DISABLE,
-+		JOBSTATS_PROCNAME_UID,
-+		JOBSTATS_NODELOCAL,
-+		NULL
-+	};
-+	int i;
-+
- 	if (!count || count > JOBSTATS_JOBID_VAR_MAX_LEN)
- 		return -EINVAL;
- 
--	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
--
--	memcpy(obd_jobid_var, buffer, count);
-+	for (i = 0; valid[i]; i++)
-+		if (sysfs_streq(buffer, valid[i]))
-+			break;
-+	if (!valid[i])
-+		return -EINVAL;
- 
--	/* Trim the trailing '\n' if any */
--	if (obd_jobid_var[count - 1] == '\n')
--		obd_jobid_var[count - 1] = 0;
-+	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
-+	strcpy(obd_jobid_var, valid[i]);
- 
- 	return count;
- }
+The next problem Vitaly pointed in the implementation is the emebedding
+of lit_root in ldlm_interval_tree also has a negative impact. Since many
+locaks are kept in memory he wants to see that ldlm_lock struct stay as
+small as possible. Explained that is why ldlm_interval was not original
+embedded but allocated separately. I added him to this chain.
