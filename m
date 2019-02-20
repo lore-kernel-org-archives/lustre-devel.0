@@ -1,18 +1,28 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 21 Feb 2019 09:37:58 +1100
+From: Patrick Farrell <pfarrell@whamcloud.com>
+Date: Wed, 20 Feb 2019 22:54:09 +0000
 Subject: [lustre-devel] Lustre interval tree problems
-In-Reply-To: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>
-References: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>
-Message-ID: <87h8cycchl.fsf@notabene.neil.brown.name>
+In-Reply-To: <87h8cycchl.fsf@notabene.neil.brown.name>
+References: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>,
+ <87h8cycchl.fsf@notabene.neil.brown.name>
+Message-ID: <MN2PR19MB25107E921212A20D9CCE8215C57D0@MN2PR19MB2510.namprd19.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Also, many LDLM locks do not have an interval.  The node which has the most of them is generally an MDS, which can have millions in certain scenarios, and makes no use of the interval at all.  This is a lot of lost memory if we're really adding part of the interval_tree in to the lock struct (I haven't looked at the patch).
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Wednesday, February 20, 2019 4:37:58 PM
+To: James Simmons; Lustre Developement
+Cc: Vitaly Fertman
+Subject: Re: [lustre-devel] Lustre interval tree problems
+
 On Wed, Feb 20 2019, James Simmons wrote:
 
-> With the port of the interval tree work to the OpenSFS branch several 
+> With the port of the interval tree work to the OpenSFS branch several
 > problems have been pointed out in the implementation which impacts
 > performance and the memory footprint in some cases.
 >
@@ -37,9 +47,5 @@ these issues in mind, and let you know what I find.
 
 NeilBrown
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190221/2082286e/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190220/41263bdf/attachment.html>
