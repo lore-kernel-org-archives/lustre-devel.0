@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Feb 2019 17:52:13 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 17/37] lustre: simplify
- lprocfs_read_frac_helper.
-In-Reply-To: <155053494572.24125.4002432022455040178.stgit@noble.brown>
+Date: Sun, 24 Feb 2019 17:53:12 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 18/37] lustre: obdclass: discard
+ lprocfs_single/seq_release
+In-Reply-To: <155053494576.24125.8952974091192338899.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494572.24125.4002432022455040178.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902241739310.22752@casper.infradead.org>
+ <155053494576.24125.8952974091192338899.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902241752280.22752@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,108 +13,111 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This function seems overly complex, the same functionality
-> is available with much less effort.
+> Neither lprocfs_single_release() or lprocfs_seq_release()
+> add any value to single_release() or seq_release() which
+> they wrap.
+> So just use the base functions and discard the wrapper.
 
-Actually we are in discussion about removing these functions.
-The details are at:
-
-https://jira.whamcloud.com/browse/LU-11157
-
-Since shells typically don't handle "floating point" representation
-well you can see the following:
-
-sanity 64d with the same error message; '209.9: syntax error: invalid 
-arithmetic operator (error token is ".9")'
-
-The second issues is that the read values are not true representation
-of the desired value. The same issues is with the string helpers as
-well. Take for example
-
-test_string_get_size_one(1100, 1, "1.10 kB", "1.07 KiB");
-
-Which is taken from linux/lib/test-string_helpers.c.
-
-If you pass 1100 to string_get_size() you can get either 1.10 kB or 1.07 
-KiB. Now if do the reverse 1.10 kB you get ~1126 which is not the same as
-11000. I discussed how to handle this problem with Andreas and he agreed
-the best solution is make all the sysfs / debugfs *_mb files turn any 
-values passed in to around up to the nearest MiB. This way we can report
-the exact MiB settings to the users. We already have a patch to do this
-for max_dirty_mb which I can push. The other *_mb files need to be updated
-to round off. If you can wait a few days I can backport the already done
-patch and push a patch for the rest. 
-
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../lustre/lustre/obdclass/lprocfs_status.c        |   47 +++-----------------
->  1 file changed, 7 insertions(+), 40 deletions(-)
+>  .../staging/lustre/lustre/include/lprocfs_status.h |    7 ++-----
+>  drivers/staging/lustre/lustre/lov/lproc_lov.c      |    2 +-
+>  .../lustre/lustre/obdclass/lprocfs_status.c        |   14 +-------------
+>  .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    2 +-
+>  4 files changed, 5 insertions(+), 20 deletions(-)
 > 
+> diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> index d69f395e3d52..8565c28f08ee 100644
+> --- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> +++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> @@ -502,9 +502,6 @@ unsigned long lprocfs_oh_sum(struct obd_histogram *oh);
+>  void lprocfs_stats_collect(struct lprocfs_stats *stats, int idx,
+>  			   struct lprocfs_counter *cnt);
+>  
+> -int lprocfs_single_release(struct inode *inode, struct file *file);
+> -int lprocfs_seq_release(struct inode *inode, struct file *file);
+> -
+>  /* write the name##_seq_show function, call LPROC_SEQ_FOPS_RO for read-only
+>   * proc entries; otherwise, you will define name##_seq_write function also for
+>   * a read-write proc entry, and then call LPROC_SEQ_SEQ instead. Finally,
+> @@ -521,7 +518,7 @@ static const struct file_operations name##_fops = {			\
+>  	.read    = seq_read,						\
+>  	.write   = custom_seq_write,					\
+>  	.llseek  = seq_lseek,						\
+> -	.release = lprocfs_single_release,				\
+> +	.release = single_release,					\
+>  }
+>  
+>  #define LPROC_SEQ_FOPS_RO(name)	 __LPROC_SEQ_FOPS(name, NULL)
+> @@ -563,7 +560,7 @@ static const struct file_operations name##_fops = {			\
+>  	static const struct file_operations name##_##type##_fops = {	\
+>  		.open	= name##_##type##_open,				\
+>  		.write	= name##_##type##_write,			\
+> -		.release = lprocfs_single_release,			\
+> +		.release = single_release,				\
+>  	}
+>  
+>  struct lustre_attr {
+> diff --git a/drivers/staging/lustre/lustre/lov/lproc_lov.c b/drivers/staging/lustre/lustre/lov/lproc_lov.c
+> index fc53f2386c39..cfb274498d30 100644
+> --- a/drivers/staging/lustre/lustre/lov/lproc_lov.c
+> +++ b/drivers/staging/lustre/lustre/lov/lproc_lov.c
+> @@ -264,7 +264,7 @@ static const struct file_operations lov_debugfs_target_fops = {
+>  	.open		= lov_target_seq_open,
+>  	.read		= seq_read,
+>  	.llseek		= seq_lseek,
+> -	.release	= lprocfs_seq_release,
+> +	.release	= seq_release,
+>  };
+>  
+>  static struct attribute *lov_attrs[] = {
 > diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index 568e6623e0c8..bd24e48f6145 100644
+> index bd24e48f6145..76d298337e95 100644
 > --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 > +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -205,53 +205,20 @@ static void obd_connect_data_seqprint(struct seq_file *m,
->  int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
->  			     int mult)
->  {
-> -	long decimal_val, frac_val;
->  	int prtn;
+> @@ -273,18 +273,6 @@ MODULE_PARM_DESC(lprocfs_no_percpu_stats, "Do not alloc percpu data for lprocfs
 >  
->  	if (count < 10)
->  		return -EINVAL;
+>  #define MAX_STRING_SIZE 128
 >  
-> -	decimal_val = val / mult;
-> -	prtn = snprintf(buffer, count, "%ld", decimal_val);
-> -	frac_val = val % mult;
+> -int lprocfs_single_release(struct inode *inode, struct file *file)
+> -{
+> -	return single_release(inode, file);
+> -}
+> -EXPORT_SYMBOL(lprocfs_single_release);
 > -
-> -	if (prtn < (count - 4) && frac_val > 0) {
-> -		long temp_frac;
-> -		int i, temp_mult = 1, frac_bits = 0;
+> -int lprocfs_seq_release(struct inode *inode, struct file *file)
+> -{
+> -	return seq_release(inode, file);
+> -}
+> -EXPORT_SYMBOL(lprocfs_seq_release);
 > -
-> -		temp_frac = frac_val * 10;
-> -		buffer[prtn++] = '.';
-> -		while (frac_bits < 2 && (temp_frac / mult) < 1) {
-> -			/* only reserved 2 bits fraction */
-> -			buffer[prtn++] = '0';
-> -			temp_frac *= 10;
-> -			frac_bits++;
-> -		}
-> -		/*
-> -		 * Need to think these cases :
-> -		 *      1. #echo x.00 > /sys/xxx       output result : x
-> -		 *      2. #echo x.0x > /sys/xxx       output result : x.0x
-> -		 *      3. #echo x.x0 > /sys/xxx       output result : x.x
-> -		 *      4. #echo x.xx > /sys/xxx       output result : x.xx
-> -		 *      Only reserved 2 bits fraction.
-> -		 */
-> -		for (i = 0; i < (5 - prtn); i++)
-> -			temp_mult *= 10;
-> -
-> -		frac_bits = min((int)count - prtn, 3 - frac_bits);
-> -		prtn += snprintf(buffer + prtn, frac_bits, "%ld",
-> -				 frac_val * temp_mult / mult);
-> +	prtn = snprintf(buffer, count, "%ld.%02lu",
-> +			val / mult,
-> +			(val % mult) / (mult / 100));
+>  /* lprocfs API calls */
 >  
-> +	/* Strip trailing zeroes, and trailing '.' */
-> +	while (prtn && buffer[prtn-1] == '0')
-> +		prtn--;
-> +	if (prtn && buffer[prtn-1] == '.')
->  		prtn--;
-> -		while (buffer[prtn] < '1' || buffer[prtn] > '9') {
-> -			prtn--;
-> -			if (buffer[prtn] == '.') {
-> -				prtn--;
-> -				break;
-> -			}
-> -		}
-> -		prtn++;
-> -	}
->  	buffer[prtn++] = '\n';
->  	return prtn;
->  }
+>  static const struct file_operations lprocfs_generic_fops = { };
+> @@ -1331,7 +1319,7 @@ const struct file_operations lprocfs_stats_seq_fops = {
+>  	.read		= seq_read,
+>  	.write		= lprocfs_stats_seq_write,
+>  	.llseek		= seq_lseek,
+> -	.release	= lprocfs_seq_release,
+> +	.release	= seq_release,
+>  };
+>  EXPORT_SYMBOL_GPL(lprocfs_stats_seq_fops);
+>  
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> index 25858b8f6cbd..d09bddaf88ba 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+> @@ -1093,7 +1093,7 @@ void ptlrpc_ldebugfs_register_service(struct dentry *entry,
+>  		.open		= ptlrpc_lprocfs_svc_req_history_open,
+>  		.read		= seq_read,
+>  		.llseek		= seq_lseek,
+> -		.release	= lprocfs_seq_release,
+> +		.release	= seq_release,
+>  	};
+>  
+>  	ptlrpc_ldebugfs_register(entry, svc->srv_name,
 > 
 > 
 > 
