@@ -1,79 +1,35 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Feb 2019 16:35:23 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 02/37] lustre: llite: don't use
- class_setup_tunables()
+Date: Sun, 24 Feb 2019 16:52:55 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 03/37] lustre: embed typ_kobj if obd_type
 In-Reply-To: <155053494490.24125.1514109985903155907.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
  <155053494490.24125.1514109985903155907.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902241533350.15750@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1902241644070.22752@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-y
-> llite_kobj does not benefit from being in the
-> lustre_kset kset (though it does need lustre_kset
-> as a parent)
 
-Nak.
+For some reason this patch didn't land in my mailbox but I can
+see it on https://patchwork.kernel.org/patch/10819037. This patch
+is mostly good since llite now uses dynamic_kobj_ktype with its own
+ktype. Thus class_sysfs_release() will never be called with llite.
 
-Yes llite does benefit from being in the kset. On large clusters you
-can end up with 1000s of clients so keeping the sysfs files setting 
-in sync needs to be done in mass. The way Lustre does this is by 
-running on the MGS server 'lctl conf_param $FSNAME.llite.lazystats=1'
-or with the newer 'lctl set_param -P llite.$FSNAME-*.lazystats=1' as
-an example. When this is done on the MGS that new value is first
-persistently stored and then transmitted to the target nodes.
-  
-The magic behind this is with class_process_config(). In the code
-path LCFG_PARAM, which handles the conf_param case' the main function
-is class_modify_config() which is used by both llite and the obd
-devices. This function first attempts to find the sysfs attribute
-from the kobject and call lustre_attr_store() directly to set it.
-If it can't find the attribute, which means its a debugfs file
-most likely, then a uevent is created and sent off. The udev rule
-then exexcutes some application to handle the debugfs settings.
-For uevents to work the kobject (llite) must belong to a kset.
+What does need fixing is
 
-With LCFG_SET_PARAM, which handles the 'set_param -P' case the
-master function is process_param2_config(). For this case we
-always send attribute changes with uevents. Besides the requirement
-of the kobject belonging to the kset this function uses 
-kset_find_object() directly which if llite is not in the kset
-will never be found.
+--------------------------------------------------------
+type->typ_kobj.kset = lustre_kset;
 
-> It also does not need the class_ktype type, as dynamic_kobj_ktype
-> is sufficient.
-> 
-> So use the simple kobject_create_and_add() to initialize it.
-> 
-> This provides flexibility for making changes to
-> class_setup_tunables().
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/llite/lproc_llite.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> index 8215296dc15d..78ec0fa65c58 100644
-> --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> @@ -46,7 +46,7 @@ int llite_tunables_register(void)
->  {
->  	int rc = 0;
->  
-> -	llite_kobj = class_setup_tunables("llite");
-> +	llite_kobj = kobject_create_and_add("llite", &lustre_kset->kobj);
->  	if (IS_ERR(llite_kobj))
->  		return PTR_ERR(llite_kobj);
->  
+changed to:
 
-        llite_kobj->kset = kset_get(&lustre_kset);
-> 
+type->typ_kobj.kset = kset_get(&lustre_kset);
+--------------------------------------------------------
 
-In llite_tunables_unregister() the call for kobject_put()
-should really be replaced with kobject_del(). This is a bug
-in my original work. 
+Next change needed it change all the 
+
+kobject_put(&type->typ_kobj); -> kobject_del(&type->typ_kobj); 
+
+So we properly handle the kset referencing. That is currently
+broken by me :-(
