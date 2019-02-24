@@ -1,69 +1,79 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 21 Feb 2019 13:25:42 +1100
-Subject: [lustre-devel] Lustre interval tree problems
-In-Reply-To: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>
-References: <alpine.LFD.2.21.1902201738170.6267@casper.infradead.org>
-Message-ID: <87y369c1y1.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sun, 24 Feb 2019 16:35:23 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 02/37] lustre: llite: don't use
+ class_setup_tunables()
+In-Reply-To: <155053494490.24125.1514109985903155907.stgit@noble.brown>
+References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
+ <155053494490.24125.1514109985903155907.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902241533350.15750@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Feb 20 2019, James Simmons wrote:
+y
+> llite_kobj does not benefit from being in the
+> lustre_kset kset (though it does need lustre_kset
+> as a parent)
 
-> With the port of the interval tree work to the OpenSFS branch several 
-> problems have been pointed out in the implementation which impacts
-> performance and the memory footprint in some cases.
+Nak.
 
-Porting to OpenSFS will have to address one issue that I could skip
-over.
+Yes llite does benefit from being in the kset. On large clusters you
+can end up with 1000s of clients so keeping the sysfs files setting 
+in sync needs to be done in mass. The way Lustre does this is by 
+running on the MGS server 'lctl conf_param $FSNAME.llite.lazystats=1'
+or with the newer 'lctl set_param -P llite.$FSNAME-*.lazystats=1' as
+an example. When this is done on the MGS that new value is first
+persistently stored and then transmitted to the target nodes.
+  
+The magic behind this is with class_process_config(). In the code
+path LCFG_PARAM, which handles the conf_param case' the main function
+is class_modify_config() which is used by both llite and the obd
+devices. This function first attempts to find the sysfs attribute
+from the kobject and call lustre_attr_store() directly to set it.
+If it can't find the attribute, which means its a debugfs file
+most likely, then a uevent is created and sent off. The udev rule
+then exexcutes some application to handle the debugfs settings.
+For uevents to work the kobject (llite) must belong to a kset.
 
-hsm_update_work() in mtd_hsm_cdt_requests.c deliberately doesn't want
-duplicates - it is the only place in all of lustre which really doesn't
-want duplicates, and it is server side so I don't have to address it.
+With LCFG_SET_PARAM, which handles the 'set_param -P' case the
+master function is process_param2_config(). For this case we
+always send attribute changes with uevents. Besides the requirement
+of the kobject belonging to the kset this function uses 
+kset_find_object() directly which if llite is not in the kset
+will never be found.
 
-I wold probably change the code to do a lookup first, then insert only
-if the lookup failed.
+> It also does not need the class_ktype type, as dynamic_kobj_ktype
+> is sufficient.
+> 
+> So use the simple kobject_create_and_add() to initialize it.
+> 
+> This provides flexibility for making changes to
+> class_setup_tunables().
+> 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/llite/lproc_llite.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> index 8215296dc15d..78ec0fa65c58 100644
+> --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> @@ -46,7 +46,7 @@ int llite_tunables_register(void)
+>  {
+>  	int rc = 0;
+>  
+> -	llite_kobj = class_setup_tunables("llite");
+> +	llite_kobj = kobject_create_and_add("llite", &lustre_kset->kobj);
+>  	if (IS_ERR(llite_kobj))
+>  		return PTR_ERR(llite_kobj);
+>  
 
->
-> The biggest issues is the ability to add duplicate locks. The reason
-> the original implementation avoided adding duplicate locks was to
-> avoid the extra compares being done with the same type of locks.
-> Especially in the case of the range lock where you can end up with
-> many duplicate read locks [0-EOF]. Comparing with 1000s of identical
-> read locks will have an impact. Their is teh question of the memory
-> foot print in this case as well. I believe this is the case with the
-> ldlm locks as well since the ability to skip large lock amounts if
-> not matching has been lost.
+        llite_kobj->kset = kset_get(&lustre_kset);
+> 
 
-The interval tree stores entries in an rb-tree, which is a
-nearly-balanced binary tree.  This provides O(ln n) lookup.
-If there are 1000s of identical read locks, then a lookup will have 10s
-of extra compares.  Even with 1,000,000 locks, that would be at most 40
-compares.
-The code simplification could well make up for some of these extra
-compares by reducing i-cache pressure, though that would be hard to
-measure.
-
-Is there any empirical evidence of a slow-down?  Does 10s of compares
-really seem like a big cost?
-
-I cannot see the memory foot print issue that you mention.
-All locks are added to the data structure even if they aren't in the
-interval tree directly.  There is a linked-list of locks that all have
-the same start/end, so keeping duplicates doesn't mean that more memory
-is used, it just means that it is linked together differently.
-
-So it isn't yet clear to me what the problem is here.
-I'd be have to have it explained to me in more detail.
-
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190221/454cd5af/attachment.sig>
+In llite_tunables_unregister() the call for kobject_put()
+should really be replaced with kobject_del(). This is a bug
+in my original work. 
