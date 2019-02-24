@@ -1,10 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Feb 2019 17:53:31 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 19/37] lustre: discard lprocfs_strnstr()
-In-Reply-To: <155053494582.24125.9057041272800982944.stgit@noble.brown>
+Date: Sun, 24 Feb 2019 18:09:57 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 22/37] lustre: lprocfs: use log2.h macros
+ instead of shift loop.
+In-Reply-To: <155053494599.24125.1795878344125234751.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494582.24125.9057041272800982944.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902241753230.22752@casper.infradead.org>
+ <155053494599.24125.1795878344125234751.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1902241809070.31684@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,53 +13,56 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This is identical to strnstr() in lib/string.h,
-> so just use that.
+> These shift loops seem to be trying to avoid doing a
+> multiplication.
+> We same effect can be achieved more transparently using
+> rounddown_pow_of_two().  Even though there is a multiplication
+> in the C code, the resulting machine code just does a single shift.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Be aware rounddown_pow_of_two(n) is undefined when "n == 0". We should
+handle the "0" case as well. We are aware of this because this case
+bit us in the LNet layer.
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../lustre/lustre/obdclass/lprocfs_status.c        |   19 +------------------
->  1 file changed, 1 insertion(+), 18 deletions(-)
+>  .../lustre/lustre/obdclass/lprocfs_status.c        |   10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index 76d298337e95..27d73c95403d 100644
+> index a179b0d6979e..637aaca96888 100644
 > --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 > +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -1552,22 +1552,6 @@ int lprocfs_write_frac_u64_helper(const char __user *buffer,
->  }
->  EXPORT_SYMBOL(lprocfs_write_frac_u64_helper);
+> @@ -341,9 +341,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
+>  		u32 blk_size = osfs.os_bsize >> 10;
+>  		u64 result = osfs.os_blocks;
 >  
-> -static char *lprocfs_strnstr(const char *s1, const char *s2, size_t len)
-> -{
-> -	size_t l2;
+> -		while (blk_size >>= 1)
+> -			result <<= 1;
 > -
-> -	l2 = strlen(s2);
-> -	if (!l2)
-> -		return (char *)s1;
-> -	while (len >= l2) {
-> -		len--;
-> -		if (!memcmp(s1, s2, l2))
-> -			return (char *)s1;
-> -		s1++;
-> -	}
-> -	return NULL;
-> -}
-> -
->  /**
->   * Find the string \a name in the input \a buffer, and return a pointer to the
->   * value immediately following \a name, reducing \a count appropriately.
-> @@ -1579,8 +1563,7 @@ char *lprocfs_find_named_value(const char *buffer, const char *name,
->  	char *val;
->  	size_t buflen = *count;
+> +		result *= rounddown_pow_of_two(blk_size);
+>  		return sprintf(buf, "%llu\n", result);
+>  	}
 >  
-> -	/* there is no strnstr() in rhel5 and ubuntu kernels */
-> -	val = lprocfs_strnstr(buffer, name, buflen);
-> +	val = strnstr(buffer, name, buflen);
->  	if (!val)
->  		return (char *)buffer;
+> @@ -364,8 +362,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
+>  		u32 blk_size = osfs.os_bsize >> 10;
+>  		u64 result = osfs.os_bfree;
 >  
+> -		while (blk_size >>= 1)
+> -			result <<= 1;
+> +		result *= rounddown_pow_of_two(blk_size);
+>  
+>  		return sprintf(buf, "%llu\n", result);
+>  	}
+> @@ -387,8 +384,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
+>  		u32 blk_size = osfs.os_bsize >> 10;
+>  		u64 result = osfs.os_bavail;
+>  
+> -		while (blk_size >>= 1)
+> -			result <<= 1;
+> +		result *= rounddown_pow_of_two(blk_size);
+>  
+>  		return sprintf(buf, "%llu\n", result);
+>  	}
 > 
 > 
 > 
