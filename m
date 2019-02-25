@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 25 Feb 2019 18:16:20 +0000
-Subject: [lustre-devel] [PATCH 24/37] lustre: lu_object: remove extra
- newline from debug printing.
-In-Reply-To: <155053494611.24125.2469014113532688461.stgit@noble.brown>
+Date: Mon, 25 Feb 2019 18:16:21 +0000
+Subject: [lustre-devel] [PATCH 25/37] lustre: deprecate
+ libcfs_debug_vmsg2
+In-Reply-To: <155053494619.24125.5150721300459339252.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494611.24125.2469014113532688461.stgit@noble.brown>
-Message-ID: <267E03EA-23B6-4555-B09E-8E71630FEF6C@whamcloud.com>
+ <155053494619.24125.5150721300459339252.stgit@noble.brown>
+Message-ID: <E7A2B4D2-236D-401C-A15F-5B64B441F07A@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,10 +14,18 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
 > 
-> In lu_cdebug_printer(), is "complete" is true, then
-> key->lck_area ends with a newline, so there is no need to
-> include on in the format too.
+> Since 2.6.36, Linux' vsprintf has supported %pV
+> which supports "recursive sprintf" - exactly the task
+> that libcfs_debug_vmsg2 aims to provide.
 > 
+> Instead of calling libcfs_debug_vmsg2(), we can put the fmt and
+> args in a 'struct va_format', and pass the address of that structure
+> to the "%pV" format.
+> 
+> So do this to remove all users of libcfs_debug_vmsg2().
+
+Interesting.  This code was always more complex than I'd like.
+
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
