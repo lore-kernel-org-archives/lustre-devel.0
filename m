@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 25 Feb 2019 18:16:17 +0000
-Subject: [lustre-devel] [PATCH 14/37] lustre: llog: change lgh_refcount
- to struct kref.
-In-Reply-To: <155053494558.24125.11270061933248014691.stgit@noble.brown>
+Date: Mon, 25 Feb 2019 18:16:20 +0000
+Subject: [lustre-devel] [PATCH 24/37] lustre: lu_object: remove extra
+ newline from debug printing.
+In-Reply-To: <155053494611.24125.2469014113532688461.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494558.24125.11270061933248014691.stgit@noble.brown>
-Message-ID: <8D48D671-98EF-4137-AB0B-1239A979D5DB@whamcloud.com>
+ <155053494611.24125.2469014113532688461.stgit@noble.brown>
+Message-ID: <267E03EA-23B6-4555-B09E-8E71630FEF6C@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,9 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
 > 
-> This is a refcount that perfectly fits the
-> pattern for kref, so change it to a kref.
+> In lu_cdebug_printer(), is "complete" is true, then
+> key->lck_area ends with a newline, so there is no need to
+> include on in the format too.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
