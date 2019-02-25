@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 25 Feb 2019 18:16:18 +0000
-Subject: [lustre-devel] [PATCH 15/37] lustre: llog_obd: Convert
- loc_refcount to refcount_t
-In-Reply-To: <155053494563.24125.5471194386420442456.stgit@noble.brown>
+Date: Mon, 25 Feb 2019 18:16:15 +0000
+Subject: [lustre-devel] [PATCH 12/37] lustre: remove unused function in
+ linkea.
+In-Reply-To: <155053494549.24125.14755296858886216830.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494563.24125.5471194386420442456.stgit@noble.brown>
-Message-ID: <266DFBB3-84F6-4E10-99FB-0F37636D60AE@whamcloud.com>
+ <155053494549.24125.14755296858886216830.stgit@noble.brown>
+Message-ID: <297EF5E9-FF08-489E-AD60-BAADA85B5A02@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,13 +14,14 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
 > 
-> Make this a refcount_t for clarity, and also
-> use refcount_dec_and_lock() rather than having separate
-> lock and dec calls.
+> Much of the linkea functionality is server-only.
+> Keep the parts used on the client, but remove the rest.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
+
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+
 
 Cheers, Andreas
 ---
