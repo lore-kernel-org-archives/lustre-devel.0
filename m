@@ -1,10 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 25 Feb 2019 18:16:21 +0000
-Subject: [lustre-devel] [PATCH 26/37] lustre: remove libcfs_debug_vmsg2
-In-Reply-To: <155053494624.24125.18162964077735119291.stgit@noble.brown>
+Date: Mon, 25 Feb 2019 18:16:19 +0000
+Subject: [lustre-devel] [PATCH 21/37] lustre: remove several
+ MAX_STRING_SIZE defines.
+In-Reply-To: <155053494593.24125.427229089746560574.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494624.24125.18162964077735119291.stgit@noble.brown>
-Message-ID: <7CFD9DE8-8DC3-429F-BF67-96318718293A@whamcloud.com>
+ <155053494593.24125.427229089746560574.stgit@noble.brown>
+Message-ID: <917ADCDD-7F94-4E95-BD80-A93CA20B036E@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,13 +14,14 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
 > 
-> Now that libcfs_debug_vmsg2 has no (external) users, we can remove it.
-> It is used to implement libcfs_debug_msg(), so simply move
-> the body of the function (suitably modified) into that one caller.
+> Some of these are unused.
+> One is used in a minimal way where it is easier to use
+> an explicit number.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+
 
 Cheers, Andreas
 ---
