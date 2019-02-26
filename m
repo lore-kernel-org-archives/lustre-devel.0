@@ -1,11 +1,13 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 26 Feb 2019 20:55:49 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 22/37] lustre: lprocfs: use log2.h macros
- instead of shift loop.
-In-Reply-To: <155053494599.24125.1795878344125234751.stgit@noble.brown>
+Date: Tue, 26 Feb 2019 22:18:21 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 02/37] lustre: llite: don't use
+ class_setup_tunables()
+In-Reply-To: <874l8rv6zt.fsf@notabene.neil.brown.name>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494599.24125.1795878344125234751.stgit@noble.brown>
-Message-ID: <alpine.LFD.2.21.1902241806550.22752@casper.infradead.org>
+ <155053494490.24125.1514109985903155907.stgit@noble.brown>
+ <alpine.LFD.2.21.1902241533350.15750@casper.infradead.org>
+ <874l8rv6zt.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1902262155390.21144@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,54 +15,79 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> These shift loops seem to be trying to avoid doing a
-> multiplication.
-> We same effect can be achieved more transparently using
-> rounddown_pow_of_two().  Even though there is a multiplication
-> in the C code, the resulting machine code just does a single shift.
+> >> llite_kobj does not benefit from being in the
+> >> lustre_kset kset (though it does need lustre_kset
+> >> as a parent)
+> >
+> > Nak.
+> >
+> > Yes llite does benefit from being in the kset. On large clusters you
+> > can end up with 1000s of clients so keeping the sysfs files setting 
+> > in sync needs to be done in mass. The way Lustre does this is by 
+> > running on the MGS server 'lctl conf_param $FSNAME.llite.lazystats=1'
+> > or with the newer 'lctl set_param -P llite.$FSNAME-*.lazystats=1' as
+> > an example. When this is done on the MGS that new value is first
+> > persistently stored and then transmitted to the target nodes.
+> >   
+> > The magic behind this is with class_process_config(). In the code
+> > path LCFG_PARAM, which handles the conf_param case' the main function
+> > is class_modify_config() which is used by both llite and the obd
+> > devices. This function first attempts to find the sysfs attribute
+> > from the kobject and call lustre_attr_store() directly to set it.
+> > If it can't find the attribute, which means its a debugfs file
+> > most likely, then a uevent is created and sent off. The udev rule
+> > then exexcutes some application to handle the debugfs settings.
+> > For uevents to work the kobject (llite) must belong to a kset.
+> >
+> > With LCFG_SET_PARAM, which handles the 'set_param -P' case the
+> > master function is process_param2_config(). For this case we
+> > always send attribute changes with uevents. Besides the requirement
+> > of the kobject belonging to the kset this function uses 
+> > kset_find_object() directly which if llite is not in the kset
+> > will never be found.
+> 
+> Thanks a lot for the explanation - there are definitely things I missed
+> there.
+> I'll drop this patch, and keep class_setup_tunables() in the later patch
+> that removed it.
 
-Be aware rounddown_pow_of_two(n) is undefined when "n == 0". 
- 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  .../lustre/lustre/obdclass/lprocfs_status.c        |   10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index a179b0d6979e..637aaca96888 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -341,9 +341,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
->  		u32 blk_size = osfs.os_bsize >> 10;
->  		u64 result = osfs.os_blocks;
->  
-> -		while (blk_size >>= 1)
-> -			result <<= 1;
-> -
-> +		result *= rounddown_pow_of_two(blk_size);
->  		return sprintf(buf, "%llu\n", result);
->  	}
->  
-> @@ -364,8 +362,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
->  		u32 blk_size = osfs.os_bsize >> 10;
->  		u64 result = osfs.os_bfree;
->  
-> -		while (blk_size >>= 1)
-> -			result <<= 1;
-> +		result *= rounddown_pow_of_two(blk_size);
->  
->  		return sprintf(buf, "%llu\n", result);
->  	}
-> @@ -387,8 +384,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
->  		u32 blk_size = osfs.os_bsize >> 10;
->  		u64 result = osfs.os_bavail;
->  
-> -		while (blk_size >>= 1)
-> -			result <<= 1;
-> +		result *= rounddown_pow_of_two(blk_size);
->  
->  		return sprintf(buf, "%llu\n", result);
->  	}
-> 
-> 
+I have a patch to replace this one. In fact I love the using the release
+for cleanups for ktype that I moved debugfs handling in llite into a new
+llite_kobj_release(). I'm looking at the next patch but that one is 
+tricker since it impacts server code as well as I pointed out in another
+email. I think we can do a reasonable cleanup here.
+
+> >> It also does not need the class_ktype type, as dynamic_kobj_ktype
+> >> is sufficient.
+> >> 
+> >> So use the simple kobject_create_and_add() to initialize it.
+> >> 
+> >> This provides flexibility for making changes to
+> >> class_setup_tunables().
+> >> 
+> >> Signed-off-by: NeilBrown <neilb@suse.com>
+> >> ---
+> >>  drivers/staging/lustre/lustre/llite/lproc_llite.c |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> >> index 8215296dc15d..78ec0fa65c58 100644
+> >> --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> >> +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+> >> @@ -46,7 +46,7 @@ int llite_tunables_register(void)
+> >>  {
+> >>  	int rc = 0;
+> >>  
+> >> -	llite_kobj = class_setup_tunables("llite");
+> >> +	llite_kobj = kobject_create_and_add("llite", &lustre_kset->kobj);
+> >>  	if (IS_ERR(llite_kobj))
+> >>  		return PTR_ERR(llite_kobj);
+> >>  
+> >
+> >         llite_kobj->kset = kset_get(&lustre_kset);
+> >> 
+> >
+> > In llite_tunables_unregister() the call for kobject_put()
+> > should really be replaced with kobject_del(). This is a bug
+> > in my original work. 
 > 
