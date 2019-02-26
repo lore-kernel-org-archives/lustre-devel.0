@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 27 Feb 2019 10:45:45 +1100
-Subject: [lustre-devel] [PATCH 11/37] lustre: kernelcomm: make
- libcfs_kkuc_msg_put static.
-In-Reply-To: <alpine.LFD.2.21.1902241711110.22752@casper.infradead.org>
+Date: Wed, 27 Feb 2019 10:59:33 +1100
+Subject: [lustre-devel] [PATCH 17/37] lustre: simplify
+ lprocfs_read_frac_helper.
+In-Reply-To: <alpine.LFD.2.21.1902241739310.22752@casper.infradead.org>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494545.24125.14664274760505145343.stgit@noble.brown>
- <alpine.LFD.2.21.1902241711110.22752@casper.infradead.org>
-Message-ID: <87va16t8pi.fsf@notabene.neil.brown.name>
+ <155053494572.24125.4002432022455040178.stgit@noble.brown>
+ <alpine.LFD.2.21.1902241739310.22752@casper.infradead.org>
+Message-ID: <87sgwat82i.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,36 +15,127 @@ To: lustre-devel@lists.lustre.org
 
 On Sun, Feb 24 2019, James Simmons wrote:
 
->> libcfs_kkuc_msg_put() is never used outside of kernelcomm.c,
->> so make it static.
+>> This function seems overly complex, the same functionality
+>> is available with much less effort.
 >
-> In the OpenSFS branch libcfs_kkuc_msg_put() is used by the
-> client and server code. While this is okay now in the future
-> this will be reverted. So do we keep it as is so it can handle
-> server code or do this change and then later do what I added
-> below:
+> Actually we are in discussion about removing these functions.
+> The details are at:
+>
+> https://jira.whamcloud.com/browse/LU-11157
+>
+> Since shells typically don't handle "floating point" representation
+> well you can see the following:
+>
+> sanity 64d with the same error message; '209.9: syntax error: invalid 
+> arithmetic operator (error token is ".9")'
+>
+> The second issues is that the read values are not true representation
+> of the desired value. The same issues is with the string helpers as
+> well. Take for example
+>
+> test_string_get_size_one(1100, 1, "1.10 kB", "1.07 KiB");
+>
+> Which is taken from linux/lib/test-string_helpers.c.
+>
+> If you pass 1100 to string_get_size() you can get either 1.10 kB or 1.07 
+> KiB. Now if do the reverse 1.10 kB you get ~1126 which is not the same as
+> 11000. I discussed how to handle this problem with Andreas and he agreed
+> the best solution is make all the sysfs / debugfs *_mb files turn any 
+> values passed in to around up to the nearest MiB. This way we can report
+> the exact MiB settings to the users. We already have a patch to do this
+> for max_dirty_mb which I can push. The other *_mb files need to be updated
+> to round off. If you can wait a few days I can backport the already done
+> patch and push a patch for the rest.
 
-Where is it used?
+My  recommendation would be to deprecate all _mb files and instead have
+_bytes files which report a simple integer - the number of bytes.
 
-Looking in the current whamcloud master
-Commit f7155420024e ("LU-11208 tests: add version check to sanity tests")
+Leave all the unit conversion to user-space.
 
-$ git grep libcfs_kkuc_msg_put
-lustre/include/lustre_kernelcomm.h:int libcfs_kkuc_msg_put(struct file *fp, void *payload);
-lustre/obdclass/kernelcomm.c: * libcfs_kkuc_msg_put - send an message from kernel to userspace
-lustre/obdclass/kernelcomm.c:int libcfs_kkuc_msg_put(struct file *filp, void *payload)
-lustre/obdclass/kernelcomm.c:EXPORT_SYMBOL(libcfs_kkuc_msg_put);
-lustre/obdclass/kernelcomm.c:                   rc = libcfs_kkuc_msg_put(reg->kr_fp, payload);
+Linus once told me that he prefers sysfs files to always be in basic
+units, and that decimals are fine.  So use "seconds" for time, even if
+that means 0.002 for 2 milliseconds.  Use bytes for storage, etc.
 
-libcfs_kkuc_msg_put() is only called from libcfs_kkuc_group_put().
-What am I missing?
-
-Thanks,
 NeilBrown
+
+>
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>  .../lustre/lustre/obdclass/lprocfs_status.c        |   47 +++-----------------
+>>  1 file changed, 7 insertions(+), 40 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> index 568e6623e0c8..bd24e48f6145 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> @@ -205,53 +205,20 @@ static void obd_connect_data_seqprint(struct seq_file *m,
+>>  int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
+>>  			     int mult)
+>>  {
+>> -	long decimal_val, frac_val;
+>>  	int prtn;
+>>  
+>>  	if (count < 10)
+>>  		return -EINVAL;
+>>  
+>> -	decimal_val = val / mult;
+>> -	prtn = snprintf(buffer, count, "%ld", decimal_val);
+>> -	frac_val = val % mult;
+>> -
+>> -	if (prtn < (count - 4) && frac_val > 0) {
+>> -		long temp_frac;
+>> -		int i, temp_mult = 1, frac_bits = 0;
+>> -
+>> -		temp_frac = frac_val * 10;
+>> -		buffer[prtn++] = '.';
+>> -		while (frac_bits < 2 && (temp_frac / mult) < 1) {
+>> -			/* only reserved 2 bits fraction */
+>> -			buffer[prtn++] = '0';
+>> -			temp_frac *= 10;
+>> -			frac_bits++;
+>> -		}
+>> -		/*
+>> -		 * Need to think these cases :
+>> -		 *      1. #echo x.00 > /sys/xxx       output result : x
+>> -		 *      2. #echo x.0x > /sys/xxx       output result : x.0x
+>> -		 *      3. #echo x.x0 > /sys/xxx       output result : x.x
+>> -		 *      4. #echo x.xx > /sys/xxx       output result : x.xx
+>> -		 *      Only reserved 2 bits fraction.
+>> -		 */
+>> -		for (i = 0; i < (5 - prtn); i++)
+>> -			temp_mult *= 10;
+>> -
+>> -		frac_bits = min((int)count - prtn, 3 - frac_bits);
+>> -		prtn += snprintf(buffer + prtn, frac_bits, "%ld",
+>> -				 frac_val * temp_mult / mult);
+>> +	prtn = snprintf(buffer, count, "%ld.%02lu",
+>> +			val / mult,
+>> +			(val % mult) / (mult / 100));
+>>  
+>> +	/* Strip trailing zeroes, and trailing '.' */
+>> +	while (prtn && buffer[prtn-1] == '0')
+>> +		prtn--;
+>> +	if (prtn && buffer[prtn-1] == '.')
+>>  		prtn--;
+>> -		while (buffer[prtn] < '1' || buffer[prtn] > '9') {
+>> -			prtn--;
+>> -			if (buffer[prtn] == '.') {
+>> -				prtn--;
+>> -				break;
+>> -			}
+>> -		}
+>> -		prtn++;
+>> -	}
+>>  	buffer[prtn++] = '\n';
+>>  	return prtn;
+>>  }
+>> 
+>> 
+>> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190227/f24b1f45/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190227/d86b2ad5/attachment.sig>
