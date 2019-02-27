@@ -1,141 +1,84 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 27 Feb 2019 10:59:33 +1100
-Subject: [lustre-devel] [PATCH 17/37] lustre: simplify
- lprocfs_read_frac_helper.
-In-Reply-To: <alpine.LFD.2.21.1902241739310.22752@casper.infradead.org>
+Date: Wed, 27 Feb 2019 11:22:16 +1100
+Subject: [lustre-devel] [PATCH 20/37] lustre: convert rsi_sem to a
+ spinlock.
+In-Reply-To: <19970218-0088-4873-B933-4F56FED1E6CC@whamcloud.com>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494572.24125.4002432022455040178.stgit@noble.brown>
- <alpine.LFD.2.21.1902241739310.22752@casper.infradead.org>
-Message-ID: <87sgwat82i.fsf@notabene.neil.brown.name>
+ <155053494585.24125.10207641299012244855.stgit@noble.brown>
+ <19970218-0088-4873-B933-4F56FED1E6CC@whamcloud.com>
+Message-ID: <87pnret70n.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sun, Feb 24 2019, James Simmons wrote:
+On Mon, Feb 25 2019, Andreas Dilger wrote:
 
->> This function seems overly complex, the same functionality
->> is available with much less effort.
+> On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
+>> 
+>> This lock is never held over code that sleeps, and is
+>> only ever held for short periods of time.
+>> So a simple spinlock is best.
+>> 
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> index 27d73c95403d..aed33068ff3c 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>> @@ -1720,10 +1720,10 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+>> 	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
+>> 	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
+>> 		/* empty string is special case */
+>> -		down_write(&squash->rsi_sem);
+>> +		spin_lock(&squash->rsi_lock);
+>> 		if (!list_empty(&squash->rsi_nosquash_nids))
+>> 			cfs_free_nidlist(&squash->rsi_nosquash_nids);
+>> -		up_write(&squash->rsi_sem);
+>> +		spin_unlock(&squash->rsi_lock);
+>> 
 >
-> Actually we are in discussion about removing these functions.
-> The details are at:
+>> @@ -1740,11 +1740,11 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+>> 	kfree(kernbuf);
+>> 	kernbuf = NULL;
+>> 
+>> -	down_write(&squash->rsi_sem);
+>> +	spin_lock(&squash->rsi_lock);
+>> 	if (!list_empty(&squash->rsi_nosquash_nids))
+>> 		cfs_free_nidlist(&squash->rsi_nosquash_nids);
+>> 	list_splice(&tmp, &squash->rsi_nosquash_nids);
+>> -	up_write(&squash->rsi_sem);
+>> +	spin_unlock(&squash->rsi_lock);
 >
-> https://jira.whamcloud.com/browse/LU-11157
 >
-> Since shells typically don't handle "floating point" representation
-> well you can see the following:
->
-> sanity 64d with the same error message; '209.9: syntax error: invalid 
-> arithmetic operator (error token is ".9")'
->
-> The second issues is that the read values are not true representation
-> of the desired value. The same issues is with the string helpers as
-> well. Take for example
->
-> test_string_get_size_one(1100, 1, "1.10 kB", "1.07 KiB");
->
-> Which is taken from linux/lib/test-string_helpers.c.
->
-> If you pass 1100 to string_get_size() you can get either 1.10 kB or 1.07 
-> KiB. Now if do the reverse 1.10 kB you get ~1126 which is not the same as
-> 11000. I discussed how to handle this problem with Andreas and he agreed
-> the best solution is make all the sysfs / debugfs *_mb files turn any 
-> values passed in to around up to the nearest MiB. This way we can report
-> the exact MiB settings to the users. We already have a patch to do this
-> for max_dirty_mb which I can push. The other *_mb files need to be updated
-> to round off. If you can wait a few days I can backport the already done
-> patch and push a patch for the rest.
+> This is held here over cds_free_nidlist(), which has calls to kfree()
+> internally.  I don't think it is acceptable to hold a spinlock over
+> kfree() these days?
 
-My  recommendation would be to deprecate all _mb files and instead have
-_bytes files which report a simple integer - the number of bytes.
+I have not heard that, and have myself called kfree inside a spinlock before.
+A quick look finds some examples in lib/idr.c
+ida_free() calls kfree() while holding a spinlock (xas_unlock_irqrestore
+is a wrapper around spin_unlock_irqrestore).
 
-Leave all the unit conversion to user-space.
-
-Linus once told me that he prefers sysfs files to always be in basic
-units, and that decimals are fine.  So use "seconds" for time, even if
-that means 0.002 for 2 milliseconds.  Use bytes for storage, etc.
+I couldn't find any documentation which said one way or the other, and
+normally if a common function cannot be called under a spinlock, it will
+call may_sleep() to ensure errors are found quickly.
 
 NeilBrown
 
+
 >
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>  .../lustre/lustre/obdclass/lprocfs_status.c        |   47 +++-----------------
->>  1 file changed, 7 insertions(+), 40 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
->> index 568e6623e0c8..bd24e48f6145 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
->> @@ -205,53 +205,20 @@ static void obd_connect_data_seqprint(struct seq_file *m,
->>  int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
->>  			     int mult)
->>  {
->> -	long decimal_val, frac_val;
->>  	int prtn;
->>  
->>  	if (count < 10)
->>  		return -EINVAL;
->>  
->> -	decimal_val = val / mult;
->> -	prtn = snprintf(buffer, count, "%ld", decimal_val);
->> -	frac_val = val % mult;
->> -
->> -	if (prtn < (count - 4) && frac_val > 0) {
->> -		long temp_frac;
->> -		int i, temp_mult = 1, frac_bits = 0;
->> -
->> -		temp_frac = frac_val * 10;
->> -		buffer[prtn++] = '.';
->> -		while (frac_bits < 2 && (temp_frac / mult) < 1) {
->> -			/* only reserved 2 bits fraction */
->> -			buffer[prtn++] = '0';
->> -			temp_frac *= 10;
->> -			frac_bits++;
->> -		}
->> -		/*
->> -		 * Need to think these cases :
->> -		 *      1. #echo x.00 > /sys/xxx       output result : x
->> -		 *      2. #echo x.0x > /sys/xxx       output result : x.0x
->> -		 *      3. #echo x.x0 > /sys/xxx       output result : x.x
->> -		 *      4. #echo x.xx > /sys/xxx       output result : x.xx
->> -		 *      Only reserved 2 bits fraction.
->> -		 */
->> -		for (i = 0; i < (5 - prtn); i++)
->> -			temp_mult *= 10;
->> -
->> -		frac_bits = min((int)count - prtn, 3 - frac_bits);
->> -		prtn += snprintf(buffer + prtn, frac_bits, "%ld",
->> -				 frac_val * temp_mult / mult);
->> +	prtn = snprintf(buffer, count, "%ld.%02lu",
->> +			val / mult,
->> +			(val % mult) / (mult / 100));
->>  
->> +	/* Strip trailing zeroes, and trailing '.' */
->> +	while (prtn && buffer[prtn-1] == '0')
->> +		prtn--;
->> +	if (prtn && buffer[prtn-1] == '.')
->>  		prtn--;
->> -		while (buffer[prtn] < '1' || buffer[prtn] > '9') {
->> -			prtn--;
->> -			if (buffer[prtn] == '.') {
->> -				prtn--;
->> -				break;
->> -			}
->> -		}
->> -		prtn++;
->> -	}
->>  	buffer[prtn++] = '\n';
->>  	return prtn;
->>  }
->> 
->> 
->> 
+> Cheers, Andreas
+> ---
+> Andreas Dilger
+> Principal Lustre Architect
+> Whamcloud
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190227/d86b2ad5/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190227/92e6fea8/attachment.sig>
