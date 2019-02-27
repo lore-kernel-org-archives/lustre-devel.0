@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 27 Feb 2019 06:37:49 +0000
-Subject: [lustre-devel] [PATCH 29/37] lustre: handles: discard h_owner
- in favour of h_ops
-In-Reply-To: <155053494646.24125.10155576042684274174.stgit@noble.brown>
+Date: Wed, 27 Feb 2019 06:52:17 +0000
+Subject: [lustre-devel] [PATCH 28/37] lustre: remove scope and source
+ from class_incref and class_decref.
+In-Reply-To: <155053494637.24125.716197573687357279.stgit@noble.brown>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494646.24125.10155576042684274174.stgit@noble.brown>
-Message-ID: <FC69F452-EB61-4535-A2DC-5B2052224885@whamcloud.com>
+ <155053494637.24125.716197573687357279.stgit@noble.brown>
+Message-ID: <F37CEB24-A519-47AF-8C22-9FD627A7D7CC@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,28 +14,37 @@ To: lustre-devel@lists.lustre.org
 
 On Feb 18, 2019, at 17:09, NeilBrown <neilb@suse.com> wrote:
 > 
-> lustre_handles  assigned a  64bit  unique identifier  (a 'cookie')  to
-> objects of  various types and  stored them  in a hash  table, allowing
-> them to be accessed by the cookie.
-> 
-> The is a facility for type checking by recording an 'owner' for each
-> object, and checking the owner on lookup.  Unfortunately this is not
-> used - owner is always zero.
-> 
-> Eahc object also contains an h_ops pointer which can be used to
-> reliably identify an owner.
-> 
-> So discard h_owner, pass and 'ops' pointer to class_handle2object(),
-> and only return objects for which the h_ops matches.
+> These arguments are no longer used, so we can discard them.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
-The h_owner is not used in the client code, but it is still used in the
-server code to ensure that only clients which have already opened a file
-handle can use the open file handle cookie to re-open the file.  The
-h_owner in this case is an MDS-local pointer to the client export data,
-so just using the h_ops pointer (which is generic to the class of users,
-not the specific user) would not provide this functionality.
+Well, they are no longer used, because you've removed the users.
+
+> -struct obd_device *class_incref(struct obd_device *obd,
+> -				const char *scope, const void *source)
+> +struct obd_device *class_incref(struct obd_device *obd)
+> {
+> 	atomic_inc(&obd->obd_refcount);
+> 	CDEBUG(D_INFO, "incref %s (%p) now %d\n", obd->obd_name, obd,
+> @@ -528,12 +527,12 @@ struct obd_device *class_incref(struct obd_device *obd,
+> }
+> EXPORT_SYMBOL(class_incref);
+> 
+> -void class_decref(struct obd_device *obd, const char *scope, const void *source)
+> +void class_decref(struct obd_device *obd)
+> {
+> 	int last;
+> 
+> -	CDEBUG(D_INFO, "Decref %s (%p) now %d - %s\n", obd->obd_name, obd,
+> -	       atomic_read(&obd->obd_refcount), scope);
+> +	CDEBUG(D_INFO, "Decref %s (%p) now %d\n", obd->obd_name, obd,
+> +	       atomic_read(&obd->obd_refcount));
+
+In particular, the scope (object type) is printed, which allows debugging the
+generic incref/decref of these objects (similar to class_get_export() and
+class_put_export() as mentioned in my other email).  If we at least can keep
+the scope and source, then these generic refcount functions could still be used
+for debugging.
 
 Cheers, Andreas
 ---
