@@ -1,101 +1,80 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 27 Feb 2019 00:54:25 +0000
-Subject: [lustre-devel] [PATCH 22/37] lustre: lprocfs: use log2.h macros
- instead of shift loop.
-In-Reply-To: <87k1hmt5o1.fsf@notabene.neil.brown.name>
+Date: Wed, 27 Feb 2019 01:00:59 +0000
+Subject: [lustre-devel] [PATCH 20/37] lustre: convert rsi_sem to a
+ spinlock.
+In-Reply-To: <87pnret70n.fsf@notabene.neil.brown.name>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494599.24125.1795878344125234751.stgit@noble.brown>
- <alpine.LFD.2.21.1902241806550.22752@casper.infradead.org>
- <87k1hmt5o1.fsf@notabene.neil.brown.name>
-Message-ID: <45B15CDD-E478-4553-8F0F-C45DB7FD28FB@whamcloud.com>
+ <155053494585.24125.10207641299012244855.stgit@noble.brown>
+ <19970218-0088-4873-B933-4F56FED1E6CC@whamcloud.com>
+ <87pnret70n.fsf@notabene.neil.brown.name>
+Message-ID: <F13C10E5-C256-46DA-8F66-A18E75194430@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Feb 26, 2019, at 17:51, NeilBrown <neilb@suse.com> wrote:
+On Feb 26, 2019, at 17:22, NeilBrown <neilb@suse.com> wrote:
 > 
-> On Tue, Feb 26 2019, James Simmons wrote:
+> On Mon, Feb 25 2019, Andreas Dilger wrote:
 > 
->>> These shift loops seem to be trying to avoid doing a
->>> multiplication.
->>> We same effect can be achieved more transparently using
->>> rounddown_pow_of_two().  Even though there is a multiplication
->>> in the C code, the resulting machine code just does a single shift.
->> 
->> Be aware rounddown_pow_of_two(n) is undefined when "n == 0". 
-> 
-> Hmm... can os_bsize ever be less than 1024?  I guess we still need to be
-> careful of the possibility.
-
-In theory, ZFS allows a 512-byte blocksize, but we don't use that today.
-There is some chance the MDT will be on a byte-granular NVRAM storage at
-some point in the future, but even those would have an allocation unit
-of 16-32 bytes or so.
-
-> The current code treats anything less than 1024 as though it were 1024,
-> so I could achieve the same thing with 
-> 
-> 		result *= rounddown_pow_of_two(blk_size ?: 1);
-> 
-> Is that too obscure?
-
-Should be fine.
-
-Cheers, Andreas
-
-> 
-> Thanks,
-> NeilBrown
-> 
-> 
->> 
+>> On Feb 18, 2019, at 16:09, NeilBrown <neilb@suse.com> wrote:
+>>> 
+>>> This lock is never held over code that sleeps, and is
+>>> only ever held for short periods of time.
+>>> So a simple spinlock is best.
+>>> 
 >>> Signed-off-by: NeilBrown <neilb@suse.com>
 >>> ---
->>> .../lustre/lustre/obdclass/lprocfs_status.c        |   10 +++-------
->>> 1 file changed, 3 insertions(+), 7 deletions(-)
 >>> 
 >>> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
->>> index a179b0d6979e..637aaca96888 100644
+>>> index 27d73c95403d..aed33068ff3c 100644
 >>> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 >>> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
->>> @@ -341,9 +341,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
->>> 		u32 blk_size = osfs.os_bsize >> 10;
->>> 		u64 result = osfs.os_blocks;
+>>> @@ -1720,10 +1720,10 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+>>> 	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
+>>> 	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
+>>> 		/* empty string is special case */
+>>> -		down_write(&squash->rsi_sem);
+>>> +		spin_lock(&squash->rsi_lock);
+>>> 		if (!list_empty(&squash->rsi_nosquash_nids))
+>>> 			cfs_free_nidlist(&squash->rsi_nosquash_nids);
+>>> -		up_write(&squash->rsi_sem);
+>>> +		spin_unlock(&squash->rsi_lock);
 >>> 
->>> -		while (blk_size >>= 1)
->>> -			result <<= 1;
->>> -
->>> +		result *= rounddown_pow_of_two(blk_size);
->>> 		return sprintf(buf, "%llu\n", result);
->>> 	}
+>> 
+>>> @@ -1740,11 +1740,11 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+>>> 	kfree(kernbuf);
+>>> 	kernbuf = NULL;
 >>> 
->>> @@ -364,8 +362,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
->>> 		u32 blk_size = osfs.os_bsize >> 10;
->>> 		u64 result = osfs.os_bfree;
->>> 
->>> -		while (blk_size >>= 1)
->>> -			result <<= 1;
->>> +		result *= rounddown_pow_of_two(blk_size);
->>> 
->>> 		return sprintf(buf, "%llu\n", result);
->>> 	}
->>> @@ -387,8 +384,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
->>> 		u32 blk_size = osfs.os_bsize >> 10;
->>> 		u64 result = osfs.os_bavail;
->>> 
->>> -		while (blk_size >>= 1)
->>> -			result <<= 1;
->>> +		result *= rounddown_pow_of_two(blk_size);
->>> 
->>> 		return sprintf(buf, "%llu\n", result);
->>> 	}
->>> 
->>> 
->>> 
+>>> -	down_write(&squash->rsi_sem);
+>>> +	spin_lock(&squash->rsi_lock);
+>>> 	if (!list_empty(&squash->rsi_nosquash_nids))
+>>> 		cfs_free_nidlist(&squash->rsi_nosquash_nids);
+>>> 	list_splice(&tmp, &squash->rsi_nosquash_nids);
+>>> -	up_write(&squash->rsi_sem);
+>>> +	spin_unlock(&squash->rsi_lock);
+>> 
+>> 
+>> This is held here over cds_free_nidlist(), which has calls to kfree()
+>> internally.  I don't think it is acceptable to hold a spinlock over
+>> kfree() these days?
+> 
+> I have not heard that, and have myself called kfree inside a spinlock before.
+> A quick look finds some examples in lib/idr.c
+> ida_free() calls kfree() while holding a spinlock (xas_unlock_irqrestore
+> is a wrapper around spin_unlock_irqrestore).
+> 
+> I couldn't find any documentation which said one way or the other, and
+> normally if a common function cannot be called under a spinlock, it will
+> call may_sleep() to ensure errors are found quickly.
+
+Hmm, maybe I'm wrong.  I thought there was something about freeing slab
+objects and eventually they spilled out of the per-CPU slab cache and
+might sleep, but that could be ancient news.
 
 Cheers, Andreas
 ---
 Andreas Dilger
-CTO Whamcloud
+Principal Lustre Architect
+Whamcloud
