@@ -1,9 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat,  2 Mar 2019 14:12:21 -0500
-Subject: [lustre-devel] [PATCH 4/7] ldlm: move comments to sphinix format
+Date: Sat,  2 Mar 2019 14:12:24 -0500
+Subject: [lustre-devel] [PATCH 7/7] lustre: move remaining comments to
+ sphinix format
 In-Reply-To: <1551553944-6419-1-git-send-email-jsimmons@infradead.org>
 References: <1551553944-6419-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1551553944-6419-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1551553944-6419-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,815 +12,704 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 Lustre comments was written for DocBook which is no longer used
-by the Linux kernel. Move all the DocBook handling to sphinix.
+by the Linux kernel. Move all the remaining lustre DocBook
+handling to sphinix.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    | 14 +--
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |  8 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 90 ++++++++++----------
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |  6 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 22 ++---
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 99 +++++++++++-----------
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 18 ++--
- 7 files changed, 127 insertions(+), 130 deletions(-)
+ drivers/staging/lustre/lustre/fld/fld_cache.c     |   4 +-
+ drivers/staging/lustre/lustre/fld/fld_internal.h  |   2 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c       | 119 +++++++++++-----------
+ drivers/staging/lustre/lustre/lov/lov_io.c        |   2 +-
+ drivers/staging/lustre/lustre/lov/lov_object.c    |  47 ++++-----
+ drivers/staging/lustre/lustre/lov/lov_pack.c      |   4 +-
+ drivers/staging/lustre/lustre/mdc/mdc_changelog.c |  91 +++++++++--------
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c       |  12 +--
+ drivers/staging/lustre/lustre/mdc/mdc_request.c   |  34 ++++---
+ drivers/staging/lustre/lustre/mgc/mgc_request.c   |   8 +-
+ drivers/staging/lustre/lustre/osc/osc_cache.c     |  12 +--
+ drivers/staging/lustre/lustre/osc/osc_lock.c      |  10 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c   |   4 +-
+ 13 files changed, 182 insertions(+), 167 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 4fc380d2..4316b2b 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -100,7 +100,7 @@
-  * Process a granting attempt for flock lock.
-  * Must be called under ns lock held.
-  *
-- * This function looks for any conflicts for \a lock in the granted or
-+ * This function looks for any conflicts for @lock in the granted or
-  * waiting queues. The lock is granted if no conflicts are found in
-  * either queue.
-  *
-@@ -291,7 +291,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
+index b4baa53..d289c29 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_cache.c
++++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
+@@ -468,7 +468,7 @@ struct fld_cache_entry
+ }
  
- 	/* In case we're reprocessing the requested lock we can't destroy
- 	 * it until after calling ldlm_add_ast_work_item() above so that laawi()
--	 * can bump the reference count on \a req. Otherwise \a req
-+	 * can bump the reference count on @req. Otherwise @req
- 	 * could be freed before the completion AST can be sent.
- 	 */
- 	if (added)
-@@ -304,12 +304,12 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
  /**
-  * Flock completion callback function.
+- * lookup \a seq sequence for range in fld cache.
++ * lookup @seq sequence for range in fld cache.
+  */
+ struct fld_cache_entry
+ *fld_cache_entry_lookup(struct fld_cache *cache, struct lu_seq_range *range)
+@@ -482,7 +482,7 @@ struct fld_cache_entry
+ }
+ 
+ /**
+- * lookup \a seq sequence for range in fld cache.
++ * lookup @seq sequence for range in fld cache.
+  */
+ int fld_cache_lookup(struct fld_cache *cache,
+ 		     const u64 seq, struct lu_seq_range *range)
+diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
+index 76666a4..e2eda59 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_internal.h
++++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
+@@ -94,7 +94,7 @@ struct fld_cache {
+ 	/** Preferred number of cached entries */
+ 	int			fci_cache_size;
+ 
+-	/** Current number of cached entries. Protected by \a fci_lock */
++	/** Current number of cached entries. Protected by @fci_lock */
+ 	int			fci_cache_count;
+ 
+ 	/** LRU list fld entries. */
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 1c7379b..fe1c14c 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1520,13 +1520,14 @@ static int lmv_close(struct obd_export *exp, struct md_op_data *op_data,
+  * walk through all of stripes to locate the entry.
   *
-- * \param lock [in,out]: A lock to be handled
-- * \param flags    [in]: flags
-- * \param *data    [in]: ldlm_work_cp_ast_lock() will use ldlm_cb_set_arg
-+ * @lock	A lock to be handled
-+ * @flags	flags
-+ * @data	ldlm_work_cp_ast_lock() will use ldlm_cb_set_arg
+  * For normal direcotry, it will locate MDS by FID directly.
+- * \param[in] lmv	LMV device
+- * \param[in] op_data	client MD stack parameters, name, namelen
+- *			mds_num etc.
+- * \param[in] fid	object FID used to locate MDS.
   *
-- * \retval 0    : success
-- * \retval <0   : failure
+- * retval		pointer to the lmv_tgt_desc if succeed.
+- *			ERR_PTR(errno) if failed.
++ * @lmv:	LMV device
++ * @op_data:	client MD stack parameters, name, namelen
++ *		mds_num etc.
++ * @fid:	object FID used to locate MDS.
++ *
++ * Returns:	pointer to the lmv_tgt_desc if succeed.
++ *		ERR_PTR(errno) if failed.
+  */
+ struct lmv_tgt_desc*
+ lmv_locate_mds(struct lmv_obd *lmv, struct md_op_data *op_data,
+@@ -2005,26 +2006,26 @@ static int lmv_fsync(struct obd_export *exp, const struct lu_fid *fid,
+  * closest(>=) to @hash_offset, from all of sub-stripes, and it is
+  * only being called for striped directory.
+  *
+- * \param[in] exp		export of LMV
+- * \param[in] op_data		parameters transferred beween client MD stack
+- *				stripe_information will be included in this
+- *				parameter
+- * \param[in] cb_op		ldlm callback being used in enqueue in
+- *				mdc_read_page
+- * \param[in] hash_offset	the hash value, which is used to locate
+- *				minum(closet) dir entry
+- * \param[in|out] stripe_offset	the caller use this to indicate the stripe
+- *				index of last entry, so to avoid hash conflict
+- *				between stripes. It will also be used to
+- *				return the stripe index of current dir entry.
+- * \param[in|out] entp		the minum entry and it also is being used
+- *				to input the last dir entry to resolve the
+- *				hash conflict
++ * @exp:		export of LMV
++ * @op_data:		parameters transferred beween client MD stack
++ *			stripe_information will be included in this
++ *			parameter
++ * @cb_op:		ldlm callback being used in enqueue in
++ *			mdc_read_page
++ * @hash_offset:	the hash value, which is used to locate
++ *			minum(closet) dir entry
++ * @stripe_offset:	the caller use this to indicate the stripe
++ *			index of last entry, so to avoid hash conflict
++ *			between stripes. It will also be used to
++ *			return the stripe index of current dir entry.
++ * @entp:		the minum entry and it also is being used
++ *			to input the last dir entry to resolve the
++ *			hash conflict
+  *
+- * \param[out] ppage		the page which holds the minum entry
++ * @ppage:		the page which holds the minum entry
+  *
+- * \retval			= 0 get the entry successfully
+- *				negative errno (< 0) does not get the entry
++ * Return:		= 0 get the entry successfully
++ *			negative errno (< 0) does not get the entry
+  */
+ static int lmv_get_min_striped_entry(struct obd_export *exp,
+ 				     struct md_op_data *op_data,
+@@ -2152,17 +2153,17 @@ static int lmv_get_min_striped_entry(struct obd_export *exp,
+  * one, so need to restore before reusing.
+  * 3. release the entry page if that is not being chosen.
+  *
+- * \param[in] exp	obd export refer to LMV
+- * \param[in] op_data	hold those MD parameters of read_entry
+- * \param[in] cb_op	ldlm callback being used in enqueue in mdc_read_entry
+- * \param[out] ldp	the entry being read
+- * \param[out] ppage	the page holding the entry. Note: because the entry
+- *			will be accessed in upper layer, so we need hold the
+- *			page until the usages of entry is finished, see
+- *			ll_dir_entry_next.
++ * @exp:	obd export refer to LMV
++ * @op_data:	hold those MD parameters of read_entry
++ * @cb_op:	ldlm callback being used in enqueue in mdc_read_entry
++ * @ldp:	the entry being read
++ * @ppage:	the page holding the entry. Note: because the entry
++ *		will be accessed in upper layer, so we need hold the
++ *		page until the usages of entry is finished, see
++ *		ll_dir_entry_next.
+  *
+- * retval		=0 if get entry successfully
+- *			<0 cannot get entry
++ * Returns:	=0 if get entry successfully
++ *		<0 cannot get entry
+  */
+ static int lmv_read_striped_page(struct obd_export *exp,
+ 				 struct md_op_data *op_data,
+@@ -2327,15 +2328,15 @@ static int lmv_read_page(struct obd_export *exp, struct md_op_data *op_data,
+  * it will walk through all of sub-stripes until the child is being
+  * unlinked finally.
+  *
+- * \param[in] exp	export refer to LMV
+- * \param[in] op_data	different parameters transferred beween client
+- *			MD stacks, name, namelen, FIDs etc.
+- *			op_fid1 is the parent FID, op_fid2 is the child
+- *			FID.
+- * \param[out] request point to the request of unlink.
++ * @exp:	export refer to LMV
++ * @op_data:	different parameters transferred beween client
++ *		MD stacks, name, namelen, FIDs etc.
++ *		op_fid1 is the parent FID, op_fid2 is the child
++ *		FID.
++ * @request:	point to the request of unlink.
+  *
+- * retval		0 if succeed
+- *			negative errno if failed.
++ * Return:	0 if succeed
++ *		negative errno if failed.
+  */
+ static int lmv_unlink(struct obd_export *exp, struct md_op_data *op_data,
+ 		      struct ptlrpc_request **request)
+@@ -2506,15 +2507,15 @@ static int lmv_precleanup(struct obd_device *obd)
+  *
+  * Dispatch request to lower-layer devices as needed.
+  *
+- * \param[in]  env	execution environment for this thread
+- * \param[in]  exp	export for the LMV device
+- * \param[in]  keylen	length of key identifier
+- * \param[in]  key	identifier of key to get value for
+- * \param[in]  vallen	size of \a val
+- * \param[out] val	pointer to storage location for value
++ * @env:	execution environment for this thread
++ * @exp:	export for the LMV device
++ * @keylen:	length of key identifier
++ * @key:	identifier of key to get value for
++ * @vallen:	size of @val
++ * @val:	pointer to storage location for value
+  *
+- * \retval 0		on success
+- * \retval negative	negated errno on failure
++ * Return:	0 on success
++ *		negated errno on failure
+  */
+ static int lmv_get_info(const struct lu_env *env, struct obd_export *exp,
+ 			u32 keylen, void *key, u32 *vallen, void *val)
+@@ -2575,16 +2576,16 @@ static int lmv_get_info(const struct lu_env *env, struct obd_export *exp,
+  *
+  * Dispatch request to lower-layer devices as needed.
+  *
+- * \param[in] env	execution environment for this thread
+- * \param[in] exp	export for the LMV device
+- * \param[in] keylen	length of key identifier
+- * \param[in] key	identifier of key to store value for
+- * \param[in] vallen	size of value to store
+- * \param[in] val	pointer to data to be stored
+- * \param[in] set	optional list of related ptlrpc requests
++ * @env:	execution environment for this thread
++ * @exp:	export for the LMV device
++ * @keylen:	length of key identifier
++ * @key:	identifier of key to store value for
++ * @vallen:	size of value to store
++ * @val:	pointer to data to be stored
++ * @set:	optional list of related ptlrpc requests
+  *
+- * \retval 0		on success
+- * \retval negative	negated errno on failure
++ * Returs:	0 on success
++ *		negative negated errno on failure
+  */
+ static int lmv_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 			      u32 keylen, void *key, u32 vallen,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 77efb86..02bc4e6 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -722,7 +722,7 @@ static int lov_io_read_ahead(const struct lu_env *env,
+ 
+ /**
+  * lov implementation of cl_operations::cio_submit() method. It takes a list
+- * of pages in \a queue, splits it into per-stripe sub-lists, invokes
++ * of pages in @queue, splits it into per-stripe sub-lists, invokes
+  * cl_io_submit() on underlying devices to submit sub-lists, and then splices
+  * everything back.
+  *
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index 397ecc1..2058275 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -1085,14 +1085,14 @@ int lov_lock_init(const struct lu_env *env, struct cl_object *obj,
+  * This function returns the last_stripe and also sets the stripe_count
+  * over which the mapping is spread
+  *
+- * \param lsm [in]		striping information for the file
++ * @lsm				striping information for the file
+  * @index			stripe component index
+  * @ext				logical extent of mapping
+- * \param start_stripe [in]	starting stripe of the mapping
+- * \param stripe_count [out]	the number of stripes across which to map is
++ * @start_stripe		starting stripe of the mapping
++ * @stripe_count		the number of stripes across which to map is
+  *				returned
+  *
+- * \retval last_stripe		return the last stripe of the mapping
++ * Return:			return the last stripe of the mapping
+  */
+ static int fiemap_calc_last_stripe(struct lov_stripe_md *lsm, int index,
+ 				   struct lu_extent *ext,
+@@ -1126,12 +1126,12 @@ static int fiemap_calc_last_stripe(struct lov_stripe_md *lsm, int index,
+ /**
+  * Set fe_device and copy extents from local buffer into main return buffer.
+  *
+- * \param fiemap [out]		fiemap to hold all extents
+- * \param lcl_fm_ext [in]	array of fiemap extents get from OSC layer
+- * \param ost_index [in]	OST index to be written into the fm_device
+- *				field for each extent
+- * \param ext_count [in]	number of extents to be copied
+- * \param current_extent [in]	where to start copying in the extent array
++ * @fiemap		fiemap to hold all extents
++ * @lcl_fm_ext		array of fiemap extents get from OSC layer
++ * @ost_index		OST index to be written into the fm_device
++ *			field for each extent
++ * @ext_count		number of extents to be copied
++ * @current_extent	where to start copying in the extent array
+  */
+ static void fiemap_prepare_and_copy_exts(struct fiemap *fiemap,
+ 					 struct fiemap_extent *lcl_fm_ext,
+@@ -1164,11 +1164,11 @@ static void fiemap_prepare_and_copy_exts(struct fiemap *fiemap,
+  * will re-calculate proper offset in next stripe.
+  * Note that the first extent is passed to lov_get_info via the value field.
+  *
+- * \param fiemap [in]		fiemap request header
+- * \param lsm [in]		striping information for the file
+- * @index			stripe component index
+- * @ext				logical extent of mapping
+- * \param start_stripe [out]	starting stripe will be returned in this
++ * @fiemap		fiemap request header
++ * @lsm			striping information for the file
++ * @index		stripe component index
++ * @ext			logical extent of mapping
++ * @start_stripe	starting stripe will be returned in this
+  */
+ static u64 fiemap_calc_fm_end_offset(struct fiemap *fiemap,
+ 				     struct lov_stripe_md *lsm,
+@@ -1411,14 +1411,15 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+  * This also handles the restarting of FIEMAP calls in case mapping overflows
+  * the available number of extents in single call.
+  *
+- * \param env [in]		lustre environment
+- * \param obj [in]		file object
+- * \param fmkey [in]		fiemap request header and other info
+- * \param fiemap [out]		fiemap buffer holding retrived map extents
+- * \param buflen [in/out]	max buffer length of @fiemap, when iterate
+- *				each OST, it is used to limit max map needed
+- * \retval 0	success
+- * \retval < 0	error
++ * @env		lustre environment
++ * @obj		file object
++ * @fmkey	fiemap request header and other info
++ * @fiemap	fiemap buffer holding retrived map extents
++ * @buflen	max buffer length of @fiemap, when iterate
++ *		each OST, it is used to limit max map needed
++ *
 + * Return:	0 success
-+ *		<0 failure
++ *		< 0 error
   */
- int
- ldlm_flock_completion_ast(struct ldlm_lock *lock, u64 flags, void *data)
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index aef83ff..e0d2851 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -99,7 +99,7 @@ static int import_set_conn(struct obd_import *imp, struct obd_uuid *uuid,
- 			goto out_free;
- 		}
- 	}
--	/* No existing import connection found for \a uuid. */
-+	/* No existing import connection found for @uuid. */
- 	if (create) {
- 		imp_conn->oic_conn = ptlrpc_conn;
- 		imp_conn->oic_uuid = *uuid;
-@@ -198,8 +198,8 @@ int client_import_del_conn(struct obd_import *imp, struct obd_uuid *uuid)
- EXPORT_SYMBOL(client_import_del_conn);
- 
- /**
-- * Find conn UUID by peer NID. \a peer is a server NID. This function is used
-- * to find a conn uuid of \a imp which can reach \a peer.
-+ * Find conn UUID by peer NID. @peer is a server NID. This function is used
-+ * to find a conn uuid of @imp which can reach @peer.
-  */
- int client_import_find_conn(struct obd_import *imp, lnet_nid_t peer,
- 			    struct obd_uuid *uuid)
-@@ -654,7 +654,7 @@ int client_disconnect_export(struct obd_export *exp)
- EXPORT_SYMBOL(client_disconnect_export);
- 
- /**
-- * Packs current SLV and Limit into \a req.
-+ * Packs current SLV and Limit into @req.
-  */
- int target_pack_pool_reply(struct ptlrpc_request *req)
- {
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index f2433dc..ba28011 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -192,7 +192,7 @@ void ldlm_lock_put(struct ldlm_lock *lock)
- EXPORT_SYMBOL(ldlm_lock_put);
- 
- /**
-- * Removes LDLM lock \a lock from LRU. Assumes LRU is already locked.
-+ * Removes LDLM lock @lock from LRU. Assumes LRU is already locked.
-  */
- int ldlm_lock_remove_from_lru_nolock(struct ldlm_lock *lock)
- {
-@@ -211,15 +211,16 @@ int ldlm_lock_remove_from_lru_nolock(struct ldlm_lock *lock)
- }
- 
- /**
-- * Removes LDLM lock \a lock from LRU. Obtains the LRU lock first.
-+ * Removes LDLM lock @lock from LRU. Obtains the LRU lock first.
+ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+ 			     struct ll_fiemap_info_key *fmkey,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 18ce9f9..269e61c 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -103,8 +103,8 @@ void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
+  * Pack LOV striping metadata for disk storage format (in little
+  * endian byte order).
   *
-- * If \a last_use is non-zero, it will remove the lock from LRU only if
-+ * If @last_use is non-zero, it will remove the lock from LRU only if
-  * it matches lock's l_last_used.
+- * This follows the getxattr() conventions. If \a buf_size is zero
+- * then return the size needed. If \a buf_size is too small then
++ * This follows the getxattr() conventions. If @buf_size is zero
++ * then return the size needed. If @buf_size is too small then
+  * return -ERANGE. Otherwise return the size of the result.
+  */
+ ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+index ea6dda7..45aef9c 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+@@ -107,12 +107,12 @@ enum {
+  * If the current record is eligible to userland delivery, push
+  * it into the crs_rec_queue where the consumer code will fetch it.
   *
-- * \retval 0 if \a last_use is set, the lock is not in LRU list or \a last_use
-- *           doesn't match lock's l_last_used;
-- *           otherwise, the lock hasn't been in the LRU list.
-- * \retval 1 the lock was in LRU list and removed.
-+ * Return:	0 if @last_use is set, the lock is not in LRU list or
-+ *		@last_use doesn't match lock's l_last_used;
-+ *		otherwise, the lock hasn't been in the LRU list.
+- * @param[in]     env  (unused)
+- * @param[in]     llh  Client-side handle used to identify the llog
+- * @param[in]     hdr  Header of the current llog record
+- * @param[in,out] data chlg_reader_state passed from caller
++ * @env:	(unused)
++ * @llh:	Client-side handle used to identify the llog
++ * @hdr:	Header of the current llog record
++ * @data:	chlg_reader_state passed from caller
+  *
+- * @return 0 or LLOG_PROC_* control code on success, negated error on failure.
++ * Returns:	0 or LLOG_PROC_* control code on success, negated error on failure.
+  */
+ static int chlg_read_cat_process_cb(const struct lu_env *env,
+ 				    struct llog_handle *llh,
+@@ -198,8 +198,9 @@ static inline struct obd_device *chlg_obd_get(struct chlg_registered_dev *dev)
+  * Record prefetch thread entry point. Opens the changelog catalog and starts
+  * reading records.
+  *
+- * @param[in,out]  args  chlg_reader_state passed from caller.
+- * @return 0 on success, negated error code on failure.
++ * @args:	chlg_reader_state passed from caller.
 + *
-+ *		1 the lock was in LRU list and removed.
++ * Returns:	0 on success, negated error code on failure.
   */
- int ldlm_lock_remove_from_lru_check(struct ldlm_lock *lock, time_t last_use)
+ static int chlg_load(void *args)
  {
-@@ -235,7 +236,7 @@ int ldlm_lock_remove_from_lru_check(struct ldlm_lock *lock, time_t last_use)
- }
- 
- /**
-- * Adds LDLM lock \a lock to namespace LRU. Assumes LRU is already locked.
-+ * Adds LDLM lock @lock to namespace LRU. Assumes LRU is already locked.
-  */
- static void ldlm_lock_add_to_lru_nolock(struct ldlm_lock *lock)
- {
-@@ -251,7 +252,7 @@ static void ldlm_lock_add_to_lru_nolock(struct ldlm_lock *lock)
- }
- 
- /**
-- * Adds LDLM lock \a lock to namespace LRU. Obtains necessary LRU locks
-+ * Adds LDLM lock @lock to namespace LRU. Obtains necessary LRU locks
-  * first.
-  */
- static void ldlm_lock_add_to_lru(struct ldlm_lock *lock)
-@@ -264,7 +265,7 @@ static void ldlm_lock_add_to_lru(struct ldlm_lock *lock)
- }
- 
- /**
-- * Moves LDLM lock \a lock that is already in namespace LRU to the tail of
-+ * Moves LDLM lock @lock that is already in namespace LRU to the tail of
-  * the LRU. Performs necessary LRU locking
-  */
- static void ldlm_lock_touch_in_lru(struct ldlm_lock *lock)
-@@ -323,7 +324,7 @@ static int ldlm_lock_destroy_internal(struct ldlm_lock *lock)
- }
- 
- /**
-- * Destroys a LDLM lock \a lock. Performs necessary locking first.
-+ * Destroys a LDLM lock @lock. Performs necessary locking first.
-  */
- static void ldlm_lock_destroy(struct ldlm_lock *lock)
- {
-@@ -341,7 +342,7 @@ static void ldlm_lock_destroy(struct ldlm_lock *lock)
- }
- 
- /**
-- * Destroys a LDLM lock \a lock that is already locked.
-+ * Destroys a LDLM lock @lock that is already locked.
-  */
- void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
- {
-@@ -426,7 +427,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- }
- 
- /**
-- * Moves LDLM lock \a lock to another resource.
-+ * Moves LDLM lock @lock to another resource.
-  * This is used on client when server returns some other lock than requested
-  * (typically as a result of intent operation)
-  */
-@@ -492,7 +493,7 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
-  */
- 
- /**
-- * Fills in handle for LDLM lock \a lock into supplied \a lockh
-+ * Fills in handle for LDLM lock @lock into supplied @lockh
-  * Does not take any references.
-  */
- void ldlm_lock2handle(const struct ldlm_lock *lock, struct lustre_handle *lockh)
-@@ -504,7 +505,7 @@ void ldlm_lock2handle(const struct ldlm_lock *lock, struct lustre_handle *lockh)
- /**
-  * Obtain a lock reference by handle.
+@@ -269,12 +270,13 @@ static int chlg_load(void *args)
+  * No partial records are copied to userland so this function can return less
+  * data than required (short read).
   *
-- * if \a flags: atomically get the lock and set the flags.
-+ * if @flags: atomically get the lock and set the flags.
-  *	      Return NULL if flag already set
-  */
- struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
-@@ -563,7 +564,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
- 
- /**
-  * Fill in "on the wire" representation for given LDLM lock into supplied
-- * lock descriptor \a desc structure.
-+ * lock descriptor @desc structure.
-  */
- void ldlm_lock2desc(struct ldlm_lock *lock, struct ldlm_lock_desc *desc)
- {
-@@ -632,8 +633,8 @@ static void ldlm_add_ast_work_item(struct ldlm_lock *lock,
- }
- 
- /**
-- * Add specified reader/writer reference to LDLM lock with handle \a lockh.
-- * r/w reference type is determined by \a mode
-+ * Add specified reader/writer reference to LDLM lock with handle @lockh.
-+ * r/w reference type is determined by @mode
-  * Calls ldlm_lock_addref_internal.
-  */
- void ldlm_lock_addref(const struct lustre_handle *lockh, enum ldlm_mode mode)
-@@ -649,8 +650,8 @@ void ldlm_lock_addref(const struct lustre_handle *lockh, enum ldlm_mode mode)
- 
- /**
-  * Helper function.
-- * Add specified reader/writer reference to LDLM lock \a lock.
-- * r/w reference type is determined by \a mode
-+ * Add specified reader/writer reference to LDLM lock @lock.
-+ * r/w reference type is determined by @mode
-  * Removes lock from LRU if it is there.
-  * Assumes the LDLM lock is already locked.
-  */
-@@ -672,12 +673,11 @@ void ldlm_lock_addref_internal_nolock(struct ldlm_lock *lock,
- }
- 
- /**
-- * Attempts to add reader/writer reference to a lock with handle \a lockh, and
-+ * Attempts to add reader/writer reference to a lock with handle @lockh, and
-  * fails if lock is already LDLM_FL_CBPENDING or destroyed.
-  *
-- * \retval 0 success, lock was addref-ed
-- *
-- * \retval -EAGAIN lock is being canceled.
-+ * Return:	0 success, lock was addref-ed
-+ *		-EAGAIN lock is being canceled.
-  */
- int ldlm_lock_addref_try(const struct lustre_handle *lockh, enum ldlm_mode mode)
- {
-@@ -701,7 +701,7 @@ int ldlm_lock_addref_try(const struct lustre_handle *lockh, enum ldlm_mode mode)
- EXPORT_SYMBOL(ldlm_lock_addref_try);
- 
- /**
-- * Add specified reader/writer reference to LDLM lock \a lock.
-+ * Add specified reader/writer reference to LDLM lock @lock.
-  * Locks LDLM lock and calls ldlm_lock_addref_internal_nolock to do the work.
-  * Only called for local locks.
-  */
-@@ -713,7 +713,7 @@ void ldlm_lock_addref_internal(struct ldlm_lock *lock, enum ldlm_mode mode)
- }
- 
- /**
-- * Removes reader/writer reference for LDLM lock \a lock.
-+ * Removes reader/writer reference for LDLM lock @lock.
-  * Assumes LDLM lock is already locked.
-  * only called in ldlm_flock_destroy and for local locks.
-  * Does NOT add lock to LRU if no r/w references left to accommodate flock locks
-@@ -739,7 +739,7 @@ void ldlm_lock_decref_internal_nolock(struct ldlm_lock *lock,
- }
- 
- /**
-- * Removes reader/writer reference for LDLM lock \a lock.
-+ * Removes reader/writer reference for LDLM lock @lock.
-  * Locks LDLM lock first.
-  * If the lock is determined to be client lock on a client and r/w refcount
-  * drops to zero and the lock is not blocked, the lock is added to LRU lock
-@@ -814,7 +814,7 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, enum ldlm_mode mode)
- }
- 
- /**
-- * Decrease reader/writer refcount for LDLM lock with handle \a lockh
-+ * Decrease reader/writer refcount for LDLM lock with handle @lockh
-  */
- void ldlm_lock_decref(const struct lustre_handle *lockh, enum ldlm_mode mode)
- {
-@@ -828,7 +828,7 @@ void ldlm_lock_decref(const struct lustre_handle *lockh, enum ldlm_mode mode)
- 
- /**
-  * Decrease reader/writer refcount for LDLM lock with handle
-- * \a lockh and mark it for subsequent cancellation once r/w refcount
-+ * @lockh and mark it for subsequent cancellation once r/w refcount
-  * drops to zero instead of putting into LRU.
-  */
- void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh,
-@@ -942,7 +942,7 @@ static void search_granted_lock(struct list_head *queue,
- 
- /**
-  * Add a lock into resource granted list after a position described by
-- * \a prev.
-+ * @prev.
-  */
- static void ldlm_granted_list_add_lock(struct ldlm_lock *lock,
- 				       struct sl_insert_point *prev)
-@@ -1051,8 +1051,8 @@ struct lock_match_data {
-  * Check if the given @lock meets the criteria for a match.
-  * A reference on the lock is taken if matched.
-  *
-- * \param lock	test-against this lock
-- * \param data	parameters
-+ * @lock	test-against this lock
-+ * @data	parameters
-  */
- static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- {
-@@ -1140,10 +1140,10 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- /**
-  * Search for a lock with given parameters in interval trees.
-  *
-- * \param res	search for a lock in this resource
-- * \param data	parameters
-+ * @res		search for a lock in this resource
-+ * @data	parameters
-  *
-- * \retval	a referenced lock or NULL.
-+ * Return:	a referenced lock or NULL.
-  */
- static struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 				      struct lock_match_data *data)
-@@ -1170,10 +1170,10 @@ static struct ldlm_lock *search_itree(struct ldlm_resource *res,
- /**
-  * Search for a lock with given properties in a queue.
-  *
-- * \param queue	search for a lock in this queue
-- * \param data	parameters
-+ * @queue	search for a lock in this queue
-+ * @data	parameters
-  *
-- * \retval	a referenced lock or NULL.
-+ * Return:	a referenced lock or NULL.
-  */
- static struct ldlm_lock *search_queue(struct list_head *queue,
- 				      struct lock_match_data *data)
-@@ -1224,7 +1224,7 @@ void ldlm_lock_allow_match(struct ldlm_lock *lock)
-  * Attempt to find a lock with specified properties.
-  *
-  * Typically returns a reference to matched lock unless LDLM_FL_TEST_LOCK is
-- * set in \a flags
-+ * set in @flags
-  *
-  * Can be called in two ways:
-  *
-@@ -1243,8 +1243,8 @@ void ldlm_lock_allow_match(struct ldlm_lock *lock)
-  * If 'flags' contains LDLM_FL_TEST_LOCK, then don't actually reference a lock,
-  *     just tell us if we would have matched.
-  *
-- * \retval 1 if it finds an already-existing lock that is compatible; in this
-- * case, lockh is filled in with a addref()ed lock
-+ * Return:	1 if it finds an already-existing lock that is compatible;
-+ *		in this case, lockh is filled in with a addref()ed lock
-  *
-  * We also check security context, and if that fails we simply return 0 (to
-  * keep caller code unchanged), the context failure will be discovered by
-@@ -1831,7 +1831,7 @@ int ldlm_run_ast_work(struct ldlm_namespace *ns, struct list_head *rpc_list,
- }
- 
- /**
-- * Helper function to call blocking AST for LDLM lock \a lock in a
-+ * Helper function to call blocking AST for LDLM lock @lock in a
-  * "cancelling" mode.
-  */
- void ldlm_cancel_callback(struct ldlm_lock *lock)
-@@ -1862,7 +1862,7 @@ void ldlm_cancel_callback(struct ldlm_lock *lock)
- }
- 
- /**
-- * Remove skiplist-enabled LDLM lock \a req from granted list
-+ * Remove skiplist-enabled LDLM lock @req from granted list
-  */
- void ldlm_unlink_lock_skiplist(struct ldlm_lock *req)
- {
-@@ -1875,7 +1875,7 @@ void ldlm_unlink_lock_skiplist(struct ldlm_lock *req)
- }
- 
- /**
-- * Attempts to cancel LDLM lock \a lock that has no reader/writer references.
-+ * Attempts to cancel LDLM lock @lock that has no reader/writer references.
-  */
- void ldlm_lock_cancel(struct ldlm_lock *lock)
- {
-@@ -1937,7 +1937,7 @@ struct export_cl_data {
- };
- 
- /**
-- * Print lock with lock handle \a lockh description into debug log.
-+ * Print lock with lock handle @lockh description into debug log.
-  *
-  * Used when printing all locks on a resource for debug purposes.
-  */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-index bae67ac..589b89d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-@@ -382,9 +382,9 @@ static inline void init_blwi(struct ldlm_bl_work_item *blwi,
- }
- 
- /**
-- * Queues a list of locks \a cancels containing \a count locks
-- * for later processing by a blocking thread.  If \a count is zero,
-- * then the lock referenced as \a lock is queued instead.
-+ * Queues a list of locks @cancels containing @count locks
-+ * for later processing by a blocking thread. If @count is zero,
-+ * then the lock referenced as @lock is queued instead.
-  *
-  * The blocking thread would then call ->l_blocking_ast callback in the lock.
-  * If list addition fails an error is returned and caller is supposed to
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index 5b23767f..1f81795 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -175,7 +175,7 @@ enum {
- 
- /**
-  * Calculates suggested grant_step in % of available locks for passed
-- * \a period. This is later used in grant_plan calculations.
-+ * @period. This is later used in grant_plan calculations.
-  */
- static inline int ldlm_pool_t2gsp(unsigned int t)
- {
-@@ -205,7 +205,7 @@ static inline int ldlm_pool_t2gsp(unsigned int t)
- }
- 
- /**
-- * Recalculates next stats on passed \a pl.
-+ * Recalculates next stats on passed @pl.
-  *
-  * \pre ->pl_lock is locked.
-  */
-@@ -231,7 +231,7 @@ static void ldlm_pool_recalc_stats(struct ldlm_pool *pl)
- 
- /**
-  * Sets SLV and Limit from container_of(pl, struct ldlm_namespace,
-- * ns_pool)->ns_obd tp passed \a pl.
-+ * ns_pool)->ns_obd tp passed @pl.
-  */
- static void ldlm_cli_pool_pop_slv(struct ldlm_pool *pl)
- {
-@@ -250,7 +250,7 @@ static void ldlm_cli_pool_pop_slv(struct ldlm_pool *pl)
- }
- 
- /**
-- * Recalculates client size pool \a pl according to current SLV and Limit.
-+ * Recalculates client size pool @pl according to current SLV and Limit.
-  */
- static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
- {
-@@ -312,7 +312,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
- /**
-  * This function is main entry point for memory pressure handling on client
-  * side.  Main goal of this function is to cancel some number of locks on
-- * passed \a pl according to \a nr and \a gfp_mask.
-+ * passed @pl according to @nr and @gfp_mask.
-  */
- static int ldlm_cli_pool_shrink(struct ldlm_pool *pl,
- 				int nr, gfp_t gfp_mask)
-@@ -350,7 +350,7 @@ static int ldlm_cli_pool_shrink(struct ldlm_pool *pl,
- 
- /**
-  * Pool recalc wrapper. Will call either client or server pool recalc callback
-- * depending what pool \a pl is used.
-+ * depending what pool @pl is used.
-  */
- static int ldlm_pool_recalc(struct ldlm_pool *pl)
- {
-@@ -691,7 +691,7 @@ void ldlm_pool_fini(struct ldlm_pool *pl)
- }
- 
- /**
-- * Add new taken ldlm lock \a lock into pool \a pl accounting.
-+ * Add new taken ldlm lock @lock into pool @pl accounting.
-  */
- void ldlm_pool_add(struct ldlm_pool *pl, struct ldlm_lock *lock)
- {
-@@ -716,7 +716,7 @@ void ldlm_pool_add(struct ldlm_pool *pl, struct ldlm_lock *lock)
- }
- 
- /**
-- * Remove ldlm lock \a lock from pool \a pl accounting.
-+ * Remove ldlm lock @lock from pool @pl accounting.
-  */
- void ldlm_pool_del(struct ldlm_pool *pl, struct ldlm_lock *lock)
- {
-@@ -734,7 +734,7 @@ void ldlm_pool_del(struct ldlm_pool *pl, struct ldlm_lock *lock)
- }
- 
- /**
-- * Returns current \a pl SLV.
-+ * Returns current @pl SLV.
-  *
-  * \pre ->pl_lock is not locked.
-  */
-@@ -749,7 +749,7 @@ u64 ldlm_pool_get_slv(struct ldlm_pool *pl)
- }
- 
- /**
-- * Sets passed \a clv to \a pl.
-+ * Sets passed @clv to @pl.
-  *
-  * \pre ->pl_lock is not locked.
-  */
-@@ -761,7 +761,7 @@ void ldlm_pool_set_clv(struct ldlm_pool *pl, u64 clv)
- }
- 
- /**
-- * Returns current LVF from \a pl.
-+ * Returns current LVF from @pl.
-  */
- u32 ldlm_pool_get_lvf(struct ldlm_pool *pl)
- {
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index b819ade..a614d74 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -143,9 +143,9 @@ static void ldlm_expired_completion_wait(struct ldlm_lock *lock, u32 conn_cnt)
-  * lock cancel, and their replies). Used for lock completion timeout on the
-  * client side.
-  *
-- * \param[in] lock	lock which is waiting the completion callback
-+ * @lock:	lock which is waiting the completion callback
-  *
-- * \retval		timeout in seconds to wait for the server reply
-+ * Return:	timeout in seconds to wait for the server reply
-  */
- /* We use the same basis for both server side and client side functions
-  * from a single node.
-@@ -555,7 +555,7 @@ static inline int ldlm_format_handles_avail(struct obd_import *imp,
- 
- /**
-  * Cancel LRU locks and pack them into the enqueue request. Pack there the given
-- * \a count locks in \a cancels.
-+ * @count locks in @cancels.
-  *
-  * This is to be called by functions preparing their own requests that
-  * might contain lists of locks to cancel in addition to actual operation
-@@ -660,12 +660,12 @@ static struct ptlrpc_request *ldlm_enqueue_pack(struct obd_export *exp,
- /**
-  * Client-side lock enqueue.
-  *
-- * If a request has some specific initialisation it is passed in \a reqp,
-+ * If a request has some specific initialisation it is passed in @reqp,
-  * otherwise it is created in ldlm_cli_enqueue.
-  *
-- * Supports sync and async requests, pass \a async flag accordingly. If a
-+ * Supports sync and async requests, pass @async flag accordingly. If a
-  * request was created in ldlm_cli_enqueue and it is the async request,
-- * pass it to the caller in \a reqp.
-+ * pass it to the caller in @reqp.
-  */
- int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 		     struct ldlm_enqueue_info *einfo,
-@@ -787,10 +787,11 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 
- /**
-  * Cancel locks locally.
-- * Returns:
-- * \retval LDLM_FL_LOCAL_ONLY if there is no need for a CANCEL RPC to the server
-- * \retval LDLM_FL_CANCELING otherwise;
-- * \retval LDLM_FL_BL_AST if there is a need for a separate CANCEL RPC.
+- * @param[in]   file   File pointer to the character device.
+- * @param[out]  buff   Userland buffer where to copy the records.
+- * @param[in]   count  Userland buffer size.
+- * @param[out]  ppos   File position, updated with the index number of the next
+- *		       record to read.
+- * @return number of copied bytes on success, negated error code on failure.
++ * @file:	File pointer to the character device.
++ * @buff:	Userland buffer where to copy the records.
++ * @count:	Userland buffer size.
++ * @ppos:	File position, updated with the index number of the next
++ *		record to read.
 + *
-+ * Returns:	LDLM_FL_LOCAL_ONLY if there is no need for a CANCEL RPC
-+ *		to the server
-+ *		LDLM_FL_CANCELING otherwise;
-+ *		LDLM_FL_BL_AST if there is a need for a separate CANCEL RPC.
++ * Returns:	number of copied bytes on success, negated error code on failure.
   */
- static u64 ldlm_cli_cancel_local(struct ldlm_lock *lock)
+ static ssize_t chlg_read(struct file *file, char __user *buff, size_t count,
+ 			 loff_t *ppos)
+@@ -336,9 +338,10 @@ static ssize_t chlg_read(struct file *file, char __user *buff, size_t count,
+ /**
+  * Jump to a given record index. Helper for chlg_llseek().
+  *
+- * @param[in,out]  crs     Internal reader state.
+- * @param[in]      offset  Desired offset (index record).
+- * @return 0 on success, negated error code on failure.
++ * @crs:	Internal reader state.
++ * @offset:	Desired offset (index record).
++ *
++ * Returns:	0 on success, negated error code on failure.
+  */
+ static int chlg_set_start_offset(struct chlg_reader_state *crs, u64 offset)
  {
-@@ -824,7 +825,7 @@ static u64 ldlm_cli_cancel_local(struct ldlm_lock *lock)
- }
- 
+@@ -370,10 +373,11 @@ static int chlg_set_start_offset(struct chlg_reader_state *crs, u64 offset)
  /**
-- * Pack \a count locks in \a head into ldlm_request buffer of request \a req.
-+ * Pack @count locks in @head into ldlm_request buffer of request @req.
+  * Move read pointer to a certain record index, encoded as an offset.
+  *
+- * @param[in,out] file   File pointer to the changelog character device
+- * @param[in]	  off    Offset to skip, actually a record index, not byte count
+- * @param[in]	  whence Relative/Absolute interpretation of the offset
+- * @return the resulting position on success or negated error code on failure.
++ * @file:	File pointer to the changelog character device
++ * @off:	Offset to skip, actually a record index, not byte count
++ * @whence:	Relative/Absolute interpretation of the offset
++ *
++ * Returns:	the resulting position on success or negated error code on failure.
   */
- static void ldlm_cancel_pack(struct ptlrpc_request *req,
- 			     struct list_head *head, int count)
-@@ -860,8 +861,8 @@ static void ldlm_cancel_pack(struct ptlrpc_request *req,
- }
- 
- /**
-- * Prepare and send a batched cancel RPC. It will include \a count lock
-- * handles of locks given in \a cancels list.
-+ * Prepare and send a batched cancel RPC. It will include @count lock
-+ * handles of locks given in @cancels list.
-  */
- static int ldlm_cli_cancel_req(struct obd_export *exp,
- 			       struct list_head *cancels,
-@@ -955,7 +956,7 @@ static inline struct ldlm_pool *ldlm_imp2pl(struct obd_import *imp)
- }
- 
- /**
-- * Update client's OBD pool related fields with new SLV and Limit from \a req.
-+ * Update client's OBD pool related fields with new SLV and Limit from @req.
-  */
- int ldlm_cli_update_pool(struct ptlrpc_request *req)
+ static loff_t chlg_llseek(struct file *file, loff_t off, int whence)
  {
-@@ -1071,7 +1072,7 @@ int ldlm_cli_cancel(const struct lustre_handle *lockh,
- EXPORT_SYMBOL(ldlm_cli_cancel);
- 
+@@ -408,10 +412,11 @@ static loff_t chlg_llseek(struct file *file, loff_t off, int whence)
  /**
-- * Locally cancel up to \a count locks in list \a cancels.
-+ * Locally cancel up to @count locks in list @cancels.
-  * Return the number of cancelled locks.
+  * Clear record range for a given changelog reader.
+  *
+- * @param[in]  crs     Current internal state.
+- * @param[in]  reader  Changelog reader ID (cl1, cl2...)
+- * @param[in]  record  Record index up which to clear
+- * @return 0 on success, negated error code on failure.
++ * @crs:	Current internal state.
++ * @reader:	Changelog reader ID (cl1, cl2...)
++ * @record:	Record index up which to clear
++ *
++ * Returns:	0 on success, negated error code on failure.
   */
- int ldlm_cli_cancel_list_local(struct list_head *cancels, int count,
-@@ -1155,12 +1156,11 @@ int ldlm_cli_cancel_list_local(struct list_head *cancels, int count,
- 
- /**
-  * Callback function for LRU-resize policy. Decides whether to keep
-- * \a lock in LRU for current \a LRU size \a unused, added in current
-- * scan \a added and number of locks to be preferably canceled \a count.
-- *
-- * \retval LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ * @lock in LRU for current @LRU size @unused, added in current
-+ * scan @added and number of locks to be preferably canceled @count.
-  *
-- * \retval LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-+ * Retun:	LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ *		LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-  */
- static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
- 						    struct ldlm_lock *lock,
-@@ -1204,12 +1204,11 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
- 
- /**
-  * Callback function for debugfs used policy. Makes decision whether to keep
-- * \a lock in LRU for current \a LRU size \a unused, added in current scan \a
-- * added and number of locks to be preferably canceled \a count.
-- *
-- * \retval LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ * @lock in LRU for current @LRU size @unused, added in current scan
-+ * @added and number of locks to be preferably canceled @count.
-  *
-- * \retval LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-+ * Return:	LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ *		LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-  */
- static enum ldlm_policy_res ldlm_cancel_passed_policy(struct ldlm_namespace *ns,
- 						      struct ldlm_lock *lock,
-@@ -1224,13 +1223,12 @@ static enum ldlm_policy_res ldlm_cancel_passed_policy(struct ldlm_namespace *ns,
- }
- 
- /**
-- * Callback function for aged policy. Makes decision whether to keep \a lock in
-- * LRU for current LRU size \a unused, added in current scan \a added and
-- * number of locks to be preferably canceled \a count.
-+ * Callback function for aged policy. Makes decision whether to keep @lock in
-+ * LRU for current LRU size @unused, added in current scan @added and
-+ * number of locks to be preferably canceled @count.
-  *
-- * \retval LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-- *
-- * \retval LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-+ * Return:	LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ *		LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-  */
- static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
- 						    struct ldlm_lock *lock,
-@@ -1274,13 +1272,12 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
- }
- 
- /**
-- * Callback function for default policy. Makes decision whether to keep \a lock
-- * in LRU for current LRU size \a unused, added in current scan \a added and
-- * number of locks to be preferably canceled \a count.
-- *
-- * \retval LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ * Callback function for default policy. Makes decision whether to keep @lock
-+ * in LRU for current LRU size @unused, added in current scan @added and
-+ * number of locks to be preferably canceled @count.
-  *
-- * \retval LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-+ * Return:	LDLM_POLICY_KEEP_LOCK keep lock in LRU in stop scanning
-+ *		LDLM_POLICY_CANCEL_LOCK cancel lock from LRU
-  */
- static enum ldlm_policy_res
- ldlm_cancel_default_policy(struct ldlm_namespace *ns, struct ldlm_lock *lock,
-@@ -1329,11 +1326,11 @@ typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
- }
- 
- /**
-- * - Free space in LRU for \a count new locks,
-+ * - Free space in LRU for @count new locks,
-  *   redundant unused locks are canceled locally;
-  * - also cancel locally unused aged locks;
-- * - do not cancel more than \a max locks;
-- * - GET the found locks and add them into the \a cancels list.
-+ * - do not cancel more than @max locks;
-+ * - GET the found locks and add them into the @cancels list.
-  *
-  * A client lock can be added to the l_bl_ast list only when it is
-  * marked LDLM_FL_CANCELING. Otherwise, somebody is already doing
-@@ -1346,15 +1343,15 @@ typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
-  * Calling policies for enabled LRU resize:
-  * ----------------------------------------
-  * flags & LDLM_LRU_FLAG_LRUR	- use LRU resize policy (SLV from server) to
-- *				  cancel not more than \a count locks;
-+ *				  cancel not more than @count locks;
-  *
-- * flags & LDLM_LRU_FLAG_PASSED - cancel \a count number of old locks (located
-+ * flags & LDLM_LRU_FLAG_PASSED - cancel @count number of old locks (located
-  *				  at the beginning of LRU list);
-  *
-- * flags & LDLM_LRU_FLAG_SHRINK - cancel not more than \a count locks according
-+ * flags & LDLM_LRU_FLAG_SHRINK - cancel not more than @count locks according
-  *				  to memory pressure policy function;
-  *
-- * flags & LDLM_LRU_FLAG_AGED   - cancel \a count locks according to
-+ * flags & LDLM_LRU_FLAG_AGED   - cancel @count locks according to
-  *				  "aged policy".
-  *
-  * flags & LDLM_LRU_FLAG_NO_WAIT - cancel as many unused locks as possible
-@@ -1529,7 +1526,7 @@ int ldlm_cancel_lru_local(struct ldlm_namespace *ns,
- }
- 
- /**
-- * Cancel at least \a nr locks from given namespace LRU.
-+ * Cancel at least @nr locks from given namespace LRU.
-  *
-  * When called with LCF_ASYNC the blocking callback will be handled
-  * in a thread and this function will return after the thread has been
-@@ -1556,7 +1553,7 @@ int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
- 
- /**
-  * Find and cancel locally unused locks found on resource, matched to the
-- * given policy, mode. GET the found locks and add them into the \a cancels
-+ * given policy, mode. GET the found locks and add them into the @cancels
-  * list.
-  */
- int ldlm_cancel_resource_local(struct ldlm_resource *res,
-@@ -1615,12 +1612,12 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
- /**
-  * Cancel client-side locks from a list and send/prepare cancel RPCs to the
-  * server.
-- * If \a req is NULL, send CANCEL request to server with handles of locks
-- * in the \a cancels. If EARLY_CANCEL is not supported, send CANCEL requests
-+ * If @req is NULL, send CANCEL request to server with handles of locks
-+ * in the @cancels. If EARLY_CANCEL is not supported, send CANCEL requests
-  * separately per lock.
-- * If \a req is not NULL, put handles of locks in \a cancels into the request
-- * buffer at the offset \a off.
-- * Destroy \a cancels at the end.
-+ * If @req is not NULL, put handles of locks in @cancels into the request
-+ * buffer at the offset @off.
-+ * Destroy @cancels at the end.
-  */
- int ldlm_cli_cancel_list(struct list_head *cancels, int count,
- 			 struct ptlrpc_request *req,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 74c7644..c1f585a 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -557,7 +557,7 @@ struct ldlm_ns_hash_def {
- 	},
- };
- 
--/** Register \a ns in the list of namespaces */
-+/** Register @ns in the list of namespaces */
- static void ldlm_namespace_register(struct ldlm_namespace *ns,
- 				    enum ldlm_side client)
+ static int chlg_clear(struct chlg_reader_state *crs, u32 reader, u64 record)
  {
-@@ -859,13 +859,13 @@ static int __ldlm_namespace_free(struct ldlm_namespace *ns, int force)
- }
- 
- /**
-- * Performs various cleanups for passed \a ns to make it drop refc and be
-+ * Performs various cleanups for passed @ns to make it drop refc and be
-  * ready for freeing. Waits for refc == 0.
+@@ -441,11 +446,12 @@ static int chlg_clear(struct chlg_reader_state *crs, u32 reader, u64 record)
+  * Handle writes() into the changelog character device. Write() can be used
+  * to request special control operations.
   *
-  * The following is done:
-- * (0) Unregister \a ns from its list to make inaccessible for potential
-+ * (0) Unregister @ns from its list to make inaccessible for potential
-  * users like pools thread and others;
-- * (1) Clear all locks in \a ns.
-+ * (1) Clear all locks in @ns.
+- * @param[in]  file  File pointer to the changelog character device
+- * @param[in]  buff  User supplied data (written data)
+- * @param[in]  count Number of written bytes
+- * @param[in]  off   (unused)
+- * @return number of written bytes on success, negated error code on failure.
++ * @file:	File pointer to the changelog character device
++ * @buff:	User supplied data (written data)
++ * @count:	Number of written bytes
++ * @off:	(unused)
++ *
++ * Returns:	number of written bytes on success, negated error code on failure.
   */
- void ldlm_namespace_free_prior(struct ldlm_namespace *ns,
- 			       struct obd_import *imp,
-@@ -899,7 +899,7 @@ void ldlm_namespace_free_prior(struct ldlm_namespace *ns,
- 	}
- }
- 
--/** Unregister \a ns from the list of namespaces. */
-+/** Unregister @ns from the list of namespaces. */
- static void ldlm_namespace_unregister(struct ldlm_namespace *ns,
- 				      enum ldlm_side client)
+ static ssize_t chlg_write(struct file *file, const char __user *buff,
+ 			  size_t count, loff_t *off)
+@@ -483,9 +489,11 @@ static ssize_t chlg_write(struct file *file, const char __user *buff,
+ /**
+  * Open handler, initialize internal CRS state and spawn prefetch thread if
+  * needed.
+- * @param[in]  inode  Inode struct for the open character device.
+- * @param[in]  file   Corresponding file pointer.
+- * @return 0 on success, negated error code on failure.
++ *
++ * @inode:	Inode struct for the open character device.
++ * @file:	Corresponding file pointer.
++ *
++ * Returns:	0 on success, negated error code on failure.
+  */
+ static int chlg_open(struct inode *inode, struct file *file)
  {
-@@ -915,9 +915,9 @@ static void ldlm_namespace_unregister(struct ldlm_namespace *ns,
+@@ -532,9 +540,10 @@ static int chlg_open(struct inode *inode, struct file *file)
+ /**
+  * Close handler, release resources.
+  *
+- * @param[in]  inode  Inode struct for the open character device.
+- * @param[in]  file   Corresponding file pointer.
+- * @return 0 on success, negated error code on failure.
++ * @inode:	Inode struct for the open character device.
++ * @file:	Corresponding file pointer.
++ *
++ * Returns:	0 on success, negated error code on failure.
+  */
+ static int chlg_release(struct inode *inode, struct file *file)
+ {
+@@ -557,9 +566,10 @@ static int chlg_release(struct inode *inode, struct file *file)
+  * Poll handler, indicates whether the device is readable (new records) and
+  * writable (always).
+  *
+- * @param[in]  file   Device file pointer.
+- * @param[in]  wait   (opaque)
+- * @return combination of the poll status flags.
++ * @file:	Device file pointer.
++ * @wait:	(opaque)
++ *
++ * Returns:	combination of the poll status flags.
+  */
+ static unsigned int chlg_poll(struct file *file, poll_table *wait)
+ {
+@@ -649,8 +659,9 @@ static void get_chlg_name(char *name, size_t name_len, struct obd_device *obd)
+  * Register a misc character device with a dynamic minor number, under a name
+  * of the form: 'changelog-fsname-MDTxxxx'. Reference this OBD device with it.
+  *
+- * @param[in] obd  This MDC obd_device.
+- * @return 0 on success, negated error code on failure.
++ * @obd:	This MDC obd_device.
++ *
++ * Returns:	0 on success, negated error code on failure.
+  */
+ int mdc_changelog_cdev_init(struct obd_device *obd)
+ {
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+index 55d2ea1..7680346 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+@@ -82,14 +82,14 @@ void mdc_pack_body(struct ptlrpc_request *req, const struct lu_fid *fid,
+ /**
+  * Pack a name (path component) into a request
+  *
+- * \param[in] req	request
+- * \param[in] field	request field (usually RMF_NAME)
+- * \param[in] name	path component
+- * \param[in] name_len	length of path component
++ * @req:	request
++ * @field:	request field (usually RMF_NAME)
++ * @name:	path component
++ * @name_len:	length of path component
+  *
+- * \a field must be present in \a req and of size \a name_len + 1.
++ * @field must be present in @req and of size @name_len + 1.
+  *
+- * \a name must be '\0' terminated of length \a name_len and represent
++ * @name must be '\0' terminated of length @name_len and represent
+  * a single path component (not contain '/').
+  */
+ static void mdc_pack_name(struct ptlrpc_request *req,
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 3eb89ec..bc764f9 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -81,16 +81,16 @@ static inline int mdc_queue_wait(struct ptlrpc_request *req)
+ /*
+  * Send MDS_GET_ROOT RPC to fetch root FID.
+  *
+- * If \a fileset is not NULL it should contain a subdirectory off
++ * If @fileset is not NULL it should contain a subdirectory off
+  * the ROOT/ directory to be mounted on the client. Return the FID
+  * of the subdirectory to the client to mount onto its mountpoint.
+  *
+- * \param[in]  imp	MDC import
+- * \param[in]  fileset	fileset name, which could be NULL
+- * \param[out] rootfid	root FID of this mountpoint
+- * \param[out] pc	root capa will be unpacked and saved in this pointer
++ * @imp:	MDC import
++ * @fileset:	fileset name, which could be NULL
++ * @rootfid:	root FID of this mountpoint
++ * @pc:		root capa will be unpacked and saved in this pointer
+  *
+- * \retval     0 on success, negative errno on failure
++ * Returns:	0 on success, negative errno on failure
+  */
+ static int mdc_get_root(struct obd_export *exp, const char *fileset,
+ 			struct lu_fid *rootfid)
+@@ -1273,15 +1273,15 @@ static int mdc_read_page_remote(void *data, struct page *page0)
+  * Read dir page from cache first, if it can not find it, read it from
+  * server and add into the cache.
+  *
+- * \param[in] exp	MDC export
+- * \param[in] op_data	client MD stack parameters, transferring parameters
++ * @exp:		MDC export
++ * @op_data:		client MD stack parameters, transferring parameters
+  *			between different layers on client MD stack.
+- * \param[in] cb_op	callback required for ldlm lock enqueue during
++ * @cb_op:		callback required for ldlm lock enqueue during
+  *			read page
+- * \param[in] hash_offset the hash offset of the page to be read
+- * \param[in] ppage	the page to be read
++ * @hash_offset:	the hash offset of the page to be read
++ * @ppage		the page to be read
+  *
+- * retval		= 0 get the page successfully
++ * Return:		= 0 get the page successfully
+  *			errno(<0) get the page failed
+  */
+ static int mdc_read_page(struct obd_export *exp, struct md_op_data *op_data,
+@@ -2151,8 +2151,9 @@ static int mdc_ioc_hsm_ct_start(struct obd_export *exp,
+ 
+ /**
+  * Send a message to any listening copytools
+- * @param val KUC message (kuc_hdr + hsm_action_list)
+- * @param len total length of message
++ *
++ * @val:	KUC message (kuc_hdr + hsm_action_list)
++ * @len:	total length of message
+  */
+ static int mdc_hsm_copytool_send(size_t len, void *val)
+ {
+@@ -2184,8 +2185,9 @@ static int mdc_hsm_copytool_send(size_t len, void *val)
+ /**
+  * callback function passed to kuc for re-registering each HSM copytool
+  * running on MDC, after MDT shutdown/recovery.
+- * @param data copytool registration data
+- * @param cb_arg callback argument (obd_import)
++ *
++ * @data:	copytool registration data
++ * @cb_arg:	callback argument (obd_import)
+  */
+ static int mdc_hsm_ct_reregister(void *data, void *cb_arg)
+ {
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index a4dfdc0..bb837ef 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -1589,11 +1589,11 @@ static bool mgc_import_in_recovery(struct obd_import *imp)
+  * trying to update from the same log simultaneously, in which case we
+  * should use a per-log semaphore instead of cld_lock.
+  *
+- * \param[in] mgc	MGC device by which to fetch the configuration log
+- * \param[in] cld	log processing state (stored in lock callback data)
++ * @mgc:	MGC device by which to fetch the configuration log
++ * @cld:	log processing state (stored in lock callback data)
+  *
+- * \retval		0 on success
+- * \retval		negative errno on failure
++ * Returns:	0 on success
++ *		negative errno on failure
+  */
+ int mgc_process_log(struct obd_device *mgc, struct config_llog_data *cld)
+ {
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 4359a93..fa554dd 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -2105,12 +2105,12 @@ static unsigned int get_write_extents(struct osc_object *obj,
+ /**
+  * prepare pages for ASYNC io and put pages in send queue.
+  *
+- * \param cmd OBD_BRW_* macroses
+- * \param lop pending pages
++ * @cmd		OBD_BRW_* macroses
++ * @lop		pending pages
+  *
+- * \return zero if no page added to send queue.
+- * \return 1 if pages successfully added to send queue.
+- * \return negative on errors.
++ * Return:	zero if no page added to send queue.
++ *		1 if pages successfully added to send queue.
++ *		negative on errors.
+  */
+ static int
+ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
+@@ -3021,7 +3021,7 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
  }
  
  /**
-- * Performs freeing memory structures related to \a ns. This is only done
-+ * Performs freeing memory structures related to @ns. This is only done
-  * when ldlm_namespce_free_prior() successfully removed all resources
-- * referencing \a ns and its refc == 0.
-+ * referencing @ns and its refc == 0.
+- * Returns a list of pages by a given [start, end] of \a obj.
++ * Returns a list of pages by a given [start, end] of @obj.
+  *
+  * Gang tree lookup (radix_tree_gang_lookup()) optimization is absolutely
+  * crucial in the face of [offset, EOF] locks.
+diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
+index bfc1abb..612305a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_lock.c
++++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
+@@ -485,14 +485,14 @@ static int __osc_dlm_blocking_ast(const struct lu_env *env,
+  * Control flow is tricky, because ldlm uses the same call-back
+  * (ldlm_lock::l_blocking_ast()) for both blocking and cancellation ast's.
+  *
+- * \param dlmlock lock for which ast occurred.
++ * @dlmlock	lock for which ast occurred.
+  *
+- * \param new description of a conflicting lock in case of blocking ast.
++ * @new		description of a conflicting lock in case of blocking ast.
+  *
+- * \param data value of dlmlock->l_ast_data
++ * @data	value of dlmlock->l_ast_data
+  *
+- * \param flag LDLM_CB_BLOCKING or LDLM_CB_CANCELING. Used to distinguish
+- *	     cancellation and blocking ast's.
++ * @flag	LDLM_CB_BLOCKING or LDLM_CB_CANCELING. Used to distinguish
++ *		cancellation and blocking ast's.
+  *
+  * Possible use cases:
+  *
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 3fedfaf..1a82e85 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2807,8 +2807,8 @@ static int osc_import_event(struct obd_device *obd,
+  * Determine whether the lock can be canceled before replaying the lock
+  * during recovery, see bug16774 for detailed information.
+  *
+- * \retval zero the lock can't be canceled
+- * \retval other ok to cancel
++ * Return:	zero the lock can't be canceled
++ *		other ok to cancel
   */
- void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+ static int osc_cancel_weight(struct ldlm_lock *lock)
  {
-@@ -936,8 +936,8 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
- 	ldlm_namespace_sysfs_unregister(ns);
- 	cfs_hash_putref(ns->ns_rs_hash);
- 	kfree(ns->ns_name);
--	/* Namespace \a ns should be not on list at this time, otherwise
--	 * this will cause issues related to using freed \a ns in poold
-+	/* Namespace @ns should be not on list at this time, otherwise
-+	 * this will cause issues related to using freed @ns in poold
- 	 * thread.
- 	 */
- 	LASSERT(list_empty(&ns->ns_list_chain));
 -- 
 1.8.3.1
