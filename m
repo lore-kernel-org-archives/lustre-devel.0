@@ -1,25 +1,36 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 2 Mar 2019 19:28:37 +0000 (GMT)
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 04 Mar 2019 10:24:53 +1100
 Subject: [lustre-devel] [PATCH 0/7] lustre: move DocBook comments to
  sphinix format
 In-Reply-To: <1551553944-6419-1-git-send-email-jsimmons@infradead.org>
 References: <1551553944-6419-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <alpine.LFD.2.21.1903021928001.29568@casper.infradead.org>
+Message-ID: <87r2bnsfqy.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Sat, Mar 02 2019, James Simmons wrote:
 
 > The Linux kernel deprecated DocBook so update Lustre to using
 > sphinix instead. I'm no Sphinix expert so things might be missed
 > but the major has been ported over. This should get the lustre
 > in shape to move out of staging.
 
-Forgot to add. This is against lustre-testing since the wip* trees
-are stil churning.
- 
+Thanks.
+This is a really good start - I've applied them all.
+I suspect there is still a lot of work to do.
+Any comment that starts "/**" but don't a Sphinix comment should be
+changed to "/*", and we should link all of this into the Documentation
+tree, at least for test (I don't want to include any patches that aren't
+in driver/staging, but having the patch available would be good).
+
+Thanks,
+NeilBrown
+
+
+>
 > James Simmons (7):
 >   lnet: move comments to sphinix format
 >   lustre: move header file comments to sphinix format
@@ -28,7 +39,7 @@ are stil churning.
 >   llite: move comments to sphinix format
 >   obdclass: move comments to sphinix format
 >   lustre: move remaining comments to sphinix format
-> 
+>
 >  .../lustre/include/linux/libcfs/libcfs_cpu.h       |  50 ++--
 >  .../lustre/include/linux/libcfs/libcfs_crypto.h    |  20 +-
 >  .../lustre/include/uapi/linux/lnet/lnetctl.h       |   2 +-
@@ -117,8 +128,13 @@ are stil churning.
 >  drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |   2 +-
 >  drivers/staging/lustre/lustre/ptlrpc/service.c     |   4 +-
 >  87 files changed, 1641 insertions(+), 1589 deletions(-)
-> 
+>
 > -- 
 > 1.8.3.1
-> 
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190304/fbd59d4d/attachment.sig>
