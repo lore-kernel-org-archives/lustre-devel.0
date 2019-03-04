@@ -1,99 +1,62 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 04 Mar 2019 17:31:38 +1100
-Subject: [lustre-devel] [PATCH 09/28] lustre: ldlm: discard varname in
- ldlm_pool.
+Subject: [lustre-devel] [PATCH 10/28] lustre: lprocfs: use log2.h macros
+ instead of shift loop.
 In-Reply-To: <155168107971.31333.14345309795939467246.stgit@noble.brown>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
-Message-ID: <155168109840.31333.11593261178506545741.stgit@noble.brown>
+Message-ID: <155168109844.31333.11945665543393290075.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This allocated buffer serves no purpose.
-A constant string is copied into it, it is passed to some
-function which copies it out again, then the buffer is freed.
-Instead, we can pass the constant string to that function.
+These shift loops seem to be trying to avoid doing a
+multiplication.
+We same effect can be achieved more transparently using
+rounddown_pow_of_two().  Even though there is a multiplication
+in the C code, the resulting machine code just does a single shift.
+
+As rounddown_pow_of_two() is not defined for 0, and as we cannot be
+positively use the blk_size is non-zero, use blk_size ?: 1.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |    2 --
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |   18 +++++-------------
- 2 files changed, 5 insertions(+), 15 deletions(-)
+ .../lustre/lustre/obdclass/lprocfs_status.c        |   10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-index d8dcf8a73e4b..c907d880274d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-@@ -31,8 +31,6 @@
-  * Lustre is a trademark of Sun Microsystems, Inc.
-  */
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 29c6b5d7abec..2af9dada195e 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -374,9 +374,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_blocks;
  
--#define MAX_STRING_SIZE 128
+-		while (blk_size >>= 1)
+-			result <<= 1;
 -
- extern int ldlm_srv_namespace_nr;
- extern int ldlm_cli_namespace_nr;
- extern struct mutex ldlm_srv_namespace_lock;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index 1f81795cc6f6..a984b5df7bc1 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -503,9 +503,9 @@ LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(lock_volume_factor, atomic);
- LDLM_POOL_SYSFS_WRITER_NOLOCK_STORE(lock_volume_factor, atomic);
- LUSTRE_RW_ATTR(lock_volume_factor);
- 
--#define LDLM_POOL_ADD_VAR(name, var, ops)			\
-+#define LDLM_POOL_ADD_VAR(_name, var, ops)			\
- 	do {							\
--		snprintf(var_name, MAX_STRING_SIZE, #name);	\
-+		pool_vars[0].name = #_name;			\
- 		pool_vars[0].data = var;			\
- 		pool_vars[0].fops = ops;			\
- 		ldebugfs_add_vars(pl->pl_debugfs_entry, pool_vars, NULL);\
-@@ -557,25 +557,18 @@ static int ldlm_pool_debugfs_init(struct ldlm_pool *pl)
- 						 ns_pool);
- 	struct dentry *debugfs_ns_parent;
- 	struct lprocfs_vars pool_vars[2];
--	char *var_name = NULL;
- 	int rc = 0;
- 
--	var_name = kzalloc(MAX_STRING_SIZE + 1, GFP_NOFS);
--	if (!var_name)
--		return -ENOMEM;
--
- 	debugfs_ns_parent = ns->ns_debugfs_entry;
- 	if (IS_ERR_OR_NULL(debugfs_ns_parent)) {
- 		CERROR("%s: debugfs entry is not initialized\n",
- 		       ldlm_ns_name(ns));
- 		rc = -EINVAL;
--		goto out_free_name;
-+		goto out;
- 	}
- 	pl->pl_debugfs_entry = debugfs_create_dir("pool", debugfs_ns_parent);
- 
--	var_name[MAX_STRING_SIZE] = '\0';
- 	memset(pool_vars, 0, sizeof(pool_vars));
--	pool_vars[0].name = var_name;
- 
- 	LDLM_POOL_ADD_VAR(state, pl, &lprocfs_pool_state_fops);
- 
-@@ -583,7 +576,7 @@ static int ldlm_pool_debugfs_init(struct ldlm_pool *pl)
- 					   LDLM_POOL_FIRST_STAT, 0);
- 	if (!pl->pl_stats) {
- 		rc = -ENOMEM;
--		goto out_free_name;
-+		goto out;
++		result *= rounddown_pow_of_two(blk_size ?: 1);
+ 		return sprintf(buf, "%llu\n", result);
  	}
  
- 	lprocfs_counter_init(pl->pl_stats, LDLM_POOL_GRANTED_STAT,
-@@ -622,8 +615,7 @@ static int ldlm_pool_debugfs_init(struct ldlm_pool *pl)
- 	debugfs_create_file("stats", 0644, pl->pl_debugfs_entry, pl->pl_stats,
- 			    &lprocfs_stats_seq_fops);
+@@ -397,8 +395,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_bfree;
  
--out_free_name:
--	kfree(var_name);
-+out:
- 	return rc;
- }
+-		while (blk_size >>= 1)
+-			result <<= 1;
++		result *= rounddown_pow_of_two(blk_size ?: 1);
  
+ 		return sprintf(buf, "%llu\n", result);
+ 	}
+@@ -420,8 +417,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_bavail;
+ 
+-		while (blk_size >>= 1)
+-			result <<= 1;
++		result *= rounddown_pow_of_two(blk_size ?: 1);
+ 
+ 		return sprintf(buf, "%llu\n", result);
+ 	}
