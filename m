@@ -1,195 +1,161 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 04 Mar 2019 17:31:38 +1100
-Subject: [lustre-devel] [PATCH 03/28] lustre: obd_type: use typ_kobj.name as
- typ_name
+Subject: [lustre-devel] [PATCH 04/28] lustre: obd_type: discard obd_types
+ linked list.
 In-Reply-To: <155168107971.31333.14345309795939467246.stgit@noble.brown>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
-Message-ID: <155168109818.31333.12042554734621018380.stgit@noble.brown>
+Message-ID: <155168109822.31333.9434810900527856527.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-As the kobject has a name (after kobject_add has been called),
-we don't need to also store it in typ_name.
-So use typ_kobj.name instead of typ_name.
+As all obd_types are kobjects in the lustre_kset kset,
+they are linked together in that kset and don't
+need any extra linkage.
 
-This requires changing some "char *" to "const char *" as
-typ.kobj.name is const.
+There are non-obd_type objects in lustre_kset, added by
+class_setup_tunables().  These have a different ->ktype, so we are
+careful to only return objects with the correct ->ktype.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+As kset_find_obj() returns a counted reference, we need
+to put that reference when done.
+
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h |    4 ++-
- drivers/staging/lustre/lustre/include/obd.h        |    2 +-
- drivers/staging/lustre/lustre/include/obd_class.h  |    2 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    2 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |   25 ++++++++------------
- drivers/staging/lustre/lustre/ptlrpc/client.c      |    2 +-
- 6 files changed, 16 insertions(+), 21 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h     |    1 -
+ drivers/staging/lustre/lustre/obdclass/genops.c |   42 +++++++++++------------
+ 2 files changed, 20 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index f6d1be1a8350..1cf0f127203a 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -308,7 +308,7 @@ struct ptlrpc_client {
- 	/** What portal do we expect replies on */
- 	u32			cli_reply_portal;
- 	/** Name of the client */
--	char			*cli_name;
-+	const char		*cli_name;
- };
- 
- /** state flags of requests */
-@@ -1817,7 +1817,7 @@ void ptlrpc_request_committed(struct ptlrpc_request *req, int force);
- int ptlrpc_inc_ref(void);
- void ptlrpc_dec_ref(void);
- 
--void ptlrpc_init_client(int req_portal, int rep_portal, char *name,
-+void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
- 			struct ptlrpc_client *);
- struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid,
- 						    lnet_nid_t nid4refnet);
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index f20c2468712a..6bf052a5ac5a 100644
+index 6bf052a5ac5a..4c58b916e0a3 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -103,12 +103,12 @@ struct obd_type {
+@@ -99,7 +99,6 @@ struct obd_info {
+ };
+ 
+ struct obd_type {
+-	struct list_head	 typ_chain;
  	struct obd_ops		*typ_dt_ops;
  	struct md_ops		*typ_md_ops;
  	struct dentry		*typ_debugfs_entry;
--	char			*typ_name;
- 	int			 typ_refcnt;
- 	struct lu_device_type	*typ_lu;
- 	spinlock_t		 obd_type_lock;
- 	struct kobject		 typ_kobj;
- };
-+#define typ_name typ_kobj.name
- 
- struct brw_page {
- 	u64			off;
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index e4cde1971e33..bf6ce3284bef 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -75,7 +75,7 @@ int class_name2dev(const char *name);
- struct obd_device *class_name2obd(const char *name);
- int class_uuid2dev(struct obd_uuid *uuid);
- struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
--					 const char *typ_name,
-+					 const char *type_name,
- 					 struct obd_uuid *grp_uuid);
- struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid,
- 					  int *next);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index e0d2851accef..9c61b332a51c 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -247,7 +247,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	struct obd_import *imp;
- 	struct obd_uuid server_uuid;
- 	int rq_portal, rp_portal, connect_op;
--	char *name = obddev->obd_type->typ_name;
-+	const char *name = obddev->obd_type->typ_name;
- 	enum ldlm_ns_type ns_type = LDLM_NS_TYPE_UNKNOWN;
- 	struct ptlrpc_connection fake_conn = {
- 		.c_self = 0,
 diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 8dd217c888a5..8f683313acf2 100644
+index 8f683313acf2..74195de639e4 100644
 --- a/drivers/staging/lustre/lustre/obdclass/genops.c
 +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -157,7 +157,6 @@ static void class_sysfs_release(struct kobject *kobj)
- 	list_del(&type->typ_chain);
- 	spin_unlock(&obd_types_lock);
+@@ -42,8 +42,6 @@
+ #include <lprocfs_status.h>
+ #include <lustre_kernelcomm.h>
  
--	kfree(type->typ_name);
+-static DEFINE_SPINLOCK(obd_types_lock);
+-static LIST_HEAD(obd_types);
+ DEFINE_RWLOCK(obd_dev_lock);
+ static struct obd_device *obd_devs[MAX_OBD_DEVICES];
+ 
+@@ -52,6 +50,7 @@ struct kmem_cache *obdo_cachep;
+ EXPORT_SYMBOL(obdo_cachep);
+ static struct kmem_cache *import_cachep;
+ 
++static struct kobj_type class_ktype;
+ static struct workqueue_struct *zombie_wq;
+ static void obd_zombie_export_add(struct obd_export *exp);
+ static void obd_zombie_import_add(struct obd_import *imp);
+@@ -88,22 +87,19 @@ static void obd_device_free(struct obd_device *obd)
+ 
+ static struct obd_type *class_search_type(const char *name)
+ {
+-	struct obd_type *type;
++	struct kobject *kobj = kset_find_obj(lustre_kset, name);
++
++	if (kobj && kobj->ktype == &class_ktype)
++		return container_of(kobj, struct obd_type, typ_kobj);
+ 
+-	spin_lock(&obd_types_lock);
+-	list_for_each_entry(type, &obd_types, typ_chain) {
+-		if (strcmp(type->typ_name, name) == 0) {
+-			spin_unlock(&obd_types_lock);
+-			return type;
+-		}
+-	}
+-	spin_unlock(&obd_types_lock);
+ 	return NULL;
+ }
+ 
+ static struct obd_type *class_get_type(const char *name)
+ {
+-	struct obd_type *type = class_search_type(name);
++	struct obd_type *type;
++
++	type = class_search_type(name);
+ 
+ 	if (!type) {
+ 		const char *modname = name;
+@@ -121,6 +117,11 @@ static struct obd_type *class_get_type(const char *name)
+ 		type->typ_refcnt++;
+ 		try_module_get(type->typ_dt_ops->owner);
+ 		spin_unlock(&type->obd_type_lock);
++		/* class_search_type() returned a counted reference,
++		 * but we don't need that count any more as
++		 * we have one through typ_refcnt.
++		 */
++		kobject_put(&type->typ_kobj);
+ 	}
+ 	return type;
+ }
+@@ -153,10 +154,6 @@ static void class_sysfs_release(struct kobject *kobj)
+ 	if (type->typ_lu)
+ 		lu_device_type_fini(type->typ_lu);
+ 
+-	spin_lock(&obd_types_lock);
+-	list_del(&type->typ_chain);
+-	spin_unlock(&obd_types_lock);
+-
  	kfree(type->typ_md_ops);
  	kfree(type->typ_dt_ops);
  	kfree(type);
-@@ -216,28 +215,24 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+@@ -199,8 +196,10 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	/* sanity check */
+ 	LASSERT(strnlen(name, CLASS_MAX_NAME) < CLASS_MAX_NAME);
+ 
+-	if (class_search_type(name)) {
++	type = class_search_type(name);
++	if (type) {
+ 		CDEBUG(D_IOCTL, "Type %s already registered\n", name);
++		kobject_put(&type->typ_kobj);
+ 		return -EEXIST;
+ 	}
+ 
+@@ -211,7 +210,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 
+ 	type->typ_kobj.kset = lustre_kset;
+ 	kobject_init(&type->typ_kobj, &class_ktype);
+-	INIT_LIST_HEAD(&type->typ_chain);
  
  	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
  	type->typ_md_ops = kzalloc(sizeof(*type->typ_md_ops), GFP_NOFS);
--	type->typ_name = kzalloc(strlen(name) + 1, GFP_NOFS);
+@@ -240,10 +238,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 			goto failed;
+ 	}
  
- 	if (!type->typ_dt_ops ||
--	    !type->typ_md_ops ||
--	    !type->typ_name)
-+	    !type->typ_md_ops)
- 		goto failed;
- 
- 	*type->typ_dt_ops = *dt_ops;
- 	/* md_ops is optional */
- 	if (md_ops)
- 		*type->typ_md_ops = *md_ops;
--	strcpy(type->typ_name, name);
- 	spin_lock_init(&type->obd_type_lock);
- 
--	type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
--						     debugfs_lustre_root);
+-	spin_lock(&obd_types_lock);
+-	list_add(&type->typ_chain, &obd_types);
+-	spin_unlock(&obd_types_lock);
 -
- 	rc = kobject_add(&type->typ_kobj, &lustre_kset->kobj, "%s", name);
--
- 	if (rc)
- 		goto failed;
+ 	return 0;
  
-+	type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
-+						     debugfs_lustre_root);
-+
- 	if (ldt) {
- 		type->typ_lu = ldt;
- 		rc = lu_device_type_init(ldt);
-@@ -564,7 +559,7 @@ struct obd_device *class_num2obd(int num)
-  * otherwise any client connected to the tgt is returned.
-  */
- struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
--					 const char *typ_name,
-+					 const char *type_name,
- 					 struct obd_uuid *grp_uuid)
- {
- 	int i;
-@@ -575,8 +570,8 @@ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
+ failed:
+@@ -268,9 +262,13 @@ int class_unregister_type(const char *name)
+ 		/* Remove ops, but leave the name for debugging */
+ 		kfree(type->typ_dt_ops);
+ 		kfree(type->typ_md_ops);
++		kobject_put(&type->typ_kobj);
+ 		return -EBUSY;
+ 	}
  
- 		if (!obd)
- 			continue;
--		if ((strncmp(obd->obd_type->typ_name, typ_name,
--			     strlen(typ_name)) == 0)) {
-+		if ((strncmp(obd->obd_type->typ_name, type_name,
-+			     strlen(type_name)) == 0)) {
- 			if (obd_uuid_equals(tgt_uuid,
- 					    &obd->u.cli.cl_target_uuid) &&
- 			    ((grp_uuid) ? obd_uuid_equals(grp_uuid,
-@@ -1388,7 +1383,7 @@ EXPORT_SYMBOL(obd_get_max_rpcs_in_flight);
- int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- {
- 	struct obd_request_slot_waiter *orsw;
--	const char *typ_name;
-+	const char *type_name;
- 	u32 old;
- 	int diff;
- 	int rc;
-@@ -1397,8 +1392,8 @@ int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- 	if (max > OBD_MAX_RIF_MAX || max < 1)
- 		return -ERANGE;
++	/* Put the ref returned by class_search_type() */
++	kobject_put(&type->typ_kobj);
++	/* Put the final ref */
+ 	kobject_put(&type->typ_kobj);
  
--	typ_name = cli->cl_import->imp_obd->obd_type->typ_name;
--	if (!strcmp(typ_name, LUSTRE_MDC_NAME)) {
-+	type_name = cli->cl_import->imp_obd->obd_type->typ_name;
-+	if (!strcmp(type_name, LUSTRE_MDC_NAME)) {
- 		/*
- 		 * adjust max_mod_rpcs_in_flight to ensure it is always
- 		 * strictly lower that max_rpcs_in_flight
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index eb5d22a538a0..da1ccd8f9dcc 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -67,7 +67,7 @@ static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async);
- /**
-  * Initialize passed in client structure @cl.
-  */
--void ptlrpc_init_client(int req_portal, int rep_portal, char *name,
-+void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
- 			struct ptlrpc_client *cl)
- {
- 	cl->cli_request_portal = req_portal;
+ 	return 0;
