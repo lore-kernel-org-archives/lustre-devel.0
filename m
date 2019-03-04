@@ -1,97 +1,126 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 04 Mar 2019 17:31:38 +1100
-Subject: [lustre-devel] [PATCH 07/28] lustre: obdclass: fix module load
- locking.
+Subject: [lustre-devel] [PATCH 08/28] lustre: convert rsi_sem to a spinlock.
 In-Reply-To: <155168107971.31333.14345309795939467246.stgit@noble.brown>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
-Message-ID: <155168109832.31333.3098059022452680010.stgit@noble.brown>
+Message-ID: <155168109836.31333.115281936121142304.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Safe module loading requires that we try_module_get() in a context
-where the module cannot be unloaded, typically protected by
-a spinlock that module-unload has to take.
-This doesn't currently happen in class_get_type().
+This lock is never held over code that sleeps, and is
+only ever held for short periods of time.
+So a simple spinlock is best.
 
-As free_module() calls synchronize_rcu() between calling the
-exit function and freeing the module, we can use rcu_read_lock()
-to check if the exit function has been called, and try_module_get()
-if it hasn't.
-
-We must also check the return status of try_module_get().
-
-Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/genops.c |   24 ++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/include/obd_class.h  |    3 +--
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    6 +++---
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |    4 ++--
+ .../lustre/lustre/obdclass/lprocfs_status.c        |    8 ++++----
+ 4 files changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index dc09c302a246..e206bb401fe3 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -99,21 +99,31 @@ static struct obd_type *class_get_type(const char *name)
- {
- 	struct obd_type *type;
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index 4567ef3b21dc..cdcc56dc4d1d 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -1690,12 +1690,11 @@ void statfs_pack(struct obd_statfs *osfs, struct kstatfs *sfs);
+ void statfs_unpack(struct kstatfs *sfs, struct obd_statfs *osfs);
  
-+	rcu_read_lock();
- 	type = class_search_type(name);
+ /* root squash info */
+-struct rw_semaphore;
+ struct root_squash_info {
+ 	uid_t			rsi_uid;
+ 	gid_t			rsi_gid;
+ 	struct list_head	rsi_nosquash_nids;
+-	struct rw_semaphore	rsi_sem;
++	spinlock_t		rsi_lock;	/* protects rsi_nosquash_nids */
+ };
  
- 	if (!type) {
- 		const char *modname = name;
+ /* linux-module.c */
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 4e98eb4af9c0..cfe8105fe138 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -130,7 +130,7 @@ static struct ll_sb_info *ll_init_sbi(void)
+ 	sbi->ll_squash.rsi_uid = 0;
+ 	sbi->ll_squash.rsi_gid = 0;
+ 	INIT_LIST_HEAD(&sbi->ll_squash.rsi_nosquash_nids);
+-	init_rwsem(&sbi->ll_squash.rsi_sem);
++	spin_lock_init(&sbi->ll_squash.rsi_lock);
  
-+		rcu_read_unlock();
- 		if (!request_module("%s", modname)) {
- 			CDEBUG(D_INFO, "Loaded module '%s'\n", modname);
--			type = class_search_type(name);
- 		} else {
- 			LCONSOLE_ERROR_MSG(0x158, "Can't load module '%s'\n",
- 					   modname);
- 		}
-+		rcu_read_lock();
-+		type = class_search_type(name);
+ 	return sbi;
+ }
+@@ -2576,7 +2576,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 	int i;
+ 
+ 	/* Update norootsquash flag */
+-	down_write(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (list_empty(&squash->rsi_nosquash_nids)) {
+ 		spin_lock(&sbi->ll_lock);
+ 		sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
+@@ -2604,7 +2604,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 			sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
+ 		spin_unlock(&sbi->ll_lock);
  	}
- 	if (type) {
--		if (try_module_get(type->typ_dt_ops->owner)) {
-+		/*
-+		 * Holding rcu_read_lock() matches the synchronize_rcu() call
-+		 * in free_module() and ensures that if type->typ_dt_ops is
-+		 * not yet NULL, then the module won't be freed until after
-+		 * we rcu_read_unlock().
-+		 */
-+		const struct obd_ops *dt_ops = READ_ONCE(type->typ_dt_ops);
-+		if (dt_ops && try_module_get(dt_ops->owner)) {
- 			atomic_inc(&type->typ_refcnt);
- 			/* class_search_type() returned a counted reference,
- 			 * but we don't need that count any more as
-@@ -125,6 +135,7 @@ static struct obd_type *class_get_type(const char *name)
- 			type = NULL;
- 		}
- 	}
-+	rcu_read_unlock();
- 	return type;
+-	up_write(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
  }
  
-@@ -244,11 +255,18 @@ int class_unregister_type(const char *name)
- 		return -EINVAL;
- 	}
+ /**
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 5de846230cd2..8434e603a122 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -1133,7 +1133,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
+ 	struct root_squash_info *squash = &sbi->ll_squash;
+ 	int len;
  
-+	/*
-+	 * Ensure that class_get_type doesn't try to get the module
-+	 * as it could be freed before the obd_type is released.
-+	 * synchronize_rcu() will be called before the module
-+	 * is freed.
-+	 */
-+	type->typ_dt_ops = NULL;
-+
- 	if (atomic_read(&type->typ_refcnt)) {
- 		CERROR("type %s has refcount (%d)\n", name, atomic_read(&type->typ_refcnt));
- 		/* This is a bad situation, let's make the best of it */
- 		/* Remove ops, but leave the name for debugging */
--		type->typ_dt_ops = NULL;
- 		type->typ_md_ops = NULL;
- 		kobject_put(&type->typ_kobj);
- 		return -EBUSY;
+-	down_read(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (!list_empty(&squash->rsi_nosquash_nids)) {
+ 		len = cfs_print_nidlist(m->buf + m->count, m->size - m->count,
+ 					&squash->rsi_nosquash_nids);
+@@ -1142,7 +1142,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
+ 	} else {
+ 		seq_puts(m, "NONE\n");
+ 	}
+-	up_read(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 71bf409240f5..29c6b5d7abec 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -1751,10 +1751,10 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+ 	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
+ 	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
+ 		/* empty string is special case */
+-		down_write(&squash->rsi_sem);
++		spin_lock(&squash->rsi_lock);
+ 		if (!list_empty(&squash->rsi_nosquash_nids))
+ 			cfs_free_nidlist(&squash->rsi_nosquash_nids);
+-		up_write(&squash->rsi_sem);
++		spin_unlock(&squash->rsi_lock);
+ 		LCONSOLE_INFO("%s: nosquash_nids is cleared\n", name);
+ 		kfree(kernbuf);
+ 		return count;
+@@ -1771,11 +1771,11 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+ 	kfree(kernbuf);
+ 	kernbuf = NULL;
+ 
+-	down_write(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (!list_empty(&squash->rsi_nosquash_nids))
+ 		cfs_free_nidlist(&squash->rsi_nosquash_nids);
+ 	list_splice(&tmp, &squash->rsi_nosquash_nids);
+-	up_write(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
+ 
+ 	return count;
+ 
