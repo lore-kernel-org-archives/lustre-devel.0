@@ -1,118 +1,61 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 04 Mar 2019 17:31:38 +1100
-Subject: [lustre-devel] [PATCH 18/28] lustre: remove unused fields from
- struct obd_device
+Subject: [lustre-devel] [PATCH 19/28] lustre: obd_sysfs: error-check value
+ stored in jobid_var
 In-Reply-To: <155168107971.31333.14345309795939467246.stgit@noble.brown>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
-Message-ID: <155168109872.31333.16031201138302253309.stgit@noble.brown>
+Message-ID: <155168109876.31333.9752731889345878238.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-One field is set but never access.
-Another is accessed but never set.
-Other are never mentioned at all.
+The jobid_var sysfs attribute only has 3 meaningful values.
+Other values cause lustre_get_jobid() to return an error
+which is uniformly ignored.
 
-Also remove the comment
-	/* use separate field as it is set in interrupt to don't mess with
-	 * protection of other bits using _bh lock
-	 */
-
-This is not correct - were it used, obd_recovery_expired would be part
-of the same 'unsigned long' as the other fields.
+To improve usability and resilience, check that the value
+written is acceptable before storing it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/obd.h        |   33 +++++++-------------
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |    4 +-
- drivers/staging/lustre/lustre/obdclass/class_obd.c |    1 -
- .../staging/lustre/lustre/obdclass/obd_config.c    |    1 -
- 4 files changed, 14 insertions(+), 25 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |   21 ++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 3bdde312e4a6..93a47cf0ef68 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -539,27 +539,18 @@ struct obd_device {
- 	char			 obd_name[MAX_OBD_NAME];
- 
- 	/* bitfield modification is protected by obd_dev_lock */
--	unsigned long obd_attached:1,      /* finished attach */
--		      obd_set_up:1,	/* finished setup */
--		      obd_version_recov:1, /* obd uses version checking */
--		      obd_replayable:1,/* recovery is enabled; inform clients */
--		      obd_no_transno:1,  /* no committed-transno notification */
--		      obd_no_recov:1,      /* fail instead of retry messages */
--		      obd_stopping:1,      /* started cleanup */
--		      obd_starting:1,      /* started setup */
--		      obd_force:1,	 /* cleanup with > 0 obd refcount */
--		      obd_fail:1,	 /* cleanup with failover */
--		      obd_no_conn:1,       /* deny new connections */
--		      obd_inactive:1,      /* device active/inactive
--					    * (for sysfs status only!!)
--					    */
--		      obd_no_ir:1,	 /* no imperative recovery. */
--		      obd_process_conf:1,  /* device is processing mgs config */
--		      obd_checksum_dump:1; /* dump pages upon cksum error */
--	/* use separate field as it is set in interrupt to don't mess with
--	 * protection of other bits using _bh lock
--	 */
--	unsigned long obd_recovery_expired:1;
-+	unsigned long obd_attached:1,	  /* finished attach */
-+		      obd_set_up:1,	  /* finished setup */
-+		      obd_no_recov:1,	  /* fail instead of retry messages */
-+		      obd_stopping:1,	  /* started cleanup */
-+		      obd_starting:1,	  /* started setup */
-+		      obd_force:1,	  /* cleanup with > 0 obd refcount */
-+		      obd_fail:1,	  /* cleanup with failover */
-+		      obd_inactive:1,	  /* device active/inactive
-+					   * (for sysfs status only!!)
-+					   */
-+		      obd_process_conf:1;/* device is processing mgs config */
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
+index e9e0bcf39d4e..1431ea02f144 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
+@@ -216,16 +216,25 @@ static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
+ 			       const char *buffer,
+ 			       size_t count)
+ {
++	static char *valid[] = {
++		JOBSTATS_DISABLE,
++		JOBSTATS_PROCNAME_UID,
++		JOBSTATS_NODELOCAL,
++		NULL
++	};
++	int i;
 +
- 	/* uuid-export hash body */
- 	struct rhashtable	 obd_uuid_hash;
- 	wait_queue_head_t	 obd_refcount_waitq;
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 5ce49e708287..6daadf24b894 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -991,10 +991,10 @@ static int mgc_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 		if (vallen != sizeof(int))
- 			return -EINVAL;
- 		value = *(int *)val;
--		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:or%d:%s\n",
-+		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:%s\n",
- 		       imp->imp_obd->obd_name, value,
- 		       imp->imp_deactive, imp->imp_invalid,
--		       imp->imp_replayable, imp->imp_obd->obd_replayable,
-+		       imp->imp_replayable,
- 		       ptlrpc_import_state_name(imp->imp_state));
- 		/* Resurrect if we previously died */
- 		if ((imp->imp_state != LUSTRE_IMP_FULL &&
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index b8fc74044fe3..1fcbda128a58 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -525,7 +525,6 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 		}
- 		CDEBUG(D_HA, "%s: disabling committed-transno notification\n",
- 		       obd->obd_name);
--		obd->obd_no_transno = 1;
- 		err = 0;
- 		break;
+ 	if (!count || count > JOBSTATS_JOBID_VAR_MAX_LEN)
+ 		return -EINVAL;
  
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 0cdadea4e63c..7b10206d6e52 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -487,7 +487,6 @@ static int class_cleanup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 				LCONSOLE_WARN("Failing over %s\n",
- 					      obd->obd_name);
- 				obd->obd_fail = 1;
--				obd->obd_no_transno = 1;
- 				obd->obd_no_recov = 1;
- 				if (OBP(obd, iocontrol)) {
- 					obd_iocontrol(OBD_IOC_SYNC,
+-	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
+-
+-	memcpy(obd_jobid_var, buffer, count);
++	for (i = 0; valid[i]; i++)
++		if (sysfs_streq(buffer, valid[i]))
++			break;
++	if (!valid[i])
++		return -EINVAL;
+ 
+-	/* Trim the trailing '\n' if any */
+-	if (obd_jobid_var[count - 1] == '\n')
+-		obd_jobid_var[count - 1] = 0;
++	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
++	strcpy(obd_jobid_var, valid[i]);
+ 
+ 	return count;
+ }
