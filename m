@@ -1,20 +1,33 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 14 Mar 2019 11:34:05 +1100
+From: Patrick Farrell <pfarrell@whamcloud.com>
+Date: Thu, 14 Mar 2019 14:12:39 +0000
 Subject: [lustre-devel] [PATCH 37/37] lustre: obd_sysfs: error-check
  value stored in jobid_var
-In-Reply-To: <DM6PR19MB2508A4BA4F95517F8BDBB9F0C5760@DM6PR19MB2508.namprd19.prod.outlook.com>
+In-Reply-To: <87sgvqpa4i.fsf@notabene.neil.brown.name>
 References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
  <155053494716.24125.12637812266850199400.stgit@noble.brown>
  <4271D74A-4B36-4781-A1DA-F5512CBCAF15@whamcloud.com>
  <87woljs4mv.fsf@notabene.neil.brown.name>
  <5154EC17-80E4-49EC-B554-9AA010DD1271@whamcloud.com>
- <DM6PR19MB2508A4BA4F95517F8BDBB9F0C5760@DM6PR19MB2508.namprd19.prod.outlook.com>
-Message-ID: <87sgvqpa4i.fsf@notabene.neil.brown.name>
+ <DM6PR19MB2508A4BA4F95517F8BDBB9F0C5760@DM6PR19MB2508.namprd19.prod.outlook.com>,
+ <87sgvqpa4i.fsf@notabene.neil.brown.name>
+Message-ID: <DM6PR19MB25083B044933104EDDA1A957C54B0@DM6PR19MB2508.namprd19.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+So can we set session ids?  Can we make them the same across many nodes?  It doesn't sound like it.  That's a basic requirement.  We need more than just "kernel provided ID which is unique to process set on a node".  The point of jobstats is to be able to collect info on all of a job, and many jobs will span many nodes.  (We also have > 1 job per node in other cases.)
+
+
+- Patrick
+
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Wednesday, March 13, 2019 7:34:05 PM
+To: Patrick Farrell; Andreas Dilger
+Cc: Lustre Development List
+Subject: Re: [PATCH 37/37] lustre: obd_sysfs: error-check value stored in jobid_var
 
 
 Hi Patrick,
@@ -497,9 +510,5 @@ On Fri, Mar 01 2019, Patrick Farrell wrote:
 > lustre-devel at lists.lustre.org
 > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190314/0833fd0c/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190314/36fbde09/attachment-0001.html>
