@@ -1,242 +1,193 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 14 Mar 2019 11:11:51 +1100
-Subject: [lustre-devel] [PATCH 25/32] lustre: incorporate BUILD_BUG_ON into
- ptlrpc_req_async_args()
+Subject: [lustre-devel] [PATCH 26/32] lustre: ptlrpc: don't use
+ list_for_each_entry_safe unnecessarily.
 In-Reply-To: <155252182126.26912.1842463462595601611.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
-Message-ID: <155252231128.26912.13060548976707885497.stgit@noble.brown>
+Message-ID: <155252231140.26912.8140429396611661381.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Every call to ptlrpc_req_async_args() should be preceded by a
-BUILD_BUG_ON(), though two aren't.
+list_for_each_entry_safe() is only needed if the body of the
+loop might change the list, or if it might drop a lock that would
+otherwise prevent the list from being changed.
 
-To improve maintainability, include the BUILD_BUG_ON into the
-ptlrpc_req_async_args() macro.
+When the body does neither of these, list_for_each_entry() should be
+preferred as it makes the behaviour of the loop more clear to readers.
+
+In each of the cases changed there, the list cannot change while the
+loop proceeds.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h |    7 +++--
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    3 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    7 ++---
- drivers/staging/lustre/lustre/osc/osc_io.c         |    3 +-
- drivers/staging/lustre/lustre/osc/osc_request.c    |   29 +++++++-------------
- drivers/staging/lustre/lustre/ptlrpc/client.c      |    6 +---
- drivers/staging/lustre/lustre/ptlrpc/import.c      |    3 +-
- 7 files changed, 23 insertions(+), 35 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/client.c  |   10 +++++-----
+ drivers/staging/lustre/lustre/ptlrpc/import.c  |   14 +++++++-------
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c |    4 ++--
+ drivers/staging/lustre/lustre/ptlrpc/recover.c |   14 +++++++-------
+ 4 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index 8c61b02a0ae5..f1326a0286ba 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -277,8 +277,11 @@
-  */
- #define OST_MAXREQSIZE		(16 * 1024)
- 
--/* Macro to hide a typecast. */
--#define ptlrpc_req_async_args(req) ((void *)&req->rq_async_args)
-+/* Macro to hide a typecast and BUILD_BUG. */
-+#define ptlrpc_req_async_args(_var, req) ({				\
-+		BUILD_BUG_ON(sizeof(*_var) > sizeof(req->rq_async_args)); \
-+		(typeof(_var))&req->rq_async_args;			\
-+	})
- 
- struct ptlrpc_replay_async_args {
- 	int		praa_old_state;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index fbb12f540dbd..a1e86a495076 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -1986,8 +1986,7 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
- 	LDLM_DEBUG(lock, "replaying lock:");
- 
- 	atomic_inc(&req->rq_import->imp_replay_inflight);
--	BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--	aa = ptlrpc_req_async_args(req);
-+	aa = ptlrpc_req_async_args(aa, req);
- 	aa->lock_handle = body->lock_handle[0];
- 	req->rq_interpret_reply = (ptlrpc_interpterer_t)replay_lock_interpret;
- 	ptlrpcd_add_req(req);
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 430c422ed627..9c3f4e9d7a34 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -48,8 +48,8 @@
- #include "mdc_internal.h"
- 
- struct mdc_getattr_args {
--	struct obd_export	   *ga_exp;
--	struct md_enqueue_info      *ga_minfo;
-+	struct obd_export	*ga_exp;
-+	struct md_enqueue_info	*ga_minfo;
- };
- 
- int it_open_error(int phase, struct lookup_intent *it)
-@@ -1266,8 +1266,7 @@ int mdc_intent_getattr_async(struct obd_export *exp,
- 		return rc;
- 	}
- 
--	BUILD_BUG_ON(sizeof(*ga) > sizeof(req->rq_async_args));
--	ga = ptlrpc_req_async_args(req);
-+	ga = ptlrpc_req_async_args(ga, req);
- 	ga->ga_exp = exp;
- 	ga->ga_minfo = minfo;
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 0b9ed01658e6..efeb94b7dc15 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -696,8 +696,7 @@ static int osc_io_data_version_start(const struct lu_env *env,
- 
- 	ptlrpc_request_set_replen(req);
- 	req->rq_interpret_reply = osc_data_version_interpret;
--	BUILD_BUG_ON(sizeof(*dva) > sizeof(req->rq_async_args));
--	dva = ptlrpc_req_async_args(req);
-+	dva = ptlrpc_req_async_args(dva, req);
- 	dva->dva_oio = oio;
- 
- 	ptlrpcd_add_req(req);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 88302ff795ae..72437da1d892 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -259,8 +259,7 @@ int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
- 		req->rq_interpret_reply =
- 			(ptlrpc_interpterer_t)osc_setattr_interpret;
- 
--		BUILD_BUG_ON(sizeof(*sa) > sizeof(req->rq_async_args));
--		sa = ptlrpc_req_async_args(req);
-+		sa = ptlrpc_req_async_args(sa, req);
- 		sa->sa_oa = oa;
- 		sa->sa_upcall = upcall;
- 		sa->sa_cookie = cookie;
-@@ -344,8 +343,7 @@ int osc_ladvise_base(struct obd_export *exp, struct obdo *oa,
- 	}
- 
- 	req->rq_interpret_reply = osc_ladvise_interpret;
--	BUILD_BUG_ON(sizeof(*la) > sizeof(req->rq_async_args));
--	la = ptlrpc_req_async_args(req);
-+	la = ptlrpc_req_async_args(la, req);
- 	la->la_oa = oa;
- 	la->la_upcall = upcall;
- 	la->la_cookie = cookie;
-@@ -438,8 +436,7 @@ int osc_punch_base(struct obd_export *exp, struct obdo *oa,
- 	ptlrpc_request_set_replen(req);
- 
- 	req->rq_interpret_reply = (ptlrpc_interpterer_t)osc_setattr_interpret;
--	BUILD_BUG_ON(sizeof(*sa) > sizeof(req->rq_async_args));
--	sa = ptlrpc_req_async_args(req);
-+	sa = ptlrpc_req_async_args(sa, req);
- 	sa->sa_oa = oa;
- 	sa->sa_upcall = upcall;
- 	sa->sa_cookie = cookie;
-@@ -516,8 +513,7 @@ int osc_sync_base(struct osc_object *obj, struct obdo *oa,
- 	ptlrpc_request_set_replen(req);
- 	req->rq_interpret_reply = osc_sync_interpret;
- 
--	BUILD_BUG_ON(sizeof(*fa) > sizeof(req->rq_async_args));
--	fa = ptlrpc_req_async_args(req);
-+	fa = ptlrpc_req_async_args(fa, req);
- 	fa->fa_obj = obj;
- 	fa->fa_oa = oa;
- 	fa->fa_upcall = upcall;
-@@ -1302,8 +1298,7 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 	}
- 	ptlrpc_request_set_replen(req);
- 
--	BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--	aa = ptlrpc_req_async_args(req);
-+	aa = ptlrpc_req_async_args(aa, req);
- 	aa->aa_oa = oa;
- 	aa->aa_requested_nob = requested_nob;
- 	aa->aa_nio_count = niocount;
-@@ -1650,7 +1645,7 @@ static int osc_brw_redo_request(struct ptlrpc_request *request,
- 	new_req->rq_generation_set = 1;
- 	new_req->rq_import_generation = request->rq_import_generation;
- 
--	new_aa = ptlrpc_req_async_args(new_req);
-+	new_aa = ptlrpc_req_async_args(new_aa, new_req);
- 
- 	INIT_LIST_HEAD(&new_aa->aa_oaps);
- 	list_splice_init(&aa->aa_oaps, &new_aa->aa_oaps);
-@@ -1973,8 +1968,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 	cl_req_attr_set(env, osc2cl(obj), crattr);
- 	lustre_msg_set_jobid(req->rq_reqmsg, crattr->cra_jobid);
- 
--	BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--	aa = ptlrpc_req_async_args(req);
-+	aa = ptlrpc_req_async_args(aa, req);
- 	INIT_LIST_HEAD(&aa->aa_oaps);
- 	list_splice_init(&rpc_list, &aa->aa_oaps);
- 	INIT_LIST_HEAD(&aa->aa_exts);
-@@ -2251,8 +2245,7 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 		if (!rc) {
- 			struct osc_enqueue_args *aa;
- 
--			BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--			aa = ptlrpc_req_async_args(req);
-+			aa = ptlrpc_req_async_args(aa, req);
- 			aa->oa_exp = exp;
- 			aa->oa_mode = einfo->ei_mode;
- 			aa->oa_type = einfo->ei_type;
-@@ -2405,8 +2398,7 @@ static int osc_statfs_async(struct obd_export *exp,
- 	}
- 
- 	req->rq_interpret_reply = (ptlrpc_interpterer_t)osc_statfs_interpret;
--	BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--	aa = ptlrpc_req_async_args(req);
-+	aa = ptlrpc_req_async_args(aa, req);
- 	aa->aa_oi = oinfo;
- 
- 	ptlrpc_set_add_req(rqset, req);
-@@ -2610,8 +2602,7 @@ static int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 		struct osc_brw_async_args *aa;
- 		struct obdo *oa;
- 
--		BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
--		aa = ptlrpc_req_async_args(req);
-+		aa = ptlrpc_req_async_args(aa, req);
- 		oa = kmem_cache_zalloc(obdo_cachep, GFP_NOFS);
- 		if (!oa) {
- 			ptlrpc_req_finished(req);
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 1ee1ad4ca088..476435633694 100644
+index 476435633694..71bb563765cc 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/client.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -2878,8 +2878,7 @@ int ptlrpc_replay_req(struct ptlrpc_request *req)
+@@ -2916,7 +2916,7 @@ int ptlrpc_replay_req(struct ptlrpc_request *req)
+  */
+ void ptlrpc_abort_inflight(struct obd_import *imp)
+ {
+-	struct ptlrpc_request *req, *n;
++	struct ptlrpc_request *req;
  
- 	LASSERT(req->rq_import->imp_state == LUSTRE_IMP_REPLAY);
+ 	/*
+ 	 * Make sure that no new requests get processed for this import.
+@@ -2930,7 +2930,7 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+ 	 * locked?  Also, how do we know if the requests on the list are
+ 	 * being freed at this time?
+ 	 */
+-	list_for_each_entry_safe(req, n, &imp->imp_sending_list, rq_list) {
++	list_for_each_entry(req, &imp->imp_sending_list, rq_list) {
+ 		DEBUG_REQ(D_RPCTRACE, req, "inflight");
  
--	LASSERT(sizeof(*aa) <= sizeof(req->rq_async_args));
--	aa = ptlrpc_req_async_args(req);
-+	aa = ptlrpc_req_async_args(aa, req);
- 	memset(aa, 0, sizeof(*aa));
+ 		spin_lock(&req->rq_lock);
+@@ -2942,7 +2942,7 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+ 		spin_unlock(&req->rq_lock);
+ 	}
  
- 	/* Prepare request to be resent with ptlrpcd */
-@@ -3209,8 +3208,7 @@ void *ptlrpcd_alloc_work(struct obd_import *imp,
- 	req->rq_no_resend = 1;
- 	req->rq_pill.rc_fmt = (void *)&worker_format;
+-	list_for_each_entry_safe(req, n, &imp->imp_delayed_list, rq_list) {
++	list_for_each_entry(req, &imp->imp_delayed_list, rq_list) {
+ 		DEBUG_REQ(D_RPCTRACE, req, "aborting waiting req");
  
--	BUILD_BUG_ON(sizeof(*args) > sizeof(req->rq_async_args));
--	args = ptlrpc_req_async_args(req);
-+	args = ptlrpc_req_async_args(args, req);
- 	args->cb = cb;
- 	args->cbdata = cbdata;
+ 		spin_lock(&req->rq_lock);
+@@ -2969,9 +2969,9 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+  */
+ void ptlrpc_abort_set(struct ptlrpc_request_set *set)
+ {
+-	struct ptlrpc_request *req, *tmp;
++	struct ptlrpc_request *req;
  
+-	list_for_each_entry_safe(req, tmp, &set->set_requests, rq_set_chain) {
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+ 		spin_lock(&req->rq_lock);
+ 		if (req->rq_phase != RQ_PHASE_RPC) {
+ 			spin_unlock(&req->rq_lock);
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index a68b870faad2..db4ed6dbf362 100644
+index db4ed6dbf362..26a976865fbd 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -690,8 +690,7 @@ int ptlrpc_connect_import(struct obd_import *imp)
- 	ptlrpc_request_set_replen(request);
- 	request->rq_interpret_reply = ptlrpc_connect_interpret;
+@@ -244,11 +244,11 @@ ptlrpc_inflight_deadline(struct ptlrpc_request *req, time64_t now)
+ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
+ {
+ 	time64_t now = ktime_get_real_seconds();
+-	struct ptlrpc_request *req, *n;
++	struct ptlrpc_request *req;
+ 	unsigned int timeout = 0;
  
--	BUILD_BUG_ON(sizeof(*aa) > sizeof(request->rq_async_args));
--	aa = ptlrpc_req_async_args(request);
-+	aa = ptlrpc_req_async_args(aa, request);
- 	memset(aa, 0, sizeof(*aa));
+ 	spin_lock(&imp->imp_lock);
+-	list_for_each_entry_safe(req, n, &imp->imp_sending_list, rq_list)
++	list_for_each_entry(req, &imp->imp_sending_list, rq_list)
+ 		timeout = max(ptlrpc_inflight_deadline(req, now), timeout);
  
- 	aa->pcaa_peer_committed = committed_before_reconnect;
+ 	spin_unlock(&imp->imp_lock);
+@@ -263,7 +263,7 @@ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
+  */
+ void ptlrpc_invalidate_import(struct obd_import *imp)
+ {
+-	struct ptlrpc_request *req, *n;
++	struct ptlrpc_request *req;
+ 	unsigned int timeout;
+ 	int rc;
+ 
+@@ -335,13 +335,13 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 				 */
+ 				rc = 0;
+ 			} else {
+-				list_for_each_entry_safe(req, n,
+-							 &imp->imp_sending_list, rq_list) {
++				list_for_each_entry(req, &imp->imp_sending_list,
++						    rq_list) {
+ 					DEBUG_REQ(D_ERROR, req,
+ 						  "still on sending list");
+ 				}
+-				list_for_each_entry_safe(req, n,
+-							 &imp->imp_delayed_list, rq_list) {
++				list_for_each_entry(req, &imp->imp_delayed_list,
++						    rq_list) {
+ 					DEBUG_REQ(D_ERROR, req,
+ 						  "still on delayed list");
+ 				}
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index f0ac2962d64a..c295e9943bf7 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -200,12 +200,12 @@ ptlrpcd_select_pc(struct ptlrpc_request *req)
+ static int ptlrpcd_steal_rqset(struct ptlrpc_request_set *des,
+ 			       struct ptlrpc_request_set *src)
+ {
+-	struct ptlrpc_request *req, *tmp;
++	struct ptlrpc_request *req;
+ 	int rc = 0;
+ 
+ 	spin_lock(&src->set_new_req_lock);
+ 	if (likely(!list_empty(&src->set_new_requests))) {
+-		list_for_each_entry_safe(req, tmp, &src->set_new_requests, rq_set_chain)
++		list_for_each_entry(req, &src->set_new_requests, rq_set_chain)
+ 			req->rq_set = des;
+ 
+ 		list_splice_init(&src->set_new_requests, &des->set_requests);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+index af672ab5b212..f33e4c541a17 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+@@ -66,7 +66,7 @@ void ptlrpc_initiate_recovery(struct obd_import *imp)
+ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+ {
+ 	int rc = 0;
+-	struct ptlrpc_request *req = NULL, *pos;
++	struct ptlrpc_request *req = NULL;
+ 	u64 last_transno;
+ 
+ 	*inflight = 0;
+@@ -120,8 +120,8 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+ 	if (!req) {
+ 		struct ptlrpc_request *tmp;
+ 
+-		list_for_each_entry_safe(tmp, pos, &imp->imp_replay_list,
+-					 rq_replay_list) {
++		list_for_each_entry(tmp, &imp->imp_replay_list,
++				    rq_replay_list) {
+ 			if (tmp->rq_transno > last_transno) {
+ 				req = tmp;
+ 				break;
+@@ -172,7 +172,7 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+  */
+ int ptlrpc_resend(struct obd_import *imp)
+ {
+-	struct ptlrpc_request *req, *next;
++	struct ptlrpc_request *req;
+ 
+ 	/* As long as we're in recovery, nothing should be added to the sending
+ 	 * list, so we don't need to hold the lock during this iteration and
+@@ -186,7 +186,7 @@ int ptlrpc_resend(struct obd_import *imp)
+ 		return -1;
+ 	}
+ 
+-	list_for_each_entry_safe(req, next, &imp->imp_sending_list, rq_list) {
++	list_for_each_entry(req, &imp->imp_sending_list, rq_list) {
+ 		LASSERTF((long)req > PAGE_SIZE && req != LP_POISON,
+ 			 "req %p bad\n", req);
+ 		LASSERTF(req->rq_type != LI_POISON, "req %p freed\n", req);
+@@ -211,10 +211,10 @@ int ptlrpc_resend(struct obd_import *imp)
+  */
+ void ptlrpc_wake_delayed(struct obd_import *imp)
+ {
+-	struct ptlrpc_request *req, *pos;
++	struct ptlrpc_request *req;
+ 
+ 	spin_lock(&imp->imp_lock);
+-	list_for_each_entry_safe(req, pos, &imp->imp_delayed_list, rq_list) {
++	list_for_each_entry(req, &imp->imp_delayed_list, rq_list) {
+ 		DEBUG_REQ(D_HA, req, "waking (set %p):", req->rq_set);
+ 		ptlrpc_client_wake_req(req);
+ 	}
