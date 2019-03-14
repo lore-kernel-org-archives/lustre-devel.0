@@ -1,118 +1,53 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 14 Mar 2019 11:11:50 +1100
-Subject: [lustre-devel] [PATCH 19/32] lustre: socklnd: discard
- kiblnd_setup_rd_iov
+Subject: [lustre-devel] [PATCH 20/32] lustre: lnet: discard
+ lnet_kvaddr_to_page
 In-Reply-To: <155252182126.26912.1842463462595601611.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
-Message-ID: <155252231077.26912.12353786712327541336.stgit@noble.brown>
+Message-ID: <155252231083.26912.3172808314490420973.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The 'to' passed to lnd_recv is *always* ITER_BVEC, so
-we can discard kiblnd_setup_rd_iov().
+This function is no longer used, so discard it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   79 +-------------------
- 1 file changed, 4 insertions(+), 75 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 -
+ drivers/staging/lustre/lnet/lnet/lib-md.c          |    9 ---------
+ 2 files changed, 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 51eb20ed3326..9f6879046b72 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -664,71 +664,6 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	return -EINVAL;
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+index fca1c19a3c84..ca5ce2520c47 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+@@ -603,7 +603,6 @@ void lnet_me_unlink(struct lnet_me *me);
+ 
+ void lnet_md_unlink(struct lnet_libmd *md);
+ void lnet_md_deconstruct(struct lnet_libmd *lmd, struct lnet_event *ev);
+-struct page *lnet_kvaddr_to_page(unsigned long vaddr);
+ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset);
+ 
+ void lnet_register_lnd(struct lnet_lnd *lnd);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+index 4c6d14aa2139..c61f0286b21b 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-md.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+@@ -85,15 +85,6 @@ lnet_md_unlink(struct lnet_libmd *md)
+ 	kfree(md);
  }
  
--static int
--kiblnd_setup_rd_iov(struct lnet_ni *ni, struct kib_tx *tx,
--		    struct kib_rdma_desc *rd, unsigned int niov,
--		    const struct kvec *iov, int offset, int nob)
+-struct page *lnet_kvaddr_to_page(unsigned long vaddr)
 -{
--	struct kib_net *net = ni->ni_data;
--	struct page *page;
--	struct scatterlist *sg;
--	unsigned long vaddr;
--	int fragnob;
--	int page_offset;
+-	if (is_vmalloc_addr((void *)vaddr))
+-		return vmalloc_to_page((void *)vaddr);
 -
--	LASSERT(nob > 0);
--	LASSERT(niov > 0);
--	LASSERT(net);
--
--	while (offset >= iov->iov_len) {
--		offset -= iov->iov_len;
--		niov--;
--		iov++;
--		LASSERT(niov > 0);
--	}
--
--	sg = tx->tx_frags;
--	do {
--		LASSERT(niov > 0);
--
--		vaddr = ((unsigned long)iov->iov_base) + offset;
--		page_offset = vaddr & (PAGE_SIZE - 1);
--		page = lnet_kvaddr_to_page(vaddr);
--		if (!page) {
--			CERROR("Can't find page\n");
--			return -EFAULT;
--		}
--
--		fragnob = min((int)(iov->iov_len - offset), nob);
--		fragnob = min(fragnob, (int)PAGE_SIZE - page_offset);
--
--		if ((fragnob < (int)PAGE_SIZE - page_offset) && (niov > 1)) {
--			CDEBUG(D_NET,
--			       "fragnob %d < available page %d: with remaining %d iovs\n",
--			       fragnob, (int)PAGE_SIZE - page_offset, niov);
--			tx->tx_gaps = true;
--		}
--
--		sg_set_page(sg, page, fragnob, page_offset);
--		sg = sg_next(sg);
--		if (!sg) {
--			CERROR("lacking enough sg entries to map tx\n");
--			return -EFAULT;
--		}
--
--		if (offset + fragnob < iov->iov_len) {
--			offset += fragnob;
--		} else {
--			offset = 0;
--			iov++;
--			niov--;
--		}
--		nob -= fragnob;
--	} while (nob > 0);
--
--	return kiblnd_map_tx(ni, tx, rd, sg - tx->tx_frags);
+-	return kmap_to_page((void *)vaddr);
 -}
+-EXPORT_SYMBOL(lnet_kvaddr_to_page);
 -
- static int
- kiblnd_setup_rd_kiov(struct lnet_ni *ni, struct kib_tx *tx,
- 		     struct kib_rdma_desc *rd, int nkiov,
-@@ -1795,16 +1730,10 @@ kiblnd_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
- 
- 		txmsg = tx->tx_msg;
- 		rd = &txmsg->ibm_u.putack.ibpam_rd;
--		if (!(to->type & ITER_BVEC))
--			rc = kiblnd_setup_rd_iov(ni, tx, rd,
--						 to->nr_segs, to->kvec,
--						 to->iov_offset,
--						 iov_iter_count(to));
--		else
--			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
--						  to->nr_segs, to->bvec,
--						  to->iov_offset,
--						  iov_iter_count(to));
-+		rc = kiblnd_setup_rd_kiov(ni, tx, rd,
-+					  to->nr_segs, to->bvec,
-+					  to->iov_offset,
-+					  iov_iter_count(to));
- 		if (rc) {
- 			CERROR("Can't setup PUT sink for %s: %d\n",
- 			       libcfs_nid2str(conn->ibc_peer->ibp_nid), rc);
+ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ {
+ 	int cpt = CFS_CPT_ANY;
