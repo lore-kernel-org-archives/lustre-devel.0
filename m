@@ -1,215 +1,255 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 14 Mar 2019 11:11:50 +1100
-Subject: [lustre-devel] [PATCH 14/32] lustre: lnet: discard kvec option from
- lnet_libmd.
+Subject: [lustre-devel] [PATCH 15/32] lustre: lnet: remove msg_iov from
+ lnet_msg.
 In-Reply-To: <155252182126.26912.1842463462595601611.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
-Message-ID: <155252231020.26912.16806897942018431304.stgit@noble.brown>
+Message-ID: <155252231035.26912.3904637484494950926.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The 'struct kvec' field in 'struct lnet_libmd' is no
-longer set - the memory is always presented as pages.
-So remove that option and the union that contained
-iov and kiov.
-
-Rename md_iov.kiov to  md_kiov.
-Discard all code that made use of md_iov.iov.
+This field is never set, so remove it and remove all
+uses of it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-types.h  |    5 -
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   14 +---
- drivers/staging/lustre/lnet/lnet/lib-md.c          |   79 +++++---------------
- drivers/staging/lustre/lnet/lnet/lib-move.c        |    5 -
- 4 files changed, 25 insertions(+), 78 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    1 -
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   30 ++++-----------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   39 ++++++--------------
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |   16 ++------
+ drivers/staging/lustre/lnet/lnet/lo.c              |   17 +++------
+ 5 files changed, 27 insertions(+), 76 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 60f9c286fe8c..e4a3e747389a 100644
+index e4a3e747389a..23fbbc47bfec 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -168,10 +168,7 @@ struct lnet_libmd {
- 	struct lnet_eq		*md_eq;
- 	unsigned int		 md_niov;	/* # frags */
- 	struct lnet_handle_md	 md_bulk_handle;
--	union {
--		struct kvec	iov[LNET_MAX_IOV];
--		struct bio_vec	kiov[LNET_MAX_IOV];
--	} md_iov;
-+	struct bio_vec		 md_kiov[LNET_MAX_IOV];
- };
+@@ -114,7 +114,6 @@ struct lnet_msg {
+ 	unsigned int		 msg_wanted;
+ 	unsigned int		 msg_offset;
+ 	unsigned int		 msg_niov;
+-	struct kvec		*msg_iov;
+ 	struct bio_vec		*msg_kiov;
  
- #define LNET_MD_FLAG_ZOMBIE		BIT(0)
+ 	struct lnet_event	 msg_ev;
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 3579d90df98d..bd9810652d09 100644
+index bd9810652d09..51eb20ed3326 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1584,16 +1584,10 @@ kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+@@ -1522,7 +1522,6 @@ kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+ 	int target_is_router = lntmsg->msg_target_is_router;
+ 	int routing = lntmsg->msg_routing;
+ 	unsigned int payload_niov = lntmsg->msg_niov;
+-	struct kvec *payload_iov = lntmsg->msg_iov;
+ 	struct bio_vec *payload_kiov = lntmsg->msg_kiov;
+ 	unsigned int payload_offset = lntmsg->msg_offset;
+ 	unsigned int payload_nob = lntmsg->msg_len;
+@@ -1543,17 +1542,11 @@ kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
  
- 		ibmsg = tx->tx_msg;
- 		rd = &ibmsg->ibm_u.get.ibgm_rd;
--		if (!(lntmsg->msg_md->md_options & LNET_MD_KIOV))
--			rc = kiblnd_setup_rd_iov(ni, tx, rd,
--						 lntmsg->msg_md->md_niov,
--						 lntmsg->msg_md->md_iov.iov,
--						 0, lntmsg->msg_md->md_length);
+ 	/* Thread context */
+ 	LASSERT(!in_interrupt());
+-	/* payload is either all vaddrs or all pages */
+-	LASSERT(!(payload_kiov && payload_iov));
++	LASSERT(payload_kiov);
+ 
+-	if (payload_kiov)
+-		iov_iter_bvec(&from, WRITE,
+-			      payload_kiov, payload_niov,
+-			      payload_nob + payload_offset);
+-	else
+-		iov_iter_kvec(&from, WRITE,
+-			      payload_iov, payload_niov,
+-			      payload_nob + payload_offset);
++	iov_iter_bvec(&from, WRITE,
++		      payload_kiov, payload_niov,
++		      payload_nob + payload_offset);
+ 
+ 	iov_iter_advance(&from, payload_offset);
+ 
+@@ -1629,14 +1622,9 @@ kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+ 			return -ENOMEM;
+ 		}
+ 
+-		if (!payload_kiov)
+-			rc = kiblnd_setup_rd_iov(ni, tx, tx->tx_rd,
+-						 payload_niov, payload_iov,
+-						 payload_offset, payload_nob);
 -		else
--			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
--						  lntmsg->msg_md->md_niov,
--						  lntmsg->msg_md->md_iov.kiov,
--						  0, lntmsg->msg_md->md_length);
-+		rc = kiblnd_setup_rd_kiov(ni, tx, rd,
-+					  lntmsg->msg_md->md_niov,
-+					  lntmsg->msg_md->md_kiov,
-+					  0, lntmsg->msg_md->md_length);
+-			rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
+-						  payload_niov, payload_kiov,
+-						  payload_offset, payload_nob);
++		rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
++					  payload_niov, payload_kiov,
++					  payload_offset, payload_nob);
  		if (rc) {
- 			CERROR("Can't setup GET sink for %s: %d\n",
+ 			CERROR("Can't setup PUT src for %s: %d\n",
  			       libcfs_nid2str(target.nid), rc);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
-index 970db903552d..4c6d14aa2139 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-md.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
-@@ -98,6 +98,7 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+@@ -1690,7 +1678,6 @@ kiblnd_reply(struct lnet_ni *ni, struct kib_rx *rx, struct lnet_msg *lntmsg)
  {
- 	int cpt = CFS_CPT_ANY;
- 	unsigned int niov;
-+	struct bio_vec *kiov = md->md_kiov;
+ 	struct lnet_process_id target = lntmsg->msg_target;
+ 	unsigned int niov = lntmsg->msg_niov;
+-	struct kvec *iov = lntmsg->msg_iov;
+ 	struct bio_vec *kiov = lntmsg->msg_kiov;
+ 	unsigned int offset = lntmsg->msg_offset;
+ 	unsigned int nob = lntmsg->msg_len;
+@@ -1706,9 +1693,6 @@ kiblnd_reply(struct lnet_ni *ni, struct kib_rx *rx, struct lnet_msg *lntmsg)
  
- 	/*
- 	 * if the md_options has a bulk handle then we want to look at the
-@@ -112,61 +113,19 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 	if (!nob)
+ 		rc = 0;
+-	else if (!kiov)
+-		rc = kiblnd_setup_rd_iov(ni, tx, tx->tx_rd,
+-					 niov, iov, offset, nob);
+ 	else
+ 		rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
+ 					  niov, kiov, offset, nob);
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index cbba90c6b9da..ce61d06f3d79 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -867,7 +867,6 @@ ksocknal_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+ 	int type = lntmsg->msg_type;
+ 	struct lnet_process_id target = lntmsg->msg_target;
+ 	unsigned int payload_niov = lntmsg->msg_niov;
+-	struct kvec *payload_iov = lntmsg->msg_iov;
+ 	struct bio_vec *payload_kiov = lntmsg->msg_kiov;
+ 	unsigned int payload_offset = lntmsg->msg_offset;
+ 	unsigned int payload_nob = lntmsg->msg_len;
+@@ -884,16 +883,10 @@ ksocknal_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
  
- 	niov = md->md_niov;
+ 	LASSERT(!payload_nob || payload_niov > 0);
+ 	LASSERT(payload_niov <= LNET_MAX_IOV);
+-	/* payload is either all vaddrs or all pages */
+-	LASSERT(!(payload_kiov && payload_iov));
+ 	LASSERT(!in_interrupt());
  
--	/*
--	 * There are three cases to handle:
--	 *  1. The MD is using lnet_kiov_t
--	 *  2. The MD is using struct kvec
--	 *  3. Contiguous buffer allocated via vmalloc
--	 *
--	 *  in case 2 we can use virt_to_page() macro to get the page
--	 *  address of the memory kvec describes.
--	 *
--	 *  in case 3 use is_vmalloc_addr() and vmalloc_to_page()
--	 *
--	 * The offset provided can be within the first iov/kiov entry or
--	 * it could go beyond it. In that case we need to make sure to
--	 * look at the page which actually contains the data that will be
--	 * DMAed.
--	 */
--	if ((md->md_options & LNET_MD_KIOV) != 0) {
--		struct bio_vec *kiov = md->md_iov.kiov;
--
--		while (offset >= kiov->bv_len) {
--			offset -= kiov->bv_len;
--			niov--;
--			kiov++;
--			if (niov == 0) {
--				CERROR("offset %d goes beyond kiov\n", offset);
--				goto out;
--			}
--		}
--
--		cpt = cfs_cpt_of_node(lnet_cpt_table(),
--				      page_to_nid(kiov->bv_page));
+-	if (payload_iov)
+-		desc_size = offsetof(struct ksock_tx,
+-				     tx_frags.virt.iov[1 + payload_niov]);
+-	else
+-		desc_size = offsetof(struct ksock_tx,
+-				     tx_frags.paged.kiov[payload_niov]);
++	desc_size = offsetof(struct ksock_tx,
++			     tx_frags.paged.kiov[payload_niov]);
+ 
+ 	if (lntmsg->msg_vmflush)
+ 		mpflag = memalloc_noreclaim_save();
+@@ -909,25 +902,15 @@ ksocknal_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+ 	tx->tx_conn = NULL;		     /* set when assigned a conn */
+ 	tx->tx_lnetmsg = lntmsg;
+ 
+-	if (payload_iov) {
+-		tx->tx_kiov = NULL;
+-		tx->tx_nkiov = 0;
+-		tx->tx_iov = tx->tx_frags.virt.iov;
+-		tx->tx_niov = 1 +
+-			      lnet_extract_iov(payload_niov, &tx->tx_iov[1],
+-					       payload_niov, payload_iov,
+-					       payload_offset, payload_nob);
 -	} else {
--		struct kvec *iov = md->md_iov.iov;
--		unsigned long vaddr;
--		struct page *page;
+-		tx->tx_niov = 1;
+-		tx->tx_iov = &tx->tx_frags.paged.iov;
+-		tx->tx_kiov = tx->tx_frags.paged.kiov;
+-		tx->tx_nkiov = lnet_extract_kiov(payload_niov, tx->tx_kiov,
+-						 payload_niov, payload_kiov,
+-						 payload_offset, payload_nob);
 -
--		while (offset >= iov->iov_len) {
--			offset -= iov->iov_len;
--			niov--;
--			iov++;
--			if (niov == 0) {
--				CERROR("offset %d goes beyond iov\n", offset);
--				goto out;
--			}
--		}
--
--		vaddr = ((unsigned long)iov->iov_base) + offset;
--		page = lnet_kvaddr_to_page(vaddr);
--		if (!page) {
--			CERROR("Couldn't resolve vaddr 0x%lx to page\n", vaddr);
-+	while (offset >= kiov->bv_len) {
-+		offset -= kiov->bv_len;
-+		niov--;
-+		kiov++;
-+		if (niov == 0) {
-+			CERROR("offset %d goes beyond kiov\n", offset);
- 			goto out;
- 		}
--		cpt = cfs_cpt_of_node(lnet_cpt_table(), page_to_nid(page));
- 	}
- 
-+	cpt = cfs_cpt_of_node(lnet_cpt_table(),
-+			      page_to_nid(kiov->bv_page));
+-		if (payload_nob >= *ksocknal_tunables.ksnd_zc_min_payload)
+-			tx->tx_zc_capable = 1;
+-	}
++	tx->tx_niov = 1;
++	tx->tx_iov = &tx->tx_frags.paged.iov;
++	tx->tx_kiov = tx->tx_frags.paged.kiov;
++	tx->tx_nkiov = lnet_extract_kiov(payload_niov, tx->tx_kiov,
++					 payload_niov, payload_kiov,
++					 payload_offset, payload_nob);
 +
- out:
- 	return cpt;
- }
-@@ -186,7 +145,7 @@ lnet_md_build(struct lnet_md *umd, int unlink)
- 		niov = DIV_ROUND_UP(offset_in_page(umd->start) + umd->length,
- 				    PAGE_SIZE);
++	if (payload_nob >= *ksocknal_tunables.ksnd_zc_min_payload)
++		tx->tx_zc_capable = 1;
  
--	size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
-+	size = offsetof(struct lnet_libmd, md_kiov[niov]);
- 	lmd = kzalloc(size, GFP_NOFS);
- 	if (!lmd)
- 		return ERR_PTR(-ENOMEM);
-@@ -207,18 +166,18 @@ lnet_md_build(struct lnet_md *umd, int unlink)
- 	lmd->md_bulk_handle = umd->bulk_handle;
- 
- 	if (umd->options & LNET_MD_KIOV) {
--		memcpy(lmd->md_iov.kiov, umd->start,
--		       niov * sizeof(lmd->md_iov.kiov[0]));
-+		memcpy(lmd->md_kiov, umd->start,
-+		       niov * sizeof(lmd->md_kiov[0]));
- 
- 		for (i = 0; i < (int)niov; i++) {
- 			/* We take the page pointer on trust */
--			if (lmd->md_iov.kiov[i].bv_offset +
--			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
-+			if (lmd->md_kiov[i].bv_offset +
-+			    lmd->md_kiov[i].bv_len > PAGE_SIZE) {
- 				kfree(lmd);
- 				return ERR_PTR(-EINVAL); /* invalid length */
- 			}
- 
--			total_length += lmd->md_iov.kiov[i].bv_len;
-+			total_length += lmd->md_kiov[i].bv_len;
- 		}
- 
- 		lmd->md_length = total_length;
-@@ -245,9 +204,9 @@ lnet_md_build(struct lnet_md *umd, int unlink)
- 				p = virt_to_page(pa);
- 			plen = min_t(int, len, PAGE_SIZE - offset_in_page(pa));
- 
--			lmd->md_iov.kiov[i].bv_page = p;
--			lmd->md_iov.kiov[i].bv_offset = offset_in_page(pa);
--			lmd->md_iov.kiov[i].bv_len = plen;
-+			lmd->md_kiov[i].bv_page = p;
-+			lmd->md_kiov[i].bv_offset = offset_in_page(pa);
-+			lmd->md_kiov[i].bv_len = plen;
- 			len -= plen;
- 			pa += plen;
- 			i += 1;
+ 	tx->tx_msg.ksm_csum = 0;
+ 	tx->tx_msg.ksm_type = KSOCK_MSG_LNET;
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 17f1c4a1029c..2938a56cee02 100644
+index 2938a56cee02..a074807f4d86 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -519,10 +519,7 @@ lnet_setpayloadbuffer(struct lnet_msg *msg)
+@@ -466,7 +466,6 @@ lnet_ni_recv(struct lnet_ni *ni, void *private, struct lnet_msg *msg,
+ 	     unsigned int rlen)
+ {
+ 	unsigned int niov = 0;
+-	struct kvec *iov = NULL;
+ 	struct bio_vec *kiov = NULL;
+ 	struct iov_iter to;
+ 	int rc;
+@@ -486,21 +485,16 @@ lnet_ni_recv(struct lnet_ni *ni, void *private, struct lnet_msg *msg,
+ 
+ 		if (mlen) {
+ 			niov = msg->msg_niov;
+-			iov = msg->msg_iov;
+ 			kiov = msg->msg_kiov;
+ 
+ 			LASSERT(niov > 0);
+-			LASSERT(!iov != !kiov);
++			LASSERT(kiov);
+ 		}
+ 	}
+ 
+-	if (iov) {
+-		iov_iter_kvec(&to, READ, iov, niov, mlen + offset);
+-		iov_iter_advance(&to, offset);
+-	} else {
+-		iov_iter_bvec(&to, READ, kiov, niov, mlen + offset);
+-		iov_iter_advance(&to, offset);
+-	}
++	iov_iter_bvec(&to, READ, kiov, niov, mlen + offset);
++	iov_iter_advance(&to, offset);
++
+ 	rc = ni->ni_net->net_lnd->lnd_recv(ni, private, msg, delayed, &to, rlen);
+ 	if (rc < 0)
+ 		lnet_finalize(msg, rc);
+@@ -515,7 +509,6 @@ lnet_setpayloadbuffer(struct lnet_msg *msg)
+ 	LASSERT(!msg->msg_routing);
+ 	LASSERT(md);
+ 	LASSERT(!msg->msg_niov);
+-	LASSERT(!msg->msg_iov);
  	LASSERT(!msg->msg_kiov);
  
  	msg->msg_niov = md->md_niov;
--	if (md->md_options & LNET_MD_KIOV)
--		msg->msg_kiov = md->md_iov.kiov;
--	else
--		msg->msg_iov = md->md_iov.iov;
-+	msg->msg_kiov = md->md_kiov;
- }
+@@ -835,7 +828,6 @@ lnet_post_routed_recv_locked(struct lnet_msg *msg, int do_recv)
+ 	struct lnet_rtrbufpool *rbp;
+ 	struct lnet_rtrbuf *rb;
  
- void
+-	LASSERT(!msg->msg_iov);
+ 	LASSERT(!msg->msg_kiov);
+ 	LASSERT(!msg->msg_niov);
+ 	LASSERT(msg->msg_routing);
+diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
+index c8a1eb62c430..f7af2f1d8f80 100644
+--- a/drivers/staging/lustre/lnet/lnet/lo.c
++++ b/drivers/staging/lustre/lnet/lnet/lo.c
+@@ -49,18 +49,11 @@ lolnd_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
+ 	struct lnet_msg *sendmsg = private;
+ 
+ 	if (lntmsg) {		   /* not discarding */
+-		if (sendmsg->msg_iov)
+-			lnet_copy_iov2iter(to,
+-					   sendmsg->msg_niov,
+-					   sendmsg->msg_iov,
+-					   sendmsg->msg_offset,
+-					   iov_iter_count(to));
+-		else
+-			lnet_copy_kiov2iter(to,
+-					    sendmsg->msg_niov,
+-					    sendmsg->msg_kiov,
+-					    sendmsg->msg_offset,
+-					    iov_iter_count(to));
++		lnet_copy_kiov2iter(to,
++				    sendmsg->msg_niov,
++				    sendmsg->msg_kiov,
++				    sendmsg->msg_offset,
++				    iov_iter_count(to));
+ 
+ 		lnet_finalize(lntmsg, 0);
+ 	}
