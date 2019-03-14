@@ -1,191 +1,102 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 14 Mar 2019 11:11:50 +1100
-Subject: [lustre-devel] [PATCH 12/32] lustre: lnet: merge lnet_md_alloc into
- lnet_md_build.
+Subject: [lustre-devel] [PATCH 13/32] lustre: lnet: always put a page list
+ into struct lnet_libmd.
 In-Reply-To: <155252182126.26912.1842463462595601611.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
-Message-ID: <155252230996.26912.15547976644328023498.stgit@noble.brown>
+Message-ID: <155252231013.26912.8330785791899165016.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-lnet_md_alloc is only called twice, each time immediately before a
-call to lnet_md_build, and these are the only calls to
-lnet_md_build().
-
-So simplify the code by merging lnet_md_alloc into lnet_md_build.
+'struct lnet_libmd' is only created in lnet_md_build().
+It can be given a list of pages or a virtual address.
+In the latter case, the memory will eventually be
+split into a list of pages.
+It is cleaner to split it into a list of pages early
+so that all lower levels only need to handle one type: a page list.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   26 --------
- drivers/staging/lustre/lnet/lnet/lib-md.c          |   63 ++++++++++++--------
- 2 files changed, 38 insertions(+), 51 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-md.c |   43 ++++++++++++++++++++---------
+ 1 file changed, 29 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 7275d517df5a..fca1c19a3c84 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -189,32 +189,6 @@ lnet_net_lock_current(void)
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+index 26c560a1e8b9..970db903552d 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-md.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+@@ -180,14 +180,13 @@ lnet_md_build(struct lnet_md *umd, int unlink)
+ 	struct lnet_libmd *lmd;
+ 	unsigned int size;
  
- #define MAX_PORTALS		64
- 
--static inline struct lnet_libmd *
--lnet_md_alloc(struct lnet_md *umd)
--{
--	struct lnet_libmd *md;
--	unsigned int size;
--	unsigned int niov;
--
 -	if (umd->options & LNET_MD_KIOV) {
--		niov = umd->length;
++	if (umd->options & LNET_MD_KIOV)
+ 		niov = umd->length;
 -		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
 -	} else {
 -		niov = 1;
 -		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
 -	}
--
--	md = kzalloc(size, GFP_NOFS);
--	if (md) {
--		/* Set here in case of early free */
--		md->md_options = umd->options;
--		md->md_niov = niov;
--		INIT_LIST_HEAD(&md->md_list);
--	}
--
--	return md;
--}
--
- struct lnet_libhandle *lnet_res_lh_lookup(struct lnet_res_container *rec,
- 					  u64 cookie);
- void lnet_res_lh_initialize(struct lnet_res_container *rec,
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
-index fdca4655206e..26c560a1e8b9 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-md.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
-@@ -171,12 +171,29 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	return cpt;
- }
++	else
++		niov = DIV_ROUND_UP(offset_in_page(umd->start) + umd->length,
++				    PAGE_SIZE);
  
--static int
--lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
-+static struct lnet_libmd *
-+lnet_md_build(struct lnet_md *umd, int unlink)
- {
- 	int i;
- 	unsigned int niov;
- 	int total_length = 0;
-+	struct lnet_libmd *lmd;
-+	unsigned int size;
-+
-+	if (umd->options & LNET_MD_KIOV) {
-+		niov = umd->length;
-+		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
-+	} else {
-+		niov = 1;
-+		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
-+	}
-+
-+	lmd = kzalloc(size, GFP_NOFS);
-+	if (!lmd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	lmd->md_niov = niov;
-+	INIT_LIST_HEAD(&lmd->md_list);
++	size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
+ 	lmd = kzalloc(size, GFP_NOFS);
+ 	if (!lmd)
+ 		return ERR_PTR(-ENOMEM);
+@@ -208,8 +207,6 @@ lnet_md_build(struct lnet_md *umd, int unlink)
+ 	lmd->md_bulk_handle = umd->bulk_handle;
  
- 	lmd->md_me = NULL;
- 	lmd->md_start = umd->start;
-@@ -199,8 +216,10 @@ lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
- 		for (i = 0; i < (int)niov; i++) {
- 			/* We take the page pointer on trust */
- 			if (lmd->md_iov.kiov[i].bv_offset +
--			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE)
--				return -EINVAL; /* invalid length */
-+			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
-+				kfree(lmd);
-+				return ERR_PTR(-EINVAL); /* invalid length */
-+			}
+ 	if (umd->options & LNET_MD_KIOV) {
+-		niov = umd->length;
+-		lmd->md_niov = umd->length;
+ 		memcpy(lmd->md_iov.kiov, umd->start,
+ 		       niov * sizeof(lmd->md_iov.kiov[0]));
  
- 			total_length += lmd->md_iov.kiov[i].bv_len;
+@@ -232,12 +229,29 @@ lnet_md_build(struct lnet_md *umd, int unlink)
+ 			kfree(lmd);
+ 			return ERR_PTR(-EINVAL);
  		}
-@@ -209,8 +228,10 @@ lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
+-	} else {   /* contiguous */
+-		lmd->md_length = umd->length;
+-		niov = 1;
+-		lmd->md_niov = 1;
+-		lmd->md_iov.iov[0].iov_base = umd->start;
+-		lmd->md_iov.iov[0].iov_len = umd->length;
++	} else {   /* contiguous - split into pages */
++		void *pa = umd->start;
++		int len = umd->length;
++
++		lmd->md_length = len;
++		i = 0;
++		while (len) {
++			struct page *p;
++			int plen;
++
++			if (is_vmalloc_addr(pa))
++				p = vmalloc_to_page(pa);
++			else
++				p = virt_to_page(pa);
++			plen = min_t(int, len, PAGE_SIZE - offset_in_page(pa));
++
++			lmd->md_iov.kiov[i].bv_page = p;
++			lmd->md_iov.kiov[i].bv_offset = offset_in_page(pa);
++			lmd->md_iov.kiov[i].bv_len = plen;
++			len -= plen;
++			pa += plen;
++			i += 1;
++		}
  
  		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
  		    (umd->max_size < 0 ||
--		     umd->max_size > total_length)) /* illegal max_size */
--			return -EINVAL;
-+		     umd->max_size > total_length)) { /* illegal max_size */
-+			kfree(lmd);
-+			return ERR_PTR(-EINVAL);
-+		}
- 	} else {   /* contiguous */
- 		lmd->md_length = umd->length;
- 		niov = 1;
-@@ -220,11 +241,13 @@ lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
- 
- 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
--		     umd->max_size > (int)umd->length)) /* illegal max_size */
--			return -EINVAL;
-+		     umd->max_size > (int)umd->length)) { /* illegal max_size */
-+			kfree(lmd);
-+			return ERR_PTR(-EINVAL);
-+		}
+@@ -245,6 +259,7 @@ lnet_md_build(struct lnet_md *umd, int unlink)
+ 			kfree(lmd);
+ 			return ERR_PTR(-EINVAL);
+ 		}
++		lmd->md_options |= LNET_MD_KIOV;
  	}
  
--	return 0;
-+	return lmd;
- }
- 
- /* must be called with resource lock held */
-@@ -341,13 +364,9 @@ LNetMDAttach(struct lnet_handle_me meh, struct lnet_md umd,
- 		return -EINVAL;
- 	}
- 
--	md = lnet_md_alloc(&umd);
--	if (!md)
--		return -ENOMEM;
--
--	rc = lnet_md_build(md, &umd, unlink);
--	if (rc)
--		goto out_free;
-+	md = lnet_md_build(&umd, unlink);
-+	if (IS_ERR(md))
-+		return PTR_ERR(md);
- 
- 	cpt = lnet_cpt_of_cookie(meh.cookie);
- 
-@@ -381,7 +400,6 @@ LNetMDAttach(struct lnet_handle_me meh, struct lnet_md umd,
- 
- out_unlock:
- 	lnet_res_unlock(cpt);
--out_free:
- 	kfree(md);
- 	return rc;
- }
-@@ -421,13 +439,9 @@ LNetMDBind(struct lnet_md umd, enum lnet_unlink unlink,
- 		return -EINVAL;
- 	}
- 
--	md = lnet_md_alloc(&umd);
--	if (!md)
--		return -ENOMEM;
--
--	rc = lnet_md_build(md, &umd, unlink);
--	if (rc)
--		goto out_free;
-+	md = lnet_md_build(&umd, unlink);
-+	if (IS_ERR(md))
-+		return PTR_ERR(md);
- 
- 	cpt = lnet_res_lock_current();
- 
-@@ -442,7 +456,6 @@ LNetMDBind(struct lnet_md umd, enum lnet_unlink unlink,
- 
- out_unlock:
- 	lnet_res_unlock(cpt);
--out_free:
- 	kfree(md);
- 
- 	return rc;
+ 	return lmd;
