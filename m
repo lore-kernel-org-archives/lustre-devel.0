@@ -1,531 +1,186 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 14 Mar 2019 23:05:20 +0000
-Subject: [lustre-devel] [PATCH 37/37] lustre: obd_sysfs: error-check
- value stored in jobid_var
-In-Reply-To: <DM6PR19MB25083B044933104EDDA1A957C54B0@DM6PR19MB2508.namprd19.prod.outlook.com>
-References: <155053473693.24125.6976971762921761309.stgit@noble.brown>
- <155053494716.24125.12637812266850199400.stgit@noble.brown>
- <4271D74A-4B36-4781-A1DA-F5512CBCAF15@whamcloud.com>
- <87woljs4mv.fsf@notabene.neil.brown.name>
- <5154EC17-80E4-49EC-B554-9AA010DD1271@whamcloud.com>
- <DM6PR19MB2508A4BA4F95517F8BDBB9F0C5760@DM6PR19MB2508.namprd19.prod.outlook.com>
- <87sgvqpa4i.fsf@notabene.neil.brown.name>
- <DM6PR19MB25083B044933104EDDA1A957C54B0@DM6PR19MB2508.namprd19.prod.outlook.com>
-Message-ID: <13223887-EEE1-46D9-B97C-3DF14328882D@whamcloud.com>
+From: Oleg Drokin <green@whamcloud.com>
+Date: Fri, 15 Mar 2019 23:18:46 +0000
+Subject: [lustre-devel] New tag 2.12.52
+Message-ID: <3084B9EE-EDA2-41DC-B696-C8F23C9D758C@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I think what Neil proposes is that the JobID be attached to the session,
-and then used by Lustre in the kernel from the session.  Not quite the
-same as a per-process JobID, but in most cases that would be enough (if a
-process wants its own JobID it can always start a new session itself).  It
-would allow multiple JobIDs for a single node, and with the "complex jobid"
-support it would still be possible to specify a per-session JobID with e.g.
-"%p", "%e", "%h", "%u", in the global "jobid_name" and use the per-session
-"jobid_this_session" for the "%j" value.
+Hello!
 
-The main difference is that the job scheduler preamble script would have to
-call "lctl set_param jobid_this_session=NNNN" before launching the user job,
-rather than not having to do anything beyond the existing "setenv".
+ I just tagged 2.12.52 in Lustre development master branch.
 
-Cheers, Andreas
+ Here?s the changelog:
 
-> On Mar 14, 2019, at 08:12, Patrick Farrell <pfarrell@whamcloud.com> wrote:
-> 
-> So can we set session ids?  Can we make them the same across many nodes?  It doesn't sound like it.  That's a basic requirement.  We need more than just "kernel provided ID which is unique to process set on a node".  The point of jobstats is to be able to collect info on all of a job, and many jobs will span many nodes.  (We also have > 1 job per node in other cases.)
-> 
-> - Patrick
->> From: NeilBrown <neilb@suse.com>
->> Sent: Wednesday, March 13, 2019 7:34:05 PM
->> To: Patrick Farrell; Andreas Dilger
->> Cc: Lustre Development List
->> Subject: Re: [PATCH 37/37] lustre: obd_sysfs: error-check value stored in jobid_var
->>  
->> 
->> Hi Patrick,
->>  I agree that "something that should live in struct_task" is the sort of
->>  answer that would be nice, but I don't think it can be justified.
->> 
->>  A "session" in the sense of "getsid" and "setsid" is traditionally a
->>  login session, but since the invention of windowing systems it is one
->>  terminal window.
->>  So if you
->>     grep NSsid /proc/self/status
->>  in different windows you will see different session ids.  All processes
->>  in that window will have the same session id unless something
->>  explicitly creates a new session - few things do that.
->> 
->>  If you want to explicitly create a new session, you can use "setsid".
->>  So
->>     setsid grep NSsid /proc/self/status
->>  will always show a new session id.
->> 
->>  Considering you sketch, the "unique parent" is already very likely to
->>  be in a session that no other job is in.
->>  If you run multiple jobs from the one terminal window (is they likely?)
->>  then the will all be in the same session unless you run
->>     setsid run-my-job
->> 
->>  The session (and anything we associated with it) will apply to all
->>  children and grandchild etc.
->>  There is no need for a timeout beyond what the code already has - it
->>  checks every 5 minutes to see if the session is still active, and
->>  forgets any inactive session.  There is no risk of a new session being
->>  confused with an old session that no longer exists, even if they have
->>  the same number.
->> 
->>  I hope that clarifies for you.
->> 
-> Thanks,
-> NeilBrown
-> 
-> 
-> On Fri, Mar 01 2019, Patrick Farrell wrote:
-> 
-> > The definition of "session" matters here.  It is increasingly common to run multiple jobs on a node at the same time, and the desire to distinguish between them is also significant.  So we can't have just one session.
-> >
-> > I believe this is part of why it was chosen to put this information in user space, associated with a particular process.
-> >
-> > So we need a solution that can meet that requirement or the broader HPC world will just ignore us.
-> >
-> > Perhaps we could use the new jobid cache functionality here.  A sketch:
-> >
-> > Have the parent - I believe there would be a unique parent for every set of job processes - register the ID (via this proc variable) and we would apply it to all children (what about grandchildren, etc...).  Then set timeouts to something like 24 or 48 hours, and but also use (or add if it's not present?) the functionality to deregister job ids at job exit.  So the timeout is only for cleanup.
-> >
-> > Although, the more I talk about this, the more this feels like something that should live in struct_task and be set from user space and managed by the kernel...
-> > ________________________________
-> > From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Andreas Dilger <adilger@whamcloud.com>
-> > Sent: Friday, March 1, 2019 2:32:00 AM
-> > To: NeilBrown
-> > Cc: Lustre Development List
-> > Subject: Re: [lustre-devel] [PATCH 37/37] lustre: obd_sysfs: error-check value stored in jobid_var
-> >
-> > On Feb 28, 2019, at 19:35, NeilBrown <neilb@suse.com> wrote:
-> >>
-> >> On Wed, Feb 27 2019, Andreas Dilger wrote:
-> >>
-> >>> On Feb 18, 2019, at 17:09, NeilBrown <neilb@suse.com> wrote:
-> >>>>
-> >>>> The jobid_var sysfs attribute only has 3 meaningful values.
-> >>>> Other values cause lustre_get_jobid() to return an error
-> >>>> which is uniformly ignored.
-> >>>>
-> >>>> To improve usability and resilience, check that the value
-> >>>> written is acceptable before storing it.
-> >>>>
-> >>>> Signed-off-by: NeilBrown <neilb@suse.com>
-> >>>
-> >>> This will no longer be true once https://review.whamcloud.com/31691
-> >>> commit 6488c0ec57de ("LU-10698 obdclass: allow specifying complex jobids")
-> >>
-> >> Actually it will.  That patch changes the use of jobid_name, my patch
-> >> restricts the values of jobid_var.
-> >>
-> >> I just realized why it is called "jobid_var" - in OpenSFS lustre, it can
-> >> be an environment variable name.  In drivers/staging lustre it cannot,
-> >> so the name is a little odd.
-> >>
-> >>>
-> >>> Currently the "%j" function was removed from the kernel client, even
-> >>> though there is no technical reason it can't work (i.e. all of the code
-> >>> to implement it is available and exported).  This is actually super
-> >>> useful for HPC cluster administrators to monitor per-job IO bandwidth
-> >>> and IOPS on the server, and something that I think should be restored.
-> >>
-> >> I think that you probably need to let go of that desire - I don't think
-> >> it is going to happen.  While the code may, as you say, work - it is
-> >> easy to dislike that approach, and would be hard to push against such
-> >> resistance.
-> >>
-> >> I have an alternate approach, patch below.  Instead of
-> >> export LUSTRE_JOBID=foobar
-> >> and process can run
-> >> echo foobar > /sys/fs/lustre/jobid_this_session
-> >>
-> >> and it will affect all processes in the current "session".
-> >>
-> >> Could you warm to this approach at all?
-> >
-> > This is the best alternative that I've seen so far.  That said, the choice
-> > of storing the JobID as an environment variable wasn't something that we
-> > invented ourselves, but rather this is what the various job schedulers do
-> > when a job is first started, and the code to extract the JobID out of the
-> > process environment was what we implemented to work within the constraints
-> > that were given to us.  The benefit of course is that we don't depend on
-> > some external process to be run for every process to extract the environment
-> > variable from the kernel memory and send it back to us.
-> >
-> > Allowing different processes to have different JobIDs on a single node is
-> > definitely a requirement for most environments these days, and so far this
-> > is the only solution that has allowed that to work.
-> >
-> > James is more familiar with the production side of the house, so I'll let
-> > him comment on how easy/hard it would be to get this kind of change added
-> > to the per-job preamble script so that it is set for all processes.
-> >
-> > Cheers, Andreas
-> >
-> >> From: NeilBrown <neilb@suse.com>
-> >> Subject: [PATCH] lustre: obdclass: allow per-session jobids.
-> >>
-> >> Lustre includes a jobid in all RPC message sent to the server.  This
-> >> is used to collected per-job statistics, where a "job" can involve
-> >> multiple processes on multiple nodes in a cluster.
-> >>
-> >> Nodes in a cluster can be running processes for multiple jobs, so it
-> >> is best if different processes can have different jobids, and that
-> >> processes on different nodes can have the same job id.
-> >>
-> >> This is not currently possible with the drivers/staging code.
-> >>
-> >> Lustre traditionally uses an environment variable to name a job, but
-> >> having the kernel reach into the address space of a process to find
-> >> that environment variable is seen by some developers to be an
-> >> unacceptable design choice.
-> >>
-> >> This patch provides an alternate method, leveraging the concept of a
-> >> "session id", as set with setsid().  Each login session already gets a
-> >> unique sid which is preserved for all processes in that session unless
-> >> explicitly changed (with setsid(1)).
-> >> When a process in a session writes to
-> >> /sys/fs/lustre/jobid_this_session, the string becomes the name for
-> >> that session.
-> >> If jobid_var is set to "manual", then the per-session jobid is used
-> >> for the jobid for all requests from processes in that session.
-> >>
-> >> When a session ends, the jobid information will be purged within 5
-> >> minutes.
-> >>
-> >> Signed-off-by: NeilBrown <neilb@suse.com>
-> >> ---
-> >> .../staging/lustre/lustre/include/lprocfs_status.h |   1 +
-> >> drivers/staging/lustre/lustre/include/obd_class.h  |   3 +
-> >> drivers/staging/lustre/lustre/obdclass/class_obd.c | 160 ++++++++++++++++++++-
-> >> drivers/staging/lustre/lustre/obdclass/obd_sysfs.c |  41 ++++++
-> >> 4 files changed, 204 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-> >> index 8565c28f08ee..1335a5722903 100644
-> >> --- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-> >> +++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-> >> @@ -370,6 +370,7 @@ static inline void s2dhms(struct dhms *ts, time64_t secs64)
-> >> #define JOBSTATS_DISABLE              "disable"
-> >> #define JOBSTATS_PROCNAME_UID         "procname_uid"
-> >> #define JOBSTATS_NODELOCAL            "nodelocal"
-> >> +#define JOBSTATS_MANUAL                      "manual"
-> >>
-> >> /* obd_config.c */
-> >> void lustre_register_client_process_config(int (*cpc)(struct lustre_cfg *lcfg));
-> >> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-> >> index 50b08c89ecc5..08003f3dd467 100644
-> >> --- a/drivers/staging/lustre/lustre/include/obd_class.h
-> >> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-> >> @@ -55,6 +55,9 @@ extern rwlock_t obd_dev_lock;
-> >> struct obd_device *class_exp2obd(struct obd_export *exp);
-> >> int class_handle_ioctl(unsigned int cmd, unsigned long arg);
-> >> int lustre_get_jobid(char *jobid);
-> >> +char *jobid_current(void);
-> >> +int jobid_set_current(char *jobid);
-> >> +
-> >>
-> >> struct lu_device_type;
-> >>
-> >> diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> >> index 1fcbda128a58..19ce3c858e59 100644
-> >> --- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> >> +++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> >> @@ -79,6 +79,144 @@ EXPORT_SYMBOL(at_extra);
-> >> char obd_jobid_var[JOBSTATS_JOBID_VAR_MAX_LEN + 1] = JOBSTATS_DISABLE;
-> >> char obd_jobid_node[LUSTRE_JOBID_SIZE + 1];
-> >>
-> >> +/*
-> >> + * Jobid can be set for a session (see setsid(2)) by writing to
-> >> + * a sysfs file from any process in that session.
-> >> + * The jobids are stored in a hash table indexed by the relevant
-> >> + * struct pid.  We periodically look for entries where the pid has
-> >> + * no PIDTYPE_SID tasks any more, and prune them.  This happens within
-> >> + * 5 seconds of a jobid being added, and every 5 minutes when jobids exist,
-> >> + * but none are added.
-> >> + */
-> >> +#define JOBID_EXPEDITED_CLEAN (5 * HZ)
-> >> +#define JOBID_BACKGROUND_CLEAN (5 * 60 * HZ)
-> >> +
-> >> +struct session_jobid {
-> >> +     struct pid              *session;
-> >> +     struct rhash_head       linkage;
-> >> +     struct rcu_head         rcu;
-> >> +     char                    jobid[1];
-> >> +};
-> >> +
-> >> +const static struct rhashtable_params jobid_params = {
-> >> +     .key_len        = sizeof(struct pid *),
-> >> +     .key_offset     = offsetof(struct session_jobid, session),
-> >> +     .head_offset    = offsetof(struct session_jobid, linkage),
-> >> +};
-> >> +static struct rhashtable session_jobids;
-> >> +
-> >> +/*
-> >> + * jobid_current must be called with rcu_read_lock held.
-> >> + * if it returns non-NULL, the string can only be used
-> >> + * until rcu_read_unlock is called.
-> >> + */
-> >> +char *jobid_current(void)
-> >> +{
-> >> +     struct pid *sid = current->signal->pids[PIDTYPE_SID];
-> >> +     struct session_jobid *sj;
-> >> +
-> >> +     sj = rhashtable_lookup_fast(&session_jobids, &sid, jobid_params);
-> >> +     if (sj)
-> >> +             return sj->jobid;
-> >> +     return NULL;
-> >> +}
-> >> +
-> >> +static void jobid_prune_expedite(void);
-> >> +/*
-> >> + * jobid_set_current will try to add a new entry
-> >> + * to the table.  If one exists with the same key, the
-> >> + * jobid will be replaced
-> >> + */
-> >> +int jobid_set_current(char *jobid)
-> >> +{
-> >> +     struct pid *sid = current->signal->pids[PIDTYPE_SID];
-> >> +     struct session_jobid *sj, *origsj;
-> >> +     int ret;
-> >> +
-> >> +     sj = kmalloc(sizeof(*sj) + strlen(jobid), GFP_KERNEL);
-> >> +     if (!sj)
-> >> +             return -ENOMEM;
-> >> +     rcu_read_lock();
-> >> +     sj->session = get_pid(sid);
-> >> +     strcpy(sj->jobid, jobid);
-> >> +     origsj = rhashtable_lookup_get_insert_fast(&session_jobids,
-> >> +                                                &sj->linkage,
-> >> +                                                jobid_params);
-> >> +     if (origsj == NULL) {
-> >> +             /* successful insert */
-> >> +             rcu_read_unlock();
-> >> +             jobid_prune_expedite();
-> >> +             return 0;
-> >> +     }
-> >> +
-> >> +     if (IS_ERR(origsj)) {
-> >> +             put_pid(sj->session);
-> >> +             kfree(sj);
-> >> +             rcu_read_unlock();
-> >> +             return PTR_ERR(origsj);
-> >> +     }
-> >> +     ret = rhashtable_replace_fast(&session_jobids,
-> >> +                                   &origsj->linkage,
-> >> +                                   &sj->linkage,
-> >> +                                   jobid_params);
-> >> +     if (ret) {
-> >> +             put_pid(sj->session);
-> >> +             kfree(sj);
-> >> +             rcu_read_unlock();
-> >> +             return ret;
-> >> +     }
-> >> +     put_pid(origsj->session);
-> >> +     rcu_read_unlock();
-> >> +     kfree_rcu(origsj, rcu);
-> >> +     jobid_prune_expedite();
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static void jobid_free(void *vsj, void *arg)
-> >> +{
-> >> +     struct session_jobid *sj = vsj;
-> >> +     put_pid(sj->session);
-> >> +     kfree(sj);
-> >> +}
-> >> +
-> >> +static void jobid_prune(struct work_struct *work);
-> >> +static DECLARE_DELAYED_WORK(jobid_prune_work, jobid_prune);
-> >> +static int jobid_prune_expedited;
-> >> +static void jobid_prune(struct work_struct *work)
-> >> +{
-> >> +     int remaining = 0;
-> >> +     struct rhashtable_iter iter;
-> >> +     struct session_jobid *sj;
-> >> +
-> >> +     jobid_prune_expedited = 0;
-> >> +     rhashtable_walk_enter(&session_jobids, &iter);
-> >> +     rhashtable_walk_start(&iter);
-> >> +     while ((sj = rhashtable_walk_next(&iter)) != NULL) {
-> >> +             if (!hlist_empty(&sj->session->tasks[PIDTYPE_SID])) {
-> >> +                     remaining++;
-> >> +                     continue;
-> >> +             }
-> >> +             if (rhashtable_remove_fast(&session_jobids,
-> >> +                                        &sj->linkage, jobid_params) == 0) {
-> >> +                     put_pid(sj->session);
-> >> +                     kfree_rcu(sj, rcu);
-> >> +             }
-> >> +     }
-> >> +     rhashtable_walk_stop(&iter);
-> >> +     rhashtable_walk_exit(&iter);
-> >> +     if (remaining)
-> >> +             schedule_delayed_work(&jobid_prune_work, JOBID_BACKGROUND_CLEAN);
-> >> +}
-> >> +
-> >> +static void jobid_prune_expedite(void)
-> >> +{
-> >> +     if (!jobid_prune_expedited) {
-> >> +             jobid_prune_expedited = 1;
-> >> +             mod_delayed_work(system_wq, &jobid_prune_work, JOBID_EXPEDITED_CLEAN);
-> >> +     }
-> >> +}
-> >> +
-> >> /* Get jobid of current process from stored variable or calculate
-> >>  * it from pid and user_id.
-> >>  *
-> >> @@ -108,6 +246,17 @@ int lustre_get_jobid(char *jobid)
-> >>                goto out_cache_jobid;
-> >>        }
-> >>
-> >> +     if (strcmp(obd_jobid_var, JOBSTATS_MANUAL) == 0) {
-> >> +             char *jid;
-> >> +             rcu_read_lock();
-> >> +             jid = jobid_current();
-> >> +             if (jid)
-> >> +                     strlcpy(tmp_jobid, jid, sizeof(tmp_jobid));
-> >> +             rcu_read_unlock();
-> >> +             if (jid)
-> >> +                     goto out_cache_jobid;
-> >> +     }
-> >> +
-> >>        return -ENOENT;
-> >>
-> >> out_cache_jobid:
-> >> @@ -663,10 +812,13 @@ static int __init obdclass_init(void)
-> >>        if (err)
-> >>                goto cleanup_zombie_impexp;
-> >>
-> >> +     err = rhashtable_init(&session_jobids, &jobid_params);
-> >> +     if (err)
-> >> +             goto cleanup_class_handle;
-> >>        err = misc_register(&obd_psdev);
-> >>        if (err) {
-> >>                CERROR("cannot register OBD miscdevices: err %d\n", err);
-> >> -             goto cleanup_class_handle;
-> >> +             goto cleanup_session_jobids;
-> >>        }
-> >>
-> >>        /* Default the dirty page cache cap to 1/2 of system memory.
-> >> @@ -724,6 +876,9 @@ static int __init obdclass_init(void)
-> >> cleanup_deregister:
-> >>        misc_deregister(&obd_psdev);
-> >>
-> >> +cleanup_session_jobids:
-> >> +     rhashtable_free_and_destroy(&session_jobids, jobid_free, NULL);
-> >> +
-> >> cleanup_class_handle:
-> >>        class_handle_cleanup();
-> >>
-> >> @@ -743,6 +898,9 @@ static void obdclass_exit(void)
-> >>        cl_global_fini();
-> >>        lu_global_fini();
-> >>
-> >> +     cancel_delayed_work_sync(&jobid_prune_work);
-> >> +     rhashtable_free_and_destroy(&session_jobids, jobid_free, NULL);
-> >> +
-> >>        obd_cleanup_caches();
-> >>
-> >>        class_procfs_clean();
-> >> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-> >> index 69ccc6a55947..112782e56793 100644
-> >> --- a/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-> >> +++ b/drivers/staging/lustre/lustre/obdclass/obd_sysfs.c
-> >> @@ -220,6 +220,7 @@ static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
-> >>                JOBSTATS_DISABLE,
-> >>                JOBSTATS_PROCNAME_UID,
-> >>                JOBSTATS_NODELOCAL,
-> >> +             JOBSTATS_MANUAL,
-> >>                NULL
-> >>        };
-> >>        int i;
-> >> @@ -263,6 +264,44 @@ static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
-> >>        return count;
-> >> }
-> >>
-> >> +static ssize_t jobid_this_session_show(struct kobject *kobj,
-> >> +                                    struct attribute *attr,
-> >> +                                    char *buf)
-> >> +{
-> >> +     char *jid;
-> >> +     int ret = -ENOENT;
-> >> +
-> >> +     rcu_read_lock();
-> >> +     jid = jobid_current();
-> >> +     if (jid)
-> >> +             ret = snprintf(buf, PAGE_SIZE, "%s\n", jid);
-> >> +     rcu_read_unlock();
-> >> +     return ret;
-> >> +}
-> >> +
-> >> +static ssize_t jobid_this_session_store(struct kobject *kobj,
-> >> +                                     struct attribute *attr,
-> >> +                                     const char *buffer,
-> >> +                                     size_t count)
-> >> +{
-> >> +     char *jobid;
-> >> +     int len;
-> >> +     int ret;
-> >> +
-> >> +     if (!count || count > LUSTRE_JOBID_SIZE)
-> >> +             return -EINVAL;
-> >> +
-> >> +     jobid = kstrndup(buffer, count, GFP_KERNEL);
-> >> +     if (!jobid)
-> >> +             return -ENOMEM;
-> >> +     len = strcspn(jobid, " \n");
-> >> +     jobid[len] = '\0';
-> >> +     ret = jobid_set_current(jobid);
-> >> +     kfree(jobid);
-> >> +
-> >> +     return ret ?: count;
-> >> +}
-> >> +
-> >> /* Root for /sys/kernel/debug/lustre */
-> >> struct dentry *debugfs_lustre_root;
-> >> EXPORT_SYMBOL_GPL(debugfs_lustre_root);
-> >> @@ -272,6 +311,7 @@ LUSTRE_RO_ATTR(pinger);
-> >> LUSTRE_RO_ATTR(health_check);
-> >> LUSTRE_RW_ATTR(jobid_var);
-> >> LUSTRE_RW_ATTR(jobid_name);
-> >> +LUSTRE_RW_ATTR(jobid_this_session);
-> >>
-> >> static struct attribute *lustre_attrs[] = {
-> >>        &lustre_attr_version.attr,
-> >> @@ -279,6 +319,7 @@ static struct attribute *lustre_attrs[] = {
-> >>        &lustre_attr_health_check.attr,
-> >>        &lustre_attr_jobid_name.attr,
-> >>        &lustre_attr_jobid_var.attr,
-> >> +     &lustre_attr_jobid_this_session.attr,
-> >>        &lustre_sattr_timeout.u.attr,
-> >>        &lustre_attr_max_dirty_mb.attr,
-> >>        &lustre_sattr_debug_peer_on_timeout.u.attr,
-> >> --
-> >> 2.14.0.rc0.dirty
-> >>
-> >
-> > Cheers, Andreas
-> > ---
-> > Andreas Dilger
-> > CTO Whamcloud
-> >
-> >
-> >
-> >
-> > _______________________________________________
-> > lustre-devel mailing list
-> > lustre-devel at lists.lustre.org
-> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Alex Zhuravlev (9):
+      LU-10496 tests: disable 39k for DoM for a while
+      LU-10143 osd-zfs: allocate sequence in advance
+      LU-11058 tests: cleanup persistent checksum= in 77k
+      LU-11920 lod: do not reset lds_def_comp_entries
+      LU-11330 osd-zfs: hash for ./.. must be 0
+      LU-9706 dt: remove dt_txn_hook_commit()
+      LU-11951 ptlrpc: reset generation for old requests
+      LU-12018 quota: do not start a thread under memory pressure
+      LU-11855 utils: move declarations out of local blocks
 
-Cheers, Andreas
----
-Andreas Dilger
-CTO Whamcloud
+Alexander Boyko (5):
+      LU-10913 llog: add startcat for wrapped catalog
+      LU-11591 llog: add synchronization for the last record
+      LU-11924 osp: combine llog cancel operations
+      LU-11934 mdc: don't use ACL at setattr
+      LU-11975 test: fix for llog test 10h
+
+Alexander Zarochentsev (2):
+      LU-11881 utils: silence error message
+      LU-8299 llite: ll_fault should fail for insane file offsets
+
+Alexey Lyashkov (5):
+      LU-11861 obdclass: fix build with debug kernel
+      LU-11862 lfsck: avoid unexpected repairing
+      LU-11111 lfsck: skip orphan processing
+      LU-11413 lnet: use right rtr address
+      LU-11413 lnet: use right address for routing message
+
+Andreas Dilger (16):
+      LU-11878 tests: don't fork-bomb sanity test_103b
+      LU-4664 libcfs: allow file/func/line passed to CDEBUG()
+      LU-10885 tests: fix up flocks_test bugs and code style
+      LU-10885 llite: enable flock mount option by default
+      LU-11797 tests: improve sanity test 272a checking
+      LU-10171 lmv: avoid gratuitous 64-bit modulus
+      LU-11770 osc: allow build without blk_integrity or crc-t10pi
+      LU-930 utils: fix --verbose option for lfs-migrate.1
+      LU-11917 tests: wait for test_257 to finish recovery
+      LU-11584 osd-ldiskfs: fix lost+found object replace
+      LU-11913 utils: allow "mq-deadline" as scheduler
+      LU-11923 utils: fix mkfs.lustre meta_bg handling
+      LU-11830 lov: avoid signed vs. unsigned comparison
+      LU-11891 utils: getstripe use --mdt-index consistently
+      LU-11880 build: allow Debian build on Raspbian
+      LU-11329 misc: reorder Git .mailmap file
+
+Andrew Perepechko (1):
+      LU-11897 ost: improve memory allocation for ost
+
+Andriy Skulysh (2):
+      LU-11701 ptlrpc: eviction of lwp connection aborts requests
+      LU-11702 o2iblnd: ibc_rxs is created and freed with different size
+
+Ann Koehler (1):
+      LU-11944 llite: Lock inode on tiny write if setuid/setgid set
+
+Arshad Hussain (1):
+      LU-6142 mgs: Fix style issues for mgs_nids.c
+
+Artem Blagodarenko (1):
+      LU-1365 tests: createmany outputs stat after 2 seconds
+
+Aurelien Degremont (1):
+      LU-11892 hsm: fix memory leak when scheduling HSM requests
+
+Elena Gryaznova (2):
+      LU-11586 tests: test_10() fix for FILESET set
+      LU-11495 tests: zconf_mount_clients() fix to work with FILESET
+
+Hongchao Zhang (1):
+      LU-11768 test: reset qsd_time before test
+
+James Nunez (7):
+      LU-11915 tests: stop running conf-sanity test 110
+      LU-10447 tests: replace $SETSTRIPE/$GETSTRIPE with $LFS
+      LU-11401 tests: add version check sanity-flr tests
+      LU-8346 tests: remove spaces around fail_val
+      LU-11208 tests: add version check to sanity tests
+      LU-11777 tests: add version check sanityn 102
+      LU-11010 tests: remove return after skip for conf-sanity
+
+James Simmons (7):
+      LU-8130 libcfs: port working hash from upstream
+      LU-11803 tests: don't assume obd device name
+      LU-8066 osd: migrate from proc to sysfs
+      LU-8130 libcfs: support latest rhashtable API
+      LU-11838 llite: remove assert for acl refcount
+      LU-8066 utils: have llapi_target_iterate use sysfs tree
+      LU-9855 obd: use ldo_process_config for mdc and osc layer
+
+Jian Yu (1):
+      LU-11927 kernel: new kernel [SLES12 SP4 4.12.14-95.6.1]
+
+Jinshan Xiong (1):
+      LU-11811 mdt: Add a proc entry to set MDT to readonly
+
+Lai Siyao (1):
+      LU-11502 migrate: link parents lock may deadlock
+
+Li Dongyang (2):
+      LU-11775 osc: reduce atomic ops in osc_enter_cache_try
+      LU-11775 osc: check if opg is in lru list without locking
+
+Li Xi (1):
+      LU-11974 llapi: improve llapi_layout_get_by_xattr(3) API
+
+Lokesh Nagappa Jaliminche (1):
+      LU-8365 ldiskfs: procfs entries for mballoc
+
+Mikhail Pershin (1):
+      LU-5604 tests: fix usage of drop_ldlm_reply() in tests
+
+Nathan Dauchy (1):
+      LU-8207 scripts: add auto-stripe option to lfs_migrate
+
+Nathaniel Clark (4):
+      LU-11720 spec: srpm should be free of kernel requiements
+      LU-11876 dkms: Add missing Requires for zlib-devel
+      LU-11947 scripts: handle ZFS targets in Lustre RA
+      LU-12042 utils: Remove stray waring from lfs mkdir
+
+NeilBrown (8):
+      LU-9868 llite: handle DCACHE_PAR_LOOKUP in ll_dcompare
+      LU-11838 socklnd:  use for_each_netdev() instead of lnet_ipif_enumerate()
+      LU-11616 llite: replace smp_wb() with full memory barrier
+      LU-9859 libcfs: replace cfs_srand() calls with add_device_randomness().
+      LU-11089 obdclass: make key_set_version an atomic_t
+      LU-11089 obdclass: use an rwsem instead of lu_key_initing_cnt.
+      LU-9859 libcfs: use strim instead of cfs_trimwhite.
+      LU-9859 libcfs: use a workqueue for rehash work.
+
+Oleg Drokin (3):
+      LU-11930 llite: Restore pio flags
+      LU-11568 ldlm: Remove use of SLAB_DESTROY_BY_RCU for ldlm lock slab
+      New tag 2.12.52
+
+Patrick Farrell (8):
+      LU-11825 llite: Remove ptask framework
+      LU-11919 llite: Initialize cl_dirty_max_pages
+      LU-11773 utils: add PFL flags support to YAML API
+      LU-11905 mdc: Add RETURN to mdc_intent_open_pack
+      LU-11206 tests: Use import_ready to check IDLE
+      LU-11982 utils: Correct lfs migrate help
+      LU-10143 tests: Add version check for interop
+      LU-11943 llog: Reset current log on ENOSPC
+
+Sebastien Buisson (3):
+      LU-11749 tests: sanity-sec 23b exec commands on right node
+      LU-11914 build: add a configure check for l_getsepol
+      LU-11894 lnet: check for asymmetrical route messages
+
+Sergey Cheremencev (1):
+      LU-11765 ofd: return EAGAIN during 1st CLEANUP_ORPHAN
+
+Thomas Stibor (3):
+      LU-11899 utils: Possible resource/memory leaks
+      LU-11960 build: Add missing libssl-dev DEB package
+      LU-12033 build: Git ignore generated *.install files
+
+Vladimir Saveliev (4):
+      LU-11634 tests: sanityn/test_77 improvements
+      LU-11911 lov: fix lov_iocontrol for inactive OST case
+      LU-11759 tests: racer cleanup
+      LU-11827 llog: protect cathandle in llog_cat_declare_add_rec
+
+Wang Shilong (3):
+      LU-11849 utils: fix to make exclude projid works
+      LU-12020 llite: make sure name pack atomic
+      LU-11243 lod: fix assertion and hang upon lod_add_device failure
