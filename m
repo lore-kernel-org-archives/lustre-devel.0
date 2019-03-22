@@ -1,37 +1,93 @@
-From: Degremont, Aurelien <degremoa@amazon.com>
-Date: Thu, 21 Mar 2019 08:25:28 +0000
-Subject: [lustre-devel] [PATCH - OpenSFS lustre bug] LNET: socklnd: fix
- infinite loop in ksocknal_push()
-In-Reply-To: <87tvfx6lom.fsf@notabene.neil.brown.name>
-References: <87tvfx6lom.fsf@notabene.neil.brown.name>
-Message-ID: <6715118C-DE53-46C5-8B6B-7C9FAEF817F5@amazon.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 22 Mar 2019 03:49:46 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 02/28] lustre: collect all resource
+ releasing for obj_type.
+In-Reply-To: <155168109814.31333.18020605502462728324.stgit@noble.brown>
+References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
+ <155168109814.31333.18020605502462728324.stgit@noble.brown>
+Message-ID: <alpine.LFD.2.21.1903220347070.32231@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi
-? 
-    If you would like me to submit this through more "normal" channels, I'm
-    happy to learn what they are, and then do that.
 
-I think that would be beneficial
+> Now that obj_type is managed as a kobject, move all
+> the freeing and deregistering into class_sysfs_release().
 
-    I assume this would mean getting access to the lustre Gerrit instance.
-    I tried the "register" link, but that takes me to
-    
-    https://review.whamcloud.com/login/%23%2Fc%2F33883
-    
-    which isn't very helpful.
-    
-Gerrit does not handle account management itself. review.whamcloud.com relies on an external OpenID provider.
-You can use any OpenID provider if you already have one. If you don't, I personally use Launchpad. You can create an account there and use it to register/login on Gerrit.  (Select 'Sign in with a Launchpad ID')
-
-https://wiki.whamcloud.com/display/PUB/Using+Gerrit
-
-I think that after creating your account, you must send an email request for push permission to info at whamcloud.com
-
-Aur?lien
-
+I don't know why I didn't receive the first patch in my mailbox :-(
+In any case I developed a patch to cleanup the class_setup_tunables()
+use in llite. That change impacts the reset of the class kobject 
+cleanup so I like to push a new set of patches. I have a few kinks
+to work out yet with the special needs of the server code which can
+impact how this code flows.
  
+> Reviewed-by: James Simmons <jsimmons@infradead.org>
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/lustre/obdclass/genops.c |   27 +++++++++++------------
+>  1 file changed, 13 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+> index 7b3432f43a40..8dd217c888a5 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+> @@ -148,6 +148,18 @@ static void class_sysfs_release(struct kobject *kobj)
+>  {
+>  	struct obd_type *type = container_of(kobj, struct obd_type, typ_kobj);
+>  
+> +	debugfs_remove_recursive(type->typ_debugfs_entry);
+> +
+> +	if (type->typ_lu)
+> +		lu_device_type_fini(type->typ_lu);
+> +
+> +	spin_lock(&obd_types_lock);
+> +	list_del(&type->typ_chain);
+> +	spin_unlock(&obd_types_lock);
+> +
+> +	kfree(type->typ_name);
+> +	kfree(type->typ_md_ops);
+> +	kfree(type->typ_dt_ops);
+>  	kfree(type);
+>  }
+>  
+> @@ -200,6 +212,7 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+>  
+>  	type->typ_kobj.kset = lustre_kset;
+>  	kobject_init(&type->typ_kobj, &class_ktype);
+> +	INIT_LIST_HEAD(&type->typ_chain);
+>  
+>  	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
+>  	type->typ_md_ops = kzalloc(sizeof(*type->typ_md_ops), GFP_NOFS);
+> @@ -239,9 +252,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+>  	return 0;
+>  
+>  failed:
+> -	kfree(type->typ_name);
+> -	kfree(type->typ_md_ops);
+> -	kfree(type->typ_dt_ops);
+>  	kobject_put(&type->typ_kobj);
+>  
+>  	return rc;
+> @@ -266,17 +276,6 @@ int class_unregister_type(const char *name)
+>  		return -EBUSY;
+>  	}
+>  
+> -	debugfs_remove_recursive(type->typ_debugfs_entry);
+> -
+> -	if (type->typ_lu)
+> -		lu_device_type_fini(type->typ_lu);
+> -
+> -	spin_lock(&obd_types_lock);
+> -	list_del(&type->typ_chain);
+> -	spin_unlock(&obd_types_lock);
+> -	kfree(type->typ_name);
+> -	kfree(type->typ_dt_ops);
+> -	kfree(type->typ_md_ops);
+>  	kobject_put(&type->typ_kobj);
+>  
+>  	return 0;
+> 
+> 
+> 
