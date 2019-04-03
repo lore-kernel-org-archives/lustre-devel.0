@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Thu, 04 Apr 2019 10:39:48 +1100
-Subject: [lustre-devel] [PATCH 14/28] lustre: portals_handle: rename ops
- to owner
-In-Reply-To: <4ED59F3E-7C66-460F-9FAC-A9B50A83E25D@whamcloud.com>
+Date: Thu, 04 Apr 2019 10:44:18 +1100
+Subject: [lustre-devel] [PATCH 18/28] lustre: remove unused fields from
+ struct obd_device
+In-Reply-To: <57CCEFAA-C92E-496A-93E8-A3FA2E28A3A3@whamcloud.com>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
- <155168109858.31333.13224172304059470846.stgit@noble.brown>
- <4ED59F3E-7C66-460F-9FAC-A9B50A83E25D@whamcloud.com>
-Message-ID: <877eca1wvv.fsf@notabene.neil.brown.name>
+ <155168109872.31333.16031201138302253309.stgit@noble.brown>
+ <57CCEFAA-C92E-496A-93E8-A3FA2E28A3A3@whamcloud.com>
+Message-ID: <874l7e1wod.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,225 +17,127 @@ On Wed, Apr 03 2019, Andreas Dilger wrote:
 
 > On Mar 3, 2019, at 23:31, NeilBrown <neilb@suse.com> wrote:
 >> 
->> Now the portals_handle_ops contains only a char*,
->> it is functioning primarily to identify the owner of each handle.
->> So change the name to h_owner, and the type to char*.
+>> One field is set but never access.
+>> Another is accessed but never set.
+>> Other are never mentioned at all.
+>
+> Well, not on the client at least...
+
+Yes ... there will be lots to (review and) put back when we add the
+server.
+
+>
+>> Also remove the comment
+>> 	/* use separate field as it is set in interrupt to don't mess with
+>> 	 * protection of other bits using _bh lock
+>> 	 */
 >> 
+>> This is not correct - were it used, obd_recovery_expired would be part
+>> of the same 'unsigned long' as the other fields.
+>
+> It probably should have been just an "unsigned long" rather than a bitfield.
+> In any case, it is no longer updated in interrupt context so it is irrelevant.
+>
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >
 > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
-Thanks.
-I've also added a note here:
-
-    Note: this h_owner is now quiet different from the similar h_owner
-    in the server code.  When server code it merged the
-    "med" pointer should be stored in the "mfd" and validated separately.
-
+Thanks,
 NeilBrown
 
 >
 >> ---
->> .../staging/lustre/lustre/include/lustre_handles.h |   12 +++---------
->> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    8 +++-----
->> drivers/staging/lustre/lustre/obdclass/genops.c    |   17 ++++++-----------
->> .../lustre/lustre/obdclass/lustre_handles.c        |   15 +++++++--------
->> 4 files changed, 19 insertions(+), 33 deletions(-)
+>> drivers/staging/lustre/lustre/include/obd.h        |   33 +++++++-------------
+>> drivers/staging/lustre/lustre/mgc/mgc_request.c    |    4 +-
+>> drivers/staging/lustre/lustre/obdclass/class_obd.c |    1 -
+>> .../staging/lustre/lustre/obdclass/obd_config.c    |    1 -
+>> 4 files changed, 14 insertions(+), 25 deletions(-)
 >> 
->> diff --git a/drivers/staging/lustre/lustre/include/lustre_handles.h b/drivers/staging/lustre/lustre/include/lustre_handles.h
->> index 8fb42851f6d1..ebbbb01710e7 100644
->> --- a/drivers/staging/lustre/lustre/include/lustre_handles.h
->> +++ b/drivers/staging/lustre/lustre/include/lustre_handles.h
->> @@ -45,11 +45,6 @@
->> #include <linux/spinlock.h>
->> #include <linux/types.h>
+>> diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+>> index 3bdde312e4a6..93a47cf0ef68 100644
+>> --- a/drivers/staging/lustre/lustre/include/obd.h
+>> +++ b/drivers/staging/lustre/lustre/include/obd.h
+>> @@ -539,27 +539,18 @@ struct obd_device {
+>> 	char			 obd_name[MAX_OBD_NAME];
 >> 
->> -struct portals_handle_ops {
->> -	/* hop_type is used for some debugging messages */
->> -	char *hop_type;
->> -};
->> -
->> /* These handles are most easily used by having them appear at the very top of
->>  * whatever object that you want to make handles for.  ie:
->>  *
->> @@ -65,7 +60,7 @@ struct portals_handle_ops {
->> struct portals_handle {
->> 	struct list_head		h_link;
->> 	u64				h_cookie;
->> -	const struct portals_handle_ops	*h_ops;
->> +	char				*h_owner;
->> 	refcount_t			h_ref;
->> 
->> 	/* newly added fields to handle the RCU issue. -jxiong */
->> @@ -77,10 +72,9 @@ struct portals_handle {
->> /* handles.c */
->> 
->> /* Add a handle to the hash table */
->> -void class_handle_hash(struct portals_handle *,
->> -		       const struct portals_handle_ops *ops);
->> +void class_handle_hash(struct portals_handle *, char *owner);
->> void class_handle_unhash(struct portals_handle *);
->> -void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
->> +void *class_handle2object(u64 cookie, char *owner);
->> int class_handle_init(void);
->> void class_handle_cleanup(void);
->> 
->> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
->> index 18f018d27936..56a2d1dcd663 100644
->> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
->> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
->> @@ -363,9 +363,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
->> 	}
->> }
->> 
->> -static struct portals_handle_ops lock_handle_ops = {
->> -	.hop_type   = "ldlm",
->> -};
->> +static const char lock_handle_owner[] = "ldlm";
->> 
->> /**
->>  *
->> @@ -405,7 +403,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
->> 	lprocfs_counter_incr(ldlm_res_to_ns(resource)->ns_stats,
->> 			     LDLM_NSS_LOCKS);
->> 	INIT_LIST_HEAD(&lock->l_handle.h_link);
->> -	class_handle_hash(&lock->l_handle, &lock_handle_ops);
->> +	class_handle_hash(&lock->l_handle, lock_handle_owner);
->> 
->> 	lu_ref_init(&lock->l_reference);
->> 	lu_ref_add(&lock->l_reference, "hash", lock);
->> @@ -509,7 +507,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
->> 
->> 	LASSERT(handle);
->> 
->> -	lock = class_handle2object(handle->cookie, &lock_handle_ops);
->> +	lock = class_handle2object(handle->cookie, lock_handle_owner);
->> 	if (!lock)
->> 		return NULL;
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
->> index ed306bbfbfb8..e0da46e7d355 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
->> @@ -708,7 +708,8 @@ int obd_init_caches(void)
->> 	return -ENOMEM;
->> }
->> 
->> -static struct portals_handle_ops export_handle_ops;
->> +static const char export_handle_owner[] = "export";
+>> 	/* bitfield modification is protected by obd_dev_lock */
+>> -	unsigned long obd_attached:1,      /* finished attach */
+>> -		      obd_set_up:1,	/* finished setup */
+>> -		      obd_version_recov:1, /* obd uses version checking */
+>> -		      obd_replayable:1,/* recovery is enabled; inform clients */
+>> -		      obd_no_transno:1,  /* no committed-transno notification */
+>> -		      obd_no_recov:1,      /* fail instead of retry messages */
+>> -		      obd_stopping:1,      /* started cleanup */
+>> -		      obd_starting:1,      /* started setup */
+>> -		      obd_force:1,	 /* cleanup with > 0 obd refcount */
+>> -		      obd_fail:1,	 /* cleanup with failover */
+>> -		      obd_no_conn:1,       /* deny new connections */
+>> -		      obd_inactive:1,      /* device active/inactive
+>> -					    * (for sysfs status only!!)
+>> -					    */
+>> -		      obd_no_ir:1,	 /* no imperative recovery. */
+>> -		      obd_process_conf:1,  /* device is processing mgs config */
+>> -		      obd_checksum_dump:1; /* dump pages upon cksum error */
+>> -	/* use separate field as it is set in interrupt to don't mess with
+>> -	 * protection of other bits using _bh lock
+>> -	 */
+>> -	unsigned long obd_recovery_expired:1;
+>> +	unsigned long obd_attached:1,	  /* finished attach */
+>> +		      obd_set_up:1,	  /* finished setup */
+>> +		      obd_no_recov:1,	  /* fail instead of retry messages */
+>> +		      obd_stopping:1,	  /* started cleanup */
+>> +		      obd_starting:1,	  /* started setup */
+>> +		      obd_force:1,	  /* cleanup with > 0 obd refcount */
+>> +		      obd_fail:1,	  /* cleanup with failover */
+>> +		      obd_inactive:1,	  /* device active/inactive
+>> +					   * (for sysfs status only!!)
+>> +					   */
+>> +		      obd_process_conf:1;/* device is processing mgs config */
 >> +
->> /* map connection to client */
->> struct obd_export *class_conn2export(struct lustre_handle *conn)
->> {
->> @@ -725,7 +726,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
->> 	}
->> 
->> 	CDEBUG(D_INFO, "looking for export cookie %#llx\n", conn->cookie);
->> -	export = class_handle2object(conn->cookie, &export_handle_ops);
->> +	export = class_handle2object(conn->cookie, export_handle_owner);
->> 	return export;
->> }
->> EXPORT_SYMBOL(class_conn2export);
->> @@ -777,10 +778,6 @@ static void class_export_destroy(struct obd_export *exp)
->> 	kfree_rcu(exp, exp_handle.h_rcu);
->> }
->> 
->> -static struct portals_handle_ops export_handle_ops = {
->> -	.hop_type	= "export",
->> -};
->> -
->> struct obd_export *class_export_get(struct obd_export *exp)
->> {
->> 	refcount_inc(&exp->exp_handle.h_ref);
->> @@ -863,7 +860,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
->> 	INIT_LIST_HEAD(&export->exp_req_replay_queue);
->> 	INIT_LIST_HEAD(&export->exp_handle.h_link);
->> 	INIT_LIST_HEAD(&export->exp_hp_rpcs);
->> -	class_handle_hash(&export->exp_handle, &export_handle_ops);
->> +	class_handle_hash(&export->exp_handle, export_handle_owner);
->> 	spin_lock_init(&export->exp_lock);
->> 	spin_lock_init(&export->exp_rpc_lock);
->> 	spin_lock_init(&export->exp_bl_list_lock);
->> @@ -967,9 +964,7 @@ static void class_import_destroy(struct obd_import *imp)
->> 	kfree_rcu(imp, imp_handle.h_rcu);
->> }
->> 
->> -static struct portals_handle_ops import_handle_ops = {
->> -	.hop_type	= "import",
->> -};
->> +static const char import_handle_owner[] = "import";
->> 
->> struct obd_import *class_import_get(struct obd_import *import)
->> {
->> @@ -1052,7 +1047,7 @@ struct obd_import *class_new_import(struct obd_device *obd)
->> 	atomic_set(&imp->imp_inval_count, 0);
->> 	INIT_LIST_HEAD(&imp->imp_conn_list);
->> 	INIT_LIST_HEAD(&imp->imp_handle.h_link);
->> -	class_handle_hash(&imp->imp_handle, &import_handle_ops);
->> +	class_handle_hash(&imp->imp_handle, import_handle_owner);
->> 	init_imp_at(&imp->imp_at);
->> 
->> 	/* the default magic is V2, will be used in connect RPC, and
->> diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
->> index 8aece57ec8c9..f41558ccdfcf 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
->> @@ -58,8 +58,7 @@ static struct handle_bucket {
->>  * Generate a unique 64bit cookie (hash) for a handle and insert it into
->>  * global (per-node) hash-table.
->>  */
->> -void class_handle_hash(struct portals_handle *h,
->> -		       const struct portals_handle_ops *ops)
->> +void class_handle_hash(struct portals_handle *h, char *owner)
->> {
->> 	struct handle_bucket *bucket;
->> 
->> @@ -85,7 +84,7 @@ void class_handle_hash(struct portals_handle *h,
->> 	h->h_cookie = handle_base;
->> 	spin_unlock(&handle_base_lock);
->> 
->> -	h->h_ops = ops;
->> +	h->h_owner = owner;
->> 	spin_lock_init(&h->h_lock);
->> 
->> 	bucket = &handle_hash[h->h_cookie & HANDLE_HASH_MASK];
->> @@ -132,7 +131,7 @@ void class_handle_unhash(struct portals_handle *h)
->> }
->> EXPORT_SYMBOL(class_handle_unhash);
->> 
->> -void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
->> +void *class_handle2object(u64 cookie, char *owner)
->> {
->> 	struct handle_bucket *bucket;
->> 	struct portals_handle *h;
->> @@ -147,14 +146,14 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
->> 
->> 	rcu_read_lock();
->> 	list_for_each_entry_rcu(h, &bucket->head, h_link) {
->> -		if (h->h_cookie != cookie || h->h_ops != ops)
->> +		if (h->h_cookie != cookie || h->h_owner != owner)
->> 			continue;
->> 
->> 		spin_lock(&h->h_lock);
->> 		if (likely(h->h_in != 0)) {
->> 			refcount_inc(&h->h_ref);
->> 			CDEBUG(D_INFO, "GET %s %p refcount=%d\n",
->> -			       h->h_ops->hop_type, h,
->> +			       h->h_owner, h,
->> 			       refcount_read(&h->h_ref));
->> 			retval = h;
+>> 	/* uuid-export hash body */
+>> 	struct rhashtable	 obd_uuid_hash;
+>> 	wait_queue_head_t	 obd_refcount_waitq;
+>> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>> index 5ce49e708287..6daadf24b894 100644
+>> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>> @@ -991,10 +991,10 @@ static int mgc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+>> 		if (vallen != sizeof(int))
+>> 			return -EINVAL;
+>> 		value = *(int *)val;
+>> -		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:or%d:%s\n",
+>> +		CDEBUG(D_MGC, "InitRecov %s %d/d%d:i%d:r%d:%s\n",
+>> 		       imp->imp_obd->obd_name, value,
+>> 		       imp->imp_deactive, imp->imp_invalid,
+>> -		       imp->imp_replayable, imp->imp_obd->obd_replayable,
+>> +		       imp->imp_replayable,
+>> 		       ptlrpc_import_state_name(imp->imp_state));
+>> 		/* Resurrect if we previously died */
+>> 		if ((imp->imp_state != LUSTRE_IMP_FULL &&
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>> index b8fc74044fe3..1fcbda128a58 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>> @@ -525,7 +525,6 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
 >> 		}
->> @@ -201,8 +200,8 @@ static int cleanup_all_handles(void)
+>> 		CDEBUG(D_HA, "%s: disabling committed-transno notification\n",
+>> 		       obd->obd_name);
+>> -		obd->obd_no_transno = 1;
+>> 		err = 0;
+>> 		break;
 >> 
->> 		spin_lock(&handle_hash[i].lock);
->> 		list_for_each_entry_rcu(h, &handle_hash[i].head, h_link) {
->> -			CERROR("force clean handle %#llx addr %p ops %p\n",
->> -			       h->h_cookie, h, h->h_ops);
->> +			CERROR("force clean handle %#llx addr %p owner %p\n",
->> +			       h->h_cookie, h, h->h_owner);
->> 
->> 			class_handle_unhash_nolock(h);
->> 			rc++;
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+>> index 0cdadea4e63c..7b10206d6e52 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+>> @@ -487,7 +487,6 @@ static int class_cleanup(struct obd_device *obd, struct lustre_cfg *lcfg)
+>> 				LCONSOLE_WARN("Failing over %s\n",
+>> 					      obd->obd_name);
+>> 				obd->obd_fail = 1;
+>> -				obd->obd_no_transno = 1;
+>> 				obd->obd_no_recov = 1;
+>> 				if (OBP(obd, iocontrol)) {
+>> 					obd_iocontrol(OBD_IOC_SYNC,
 >> 
 >> 
 >
@@ -250,4 +152,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190404/bdd8c89c/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190404/542ffcc4/attachment-0001.sig>
