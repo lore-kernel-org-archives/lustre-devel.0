@@ -1,11 +1,11 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 3 Apr 2019 20:43:38 +0000
-Subject: [lustre-devel] [PATCH 28/32] lustre: don't declare extern
- variables in C files.
-In-Reply-To: <155252231164.26912.14871078632567032600.stgit@noble.brown>
+Date: Wed, 3 Apr 2019 20:44:38 +0000
+Subject: [lustre-devel] [PATCH 29/32] lustre: introduce
+ CONFIG_LUSTRE_FS_POSIX_ACL
+In-Reply-To: <155252231193.26912.14536836197493170469.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
- <155252231164.26912.14871078632567032600.stgit@noble.brown>
-Message-ID: <E8286834-9920-48A2-895B-8B6365388920@whamcloud.com>
+ <155252231193.26912.14536836197493170469.stgit@noble.brown>
+Message-ID: <6D368D71-3975-4CD4-8A16-657CAEFD2C72@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,70 +14,225 @@ To: lustre-devel@lists.lustre.org
 
 On Mar 13, 2019, at 18:11, NeilBrown <neilb@suse.com> wrote:
 > 
-> 'extern' declarations should only appear in .h files.
-> All these names are declared in .h files as needed,
-> and these duplicate declarations in .c files can
-> be removed.
+> Lustre (or any file system) should not conditionally
+> compile code based on CONFIG_FS_POSIX_ACL.  This config
+> option enables library support.
+> A file system can define it's own config option,
+> which then selects CONFIG_FS_POSIX_ACL (if needed).  It should
+> act on its own option, not the library one.
+> 
+> This patch makes that change.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
-Totally agree on this.  It can be a source of hard-to-find bugs.
-
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
-
 > ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    2 --
-> drivers/staging/lustre/lustre/ptlrpc/import.c      |    1 -
-> .../staging/lustre/lustre/ptlrpc/ptlrpc_module.c   |    5 -----
-> 3 files changed, 8 deletions(-)
+> drivers/staging/lustre/lustre/Kconfig              |   11 +++++++++++
+> drivers/staging/lustre/lustre/include/lustre_acl.h |    6 +++---
+> drivers/staging/lustre/lustre/include/obd.h        |    2 +-
+> drivers/staging/lustre/lustre/llite/Makefile       |    2 +-
+> .../staging/lustre/lustre/llite/llite_internal.h   |    4 ++--
+> drivers/staging/lustre/lustre/llite/llite_lib.c    |   10 +++++-----
+> drivers/staging/lustre/lustre/llite/xattr.c        |    4 ++--
+> drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 +++---
+> 8 files changed, 28 insertions(+), 17 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> index d79f70d17220..82ec936a6e80 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> @@ -681,8 +681,6 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+> diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
+> index ccb78a945995..2ea3f2456b0f 100644
+> --- a/drivers/staging/lustre/lustre/Kconfig
+> +++ b/drivers/staging/lustre/lustre/Kconfig
+> @@ -30,6 +30,17 @@ config LUSTRE_FS
+> 
+> 	  See also http://wiki.lustre.org/
+> 
+> +config LUSTRE_FS_POSIX_ACL
+> +	bool "Lustre POSIX Access Control Lists"
+> +	depends on LUSTRE_FS
+> +	select FS_POSIX_ACL
+> +	help
+> +	  POSIX Access Control Lists (ACLs) support permissions for users and
+> +	  groups beyond the owner/group/world scheme.
+> +	  Lustre can support these ACLs.
+> +
+> +	  In in doubt, say Y.
+> +
+> config LUSTRE_DEBUG_EXPENSIVE_CHECK
+> 	bool "Enable Lustre DEBUG checks"
+> 	depends on LUSTRE_FS
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_acl.h b/drivers/staging/lustre/lustre/include/lustre_acl.h
+> index e7575a172b5f..e1f373d2e6cb 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_acl.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_acl.h
+> @@ -36,7 +36,7 @@
+> 
+> #include <linux/fs.h>
+> #include <linux/dcache.h>
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> #include <linux/posix_acl_xattr.h>
+> 
+> #define LUSTRE_POSIX_ACL_MAX_ENTRIES	32
+> @@ -44,8 +44,8 @@
+> 	(sizeof(struct posix_acl_xattr_header) +				\
+> 	 LUSTRE_POSIX_ACL_MAX_ENTRIES * sizeof(struct posix_acl_xattr_entry))
+> 
+> -#else /* ! CONFIG_FS_POSIX_ACL */
+> +#else /* ! CONFIG_LUSTRE_FS_POSIX_ACL */
+> #define LUSTRE_POSIX_ACL_MAX_SIZE_OLD 0
+> -#endif /* CONFIG_FS_POSIX_ACL */
+> +#endif /* CONFIG_LUSTRE_FS_POSIX_ACL */
+> 
+> #endif
+> diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+> index faf2ea623a09..6c984732d9c2 100644
+> --- a/drivers/staging/lustre/lustre/include/obd.h
+> +++ b/drivers/staging/lustre/lustre/include/obd.h
+> @@ -872,7 +872,7 @@ struct lustre_md {
+> 	struct mdt_body			*body;
+> 	struct lu_buf			 layout;
+> 	struct lmv_stripe_md		*lmv;
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	struct posix_acl		*posix_acl;
+> #endif
+> 	struct mdt_remote_perm		*remote_perm;
+> diff --git a/drivers/staging/lustre/lustre/llite/Makefile b/drivers/staging/lustre/lustre/llite/Makefile
+> index 7d0225476362..b6698af044f6 100644
+> --- a/drivers/staging/lustre/lustre/llite/Makefile
+> +++ b/drivers/staging/lustre/lustre/llite/Makefile
+> @@ -10,4 +10,4 @@ lustre-y := dcache.o dir.o file.o llite_lib.o llite_nfs.o \
+> 	    vvp_dev.o vvp_page.o vvp_lock.o vvp_io.o vvp_object.o \
+> 	    lproc_llite.o
+> 
+> -lustre-$(CONFIG_FS_POSIX_ACL) += acl.o
+> +lustre-$(CONFIG_LUSTRE_FS_POSIX_ACL) += acl.o
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> index c8860904bdd4..83053459f9c7 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
+> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> @@ -814,13 +814,13 @@ int ll_release_openhandle(struct inode *inode, struct lookup_intent *it);
+> int ll_md_real_close(struct inode *inode, fmode_t fmode);
+> int ll_getattr(const struct path *path, struct kstat *stat,
+> 	       u32 request_mask, unsigned int flags);
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> struct posix_acl *ll_get_acl(struct inode *inode, int type);
+> int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type);
+> #else
+> #define ll_get_acl NULL
+> #define ll_set_acl NULL
+> -#endif /* CONFIG_FS_POSIX_ACL */
+> +#endif /* CONFIG_LUSTRE_FS_POSIX_ACL */
+> 
+> int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+> 	       const char *name, int namelen);
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+> index cfe8105fe138..e55a4e0f68bf 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_lib.c
+> +++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+> @@ -209,7 +209,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+> 
+> 	if (sbi->ll_flags & LL_SBI_LRU_RESIZE)
+> 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	data->ocd_connect_flags |= OBD_CONNECT_ACL | OBD_CONNECT_UMASK |
+> 				   OBD_CONNECT_LARGE_ACL;
+> #endif
+> @@ -512,7 +512,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+> 	ptlrpc_req_finished(request);
+> 
+> 	if (IS_ERR(root)) {
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 		if (lmd.posix_acl) {
+> 			posix_acl_release(lmd.posix_acl);
+> 			lmd.posix_acl = NULL;
+> @@ -1394,7 +1394,7 @@ void ll_clear_inode(struct inode *inode)
+> 
+> 	ll_xattr_cache_destroy(inode);
+> 
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	forget_all_cached_acls(inode);
+> 	if (lli->lli_posix_acl) {
+> 		posix_acl_release(lli->lli_posix_acl);
+> @@ -1825,7 +1825,7 @@ int ll_update_inode(struct inode *inode, struct lustre_md *md)
+> 			return rc;
+> 	}
+> 
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	if (body->mbo_valid & OBD_MD_FLACL) {
+> 		spin_lock(&lli->lli_lock);
+> 		if (lli->lli_posix_acl)
+> @@ -2239,7 +2239,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+> 					     sbi->ll_flags & LL_SBI_32BIT_API),
+> 				 &md);
+> 		if (IS_ERR(*inode)) {
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 			if (md.posix_acl) {
+> 				posix_acl_release(md.posix_acl);
+> 				md.posix_acl = NULL;
+> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+> index a1d27061ac19..c1f6c38350d7 100644
+> --- a/drivers/staging/lustre/lustre/llite/xattr.c
+> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
+> @@ -433,7 +433,7 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
+> 	    !strcmp(name, "selinux"))
+> 		return -EOPNOTSUPP;
+> 
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	/* posix acl is under protection of LOOKUP lock. when calling to this,
+> 	 * we just have path resolution to the target inode, so we have great
+> 	 * chance that cached ACL is uptodate.
+> @@ -676,7 +676,7 @@ const struct xattr_handler *ll_xattr_handlers[] = {
+> 	&ll_user_xattr_handler,
+> 	&ll_trusted_xattr_handler,
+> 	&ll_security_xattr_handler,
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 	&ll_acl_access_xattr_handler,
+> 	&ll_acl_default_xattr_handler,
+> #endif
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index 451e6c94c7e8..b54c5f1418ae 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -408,7 +408,7 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
+> 				req);
 > }
-> EXPORT_SYMBOL(ldlm_namespace_new);
 > 
-> -extern struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
-> -
-> /**
->  * Cancel and destroy all locks on a resource.
->  *
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> index b2a57d2bdde7..a6f15429eda2 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> @@ -1558,7 +1558,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
-> EXPORT_SYMBOL(ptlrpc_disconnect_import);
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> static int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
+> {
+> 	struct req_capsule *pill = &req->rq_pill;
+> @@ -535,7 +535,7 @@ static int mdc_get_lustre_md(struct obd_export *exp,
+> 			rc = mdc_unpack_acl(req, md);
+> 			if (rc)
+> 				goto out;
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 		} else {
+> 			md->posix_acl = NULL;
+> #endif
+> @@ -544,7 +544,7 @@ static int mdc_get_lustre_md(struct obd_export *exp,
 > 
-> /* Adaptive Timeout utils */
-> -extern unsigned int at_min, at_max, at_history;
-> 
-> /*
->  *Update at_current with the specified value (bounded by at_min and at_max),
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
-> index 5c32b657b3b5..76018805f0ce 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
-> @@ -40,11 +40,6 @@
-> 
-> #include "ptlrpc_internal.h"
-> 
-> -extern spinlock_t ptlrpc_last_xid_lock;
-> -#if RS_DEBUG
-> -extern spinlock_t ptlrpc_rs_debug_lock;
-> -#endif
-> -
-> DEFINE_MUTEX(ptlrpc_startup);
-> static int ptlrpc_active = 0;
-> 
+> out:
+> 	if (rc) {
+> -#ifdef CONFIG_FS_POSIX_ACL
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> 		posix_acl_release(md->posix_acl);
+> #endif
+> 	}
 > 
 > 
 
 Cheers, Andreas
 ---
 Andreas Dilger
-Principal Lustre Architect
-Whamcloud
+CTO Whamcloud
