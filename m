@@ -1,11 +1,10 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 3 Apr 2019 20:45:43 +0000
-Subject: [lustre-devel] [PATCH 30/32] lustre: remove some "#ifdef
- CONFIG*" from .c files.
-In-Reply-To: <155252231208.26912.7799074082457334373.stgit@noble.brown>
+Date: Wed, 3 Apr 2019 20:47:15 +0000
+Subject: [lustre-devel] [PATCH 31/32] lustre: mdc: create mdc_acl.c
+In-Reply-To: <155252231217.26912.1851699923338684554.stgit@noble.brown>
 References: <155252182126.26912.1842463462595601611.stgit@noble.brown>
- <155252231208.26912.7799074082457334373.stgit@noble.brown>
-Message-ID: <C9943C38-92A3-4AB7-8C14-FF4CB621BF6D@whamcloud.com>
+ <155252231217.26912.1851699923338684554.stgit@noble.brown>
+Message-ID: <C7E3D55D-531A-4F6E-AB4D-3D1BFE9F50F5@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,201 +13,183 @@ To: lustre-devel@lists.lustre.org
 
 On Mar 13, 2019, at 18:11, NeilBrown <neilb@suse.com> wrote:
 > 
-> It is Linux policy to avoid #ifdef in C files where
-> convenient - .h files are OK.
+> This new C file contains acl related code so it can be
+> conditionally compiled.
 > 
-> This patch defines a few inline functions which differ
-> depending on CONFIG_LUSTRE_FS_POSIX_ACL, and removes
-> some #ifdefs from .c files.
+> The only use of CONFIG_LUSTRE_FS_POSIX_ACL in a C file is
+> now in xattr.c which is not convenient to avoid.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
 > ---
-> drivers/staging/lustre/lustre/include/obd.h        |   21 +++++++++++
-> .../staging/lustre/lustre/llite/llite_internal.h   |   29 +++++++++++++++
-> drivers/staging/lustre/lustre/llite/llite_lib.c    |   39 ++++----------------
-> drivers/staging/lustre/lustre/mdc/mdc_request.c    |    8 ++--
-> 4 files changed, 61 insertions(+), 36 deletions(-)
+> drivers/staging/lustre/lustre/mdc/Makefile       |    1 
+> drivers/staging/lustre/lustre/mdc/mdc_acl.c      |   48 +++++++++++++++++++
+> drivers/staging/lustre/lustre/mdc/mdc_internal.h |   10 ++++
+> drivers/staging/lustre/lustre/mdc/mdc_request.c  |   57 +---------------------
+> 4 files changed, 61 insertions(+), 55 deletions(-)
+> create mode 100644 drivers/staging/lustre/lustre/mdc/mdc_acl.c
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-> index 6c984732d9c2..354f7d64e08a 100644
-> --- a/drivers/staging/lustre/lustre/include/obd.h
-> +++ b/drivers/staging/lustre/lustre/include/obd.h
-> @@ -37,6 +37,8 @@
-> #include <linux/kobject.h>
-> #include <linux/spinlock.h>
-> #include <linux/sysfs.h>
-> +#include <linux/fs.h>
-> +#include <linux/posix_acl.h>
+> diff --git a/drivers/staging/lustre/lustre/mdc/Makefile b/drivers/staging/lustre/lustre/mdc/Makefile
+> index 5f48e91b9839..137a4413c268 100644
+> --- a/drivers/staging/lustre/lustre/mdc/Makefile
+> +++ b/drivers/staging/lustre/lustre/mdc/Makefile
+> @@ -3,3 +3,4 @@ ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
 > 
-> #include <uapi/linux/lustre/lustre_idl.h>
-> #include <lustre_lib.h>
-> @@ -878,6 +880,25 @@ struct lustre_md {
-> 	struct mdt_remote_perm		*remote_perm;
-> };
-> 
-> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> +static inline void lmd_clear_acl(struct lustre_md *md)
+> obj-$(CONFIG_LUSTRE_FS) += mdc.o
+> mdc-y := mdc_changelog.o mdc_request.o mdc_reint.o mdc_lib.o mdc_locks.o lproc_mdc.o
+> +mdc-$(CONFIG_LUSTRE_FS_POSIX_ACL) += mdc_acl.o
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_acl.c b/drivers/staging/lustre/lustre/mdc/mdc_acl.c
+> new file mode 100644
+> index 000000000000..045235ad703a
+> --- /dev/null
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_acl.c
+> @@ -0,0 +1,48 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +
+> +#include <lustre_acl.h>
+> +
+> +#include "mdc_internal.h"
+> +
+> +int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
 > +{
-> +	if (md->posix_acl) {
-> +		posix_acl_release(md->posix_acl);
+> +	struct req_capsule *pill = &req->rq_pill;
+> +	struct mdt_body	*body = md->body;
+> +	struct posix_acl *acl;
+> +	void *buf;
+> +	int rc;
+> +
+> +	/* for ACL, it's possible that FLACL is set but aclsize is zero.
+> +	 * only when aclsize != 0 there's an actual segment for ACL
+> +	 * in reply buffer.
+> +	 */
+> +	if (!body->mbo_aclsize) {
 > +		md->posix_acl = NULL;
+> +		return 0;
 > +	}
-> +}
 > +
-> +#define OBD_CONNECT_ACL_FLAGS	\
-> +	(OBD_CONNECT_ACL | OBD_CONNECT_UMASK | OBD_CONNECT_LARGE_ACL)
-> +#else
-> +static inline void lmd_clear_acl(struct lustre_md *md)
-> +{
-> +}
+> +	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
 > +
-> +#define OBD_CONNECT_ACL_FLAGS	(0)
-> +#endif
+> +	if (!buf)
+> +		return -EPROTO;
 > +
-> struct md_open_data {
-> 	struct obd_client_handle	*mod_och;
-> 	struct ptlrpc_request		*mod_open_req;
-> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> index 83053459f9c7..95ec46779c41 100644
-> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> @@ -246,6 +246,35 @@ struct ll_inode_info {
-> 	struct list_head		lli_xattrs;/* ll_xattr_entry->xe_list */
-> };
-> 
-> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> +static inline void lli_clear_acl(struct ll_inode_info *lli)
-> +{
-> +	if (lli->lli_posix_acl) {
-> +		posix_acl_release(lli->lli_posix_acl);
-> +		lli->lli_posix_acl = NULL;
+> +	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
+> +	if (!acl)
+> +		return 0;
+> +
+> +	if (IS_ERR(acl)) {
+> +		rc = PTR_ERR(acl);
+> +		CERROR("convert xattr to acl: %d\n", rc);
+> +		return rc;
 > +	}
+> +
+> +	rc = posix_acl_valid(&init_user_ns, acl);
+> +	if (rc) {
+> +		CERROR("validate acl: %d\n", rc);
+> +		posix_acl_release(acl);
+> +		return rc;
+> +	}
+> +
+> +	md->posix_acl = acl;
+> +	return 0;
 > +}
-> +
-> +static inline void lli_replace_acl(struct ll_inode_info *lli,
-> +				   struct lustre_md *md)
-> +{
-> +	spin_lock(&lli->lli_lock);
-> +	if (lli->lli_posix_acl)
-> +		posix_acl_release(lli->lli_posix_acl);
-> +	lli->lli_posix_acl = md->posix_acl;
-> +	spin_unlock(&lli->lli_lock);
-> +}
-> +#else
-> +static inline void lli_clear_acl(struct ll_inode_info *lli)
-> +{
-> +}
-> +
-> +static inline void lli_replace_acl(struct ll_inode_info *lli,
-> +				   struct lustre_md *md)
-> +{
-> +}
-> +#endif
-> +
-> static inline u32 ll_layout_version_get(struct ll_inode_info *lli)
-> {
-> 	u32 gen;
-> diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-> index e55a4e0f68bf..d4325b49b924 100644
-> --- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-> +++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-> @@ -209,10 +209,8 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
-> 
-> 	if (sbi->ll_flags & LL_SBI_LRU_RESIZE)
-> 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> -	data->ocd_connect_flags |= OBD_CONNECT_ACL | OBD_CONNECT_UMASK |
-> -				   OBD_CONNECT_LARGE_ACL;
-> -#endif
-> +
-> +	data->ocd_connect_flags |= OBD_CONNECT_ACL_FLAGS;
-> 
-> 	if (OBD_FAIL_CHECK(OBD_FAIL_MDC_LIGHTWEIGHT))
-> 		/* flag mdc connection as lightweight, only used for test
-> @@ -512,12 +510,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
-> 	ptlrpc_req_finished(request);
-> 
-> 	if (IS_ERR(root)) {
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> -		if (lmd.posix_acl) {
-> -			posix_acl_release(lmd.posix_acl);
-> -			lmd.posix_acl = NULL;
-> -		}
-> -#endif
-> +		lmd_clear_acl(&lmd);
-> 		err = -EBADF;
-> 		CERROR("lustre_lite: bad iget4 for root\n");
-> 		goto out_root;
-> @@ -1394,13 +1387,8 @@ void ll_clear_inode(struct inode *inode)
-> 
-> 	ll_xattr_cache_destroy(inode);
-> 
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> 	forget_all_cached_acls(inode);
-> -	if (lli->lli_posix_acl) {
-> -		posix_acl_release(lli->lli_posix_acl);
-> -		lli->lli_posix_acl = NULL;
-> -	}
-> -#endif
-> +	lli_clear_acl(lli);
-> 	lli->lli_inode_magic = LLI_INODE_DEAD;
-> 
-> 	if (S_ISDIR(inode->i_mode))
-> @@ -1825,15 +1813,9 @@ int ll_update_inode(struct inode *inode, struct lustre_md *md)
-> 			return rc;
-> 	}
-> 
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> -	if (body->mbo_valid & OBD_MD_FLACL) {
-> -		spin_lock(&lli->lli_lock);
-> -		if (lli->lli_posix_acl)
-> -			posix_acl_release(lli->lli_posix_acl);
-> -		lli->lli_posix_acl = md->posix_acl;
-> -		spin_unlock(&lli->lli_lock);
-> -	}
-> -#endif
-> +	if (body->mbo_valid & OBD_MD_FLACL)
-> +		lli_replace_acl(lli, md);
-> +
-> 	inode->i_ino = cl_fid_build_ino(&body->mbo_fid1,
-> 					sbi->ll_flags & LL_SBI_32BIT_API);
-> 	inode->i_generation = cl_fid_build_gen(&body->mbo_fid1);
-> @@ -2239,12 +2221,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
-> 					     sbi->ll_flags & LL_SBI_32BIT_API),
-> 				 &md);
-> 		if (IS_ERR(*inode)) {
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> -			if (md.posix_acl) {
-> -				posix_acl_release(md.posix_acl);
-> -				md.posix_acl = NULL;
-> -			}
-> -#endif
-> +			lmd_clear_acl(&md);
-> 			rc = PTR_ERR(*inode);
-> 			CERROR("new_inode -fatal: rc %d\n", rc);
-> 			goto out;
-> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-> index b54c5f1418ae..a0b74244f295 100644
-> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-> @@ -543,11 +543,9 @@ static int mdc_get_lustre_md(struct obd_export *exp,
-> 	}
-> 
-> out:
-> -	if (rc) {
-> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-> -		posix_acl_release(md->posix_acl);
-> -#endif
-> -	}
-> +	if (rc)
-> +		lmd_clear_acl(md);
-> +
-> 	return rc;
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_internal.h b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
+> index 2b849e8166b2..20beff384add 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_internal.h
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
+> @@ -141,6 +141,16 @@ static inline int mdc_prep_elc_req(struct obd_export *exp,
+> 				 count);
 > }
 > 
+> +#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> +int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md);
+> +#else
+> +static inline
+> +int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> static inline unsigned long hash_x_index(u64 hash, int hash64)
+> {
+> 	if (BITS_PER_LONG == 32 && hash64)
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index a0b74244f295..7d4450ef8740 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -408,46 +408,6 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
+> 				req);
+> }
+> 
+> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> -static int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
+> -{
+> -	struct req_capsule *pill = &req->rq_pill;
+> -	struct mdt_body	*body = md->body;
+> -	struct posix_acl *acl;
+> -	void *buf;
+> -	int rc;
+> -
+> -	if (!body->mbo_aclsize)
+> -		return 0;
+> -
+> -	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
+> -
+> -	if (!buf)
+> -		return -EPROTO;
+> -
+> -	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
+> -	if (!acl)
+> -		return 0;
+> -
+> -	if (IS_ERR(acl)) {
+> -		rc = PTR_ERR(acl);
+> -		CERROR("convert xattr to acl: %d\n", rc);
+> -		return rc;
+> -	}
+> -
+> -	rc = posix_acl_valid(&init_user_ns, acl);
+> -	if (rc) {
+> -		CERROR("validate acl: %d\n", rc);
+> -		posix_acl_release(acl);
+> -		return rc;
+> -	}
+> -
+> -	md->posix_acl = acl;
+> -	return 0;
+> -}
+> -#else
+> -#define mdc_unpack_acl(req, md) 0
+> -#endif
+> 
+> static int mdc_get_lustre_md(struct obd_export *exp,
+> 			     struct ptlrpc_request *req,
+> @@ -526,21 +486,8 @@ static int mdc_get_lustre_md(struct obd_export *exp,
+> 	}
+> 	rc = 0;
+> 
+> -	if (md->body->mbo_valid & OBD_MD_FLACL) {
+> -		/* for ACL, it's possible that FLACL is set but aclsize is zero.
+> -		 * only when aclsize != 0 there's an actual segment for ACL
+> -		 * in reply buffer.
+> -		 */
+> -		if (md->body->mbo_aclsize) {
+> -			rc = mdc_unpack_acl(req, md);
+> -			if (rc)
+> -				goto out;
+> -#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+> -		} else {
+> -			md->posix_acl = NULL;
+> -#endif
+> -		}
+> -	}
+> +	if (md->body->mbo_valid & OBD_MD_FLACL)
+> +		rc = mdc_unpack_acl(req, md);
+> 
+> out:
+> 	if (rc)
 > 
 > 
 
