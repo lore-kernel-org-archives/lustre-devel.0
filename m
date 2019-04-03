@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Thu, 04 Apr 2019 10:37:23 +1100
-Subject: [lustre-devel] [PATCH 11/28] lustre: handles: discard h_owner
- in favour of h_ops
-In-Reply-To: <DD40EE3E-859B-4842-85C8-D6DA4721D624@whamcloud.com>
+Date: Thu, 04 Apr 2019 10:39:48 +1100
+Subject: [lustre-devel] [PATCH 14/28] lustre: portals_handle: rename ops
+ to owner
+In-Reply-To: <4ED59F3E-7C66-460F-9FAC-A9B50A83E25D@whamcloud.com>
 References: <155168107971.31333.14345309795939467246.stgit@noble.brown>
- <155168109847.31333.10992261955260144819.stgit@noble.brown>
- <DD40EE3E-859B-4842-85C8-D6DA4721D624@whamcloud.com>
-Message-ID: <87a7h61wzw.fsf@notabene.neil.brown.name>
+ <155168109858.31333.13224172304059470846.stgit@noble.brown>
+ <4ED59F3E-7C66-460F-9FAC-A9B50A83E25D@whamcloud.com>
+Message-ID: <877eca1wvv.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,160 +17,237 @@ On Wed, Apr 03 2019, Andreas Dilger wrote:
 
 > On Mar 3, 2019, at 23:31, NeilBrown <neilb@suse.com> wrote:
 >> 
->> lustre_handles  assigned a  64bit  unique identifier  (a 'cookie')  to
->> objects of  various types and  stored them  in a hash  table, allowing
->> them to be accessed by the cookie.
->> 
->> The is a facility for type checking by recording an 'owner' for each
->> object, and checking the owner on lookup.  Unfortunately this is not
->> used - owner is always zero.
->> 
->> Eahc object also contains an h_ops pointer which can be used to
->> reliably identify an owner.
->> 
->> So discard h_owner, pass and 'ops' pointer to class_handle2object(),
->> and only return objects for which the h_ops matches.
+>> Now the portals_handle_ops contains only a char*,
+>> it is functioning primarily to identify the owner of each handle.
+>> So change the name to h_owner, and the type to char*.
 >> 
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >
-> Probably a bit late to the party here, but it would be useful to add a
-> portability note here, that the pointer to "struct mdt_export_data"
-> that is currently stored in h_owner should move to "struct mdt_file_data"
-> in the server code.
-
-It is never to late to provide review!
-The tricky think with notes it putting them somewhere that they'll
-be read at the write time.
-I've put this note in the commit message
-
-    Note that server code uses h_owner slightly differently - it
-    identifies not only the type but also the "struct mdt_export_data"
-    that the cookie is associated with.
-    This can be changed to store the mdt_export_data  pointer in
-    the mdt_file_data, and  check it to validate the candidate returned by
-    class_handle2object() finds a candidate.
-
-Hopefully when someone (me?) ports the server code, they'll notice that
-they cannot use h_owner the same way, check the commit which changed
-things, and find this.
-
->
 > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
-Thanks!
+Thanks.
+I've also added a note here:
+
+    Note: this h_owner is now quiet different from the similar h_owner
+    in the server code.  When server code it merged the
+    "med" pointer should be stored in the "mfd" and validated separately.
 
 NeilBrown
 
 >
 >> ---
->> .../staging/lustre/lustre/include/lustre_handles.h |    7 +++----
->> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    2 +-
->> drivers/staging/lustre/lustre/obdclass/genops.c    |    3 ++-
->> .../lustre/lustre/obdclass/lustre_handles.c        |    6 +++---
->> 4 files changed, 9 insertions(+), 9 deletions(-)
+>> .../staging/lustre/lustre/include/lustre_handles.h |   12 +++---------
+>> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    8 +++-----
+>> drivers/staging/lustre/lustre/obdclass/genops.c    |   17 ++++++-----------
+>> .../lustre/lustre/obdclass/lustre_handles.c        |   15 +++++++--------
+>> 4 files changed, 19 insertions(+), 33 deletions(-)
 >> 
 >> diff --git a/drivers/staging/lustre/lustre/include/lustre_handles.h b/drivers/staging/lustre/lustre/include/lustre_handles.h
->> index 683680891e4c..9a4b1a821e7b 100644
+>> index 8fb42851f6d1..ebbbb01710e7 100644
 >> --- a/drivers/staging/lustre/lustre/include/lustre_handles.h
 >> +++ b/drivers/staging/lustre/lustre/include/lustre_handles.h
->> @@ -65,8 +65,7 @@ struct portals_handle_ops {
+>> @@ -45,11 +45,6 @@
+>> #include <linux/spinlock.h>
+>> #include <linux/types.h>
+>> 
+>> -struct portals_handle_ops {
+>> -	/* hop_type is used for some debugging messages */
+>> -	char *hop_type;
+>> -};
+>> -
+>> /* These handles are most easily used by having them appear at the very top of
+>>  * whatever object that you want to make handles for.  ie:
+>>  *
+>> @@ -65,7 +60,7 @@ struct portals_handle_ops {
 >> struct portals_handle {
 >> 	struct list_head		h_link;
 >> 	u64				h_cookie;
->> -	const void			*h_owner;
->> -	struct portals_handle_ops	*h_ops;
->> +	const struct portals_handle_ops	*h_ops;
+>> -	const struct portals_handle_ops	*h_ops;
+>> +	char				*h_owner;
+>> 	refcount_t			h_ref;
 >> 
 >> 	/* newly added fields to handle the RCU issue. -jxiong */
->> 	struct rcu_head			h_rcu;
->> @@ -79,9 +78,9 @@ struct portals_handle {
+>> @@ -77,10 +72,9 @@ struct portals_handle {
+>> /* handles.c */
 >> 
 >> /* Add a handle to the hash table */
->> void class_handle_hash(struct portals_handle *,
->> -		       struct portals_handle_ops *ops);
->> +		       const struct portals_handle_ops *ops);
+>> -void class_handle_hash(struct portals_handle *,
+>> -		       const struct portals_handle_ops *ops);
+>> +void class_handle_hash(struct portals_handle *, char *owner);
 >> void class_handle_unhash(struct portals_handle *);
->> -void *class_handle2object(u64 cookie, const void *owner);
->> +void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
->> void class_handle_free_cb(struct rcu_head *rcu);
+>> -void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
+>> +void *class_handle2object(u64 cookie, char *owner);
 >> int class_handle_init(void);
 >> void class_handle_cleanup(void);
+>> 
 >> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
->> index 7ec5fc900da8..768cccc1fa82 100644
+>> index 18f018d27936..56a2d1dcd663 100644
 >> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 >> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
->> @@ -515,7 +515,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
+>> @@ -363,9 +363,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
+>> 	}
+>> }
+>> 
+>> -static struct portals_handle_ops lock_handle_ops = {
+>> -	.hop_type   = "ldlm",
+>> -};
+>> +static const char lock_handle_owner[] = "ldlm";
+>> 
+>> /**
+>>  *
+>> @@ -405,7 +403,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
+>> 	lprocfs_counter_incr(ldlm_res_to_ns(resource)->ns_stats,
+>> 			     LDLM_NSS_LOCKS);
+>> 	INIT_LIST_HEAD(&lock->l_handle.h_link);
+>> -	class_handle_hash(&lock->l_handle, &lock_handle_ops);
+>> +	class_handle_hash(&lock->l_handle, lock_handle_owner);
+>> 
+>> 	lu_ref_init(&lock->l_reference);
+>> 	lu_ref_add(&lock->l_reference, "hash", lock);
+>> @@ -509,7 +507,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
 >> 
 >> 	LASSERT(handle);
 >> 
->> -	lock = class_handle2object(handle->cookie, NULL);
->> +	lock = class_handle2object(handle->cookie, &lock_handle_ops);
+>> -	lock = class_handle2object(handle->cookie, &lock_handle_ops);
+>> +	lock = class_handle2object(handle->cookie, lock_handle_owner);
 >> 	if (!lock)
 >> 		return NULL;
 >> 
 >> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
->> index e206bb401fe3..42859fbca330 100644
+>> index ed306bbfbfb8..e0da46e7d355 100644
 >> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
 >> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
->> @@ -708,6 +708,7 @@ int obd_init_caches(void)
+>> @@ -708,7 +708,8 @@ int obd_init_caches(void)
 >> 	return -ENOMEM;
 >> }
 >> 
->> +static struct portals_handle_ops export_handle_ops;
+>> -static struct portals_handle_ops export_handle_ops;
+>> +static const char export_handle_owner[] = "export";
+>> +
 >> /* map connection to client */
 >> struct obd_export *class_conn2export(struct lustre_handle *conn)
 >> {
->> @@ -724,7 +725,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
+>> @@ -725,7 +726,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
 >> 	}
 >> 
 >> 	CDEBUG(D_INFO, "looking for export cookie %#llx\n", conn->cookie);
->> -	export = class_handle2object(conn->cookie, NULL);
->> +	export = class_handle2object(conn->cookie, &export_handle_ops);
+>> -	export = class_handle2object(conn->cookie, &export_handle_ops);
+>> +	export = class_handle2object(conn->cookie, export_handle_owner);
 >> 	return export;
 >> }
 >> EXPORT_SYMBOL(class_conn2export);
+>> @@ -777,10 +778,6 @@ static void class_export_destroy(struct obd_export *exp)
+>> 	kfree_rcu(exp, exp_handle.h_rcu);
+>> }
+>> 
+>> -static struct portals_handle_ops export_handle_ops = {
+>> -	.hop_type	= "export",
+>> -};
+>> -
+>> struct obd_export *class_export_get(struct obd_export *exp)
+>> {
+>> 	refcount_inc(&exp->exp_handle.h_ref);
+>> @@ -863,7 +860,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+>> 	INIT_LIST_HEAD(&export->exp_req_replay_queue);
+>> 	INIT_LIST_HEAD(&export->exp_handle.h_link);
+>> 	INIT_LIST_HEAD(&export->exp_hp_rpcs);
+>> -	class_handle_hash(&export->exp_handle, &export_handle_ops);
+>> +	class_handle_hash(&export->exp_handle, export_handle_owner);
+>> 	spin_lock_init(&export->exp_lock);
+>> 	spin_lock_init(&export->exp_rpc_lock);
+>> 	spin_lock_init(&export->exp_bl_list_lock);
+>> @@ -967,9 +964,7 @@ static void class_import_destroy(struct obd_import *imp)
+>> 	kfree_rcu(imp, imp_handle.h_rcu);
+>> }
+>> 
+>> -static struct portals_handle_ops import_handle_ops = {
+>> -	.hop_type	= "import",
+>> -};
+>> +static const char import_handle_owner[] = "import";
+>> 
+>> struct obd_import *class_import_get(struct obd_import *import)
+>> {
+>> @@ -1052,7 +1047,7 @@ struct obd_import *class_new_import(struct obd_device *obd)
+>> 	atomic_set(&imp->imp_inval_count, 0);
+>> 	INIT_LIST_HEAD(&imp->imp_conn_list);
+>> 	INIT_LIST_HEAD(&imp->imp_handle.h_link);
+>> -	class_handle_hash(&imp->imp_handle, &import_handle_ops);
+>> +	class_handle_hash(&imp->imp_handle, import_handle_owner);
+>> 	init_imp_at(&imp->imp_at);
+>> 
+>> 	/* the default magic is V2, will be used in connect RPC, and
 >> diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
->> index 0674afb0059f..32b70d613f71 100644
+>> index 8aece57ec8c9..f41558ccdfcf 100644
 >> --- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
 >> +++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
->> @@ -59,7 +59,7 @@ static struct handle_bucket {
+>> @@ -58,8 +58,7 @@ static struct handle_bucket {
+>>  * Generate a unique 64bit cookie (hash) for a handle and insert it into
 >>  * global (per-node) hash-table.
 >>  */
->> void class_handle_hash(struct portals_handle *h,
->> -		       struct portals_handle_ops *ops)
->> +		       const struct portals_handle_ops *ops)
+>> -void class_handle_hash(struct portals_handle *h,
+>> -		       const struct portals_handle_ops *ops)
+>> +void class_handle_hash(struct portals_handle *h, char *owner)
 >> {
 >> 	struct handle_bucket *bucket;
 >> 
->> @@ -132,7 +132,7 @@ void class_handle_unhash(struct portals_handle *h)
+>> @@ -85,7 +84,7 @@ void class_handle_hash(struct portals_handle *h,
+>> 	h->h_cookie = handle_base;
+>> 	spin_unlock(&handle_base_lock);
+>> 
+>> -	h->h_ops = ops;
+>> +	h->h_owner = owner;
+>> 	spin_lock_init(&h->h_lock);
+>> 
+>> 	bucket = &handle_hash[h->h_cookie & HANDLE_HASH_MASK];
+>> @@ -132,7 +131,7 @@ void class_handle_unhash(struct portals_handle *h)
 >> }
 >> EXPORT_SYMBOL(class_handle_unhash);
 >> 
->> -void *class_handle2object(u64 cookie, const void *owner)
->> +void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
+>> -void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
+>> +void *class_handle2object(u64 cookie, char *owner)
 >> {
 >> 	struct handle_bucket *bucket;
 >> 	struct portals_handle *h;
->> @@ -147,7 +147,7 @@ void *class_handle2object(u64 cookie, const void *owner)
+>> @@ -147,14 +146,14 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
 >> 
 >> 	rcu_read_lock();
 >> 	list_for_each_entry_rcu(h, &bucket->head, h_link) {
->> -		if (h->h_cookie != cookie || h->h_owner != owner)
->> +		if (h->h_cookie != cookie || h->h_ops != ops)
+>> -		if (h->h_cookie != cookie || h->h_ops != ops)
+>> +		if (h->h_cookie != cookie || h->h_owner != owner)
 >> 			continue;
 >> 
 >> 		spin_lock(&h->h_lock);
+>> 		if (likely(h->h_in != 0)) {
+>> 			refcount_inc(&h->h_ref);
+>> 			CDEBUG(D_INFO, "GET %s %p refcount=%d\n",
+>> -			       h->h_ops->hop_type, h,
+>> +			       h->h_owner, h,
+>> 			       refcount_read(&h->h_ref));
+>> 			retval = h;
+>> 		}
+>> @@ -201,8 +200,8 @@ static int cleanup_all_handles(void)
+>> 
+>> 		spin_lock(&handle_hash[i].lock);
+>> 		list_for_each_entry_rcu(h, &handle_hash[i].head, h_link) {
+>> -			CERROR("force clean handle %#llx addr %p ops %p\n",
+>> -			       h->h_cookie, h, h->h_ops);
+>> +			CERROR("force clean handle %#llx addr %p owner %p\n",
+>> +			       h->h_cookie, h, h->h_owner);
+>> 
+>> 			class_handle_unhash_nolock(h);
+>> 			rc++;
 >> 
 >> 
 >
 > Cheers, Andreas
 > ---
 > Andreas Dilger
-> CTO Whamcloud
+> Principal Lustre Architect
+> Whamcloud
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190404/2cfa7a12/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190404/bdd8c89c/attachment.sig>
