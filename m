@@ -1,68 +1,101 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 24 Apr 2019 12:17:26 +1000
-Subject: [lustre-devel] [PATCH 2/4] lustre: update for SO_RCVTIMEO
- SO_SNDTIMEO changes.
+Subject: [lustre-devel] [PATCH 3/4] lustre: remove use of
+ selinux_is_enabled().
 In-Reply-To: <155607223991.16863.3231709121984405156.stgit@noble.brown>
 References: <155607223991.16863.3231709121984405156.stgit@noble.brown>
-Message-ID: <155607224617.16863.14802160542309003623.stgit@noble.brown>
+Message-ID: <155607224621.16863.13502209812654413995.stgit@noble.brown>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-These socket options have been changed to be Y2K038 compliant.
-So we need to use the _NEW versions and use the correct
-data structure.
+selinux_is_enabled() no longer exists.  Instead we depend on
+relevant functions returning -EOPNOTSUPP.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/lnet/lib-socket.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/llite/xattr.c        |   11 -----------
+ .../staging/lustre/lustre/llite/xattr_security.c   |   16 +++++++++-------
+ 2 files changed, 9 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-index 095f9f5e5ea1..6ea8f3f904d0 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-@@ -50,6 +50,7 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
- 	long jiffies_left = timeout * msecs_to_jiffies(MSEC_PER_SEC);
- 	unsigned long then;
- 	struct timeval tv;
-+	struct __kernel_sock_timeval ktv;
- 	struct kvec iov = {
- 		.iov_base = buffer,
- 		.iov_len = nob
-@@ -67,8 +68,10 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
- 		if (timeout) {
- 			/* Set send timeout to remaining time */
- 			jiffies_to_timeval(jiffies_left, &tv);
--			rc = kernel_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO,
--					       (char *)&tv, sizeof(tv));
-+			ktv.tv_sec = tv.tv_sec;
-+			ktv.tv_usec = tv.tv_usec;
-+			rc = kernel_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO_NEW,
-+					       (char *)&ktv, sizeof(ktv));
- 			if (rc) {
- 				CERROR("Can't set socket send timeout %ld.%06d: %d\n",
- 				       (long)tv.tv_sec, (int)tv.tv_usec, rc);
-@@ -105,6 +108,7 @@ lnet_sock_read(struct socket *sock, void *buffer, int nob, int timeout)
- 	long jiffies_left = timeout * msecs_to_jiffies(MSEC_PER_SEC);
- 	unsigned long then;
- 	struct timeval tv;
-+	struct __kernel_sock_timeval ktv;
- 	struct kvec iov = {
- 		.iov_base = buffer,
- 		.iov_len = nob
-@@ -121,8 +125,10 @@ lnet_sock_read(struct socket *sock, void *buffer, int nob, int timeout)
- 	for (;;) {
- 		/* Set receive timeout to remaining time */
- 		jiffies_to_timeval(jiffies_left, &tv);
--		rc = kernel_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
--				       (char *)&tv, sizeof(tv));
-+		ktv.tv_sec = tv.tv_sec;
-+		ktv.tv_usec = tv.tv_usec;
-+		rc = kernel_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO_NEW,
-+				       (char *)&ktv, sizeof(ktv));
- 		if (rc) {
- 			CERROR("Can't set socket recv timeout %ld.%06d: %d\n",
- 			       (long)tv.tv_sec, (int)tv.tv_usec, rc);
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index a1d27061ac19..d604c5bc1abe 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -35,7 +35,6 @@
+ #include <linux/sched.h>
+ #include <linux/mm.h>
+ #include <linux/xattr.h>
+-#include <linux/selinux.h>
+ 
+ #define DEBUG_SUBSYSTEM S_LLITE
+ 
+@@ -121,11 +120,6 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
+ 	     (handler->flags == XATTR_LUSTRE_T && !strcmp(name, "lov"))))
+ 		return 0;
+ 
+-	/* LU-549:  Disable security.selinux when selinux is disabled */
+-	if (handler->flags == XATTR_SECURITY_T && !selinux_is_enabled() &&
+-	    strcmp(name, "selinux") == 0)
+-		return -EOPNOTSUPP;
+-
+ 	/*FIXME: enable IMA when the conditions are ready */
+ 	if (handler->flags == XATTR_SECURITY_T &&
+ 	    (!strcmp(name, "ima") || !strcmp(name, "evm")))
+@@ -428,11 +422,6 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
+ 	if (rc)
+ 		return rc;
+ 
+-	/* LU-549:  Disable security.selinux when selinux is disabled */
+-	if (handler->flags == XATTR_SECURITY_T && !selinux_is_enabled() &&
+-	    !strcmp(name, "selinux"))
+-		return -EOPNOTSUPP;
+-
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	/* posix acl is under protection of LOOKUP lock. when calling to this,
+ 	 * we just have path resolution to the target inode, so we have great
+diff --git a/drivers/staging/lustre/lustre/llite/xattr_security.c b/drivers/staging/lustre/lustre/llite/xattr_security.c
+index f1c011eb5613..e5a52d96643b 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr_security.c
++++ b/drivers/staging/lustre/lustre/llite/xattr_security.c
+@@ -32,7 +32,6 @@
+ 
+ #include <linux/types.h>
+ #include <linux/security.h>
+-#include <linux/selinux.h>
+ #include <linux/xattr.h>
+ #include "llite_internal.h"
+ 
+@@ -58,11 +57,11 @@ int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
+ 	 * calls it and assumes that if anything is returned then it must come
+ 	 * from SELinux.
+ 	 */
+-	if (!selinux_is_enabled())
+-		return 0;
+ 
+ 	rc = security_dentry_init_security(dentry, mode, name, secctx,
+ 					   secctx_size);
++	if (rc == -EOPNOTSUPP)
++		return 0;
+ 	if (rc < 0)
+ 		return rc;
+ 
+@@ -124,9 +123,12 @@ int
+ ll_inode_init_security(struct dentry *dentry, struct inode *inode,
+ 		       struct inode *dir)
+ {
+-	if (!selinux_is_enabled())
+-		return 0;
++	int err;
+ 
+-	return security_inode_init_security(inode, dir, NULL,
+-					    &ll_initxattrs, dentry);
++	err = security_inode_init_security(inode, dir, NULL,
++					   &ll_initxattrs, dentry);
++
++	if (err == -EOPNOTSUPP)
++		return 0;
++	return err;
+ }
