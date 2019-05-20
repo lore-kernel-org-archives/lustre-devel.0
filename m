@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 20 May 2019 08:50:50 -0400
-Subject: [lustre-devel] [PATCH v2 08/29] lustre: obd_type: use typ_kobj.name
- as typ_name
+Date: Mon, 20 May 2019 08:50:45 -0400
+Subject: [lustre-devel] [PATCH v2 03/29] lustre: llite: replace lli_trunc_sem
 In-Reply-To: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1558356671-29599-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1558356671-29599-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,174 +12,143 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-As the kobject has a name (after kobject_add has been called),
-we don't need to also store it in typ_name.
-So use typ_kobj.name instead of typ_name.
+lli_trunc_sem can lead to a readlock.
 
-This requires changing some "char *" to "const char *" as
-typ.kobj.name is const.
+vvp_io_read_start can take mmap_sem while holding lli_trunc_sem,
+and vvp_io_fault_start will take lli_trunc_sem while holding mmap_sem.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+These aren't necessarily the same mmap_sem, but can be if you mmap a
+lustre file, then read into that mapped memory from the file.
+
+These are both 'down_read' calls on lli_trunc_sem so they don't
+necessarily conflict, but if vvp_io_setattr_start() is called to
+truncate the file between these, the later will wait for the former
+and a deadlock can eventuate.
+
+Solve this by replacing with a hand-coded semaphore, using atomic
+counters and wait_var_event().
+In the vvp_io_fault_start() case where mmap_sem is held, don't wait
+for a pending writer, only for an active writer.  This means we won't
+wait if vvp_io_read_start has started, and so no deadlock happens.
+
+I'd like there to be a better way to fix this, but I haven't found it
+yet.
+
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- fs/lustre/include/lustre_net.h |  4 ++--
- fs/lustre/include/obd.h        |  2 +-
- fs/lustre/include/obd_class.h  |  2 +-
- fs/lustre/ldlm/ldlm_lib.c      |  2 +-
- fs/lustre/obdclass/genops.c    | 18 +++++++-----------
- fs/lustre/ptlrpc/client.c      |  2 +-
- 6 files changed, 13 insertions(+), 17 deletions(-)
+ fs/lustre/llite/llite_internal.h |  3 ++-
+ fs/lustre/llite/llite_lib.c      |  3 ++-
+ fs/lustre/llite/vvp_io.c         | 28 +++++++++++++++++++++-------
+ 3 files changed, 25 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index f6d1be1..1cf0f12 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -308,7 +308,7 @@ struct ptlrpc_client {
- 	/** What portal do we expect replies on */
- 	u32			cli_reply_portal;
- 	/** Name of the client */
--	char			*cli_name;
-+	const char		*cli_name;
- };
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index 9da59b1..7566b1b 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -190,7 +190,8 @@ struct ll_inode_info {
+ 			 *    struct list_head wait_list;
+ 			 * }
+ 			 */
+-			struct rw_semaphore		lli_trunc_sem;
++			atomic_t			lli_trunc_readers;
++			atomic_t			lli_trunc_waiters;
+ 			struct range_lock_tree		lli_write_tree;
  
- /** state flags of requests */
-@@ -1817,7 +1817,7 @@ static inline int ptlrpc_client_bulk_active(struct ptlrpc_request *req)
- int ptlrpc_inc_ref(void);
- void ptlrpc_dec_ref(void);
+ 			struct rw_semaphore		lli_glimpse_sem;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 4e98eb4..ab7c84a 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -894,7 +894,8 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	} else {
+ 		mutex_init(&lli->lli_size_mutex);
+ 		lli->lli_symlink_name = NULL;
+-		init_rwsem(&lli->lli_trunc_sem);
++		atomic_set(&lli->lli_trunc_readers, 0);
++		atomic_set(&lli->lli_trunc_waiters, 0);
+ 		range_lock_tree_init(&lli->lli_write_tree);
+ 		init_rwsem(&lli->lli_glimpse_sem);
+ 		lli->lli_glimpse_time = 0;
+diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
+index 225a858..a9db530 100644
+--- a/fs/lustre/llite/vvp_io.c
++++ b/fs/lustre/llite/vvp_io.c
+@@ -667,7 +667,10 @@ static int vvp_io_setattr_start(const struct lu_env *env,
+ 	struct ll_inode_info *lli = ll_i2info(inode);
  
--void ptlrpc_init_client(int req_portal, int rep_portal, char *name,
-+void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
- 			struct ptlrpc_client *);
- struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid,
- 						    lnet_nid_t nid4refnet);
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index f20c246..6bf052a 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -103,12 +103,12 @@ struct obd_type {
- 	struct obd_ops		*typ_dt_ops;
- 	struct md_ops		*typ_md_ops;
- 	struct dentry		*typ_debugfs_entry;
--	char			*typ_name;
- 	int			 typ_refcnt;
- 	struct lu_device_type	*typ_lu;
- 	spinlock_t		 obd_type_lock;
- 	struct kobject		 typ_kobj;
- };
-+#define typ_name typ_kobj.name
+ 	if (cl_io_is_trunc(io)) {
+-		down_write(&lli->lli_trunc_sem);
++		atomic_inc(&lli->lli_trunc_waiters);
++		wait_var_event(&lli->lli_trunc_readers,
++			       atomic_cmpxchg(&lli->lli_trunc_readers, 0, -1) == 0);
++		atomic_dec(&lli->lli_trunc_waiters);
+ 		inode_lock(inode);
+ 		inode_dio_wait(inode);
+ 	} else {
+@@ -693,7 +696,8 @@ static void vvp_io_setattr_end(const struct lu_env *env,
+ 		 */
+ 		vvp_do_vmtruncate(inode, io->u.ci_setattr.sa_attr.lvb_size);
+ 		inode_unlock(inode);
+-		up_write(&lli->lli_trunc_sem);
++		atomic_set(&lli->lli_trunc_readers, 0);
++		wake_up_var(&lli->lli_trunc_readers);
+ 	} else {
+ 		inode_unlock(inode);
+ 	}
+@@ -732,7 +736,9 @@ static int vvp_io_read_start(const struct lu_env *env,
  
- struct brw_page {
- 	u64			off;
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index 1729865..742cb9a4 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -74,7 +74,7 @@ struct obd_device *class_newdev(const char *type_name, const char *name,
- struct obd_device *class_name2obd(const char *name);
- int class_uuid2dev(struct obd_uuid *uuid);
- struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
--					 const char *typ_name,
-+					 const char *type_name,
- 					 struct obd_uuid *grp_uuid);
- struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid,
- 					  int *next);
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index e0d2851..9c61b33 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -247,7 +247,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	struct obd_import *imp;
- 	struct obd_uuid server_uuid;
- 	int rq_portal, rp_portal, connect_op;
--	char *name = obddev->obd_type->typ_name;
-+	const char *name = obddev->obd_type->typ_name;
- 	enum ldlm_ns_type ns_type = LDLM_NS_TYPE_UNKNOWN;
- 	struct ptlrpc_connection fake_conn = {
- 		.c_self = 0,
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index 2a5ec93..7be779f 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -144,7 +144,6 @@ static void class_sysfs_release(struct kobject *kobj)
- 	list_del(&type->typ_chain);
- 	spin_unlock(&obd_types_lock);
+ 	CDEBUG(D_VFSTRACE, "read: -> [%lli, %lli)\n", pos, pos + cnt);
  
--	kfree(type->typ_name);
- 	kfree(type->typ_md_ops);
- 	kfree(type->typ_dt_ops);
- 	kfree(type);
-@@ -187,18 +186,15 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+-	down_read(&lli->lli_trunc_sem);
++	wait_var_event(&lli->lli_trunc_readers,
++		       atomic_read(&lli->lli_trunc_waiters) == 0 &&
++		       atomic_inc_unless_negative(&lli->lli_trunc_readers));
  
- 	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
- 	type->typ_md_ops = kzalloc(sizeof(*type->typ_md_ops), GFP_NOFS);
--	type->typ_name = kzalloc(strlen(name) + 1, GFP_NOFS);
+ 	if (!can_populate_pages(env, io, inode))
+ 		return 0;
+@@ -965,7 +971,9 @@ static int vvp_io_write_start(const struct lu_env *env,
+ 	size_t cnt = io->u.ci_wr.wr.crw_count;
+ 	ssize_t result = 0;
  
- 	if (!type->typ_dt_ops ||
--	    !type->typ_md_ops ||
--	    !type->typ_name)
-+	    !type->typ_md_ops)
- 		goto failed;
+-	down_read(&lli->lli_trunc_sem);
++	wait_var_event(&lli->lli_trunc_readers,
++		       atomic_read(&lli->lli_trunc_waiters) == 0 &&
++		       atomic_inc_unless_negative(&lli->lli_trunc_readers));
  
- 	*type->typ_dt_ops = *dt_ops;
- 	/* md_ops is optional */
- 	if (md_ops)
- 		*type->typ_md_ops = *md_ops;
--	strcpy(type->typ_name, name);
- 	spin_lock_init(&type->obd_type_lock);
+ 	if (!can_populate_pages(env, io, inode))
+ 		return 0;
+@@ -1059,7 +1067,9 @@ static void vvp_io_rw_end(const struct lu_env *env,
+ 	struct inode *inode = vvp_object_inode(ios->cis_obj);
+ 	struct ll_inode_info *lli = ll_i2info(inode);
  
- 	if (ldt) {
-@@ -530,7 +526,7 @@ struct obd_device *class_num2obd(int num)
-  * otherwise any client connected to the tgt is returned.
-  */
- struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
--					 const char *typ_name,
-+					 const char *type_name,
- 					 struct obd_uuid *grp_uuid)
- {
- 	int i;
-@@ -541,8 +537,8 @@ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
+-	up_read(&lli->lli_trunc_sem);
++	if (atomic_dec_return(&lli->lli_trunc_readers) == 0 &&
++	    atomic_read(&lli->lli_trunc_waiters))
++		wake_up_var(&lli->lli_trunc_readers);
+ }
  
- 		if (!obd)
- 			continue;
--		if ((strncmp(obd->obd_type->typ_name, typ_name,
--			     strlen(typ_name)) == 0)) {
-+		if ((strncmp(obd->obd_type->typ_name, type_name,
-+			     strlen(type_name)) == 0)) {
- 			if (obd_uuid_equals(tgt_uuid,
- 					    &obd->u.cli.cl_target_uuid) &&
- 			    ((grp_uuid) ? obd_uuid_equals(grp_uuid,
-@@ -1354,7 +1350,7 @@ u32 obd_get_max_rpcs_in_flight(struct client_obd *cli)
- int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- {
- 	struct obd_request_slot_waiter *orsw;
--	const char *typ_name;
-+	const char *type_name;
- 	u32 old;
- 	int diff;
- 	int rc;
-@@ -1363,8 +1359,8 @@ int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- 	if (max > OBD_MAX_RIF_MAX || max < 1)
- 		return -ERANGE;
+ static int vvp_io_kernel_fault(struct vvp_fault_io *cfio)
+@@ -1124,7 +1134,8 @@ static int vvp_io_fault_start(const struct lu_env *env,
+ 	loff_t size;
+ 	pgoff_t last_index;
  
--	typ_name = cli->cl_import->imp_obd->obd_type->typ_name;
--	if (!strcmp(typ_name, LUSTRE_MDC_NAME)) {
-+	type_name = cli->cl_import->imp_obd->obd_type->typ_name;
-+	if (!strcmp(type_name, LUSTRE_MDC_NAME)) {
- 		/*
- 		 * adjust max_mod_rpcs_in_flight to ensure it is always
- 		 * strictly lower that max_rpcs_in_flight
-diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
-index eb5d22a..da1ccd8 100644
---- a/fs/lustre/ptlrpc/client.c
-+++ b/fs/lustre/ptlrpc/client.c
-@@ -67,7 +67,7 @@
- /**
-  * Initialize passed in client structure @cl.
-  */
--void ptlrpc_init_client(int req_portal, int rep_portal, char *name,
-+void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
- 			struct ptlrpc_client *cl)
- {
- 	cl->cli_request_portal = req_portal;
+-	down_read(&lli->lli_trunc_sem);
++	wait_var_event(&lli->lli_trunc_readers,
++		       atomic_inc_unless_negative(&lli->lli_trunc_readers));
+ 
+ 	/* offset of the last byte on the page */
+ 	offset = cl_offset(obj, fio->ft_index + 1) - 1;
+@@ -1281,7 +1292,10 @@ static void vvp_io_fault_end(const struct lu_env *env,
+ 
+ 	CLOBINVRNT(env, ios->cis_io->ci_obj,
+ 		   vvp_object_invariant(ios->cis_io->ci_obj));
+-	up_read(&lli->lli_trunc_sem);
++
++	if (atomic_dec_return(&lli->lli_trunc_readers) == 0 &&
++	    atomic_read(&lli->lli_trunc_waiters))
++		wake_up_var(&lli->lli_trunc_readers);
+ }
+ 
+ static int vvp_io_fsync_start(const struct lu_env *env,
 -- 
 1.8.3.1
