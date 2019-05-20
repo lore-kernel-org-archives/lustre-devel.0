@@ -1,9 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 20 May 2019 08:51:00 -0400
-Subject: [lustre-devel] [PATCH v2 18/29] lustre: discard OBD_FREE_RCU
+Date: Mon, 20 May 2019 08:50:51 -0400
+Subject: [lustre-devel] [PATCH v2 09/29] lustre: obd_type: discard obd_types
+ linked list.
 In-Reply-To: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1558356671-29599-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1558356671-29599-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,168 +13,157 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-OBD_FREE_RCU and the hop_free call-back together form an overly
-complex mechanism equivalent to kfree_rcu() or call_rcu(...).
-Discard them and use the simpler approach.
+As all obd_types are kobjects in the lustre_kset kset,
+they are linked together in that kset and don't
+need any extra linkage.
 
-This removes the only use for the field h_size, so discard
-that too.
+There are non-obd_type objects in lustre_kset, added by
+class_setup_tunables(). These have a different ->ktype, so we are
+careful to only return objects with the correct ->ktype.
+
+As kset_find_obj() returns a counted reference, we need
+to put that reference when done.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- fs/lustre/include/lustre_handles.h  |  3 ---
- fs/lustre/include/obd_support.h     | 10 ----------
- fs/lustre/ldlm/ldlm_lock.c          | 16 ++++++++--------
- fs/lustre/obdclass/genops.c         |  6 ++----
- fs/lustre/obdclass/lustre_handles.c | 15 ---------------
- 5 files changed, 10 insertions(+), 40 deletions(-)
+ fs/lustre/include/obd.h     |  1 -
+ fs/lustre/obdclass/genops.c | 42 ++++++++++++++++++++----------------------
+ 2 files changed, 20 insertions(+), 23 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_handles.h b/fs/lustre/include/lustre_handles.h
-index be5d41b..8fb4285 100644
---- a/fs/lustre/include/lustre_handles.h
-+++ b/fs/lustre/include/lustre_handles.h
-@@ -46,7 +46,6 @@
- #include <linux/types.h>
- 
- struct portals_handle_ops {
--	void (*hop_free)(void *object, int size);
- 	/* hop_type is used for some debugging messages */
- 	char *hop_type;
- };
-@@ -72,7 +71,6 @@ struct portals_handle {
- 	/* newly added fields to handle the RCU issue. -jxiong */
- 	struct rcu_head			h_rcu;
- 	spinlock_t			h_lock;
--	unsigned int			h_size:31;
- 	unsigned int			h_in:1;
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 6bf052a..4c58b91 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -99,7 +99,6 @@ struct obd_info {
  };
  
-@@ -83,7 +81,6 @@ void class_handle_hash(struct portals_handle *,
- 		       const struct portals_handle_ops *ops);
- void class_handle_unhash(struct portals_handle *);
- void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
--void class_handle_free_cb(struct rcu_head *rcu);
- int class_handle_init(void);
- void class_handle_cleanup(void);
- 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 3e15cac..91d6a86 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -503,16 +503,6 @@
- #define POISON_PAGE(page, val) do { } while (0)
- #endif
- 
--#define OBD_FREE_RCU(ptr, size, handle)			\
--do {							\
--	struct portals_handle *__h = (handle);		\
--							\
--	__h->h_cookie = (unsigned long)(ptr);		\
--	__h->h_size = (size);				\
--	call_rcu(&__h->h_rcu, class_handle_free_cb);	\
--	POISON_PTR(ptr);				\
--} while (0)
--
- #define KEY_IS(str)					\
- 	(keylen >= (sizeof(str) - 1) &&			\
- 	memcmp(key, str, (sizeof(str) - 1)) == 0)
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index ecd3f4a..18f018d 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -153,6 +153,13 @@ struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock)
- }
- EXPORT_SYMBOL(ldlm_lock_get);
- 
-+static void lock_handle_free(struct rcu_head *rcu)
-+{
-+	struct ldlm_lock *lock = container_of(rcu, struct ldlm_lock,
-+					      l_handle.h_rcu);
-+	kmem_cache_free(ldlm_lock_slab, lock);
-+}
-+
- /**
-  * Release lock reference.
-  *
-@@ -186,7 +193,7 @@ void ldlm_lock_put(struct ldlm_lock *lock)
- 		kfree(lock->l_lvb_data);
- 
- 		lu_ref_fini(&lock->l_reference);
--		OBD_FREE_RCU(lock, sizeof(*lock), &lock->l_handle);
-+		call_rcu(&lock->l_handle.h_rcu, lock_handle_free);
- 	}
- }
- EXPORT_SYMBOL(ldlm_lock_put);
-@@ -356,14 +363,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
- 	}
- }
- 
--static void lock_handle_free(void *lock, int size)
--{
--	LASSERT(size == sizeof(struct ldlm_lock));
--	kmem_cache_free(ldlm_lock_slab, lock);
--}
--
- static struct portals_handle_ops lock_handle_ops = {
--	.hop_free   = lock_handle_free,
- 	.hop_type   = "ldlm",
- };
- 
+ struct obd_type {
+-	struct list_head	 typ_chain;
+ 	struct obd_ops		*typ_dt_ops;
+ 	struct md_ops		*typ_md_ops;
+ 	struct dentry		*typ_debugfs_entry;
 diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index c6dc3ba..1d1d457 100644
+index 7be779f..3f46298 100644
 --- a/fs/lustre/obdclass/genops.c
 +++ b/fs/lustre/obdclass/genops.c
-@@ -743,11 +743,10 @@ static void class_export_destroy(struct obd_export *exp)
- 	if (exp != obd->obd_self_export)
- 		class_decref(obd, "export", exp);
+@@ -42,8 +42,6 @@
+ #include <lprocfs_status.h>
+ #include <lustre_kernelcomm.h>
  
--	OBD_FREE_RCU(exp, sizeof(*exp), &exp->exp_handle);
-+	kfree_rcu(exp, exp_handle.h_rcu);
- }
+-static DEFINE_SPINLOCK(obd_types_lock);
+-static LIST_HEAD(obd_types);
+ DEFINE_RWLOCK(obd_dev_lock);
+ static struct obd_device *obd_devs[MAX_OBD_DEVICES];
  
- static struct portals_handle_ops export_handle_ops = {
--	.hop_free	= NULL,
- 	.hop_type	= "export",
- };
+@@ -52,6 +50,7 @@
+ EXPORT_SYMBOL(obdo_cachep);
+ static struct kmem_cache *import_cachep;
  
-@@ -934,11 +933,10 @@ static void class_import_destroy(struct obd_import *imp)
++static struct kobj_type class_ktype;
+ static struct workqueue_struct *zombie_wq;
+ static void obd_zombie_export_add(struct obd_export *exp);
+ static void obd_zombie_import_add(struct obd_import *imp);
+@@ -88,23 +87,20 @@ static void obd_device_free(struct obd_device *obd)
  
- 	LASSERT(!imp->imp_sec);
- 	class_decref(imp->imp_obd, "import", imp);
--	OBD_FREE_RCU(imp, sizeof(*imp), &imp->imp_handle);
-+	kfree_rcu(imp, imp_handle.h_rcu);
- }
- 
- static struct portals_handle_ops import_handle_ops = {
--	.hop_free	= NULL,
- 	.hop_type	= "import",
- };
- 
-diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
-index 32cd6ae..8aece57 100644
---- a/fs/lustre/obdclass/lustre_handles.c
-+++ b/fs/lustre/obdclass/lustre_handles.c
-@@ -167,21 +167,6 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
- }
- EXPORT_SYMBOL(class_handle2object);
- 
--void class_handle_free_cb(struct rcu_head *rcu)
--{
--	struct portals_handle *h;
--	void *ptr;
--
--	h = container_of(rcu, struct portals_handle, h_rcu);
--	ptr = (void *)(unsigned long)h->h_cookie;
--
--	if (h->h_ops->hop_free)
--		h->h_ops->hop_free(ptr, h->h_size);
--	else
--		kfree(ptr);
--}
--EXPORT_SYMBOL(class_handle_free_cb);
--
- int class_handle_init(void)
+ static struct obd_type *class_search_type(const char *name)
  {
- 	struct handle_bucket *bucket;
+-	struct obd_type *type;
++	struct kobject *kobj = kset_find_obj(lustre_kset, name);
+ 
+-	spin_lock(&obd_types_lock);
+-	list_for_each_entry(type, &obd_types, typ_chain) {
+-		if (strcmp(type->typ_name, name) == 0) {
+-			spin_unlock(&obd_types_lock);
+-			return type;
+-		}
+-	}
+-	spin_unlock(&obd_types_lock);
++	if (kobj && kobj->ktype == &class_ktype)
++		return container_of(kobj, struct obd_type, typ_kobj);
++
++	kobject_put(kobj);
+ 	return NULL;
+ }
+ 
+ static struct obd_type *class_get_type(const char *name)
+ {
+-	struct obd_type *type = class_search_type(name);
++	struct obd_type *type;
+ 
++	type = class_search_type(name);
+ 	if (!type) {
+ 		const char *modname = name;
+ 
+@@ -121,6 +117,11 @@ static struct obd_type *class_get_type(const char *name)
+ 		type->typ_refcnt++;
+ 		try_module_get(type->typ_dt_ops->owner);
+ 		spin_unlock(&type->obd_type_lock);
++		/* class_search_type() returned a counted reference,
++		 * but we don't need that count any more as
++		 * we have one through typ_refcnt.
++		 */
++		kobject_put(&type->typ_kobj);
+ 	}
+ 	return type;
+ }
+@@ -140,10 +141,6 @@ static void class_sysfs_release(struct kobject *kobj)
+ 
+ 	debugfs_remove_recursive(type->typ_debugfs_entry);
+ 
+-	spin_lock(&obd_types_lock);
+-	list_del(&type->typ_chain);
+-	spin_unlock(&obd_types_lock);
+-
+ 	kfree(type->typ_md_ops);
+ 	kfree(type->typ_dt_ops);
+ 	kfree(type);
+@@ -166,8 +163,10 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	/* sanity check */
+ 	LASSERT(strnlen(name, CLASS_MAX_NAME) < CLASS_MAX_NAME);
+ 
+-	if (class_search_type(name)) {
++	type = class_search_type(name);
++	if (type) {
+ 		CDEBUG(D_IOCTL, "Type %s already registered\n", name);
++		kobject_put(&type->typ_kobj);
+ 		return -EEXIST;
+ 	}
+ 
+@@ -175,7 +174,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	if (!type)
+ 		return -ENOMEM;
+ 
+-	INIT_LIST_HEAD(&type->typ_chain);
+ 	type->typ_kobj.kset = lustre_kset;
+ 	rc = kobject_init_and_add(&type->typ_kobj, &class_ktype,
+ 				  &lustre_kset->kobj, "%s", name);
+@@ -204,10 +202,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 			goto failed;
+ 	}
+ 
+-	spin_lock(&obd_types_lock);
+-	list_add(&type->typ_chain, &obd_types);
+-	spin_unlock(&obd_types_lock);
+-
+ 	return 0;
+ 
+ failed:
+@@ -232,12 +226,16 @@ int class_unregister_type(const char *name)
+ 		/* Remove ops, but leave the name for debugging */
+ 		kfree(type->typ_dt_ops);
+ 		kfree(type->typ_md_ops);
++		kobject_put(&type->typ_kobj);
+ 		return -EBUSY;
+ 	}
+ 
+ 	if (type->typ_lu)
+ 		lu_device_type_fini(type->typ_lu);
+ 
++	/* Put the ref returned by class_search_type() */
++	kobject_put(&type->typ_kobj);
++	/* Put the final ref */
+ 	kobject_put(&type->typ_kobj);
+ 
+ 	return 0;
 -- 
 1.8.3.1
