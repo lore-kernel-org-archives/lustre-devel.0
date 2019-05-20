@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 20 May 2019 08:51:09 -0400
-Subject: [lustre-devel] [PATCH 27/29] lustre: ldlm: discard l_lock from
- struct ldlm_lock.
+Date: Mon, 20 May 2019 08:50:52 -0400
+Subject: [lustre-devel] [PATCH v2 10/29] lustre: obd_type: discard
+ obd_type_lock
 In-Reply-To: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1558356671-29599-28-git-send-email-jsimmons@infradead.org>
+Message-ID: <1558356671-29599-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,232 +13,189 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-This spinlock (l_lock) is only used to stablise the l_resource
-pointer while taking a spinlock on the resource.
+This lock is only used to protect typ_refcnt, so change
+that to an atomic_t and discard the lock.
 
-This is not necessary - it is sufficient to take the resource
-spinlock, and then check if l_resource has changed or not.  If it
-hasn't then it cannot change until the resource spinlock is dropped.
+The lock also covers calls to try_module_get and module_put,
+but this serves no purpose as it does not prevent the module
+from being unloaded.
 
-We must ensure this is safe even if the resource is freed before
-lock_res_and_lock() managed to get the lock.  To do this we mark the
-slab as SLAB_TYPESAFE_BY_RCU and initialise the lock in an
-init_once() function, but not on every allocate (and specifically
-don't zero the whole srtuct on each allocation).
-This means that if we find a resource after taking the RCU read lock,
-then it is always safe to take and then drop the spinlock.
-After taking the spinlock, we can check if it is more generally safe
-to use.
-
-Discarding l_lock shrinks 'struct ldlm_lock' which helps save memory.
+Finally, the return value for the call to try_module_get is
+ignored, which is not safe.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- fs/lustre/include/lustre_dlm.h |  5 -----
- fs/lustre/ldlm/l_lock.c        | 20 ++++++++++++--------
- fs/lustre/ldlm/ldlm_lock.c     | 26 +++++++++++++-------------
- fs/lustre/ldlm/ldlm_lockd.c    | 21 ++++++++++++++++++++-
- fs/lustre/ldlm/ldlm_resource.c |  9 +++++----
- 5 files changed, 50 insertions(+), 31 deletions(-)
+ fs/lustre/include/obd.h         |  3 +--
+ fs/lustre/include/obd_class.h   |  1 -
+ fs/lustre/mdc/mdc_request.c     |  2 +-
+ fs/lustre/mgc/mgc_request.c     |  7 -------
+ fs/lustre/obdclass/genops.c     | 29 ++++++++++++++---------------
+ fs/lustre/obdclass/lu_object.c  |  2 +-
+ fs/lustre/obdclass/obd_config.c | 19 -------------------
+ 7 files changed, 17 insertions(+), 46 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index fd9b0f8..3417661 100644
---- a/fs/lustre/include/lustre_dlm.h
-+++ b/fs/lustre/include/lustre_dlm.h
-@@ -591,11 +591,6 @@ struct ldlm_lock {
- 	 */
- 	struct portals_handle		l_handle;
- 	/**
--	 * Internal spinlock protects l_resource.  We should hold this lock
--	 * first before taking res_lock.
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 4c58b91..61fb815 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -102,9 +102,8 @@ struct obd_type {
+ 	struct obd_ops		*typ_dt_ops;
+ 	struct md_ops		*typ_md_ops;
+ 	struct dentry		*typ_debugfs_entry;
+-	int			 typ_refcnt;
++	atomic_t		 typ_refcnt;
+ 	struct lu_device_type	*typ_lu;
+-	spinlock_t		 obd_type_lock;
+ 	struct kobject		 typ_kobj;
+ };
+ #define typ_name typ_kobj.name
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index 742cb9a4..a853ed5 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -210,7 +210,6 @@ struct lustre_profile {
+ struct lustre_profile *class_get_profile(const char *prof);
+ void class_del_profile(const char *prof);
+ void class_put_profile(struct lustre_profile *lprof);
+-void class_del_profiles(void);
+ 
+ #if LUSTRE_TRACKS_LOCK_EXP_REFS
+ 
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index bc764f9..705a4e3 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -2542,7 +2542,7 @@ static int mdc_init_ea_size(struct obd_export *exp, u32 easize, u32 def_easize)
+ static int mdc_precleanup(struct obd_device *obd)
+ {
+ 	/* Failsafe, ok if racy */
+-	if (obd->obd_type->typ_refcnt <= 1)
++	if (atomic_read(&obd->obd_type->typ_refcnt) <= 1)
+ 		libcfs_kkuc_group_rem(0, KUC_GRP_HSM);
+ 
+ 	mdc_changelog_cdev_finish(obd);
+diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
+index 84ba6d0..d8be54d 100644
+--- a/fs/lustre/mgc/mgc_request.c
++++ b/fs/lustre/mgc/mgc_request.c
+@@ -712,13 +712,6 @@ static int mgc_precleanup(struct obd_device *obd)
+ 
+ static int mgc_cleanup(struct obd_device *obd)
+ {
+-	/* COMPAT_146 - old config logs may have added profiles we don't
+-	 * know about
 -	 */
--	spinlock_t			l_lock;
--	/**
- 	 * Pointer to actual resource this lock is in.
- 	 * ldlm_lock_change_resource() can change this.
- 	 */
-diff --git a/fs/lustre/ldlm/l_lock.c b/fs/lustre/ldlm/l_lock.c
-index 296259a..0ba4942 100644
---- a/fs/lustre/ldlm/l_lock.c
-+++ b/fs/lustre/ldlm/l_lock.c
-@@ -45,15 +45,21 @@
-  * being an atomic operation.
-  */
- struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
--				__acquires(&lock->l_lock)
- 				__acquires(&lock->l_resource->lr_lock)
- {
--	spin_lock(&lock->l_lock);
-+	struct ldlm_resource *res;
- 
--	lock_res(lock->l_resource);
+-	if (obd->obd_type->typ_refcnt <= 1)
+-		/* Only for the last mgc */
+-		class_del_profiles();
 -
--	ldlm_set_res_locked(lock);
--	return lock->l_resource;
-+	rcu_read_lock();
-+	while (1) {
-+		res = rcu_dereference(lock->l_resource);
-+		lock_res(res);
-+		if (res == lock->l_resource) {
-+			ldlm_set_res_locked(lock);
-+			rcu_read_unlock();
-+			return res;
-+		}
-+		unlock_res(res);
-+	}
- }
- EXPORT_SYMBOL(lock_res_and_lock);
+ 	lprocfs_obd_cleanup(obd);
+ 	ptlrpcd_decref();
  
-@@ -62,12 +68,10 @@ struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
-  */
- void unlock_res_and_lock(struct ldlm_lock *lock)
- 		__releases(&lock->l_resource->lr_lock)
--		__releases(&lock->l_lock)
- {
- 	/* on server-side resource of lock doesn't change */
- 	ldlm_clear_res_locked(lock);
- 
- 	unlock_res(lock->l_resource);
--	spin_unlock(&lock->l_lock);
- }
- EXPORT_SYMBOL(unlock_res_and_lock);
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index 5ac7723..e62dad1 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -383,7 +383,6 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- 	if (!lock)
- 		return NULL;
- 
--	spin_lock_init(&lock->l_lock);
- 	lock->l_resource = resource;
- 	lu_ref_add(&resource->lr_reference, "lock", lock);
- 
-@@ -452,12 +451,13 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 
- 	lu_ref_add(&newres->lr_reference, "lock", lock);
- 	/*
--	 * To flip the lock from the old to the new resource, lock, oldres and
--	 * newres have to be locked. Resource spin-locks are nested within
--	 * lock->l_lock, and are taken in the memory address order to avoid
--	 * dead-locks.
-+	 * To flip the lock from the old to the new resource, oldres
-+	 * and newres have to be locked. Resource spin-locks are taken
-+	 * in the memory address order to avoid dead-locks.
-+	 * As this is the only circumstance where ->l_resource
-+	 * can change, and this cannot race with itself, it is safe
-+	 * to access lock->l_resource without being careful about locking.
- 	 */
--	spin_lock(&lock->l_lock);
- 	oldres = lock->l_resource;
- 	if (oldres < newres) {
- 		lock_res(oldres);
-@@ -468,9 +468,9 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 	}
- 	LASSERT(memcmp(new_resid, &oldres->lr_name,
- 		       sizeof(oldres->lr_name)) != 0);
--	lock->l_resource = newres;
-+	rcu_assign_pointer(lock->l_resource, newres);
- 	unlock_res(oldres);
--	unlock_res_and_lock(lock);
-+	unlock_res(newres);
- 
- 	/* ...and the flowers are still standing! */
- 	lu_ref_del(&oldres->lr_reference, "lock", lock);
-@@ -1964,11 +1964,11 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 	va_list args;
- 	struct va_format vaf;
- 
--	if (spin_trylock(&lock->l_lock)) {
--		if (lock->l_resource)
--			resource = ldlm_resource_getref(lock->l_resource);
--		spin_unlock(&lock->l_lock);
--	}
-+	rcu_read_lock();
-+	resource = rcu_dereference(lock->l_resource);
-+	if (resource && !atomic_inc_not_zero(&resource->lr_refcount))
-+		resource = NULL;
-+	rcu_read_unlock();
- 
- 	va_start(args, fmt);
- 	vaf.fmt = fmt;
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index 589b89d..ea87fd6 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -1097,6 +1097,23 @@ static int ldlm_cleanup(void)
- 	return 0;
- }
- 
-+void ldlm_resource_init_once(void *p)
-+{
-+	/*
-+	 * It is import to initialise the spinlock only once,
-+	 * as ldlm_lock_change_resource() could try to lock
-+	 * the resource *after* it has been freed and possibly
-+	 * reused. SLAB_TYPESAFE_BY_RCU ensures the memory won't
-+	 * be freed while the lock is being taken, but we need to
-+	 * ensure that it doesn't get reinitialized either.
-+	 */
-+	struct ldlm_resource *res = p;
-+
-+	memset(res, 0, sizeof(*res));
-+	mutex_init(&res->lr_lvb_mutex);
-+	spin_lock_init(&res->lr_lock);
-+}
-+
- int ldlm_init(void)
- {
- 	mutex_init(&ldlm_ref_mutex);
-@@ -1104,7 +1121,9 @@ int ldlm_init(void)
- 	mutex_init(ldlm_namespace_lock(LDLM_NAMESPACE_CLIENT));
- 	ldlm_resource_slab = kmem_cache_create("ldlm_resources",
- 					       sizeof(struct ldlm_resource), 0,
--					       SLAB_HWCACHE_ALIGN, NULL);
-+					       SLAB_TYPESAFE_BY_RCU |
-+					       SLAB_HWCACHE_ALIGN,
-+					       ldlm_resource_init_once);
- 	if (!ldlm_resource_slab)
- 		return -ENOMEM;
- 
-diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
-index 45b2e97..d79f70d 100644
---- a/fs/lustre/ldlm/ldlm_resource.c
-+++ b/fs/lustre/ldlm/ldlm_resource.c
-@@ -994,12 +994,14 @@ static struct ldlm_resource *ldlm_resource_new(enum ldlm_type ldlm_type)
- {
- 	struct ldlm_resource *res;
- 
--	res = kmem_cache_zalloc(ldlm_resource_slab, GFP_NOFS);
-+	res = kmem_cache_alloc(ldlm_resource_slab, GFP_NOFS);
- 	if (!res)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&res->lr_granted);
- 	INIT_LIST_HEAD(&res->lr_waiting);
-+	res->lr_lvb_inode = NULL;
-+	res->lr_lvb_len = 0;
- 
- 	if (ldlm_type == LDLM_EXTENT) {
- 		int idx;
-@@ -1017,16 +1019,15 @@ static struct ldlm_resource *ldlm_resource_new(enum ldlm_type ldlm_type)
- 			res->lr_itree[idx].lit_mode = 1 << idx;
- 			res->lr_itree[idx].lit_root = RB_ROOT_CACHED;
+diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
+index 3f46298..9c9ad9c 100644
+--- a/fs/lustre/obdclass/genops.c
++++ b/fs/lustre/obdclass/genops.c
+@@ -113,15 +113,17 @@ static struct obd_type *class_get_type(const char *name)
  		}
+ 	}
+ 	if (type) {
+-		spin_lock(&type->obd_type_lock);
+-		type->typ_refcnt++;
+-		try_module_get(type->typ_dt_ops->owner);
+-		spin_unlock(&type->obd_type_lock);
+-		/* class_search_type() returned a counted reference,
+-		 * but we don't need that count any more as
+-		 * we have one through typ_refcnt.
+-		 */
+-		kobject_put(&type->typ_kobj);
++		if (try_module_get(type->typ_dt_ops->owner)) {
++			atomic_inc(&type->typ_refcnt);
++			/* class_search_type() returned a counted reference,
++			 * but we don't need that count any more as
++			 * we have one through typ_refcnt.
++			 */
++			kobject_put(&type->typ_kobj);
++		} else {
++			kobject_put(&type->typ_kobj);
++			type = NULL;
++		}
+ 	}
+ 	return type;
+ }
+@@ -129,10 +131,8 @@ static struct obd_type *class_get_type(const char *name)
+ void class_put_type(struct obd_type *type)
+ {
+ 	LASSERT(type);
+-	spin_lock(&type->obd_type_lock);
+-	type->typ_refcnt--;
+ 	module_put(type->typ_dt_ops->owner);
+-	spin_unlock(&type->obd_type_lock);
++	atomic_dec(&type->typ_refcnt);
+ }
+ 
+ static void class_sysfs_release(struct kobject *kobj)
+@@ -193,7 +193,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	/* md_ops is optional */
+ 	if (md_ops)
+ 		*type->typ_md_ops = *md_ops;
+-	spin_lock_init(&type->obd_type_lock);
+ 
+ 	if (ldt) {
+ 		type->typ_lu = ldt;
+@@ -220,8 +219,8 @@ int class_unregister_type(const char *name)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (type->typ_refcnt) {
+-		CERROR("type %s has refcount (%d)\n", name, type->typ_refcnt);
++	if (atomic_read(&type->typ_refcnt)) {
++		CERROR("type %s has refcount (%d)\n", name, atomic_read(&type->typ_refcnt));
+ 		/* This is a bad situation, let's make the best of it */
+ 		/* Remove ops, but leave the name for debugging */
+ 		kfree(type->typ_dt_ops);
+diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
+index 9c872db..770cc1b 100644
+--- a/fs/lustre/obdclass/lu_object.c
++++ b/fs/lustre/obdclass/lu_object.c
+@@ -1267,7 +1267,7 @@ void lu_stack_fini(const struct lu_env *env, struct lu_device *top)
+ 		next = ldt->ldt_ops->ldto_device_free(env, scan);
+ 		type = ldt->ldt_obd_type;
+ 		if (type) {
+-			type->typ_refcnt--;
++			atomic_dec(&type->typ_refcnt);
+ 			class_put_type(type);
+ 		}
+ 	}
+diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
+index 0cdadea4..0da69f6 100644
+--- a/fs/lustre/obdclass/obd_config.c
++++ b/fs/lustre/obdclass/obd_config.c
+@@ -743,25 +743,6 @@ void class_put_profile(struct lustre_profile *lprof)
+ }
+ EXPORT_SYMBOL(class_put_profile);
+ 
+-/* COMPAT_146 */
+-void class_del_profiles(void)
+-{
+-	struct lustre_profile *lprof, *n;
+-
+-	spin_lock(&lustre_profile_list_lock);
+-	list_for_each_entry_safe(lprof, n, &lustre_profile_list, lp_list) {
+-		list_del(&lprof->lp_list);
+-		lprof->lp_list_deleted = true;
+-		spin_unlock(&lustre_profile_list_lock);
+-
+-		class_put_profile(lprof);
+-
+-		spin_lock(&lustre_profile_list_lock);
 -	}
-+	} else
-+		res->lr_itree = NULL;
- 
- 	atomic_set(&res->lr_refcount, 1);
--	spin_lock_init(&res->lr_lock);
- 	lu_ref_init(&res->lr_reference);
- 
- 	/* The creator of the resource must unlock the mutex after LVB
- 	 * initialization.
- 	 */
--	mutex_init(&res->lr_lvb_mutex);
- 	mutex_lock(&res->lr_lvb_mutex);
- 
- 	return res;
+-	spin_unlock(&lustre_profile_list_lock);
+-}
+-EXPORT_SYMBOL(class_del_profiles);
+-
+ /* We can't call lquota_process_config directly because
+  * it lives in a module that must be loaded after this one.
+  */
 -- 
 1.8.3.1
