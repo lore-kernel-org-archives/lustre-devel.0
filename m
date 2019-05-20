@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 20 May 2019 08:50:51 -0400
-Subject: [lustre-devel] [PATCH v2 09/29] lustre: obd_type: discard obd_types
- linked list.
+Date: Mon, 20 May 2019 08:50:46 -0400
+Subject: [lustre-devel] [PATCH v2 04/29] lustre: lov: use GFP_NOFS to
+ allocate lo_entries.
 In-Reply-To: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1558356671-29599-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1558356671-29599-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,157 +13,71 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-As all obd_types are kobjects in the lustre_kset kset,
-they are linked together in that kset and don't
-need any extra linkage.
+lo_type_guard is taken during memory reclaim:
 
-There are non-obd_type objects in lustre_kset, added by
-class_setup_tunables(). These have a different ->ktype, so we are
-careful to only return objects with the correct ->ktype.
+               -> #0 (&lov->lo_type_guard){++++}:
+[  576.552501]        down_read+0x27/0x7c
+[  576.553072]        lov_object_delete+0xd5/0x1bb
+[  576.553836]        lu_object_free+0x5f/0x111
+[  576.554524]        lu_object_put+0x313/0x337
+[  576.555267]        cl_inode_fini+0x158/0x1ac
+[  576.555898]        ll_delete_inode+0xcc/0xd5
+[  576.556572]        evict+0xb4/0x166
+[  576.557162]        dispose_list+0x30/0x34
+[  576.557834]        prune_icache_sb+0x55/0x73
+[  576.558465]        super_cache_scan+0x122/0x16d
+[  576.559138]        shrink_slab.part.22.constprop.37+0x27b/0x414
+[  576.560059]        shrink_node+0x8d/0x1b3
 
-As kset_find_obj() returns a counted reference, we need
-to put that reference when done.
+and lov_init_composite is called while lo_type_guard is held:
+
+[  576.540707]        lov_init_composite+0xff/0xc5f
+[  576.541496]        lov_conf_set+0x4cf/0x658
+[  576.542179]        cl_conf_set+0x49/0x58
+[  576.542790]        cl_file_inode_init+0x21a/0x2b8
+[  576.543564]        ll_update_inode+0x4e/0xea5
+[  576.544277]        ll_iget+0x112/0x1bf
+[  576.544871]        ll_prep_inode+0x242/0x43d
+[  576.545541]        ll_lookup_it_finish+0xcf/0x51d
+[  576.546308]        ll_lookup_it+0x52e/0x5fc
+[  576.546976]        ll_atomic_open+0x1ce/0x74f
+[  576.547666]        lookup_open+0x298/0x526
+[  576.548325]        path_openat+0x29a/0x7d3
+[  576.548917]        do_filp_open+0x57/0xc1
+[  576.549539]        do_sys_open+0x137/0x1e7
+
+so it is not safe to use GFP_KERNEL in lov_init_composite().
+
+Use GFP_NOFS instead.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- fs/lustre/include/obd.h     |  1 -
- fs/lustre/obdclass/genops.c | 42 ++++++++++++++++++++----------------------
- 2 files changed, 20 insertions(+), 23 deletions(-)
+ fs/lustre/lov/lov_object.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index 6bf052a..4c58b91 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -99,7 +99,6 @@ struct obd_info {
- };
+diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
+index 2058275..261f7b7 100644
+--- a/fs/lustre/lov/lov_object.c
++++ b/fs/lustre/lov/lov_object.c
+@@ -216,8 +216,8 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
+ 	r0->lo_nr = lse->lsme_stripe_count;
+ 	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
  
- struct obd_type {
--	struct list_head	 typ_chain;
- 	struct obd_ops		*typ_dt_ops;
- 	struct md_ops		*typ_md_ops;
- 	struct dentry		*typ_debugfs_entry;
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index 7be779f..3f46298 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -42,8 +42,6 @@
- #include <lprocfs_status.h>
- #include <lustre_kernelcomm.h>
- 
--static DEFINE_SPINLOCK(obd_types_lock);
--static LIST_HEAD(obd_types);
- DEFINE_RWLOCK(obd_dev_lock);
- static struct obd_device *obd_devs[MAX_OBD_DEVICES];
- 
-@@ -52,6 +50,7 @@
- EXPORT_SYMBOL(obdo_cachep);
- static struct kmem_cache *import_cachep;
- 
-+static struct kobj_type class_ktype;
- static struct workqueue_struct *zombie_wq;
- static void obd_zombie_export_add(struct obd_export *exp);
- static void obd_zombie_import_add(struct obd_import *imp);
-@@ -88,23 +87,20 @@ static void obd_device_free(struct obd_device *obd)
- 
- static struct obd_type *class_search_type(const char *name)
- {
--	struct obd_type *type;
-+	struct kobject *kobj = kset_find_obj(lustre_kset, name);
- 
--	spin_lock(&obd_types_lock);
--	list_for_each_entry(type, &obd_types, typ_chain) {
--		if (strcmp(type->typ_name, name) == 0) {
--			spin_unlock(&obd_types_lock);
--			return type;
--		}
--	}
--	spin_unlock(&obd_types_lock);
-+	if (kobj && kobj->ktype == &class_ktype)
-+		return container_of(kobj, struct obd_type, typ_kobj);
-+
-+	kobject_put(kobj);
- 	return NULL;
- }
- 
- static struct obd_type *class_get_type(const char *name)
- {
--	struct obd_type *type = class_search_type(name);
-+	struct obd_type *type;
- 
-+	type = class_search_type(name);
- 	if (!type) {
- 		const char *modname = name;
- 
-@@ -121,6 +117,11 @@ static struct obd_type *class_get_type(const char *name)
- 		type->typ_refcnt++;
- 		try_module_get(type->typ_dt_ops->owner);
- 		spin_unlock(&type->obd_type_lock);
-+		/* class_search_type() returned a counted reference,
-+		 * but we don't need that count any more as
-+		 * we have one through typ_refcnt.
-+		 */
-+		kobject_put(&type->typ_kobj);
- 	}
- 	return type;
- }
-@@ -140,10 +141,6 @@ static void class_sysfs_release(struct kobject *kobj)
- 
- 	debugfs_remove_recursive(type->typ_debugfs_entry);
- 
--	spin_lock(&obd_types_lock);
--	list_del(&type->typ_chain);
--	spin_unlock(&obd_types_lock);
--
- 	kfree(type->typ_md_ops);
- 	kfree(type->typ_dt_ops);
- 	kfree(type);
-@@ -166,8 +163,10 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 	/* sanity check */
- 	LASSERT(strnlen(name, CLASS_MAX_NAME) < CLASS_MAX_NAME);
- 
--	if (class_search_type(name)) {
-+	type = class_search_type(name);
-+	if (type) {
- 		CDEBUG(D_IOCTL, "Type %s already registered\n", name);
-+		kobject_put(&type->typ_kobj);
- 		return -EEXIST;
- 	}
- 
-@@ -175,7 +174,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 	if (!type)
+-	r0->lo_sub = kvzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
+-			      GFP_KERNEL);
++	r0->lo_sub = kzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
++			      GFP_NOFS);
+ 	if (!r0->lo_sub)
  		return -ENOMEM;
  
--	INIT_LIST_HEAD(&type->typ_chain);
- 	type->typ_kobj.kset = lustre_kset;
- 	rc = kobject_init_and_add(&type->typ_kobj, &class_ktype,
- 				  &lustre_kset->kobj, "%s", name);
-@@ -204,10 +202,6 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 			goto failed;
- 	}
+@@ -302,7 +302,7 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 	comp->lo_entry_count = entry_count;
  
--	spin_lock(&obd_types_lock);
--	list_add(&type->typ_chain, &obd_types);
--	spin_unlock(&obd_types_lock);
--
- 	return 0;
+ 	comp->lo_entries = kcalloc(entry_count, sizeof(*comp->lo_entries),
+-				   GFP_KERNEL);
++				   GFP_NOFS);
+ 	if (!comp->lo_entries)
+ 		return -ENOMEM;
  
- failed:
-@@ -232,12 +226,16 @@ int class_unregister_type(const char *name)
- 		/* Remove ops, but leave the name for debugging */
- 		kfree(type->typ_dt_ops);
- 		kfree(type->typ_md_ops);
-+		kobject_put(&type->typ_kobj);
- 		return -EBUSY;
- 	}
- 
- 	if (type->typ_lu)
- 		lu_device_type_fini(type->typ_lu);
- 
-+	/* Put the ref returned by class_search_type() */
-+	kobject_put(&type->typ_kobj);
-+	/* Put the final ref */
- 	kobject_put(&type->typ_kobj);
- 
- 	return 0;
 -- 
 1.8.3.1
