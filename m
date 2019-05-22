@@ -1,10 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 22 May 2019 13:54:37 +1000
-Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
-In-Reply-To: <1558356671-29599-2-git-send-email-jsimmons@infradead.org>
+Date: Wed, 22 May 2019 14:22:26 +1000
+Subject: [lustre-devel] [PATCH v2 05/29] lustre: llite: don't use
+ class_setup_tunables()
+In-Reply-To: <1558356671-29599-6-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <87blzvw3cy.fsf@notabene.neil.brown.name>
+ <1558356671-29599-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <878suzw22l.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,72 +14,140 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, May 20 2019, James Simmons wrote:
 
-> From: Patrick Farrell <pfarrell@whamcloud.com>
+> llite is very different from the other types of lustre devices.
+> Since this is the case llite should register independently. Doing
+> this allows us to cleanup the debugfs registering in the release
+> function of struct kobj_type.
 >
-> Various error conditions in the fault path can cause us to
-> not return a page in vm_fault.  Check if it's present
-> before accessing it.
-
-I cannot find any error conditions that would leave ->page NULL,
-but that wouldn't set one of
-  VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED
-in 'result'.
-
-Can someone provide an example?
-
-(I have seen crashes with vmf->page being NULL, but they were caused
- by VM_FAULT_RETRY being #defined to 0 as lustre/llite/llite_internal.h
- still does on OpenSFS lustre)
-
->
-> Additionally, it's not valid to return VM_FAULT_NOPAGE for
-> page faults.  The correct return when accessing a page that
-> does not exist is VM_FAULT_SIGBUS.  Correcting this avoids
-> looping infinitely in the testcase.
-
-I agree with that.  VM_FAULT_NOPAGE is valid for page_mkwrite - and
-ll_page_mkwrite() has separate code to choose VM_FAULT_NOPAGE.
-So the change to to_fault_error() is valid.
-
-NeilBrown
-
-
->
-> Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-11403
-> Reviewed-on: https://review.whamcloud.com/34247
-> Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-> Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+> Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
+> Reviewed-on: https://review.whamcloud.com/34292
+> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> Reviewed-by: Ben Evans <bevans@cray.com>
 > Reviewed-by: Oleg Drokin <green@whamcloud.com>
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  fs/lustre/llite/llite_mmap.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
+>  fs/lustre/llite/lproc_llite.c | 41 ++++++++++++++++++++++++++++++-----------
+>  1 file changed, 30 insertions(+), 11 deletions(-)
 >
-> diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-> index 1865db1..c8e57ad 100644
-> --- a/fs/lustre/llite/llite_mmap.c
-> +++ b/fs/lustre/llite/llite_mmap.c
-> @@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
->  	case 0:
->  		result = VM_FAULT_LOCKED;
->  		break;
-> -	case -EFAULT:
-> -		result = VM_FAULT_NOPAGE;
-> -		break;
->  	case -ENOMEM:
->  		result = VM_FAULT_OOM;
->  		break;
-> @@ -366,7 +363,8 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+> diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+> index 5de8462..91b0a50 100644
+> --- a/fs/lustre/llite/lproc_llite.c
+> +++ b/fs/lustre/llite/lproc_llite.c
+> @@ -42,18 +42,40 @@
+>  static struct kobject *llite_kobj;
+>  static struct dentry *llite_root;
 >  
->  restart:
->  	result = __ll_fault(vmf->vma, vmf);
-> -	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
-> +	if (vmf->page &&
-> +	    !(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
->  		struct page *vmpage = vmf->page;
+> +static void llite_kobj_release(struct kobject *kobj)
+> +{
+> +	if (!IS_ERR_OR_NULL(llite_root)) {
+> +		debugfs_remove(llite_root);
+> +		llite_root = NULL;
+> +	}
+> +
+> +	kfree(kobj);
+> +}
+> +
+> +static struct kobj_type llite_kobj_ktype = {
+> +	.release	= llite_kobj_release,
+> +	.sysfs_ops	= &lustre_sysfs_ops,
+> +};
+> +
+>  int llite_tunables_register(void)
+>  {
+> -	int rc = 0;
+> +	int rc;
+> +
+> +	llite_kobj = kzalloc(sizeof(*llite_kobj), GFP_KERNEL);
+> +	if (!llite_kobj)
+> +		return -ENOMEM;
 >  
->  		/* check if this page has been truncated */
+> -	llite_kobj = class_setup_tunables("llite");
+> -	if (IS_ERR(llite_kobj))
+> -		return PTR_ERR(llite_kobj);
+> +	llite_kobj->kset = lustre_kset;
+> +	rc = kobject_init_and_add(llite_kobj, &llite_kobj_ktype,
+> +				  &lustre_kset->kobj, "%s", "llite");
+> +	if (rc)
+> +		goto free_kobj;
+>  
+>  	llite_root = debugfs_create_dir("llite", debugfs_lustre_root);
+>  	if (IS_ERR_OR_NULL(llite_root)) {
+>  		rc = llite_root ? PTR_ERR(llite_root) : -ENOMEM;
+>  		llite_root = NULL;
+> +free_kobj:
+>  		kobject_put(llite_kobj);
+>  		llite_kobj = NULL;
+
+eeek.  Goto into the inside of an if/then clause is .... not my
+favourite.
+
+> +	rc = kobject_init_and_add(llite_kobj, &llite_kobj_ktype,
+> +				  &lustre_kset->kobj, "%s", "llite");
+> +	if (rc)
+> +		goto free_kobj;
+>  
+>  	llite_root = debugfs_create_dir("llite", debugfs_lustre_root);
+>  	if (IS_ERR_OR_NULL(llite_root)) {
+>  		rc = llite_root ? PTR_ERR(llite_root) : -ENOMEM;
+>  		llite_root = NULL;
+                goto free_kobj;
+        }
+        return 0;
+> +free_kobj:
+> 	kobject_put(llite_kobj);
+> 	llite_kobj = NULL;
+        return rc;
+
+Isn't that much cleaner?
+
+Otherwise, I like the patch.
+
+Thanks,
+NeilBrown
+
+
+>  	}
+> @@ -65,9 +87,6 @@ void llite_tunables_unregister(void)
+>  {
+>  	kobject_put(llite_kobj);
+>  	llite_kobj = NULL;
+> -
+> -	debugfs_remove(llite_root);
+> -	llite_root = NULL;
+>  }
+>  
+>  /* debugfs llite mount point registration */
+> @@ -1216,17 +1235,17 @@ static ssize_t ll_nosquash_nids_seq_write(struct file *file,
+>  	NULL,
+>  };
+>  
+> -static void llite_kobj_release(struct kobject *kobj)
+> +static void sbi_kobj_release(struct kobject *kobj)
+>  {
+>  	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+>  					      ll_kset.kobj);
+>  	complete(&sbi->ll_kobj_unregister);
+>  }
+>  
+> -static struct kobj_type llite_ktype = {
+> +static struct kobj_type sbi_ktype = {
+>  	.default_attrs	= llite_attrs,
+>  	.sysfs_ops	= &lustre_sysfs_ops,
+> -	.release	= llite_kobj_release,
+> +	.release	= sbi_kobj_release,
+>  };
+>  
+>  static const struct llite_file_opcode {
+> @@ -1384,7 +1403,7 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
+>  out_ll_kset:
+>  	/* Yes we also register sysfs mount kset here as well */
+>  	sbi->ll_kset.kobj.parent = llite_kobj;
+> -	sbi->ll_kset.kobj.ktype = &llite_ktype;
+> +	sbi->ll_kset.kobj.ktype = &sbi_ktype;
+>  	init_completion(&sbi->ll_kobj_unregister);
+>  	err = kobject_set_name(&sbi->ll_kset.kobj, "%s", name);
+>  	if (err)
 > -- 
 > 1.8.3.1
 -------------- next part --------------
@@ -87,4 +156,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190522/29599858/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190522/757f908a/attachment.sig>
