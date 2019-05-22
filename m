@@ -1,109 +1,104 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 22 May 2019 16:53:08 +1000
-Subject: [lustre-devel] [PATCH v2 10/29] lustre: obd_type: discard
- obd_type_lock
-In-Reply-To: <1558356671-29599-11-git-send-email-jsimmons@infradead.org>
+From: Patrick Farrell <pfarrell@whamcloud.com>
+Date: Wed, 22 May 2019 12:48:37 +0000
+Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
+In-Reply-To: <87blzvw3cy.fsf@notabene.neil.brown.name>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-11-git-send-email-jsimmons@infradead.org>
-Message-ID: <87zhnfugiz.fsf@notabene.neil.brown.name>
+ <1558356671-29599-2-git-send-email-jsimmons@infradead.org>,
+ <87blzvw3cy.fsf@notabene.neil.brown.name>
+Message-ID: <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Neil,
+
+If you can?t find any, I imagine they don?t exist, at least in your branch, given that difference you cited.
+
+The particular case we had is here:
+https://jira.whamcloud.com/browse/LU-11403
+
+Which is when the file exists but has no striping info, and hence no data.
+
+- Patrick
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Tuesday, May 21, 2019 10:54:37 PM
+To: James Simmons; Andreas Dilger; Oleg Drokin
+Cc: Lustre Development List; Patrick Farrell; James Simmons
+Subject: Re: [PATCH v2 01/29] lustre: llite: ll_fault fixes
+
 On Mon, May 20 2019, James Simmons wrote:
 
-> From: NeilBrown <neilb@suse.com>
+> From: Patrick Farrell <pfarrell@whamcloud.com>
 >
-> This lock is only used to protect typ_refcnt, so change
-> that to an atomic_t and discard the lock.
->
-> The lock also covers calls to try_module_get and module_put,
-> but this serves no purpose as it does not prevent the module
-> from being unloaded.
->
-> Finally, the return value for the call to try_module_get is
-> ignored, which is not safe.
->
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  fs/lustre/include/obd.h         |  3 +--
->  fs/lustre/include/obd_class.h   |  1 -
->  fs/lustre/mdc/mdc_request.c     |  2 +-
->  fs/lustre/mgc/mgc_request.c     |  7 -------
->  fs/lustre/obdclass/genops.c     | 29 ++++++++++++++---------------
->  fs/lustre/obdclass/lu_object.c  |  2 +-
->  fs/lustre/obdclass/obd_config.c | 19 -------------------
->  7 files changed, 17 insertions(+), 46 deletions(-)
->
-> diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-> index 4c58b91..61fb815 100644
-> --- a/fs/lustre/include/obd.h
-> +++ b/fs/lustre/include/obd.h
-> @@ -102,9 +102,8 @@ struct obd_type {
->  	struct obd_ops		*typ_dt_ops;
->  	struct md_ops		*typ_md_ops;
->  	struct dentry		*typ_debugfs_entry;
-> -	int			 typ_refcnt;
-> +	atomic_t		 typ_refcnt;
->  	struct lu_device_type	*typ_lu;
-> -	spinlock_t		 obd_type_lock;
->  	struct kobject		 typ_kobj;
->  };
->  #define typ_name typ_kobj.name
-> diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-> index 742cb9a4..a853ed5 100644
-> --- a/fs/lustre/include/obd_class.h
-> +++ b/fs/lustre/include/obd_class.h
-> @@ -210,7 +210,6 @@ struct lustre_profile {
->  struct lustre_profile *class_get_profile(const char *prof);
->  void class_del_profile(const char *prof);
->  void class_put_profile(struct lustre_profile *lprof);
-> -void class_del_profiles(void);
->  
->  #if LUSTRE_TRACKS_LOCK_EXP_REFS
->  
-> diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-> index bc764f9..705a4e3 100644
-> --- a/fs/lustre/mdc/mdc_request.c
-> +++ b/fs/lustre/mdc/mdc_request.c
-> @@ -2542,7 +2542,7 @@ static int mdc_init_ea_size(struct obd_export *exp, u32 easize, u32 def_easize)
->  static int mdc_precleanup(struct obd_device *obd)
->  {
->  	/* Failsafe, ok if racy */
-> -	if (obd->obd_type->typ_refcnt <= 1)
-> +	if (atomic_read(&obd->obd_type->typ_refcnt) <= 1)
->  		libcfs_kkuc_group_rem(0, KUC_GRP_HSM);
->  
->  	mdc_changelog_cdev_finish(obd);
-> diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
-> index 84ba6d0..d8be54d 100644
-> --- a/fs/lustre/mgc/mgc_request.c
-> +++ b/fs/lustre/mgc/mgc_request.c
-> @@ -712,13 +712,6 @@ static int mgc_precleanup(struct obd_device *obd)
->  
->  static int mgc_cleanup(struct obd_device *obd)
->  {
-> -	/* COMPAT_146 - old config logs may have added profiles we don't
-> -	 * know about
-> -	 */
-> -	if (obd->obd_type->typ_refcnt <= 1)
-> -		/* Only for the last mgc */
-> -		class_del_profiles();
-> -
+> Various error conditions in the fault path can cause us to
+> not return a page in vm_fault.  Check if it's present
+> before accessing it.
 
-You didn't add any text to the change log describing this change!!!!
+I cannot find any error conditions that would leave ->page NULL,
+but that wouldn't set one of
+  VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED
+in 'result'.
 
-Could you please post it as a separate patch - it is only tangentially
-related to the changes in this patch.
+Can someone provide an example?
 
-Thanks,
+(I have seen crashes with vmf->page being NULL, but they were caused
+ by VM_FAULT_RETRY being #defined to 0 as lustre/llite/llite_internal.h
+ still does on OpenSFS lustre)
+
+>
+> Additionally, it's not valid to return VM_FAULT_NOPAGE for
+> page faults.  The correct return when accessing a page that
+> does not exist is VM_FAULT_SIGBUS.  Correcting this avoids
+> looping infinitely in the testcase.
+
+I agree with that.  VM_FAULT_NOPAGE is valid for page_mkwrite - and
+ll_page_mkwrite() has separate code to choose VM_FAULT_NOPAGE.
+So the change to to_fault_error() is valid.
+
 NeilBrown
+
+
+>
+> Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-11403
+> Reviewed-on: https://review.whamcloud.com/34247
+> Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+> Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+> Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  fs/lustre/llite/llite_mmap.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
+> index 1865db1..c8e57ad 100644
+> --- a/fs/lustre/llite/llite_mmap.c
+> +++ b/fs/lustre/llite/llite_mmap.c
+> @@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
+>        case 0:
+>                result = VM_FAULT_LOCKED;
+>                break;
+> -     case -EFAULT:
+> -             result = VM_FAULT_NOPAGE;
+> -             break;
+>        case -ENOMEM:
+>                result = VM_FAULT_OOM;
+>                break;
+> @@ -366,7 +363,8 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+>
+>  restart:
+>        result = __ll_fault(vmf->vma, vmf);
+> -     if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
+> +     if (vmf->page &&
+> +         !(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
+>                struct page *vmpage = vmf->page;
+>
+>                /* check if this page has been truncated */
+> --
+> 1.8.3.1
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190522/2283efe8/attachment-0001.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190522/58f60308/attachment.html>
