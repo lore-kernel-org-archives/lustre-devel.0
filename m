@@ -1,104 +1,109 @@
-From: Patrick Farrell <pfarrell@whamcloud.com>
-Date: Wed, 22 May 2019 12:48:37 +0000
-Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
-In-Reply-To: <87blzvw3cy.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 22 May 2019 19:51:57 +0100 (BST)
+Subject: [lustre-devel] [PATCH v2 07/29] lustre: obd: collect all
+ resource releasing for obj_type.
+In-Reply-To: <1558356671-29599-8-git-send-email-jsimmons@infradead.org>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-2-git-send-email-jsimmons@infradead.org>,
- <87blzvw3cy.fsf@notabene.neil.brown.name>
-Message-ID: <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>
+ <1558356671-29599-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <alpine.LFD.2.21.1905221918410.26312@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Neil,
 
-If you can?t find any, I imagine they don?t exist, at least in your branch, given that difference you cited.
-
-The particular case we had is here:
-https://jira.whamcloud.com/browse/LU-11403
-
-Which is when the file exists but has no striping info, and hence no data.
-
-- Patrick
-________________________________
-From: NeilBrown <neilb@suse.com>
-Sent: Tuesday, May 21, 2019 10:54:37 PM
-To: James Simmons; Andreas Dilger; Oleg Drokin
-Cc: Lustre Development List; Patrick Farrell; James Simmons
-Subject: Re: [PATCH v2 01/29] lustre: llite: ll_fault fixes
-
-On Mon, May 20 2019, James Simmons wrote:
-
-> From: Patrick Farrell <pfarrell@whamcloud.com>
+>>  int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+>> @@ -181,10 +163,17 @@ int class_register_type(struct obd_ops *dt_ops, 
+>struct md_ops *md_ops,
+>>  		return -EEXIST;
+>>  	}
+>>  
+>> -	rc = -ENOMEM;
+>>  	type = kzalloc(sizeof(*type), GFP_NOFS);
+>>  	if (!type)
+>> -		return rc;
+>> +		return -ENOMEM;
+>> +
+>> +	type->typ_kobj.kset = lustre_kset;
+>> +	rc = kobject_init_and_add(&type->typ_kobj, &class_ktype,
+>> +				  &lustre_kset->kobj, "%s", name);
 >
-> Various error conditions in the fault path can cause us to
-> not return a page in vm_fault.  Check if it's present
-> before accessing it.
-
-I cannot find any error conditions that would leave ->page NULL,
-but that wouldn't set one of
-  VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED
-in 'result'.
-
-Can someone provide an example?
-
-(I have seen crashes with vmf->page being NULL, but they were caused
- by VM_FAULT_RETRY being #defined to 0 as lustre/llite/llite_internal.h
- still does on OpenSFS lustre)
-
+>I don't know that I would actually cause a problem, but I don't like
+>"add"ing and object (above) before fully initializing it (below).  So
+>I've kept the split from my version where kobject_init() happens early
+>and kobject_add() happens later.
+>I've included the other changes that you made.
 >
-> Additionally, it's not valid to return VM_FAULT_NOPAGE for
-> page faults.  The correct return when accessing a page that
-> does not exist is VM_FAULT_SIGBUS.  Correcting this avoids
-> looping infinitely in the testcase.
+>Thanks,
+>NeilBrown
 
-I agree with that.  VM_FAULT_NOPAGE is valid for page_mkwrite - and
-ll_page_mkwrite() has separate code to choose VM_FAULT_NOPAGE.
-So the change to to_fault_error() is valid.
+The reason I did it that way was to handle the server case down the road.
+So for the case when both client and server are on the same node, and yes
+people do such setups for testing this is important.
 
-NeilBrown
+Consider the case we have both the lov and lod layer on a single node. 
+Both layers attempt to create "lov" obd_type. When the lov module loads 
+first then a complete obd_type is created. Once lod loads then it just 
+uses real lov obd_type and creates the needed symlinks. You end up with
 
+ls -al /sys/fs/lustre/lov/
+total 0
+drwxr-xr-x  2 root root 0 May 22 14:27 .
+drwxr-xr-x 14 root root 0 May 22 14:27 ..
+lrwxrwxrwx  1 root root 0 May 22 14:27 lustre-MDT0000-mdtlov -> 
+../lod/lustre-MDT0000-mdtlov
+lrwxrwxrwx  1 root root 0 May 22 14:27 lustre-MDT0002-mdtlov -> 
+../lod/lustre-MDT0002-mdtlov
 
->
-> Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-11403
-> Reviewed-on: https://review.whamcloud.com/34247
-> Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-> Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
-> Reviewed-by: Oleg Drokin <green@whamcloud.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->  fs/lustre/llite/llite_mmap.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-> index 1865db1..c8e57ad 100644
-> --- a/fs/lustre/llite/llite_mmap.c
-> +++ b/fs/lustre/llite/llite_mmap.c
-> @@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
->        case 0:
->                result = VM_FAULT_LOCKED;
->                break;
-> -     case -EFAULT:
-> -             result = VM_FAULT_NOPAGE;
-> -             break;
->        case -ENOMEM:
->                result = VM_FAULT_OOM;
->                break;
-> @@ -366,7 +363,8 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
->
->  restart:
->        result = __ll_fault(vmf->vma, vmf);
-> -     if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
-> +     if (vmf->page &&
-> +         !(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
->                struct page *vmpage = vmf->page;
->
->                /* check if this page has been truncated */
-> --
-> 1.8.3.1
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190522/58f60308/attachment.html>
+Plus the real lov obd devices.
+
+Now if lod loads first then the lod module creates a "lov" obd_type
+using class_create_symlink() but is not fully initialized nor does
+it need to be. If the client lov module is present and it loads then
+it takes the "lov" obd_type create by the lod and finishes initializing
+it.
+
+Looking at the final code and added in server case:
+
+        type = class_search_type(name);
+        if (type) {
+                kobject_put(&type->typ_kobj);
+		if (strcmp(name, LUSTRE_LOV_NAME) == 0 ||
+                    strcmp(name, LUSTRE_OSC_NAME) == 0)
+                        goto dir_exist;
+		CDEBUG(D_IOCTL, "Type %s already registered\n", name);
+                return -EEXIST;
+        }
+
+        type = kzalloc(sizeof(*type), GFP_NOFS);
+        if (!type)
+                return rc;
+
+        type->typ_kobj.kset = lustre_kset;
+        kobject_init(&type->typ_kobj, &class_ktype);
+
+        type->typ_dt_ops = dt_ops;  /* lov obd_type is never set to the 
+				     * correct values if lod created it.
+				     */
+        type->typ_md_ops = md_ops;
+
+        rc = kobject_add(&type->typ_kobj, &lustre_kset->kobj, "%s", name);
+        if (rc)
+                goto failed;
+
+        type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
+                                                     debugfs_lustre_root);
+dir_exit:
+
+Now if this needed for the later module handling patches I guess we could
+do:
+
+	if (strcmp(name, LUSTRE_LOV_NAME) == 0 ||
+            strcmp(name, LUSTRE_OSC_NAME) == 0) {
+		type->typ_dt_ops = dt_ops;
+		type->typ_md_ops = md_ops;
+		goto dir_exist;
+	}
+
+Is that the case?
