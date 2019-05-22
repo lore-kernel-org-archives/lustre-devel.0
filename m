@@ -1,11 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 22 May 2019 20:06:11 +0100 (BST)
-Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
-In-Reply-To: <87blzvw3cy.fsf@notabene.neil.brown.name>
+Date: Wed, 22 May 2019 20:24:48 +0100 (BST)
+Subject: [lustre-devel] [PATCH v2 10/29] lustre: obd_type: discard
+ obd_type_lock
+In-Reply-To: <87zhnfugiz.fsf@notabene.neil.brown.name>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-2-git-send-email-jsimmons@infradead.org>
- <87blzvw3cy.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1905222005120.26312@casper.infradead.org>
+ <1558356671-29599-11-git-send-email-jsimmons@infradead.org>
+ <87zhnfugiz.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1905222023590.2256@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,78 +14,91 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > From: Patrick Farrell <pfarrell@whamcloud.com>
+> On Mon, May 20 2019, James Simmons wrote:
+> 
+> > From: NeilBrown <neilb@suse.com>
 > >
-> > Various error conditions in the fault path can cause us to
-> > not return a page in vm_fault.  Check if it's present
-> > before accessing it.
-> 
-> I cannot find any error conditions that would leave ->page NULL,
-> but that wouldn't set one of
->   VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED
-> in 'result'.
-> 
-> Can someone provide an example?
-
-Reproducer is here:
-
-https://review.whamcloud.com/#/c/34247/7/lustre/tests/mmap_mknod_test.c
-
-Just run mmap_mknod_test "file" and it will show this problem.
-
-> (I have seen crashes with vmf->page being NULL, but they were caused
->  by VM_FAULT_RETRY being #defined to 0 as lustre/llite/llite_internal.h
->  still does on OpenSFS lustre)
-> 
+> > This lock is only used to protect typ_refcnt, so change
+> > that to an atomic_t and discard the lock.
 > >
-> > Additionally, it's not valid to return VM_FAULT_NOPAGE for
-> > page faults.  The correct return when accessing a page that
-> > does not exist is VM_FAULT_SIGBUS.  Correcting this avoids
-> > looping infinitely in the testcase.
-> 
-> I agree with that.  VM_FAULT_NOPAGE is valid for page_mkwrite - and
-> ll_page_mkwrite() has separate code to choose VM_FAULT_NOPAGE.
-> So the change to to_fault_error() is valid.
-> 
-> NeilBrown
-> 
-> 
+> > The lock also covers calls to try_module_get and module_put,
+> > but this serves no purpose as it does not prevent the module
+> > from being unloaded.
 > >
-> > Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-11403
-> > Reviewed-on: https://review.whamcloud.com/34247
-> > Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-> > Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
-> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > Finally, the return value for the call to try_module_get is
+> > ignored, which is not safe.
+> >
+> > Signed-off-by: NeilBrown <neilb@suse.com>
 > > ---
-> >  fs/lustre/llite/llite_mmap.c | 6 ++----
-> >  1 file changed, 2 insertions(+), 4 deletions(-)
+> >  fs/lustre/include/obd.h         |  3 +--
+> >  fs/lustre/include/obd_class.h   |  1 -
+> >  fs/lustre/mdc/mdc_request.c     |  2 +-
+> >  fs/lustre/mgc/mgc_request.c     |  7 -------
+> >  fs/lustre/obdclass/genops.c     | 29 ++++++++++++++---------------
+> >  fs/lustre/obdclass/lu_object.c  |  2 +-
+> >  fs/lustre/obdclass/obd_config.c | 19 -------------------
+> >  7 files changed, 17 insertions(+), 46 deletions(-)
 > >
-> > diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-> > index 1865db1..c8e57ad 100644
-> > --- a/fs/lustre/llite/llite_mmap.c
-> > +++ b/fs/lustre/llite/llite_mmap.c
-> > @@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
-> >  	case 0:
-> >  		result = VM_FAULT_LOCKED;
-> >  		break;
-> > -	case -EFAULT:
-> > -		result = VM_FAULT_NOPAGE;
-> > -		break;
-> >  	case -ENOMEM:
-> >  		result = VM_FAULT_OOM;
-> >  		break;
-> > @@ -366,7 +363,8 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+> > diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+> > index 4c58b91..61fb815 100644
+> > --- a/fs/lustre/include/obd.h
+> > +++ b/fs/lustre/include/obd.h
+> > @@ -102,9 +102,8 @@ struct obd_type {
+> >  	struct obd_ops		*typ_dt_ops;
+> >  	struct md_ops		*typ_md_ops;
+> >  	struct dentry		*typ_debugfs_entry;
+> > -	int			 typ_refcnt;
+> > +	atomic_t		 typ_refcnt;
+> >  	struct lu_device_type	*typ_lu;
+> > -	spinlock_t		 obd_type_lock;
+> >  	struct kobject		 typ_kobj;
+> >  };
+> >  #define typ_name typ_kobj.name
+> > diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+> > index 742cb9a4..a853ed5 100644
+> > --- a/fs/lustre/include/obd_class.h
+> > +++ b/fs/lustre/include/obd_class.h
+> > @@ -210,7 +210,6 @@ struct lustre_profile {
+> >  struct lustre_profile *class_get_profile(const char *prof);
+> >  void class_del_profile(const char *prof);
+> >  void class_put_profile(struct lustre_profile *lprof);
+> > -void class_del_profiles(void);
 > >  
-> >  restart:
-> >  	result = __ll_fault(vmf->vma, vmf);
-> > -	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
-> > +	if (vmf->page &&
-> > +	    !(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
-> >  		struct page *vmpage = vmf->page;
+> >  #if LUSTRE_TRACKS_LOCK_EXP_REFS
 > >  
-> >  		/* check if this page has been truncated */
-> > -- 
-> > 1.8.3.1
+> > diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+> > index bc764f9..705a4e3 100644
+> > --- a/fs/lustre/mdc/mdc_request.c
+> > +++ b/fs/lustre/mdc/mdc_request.c
+> > @@ -2542,7 +2542,7 @@ static int mdc_init_ea_size(struct obd_export *exp, u32 easize, u32 def_easize)
+> >  static int mdc_precleanup(struct obd_device *obd)
+> >  {
+> >  	/* Failsafe, ok if racy */
+> > -	if (obd->obd_type->typ_refcnt <= 1)
+> > +	if (atomic_read(&obd->obd_type->typ_refcnt) <= 1)
+> >  		libcfs_kkuc_group_rem(0, KUC_GRP_HSM);
+> >  
+> >  	mdc_changelog_cdev_finish(obd);
+> > diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
+> > index 84ba6d0..d8be54d 100644
+> > --- a/fs/lustre/mgc/mgc_request.c
+> > +++ b/fs/lustre/mgc/mgc_request.c
+> > @@ -712,13 +712,6 @@ static int mgc_precleanup(struct obd_device *obd)
+> >  
+> >  static int mgc_cleanup(struct obd_device *obd)
+> >  {
+> > -	/* COMPAT_146 - old config logs may have added profiles we don't
+> > -	 * know about
+> > -	 */
+> > -	if (obd->obd_type->typ_refcnt <= 1)
+> > -		/* Only for the last mgc */
+> > -		class_del_profiles();
+> > -
 > 
+> You didn't add any text to the change log describing this change!!!!
+> 
+> Could you please post it as a separate patch - it is only tangentially
+> related to the changes in this patch.
+
+Sure. Also another patch exist which pretty much makes typ_refcnt only
+used in the obd_class layer.
