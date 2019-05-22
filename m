@@ -1,11 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 22 May 2019 19:51:57 +0100 (BST)
-Subject: [lustre-devel] [PATCH v2 07/29] lustre: obd: collect all
- resource releasing for obj_type.
-In-Reply-To: <1558356671-29599-8-git-send-email-jsimmons@infradead.org>
+Date: Wed, 22 May 2019 19:58:59 +0100 (BST)
+Subject: [lustre-devel] [PATCH v2 05/29] lustre: llite: don't use
+ class_setup_tunables()
+In-Reply-To: <878suzw22l.fsf@notabene.neil.brown.name>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-8-git-send-email-jsimmons@infradead.org>
-Message-ID: <alpine.LFD.2.21.1905221918410.26312@casper.infradead.org>
+ <1558356671-29599-6-git-send-email-jsimmons@infradead.org>
+ <878suzw22l.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1905221953290.26312@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,97 +14,146 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
->>  int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
->> @@ -181,10 +163,17 @@ int class_register_type(struct obd_ops *dt_ops, 
->struct md_ops *md_ops,
->>  		return -EEXIST;
->>  	}
->>  
->> -	rc = -ENOMEM;
->>  	type = kzalloc(sizeof(*type), GFP_NOFS);
->>  	if (!type)
->> -		return rc;
->> +		return -ENOMEM;
->> +
->> +	type->typ_kobj.kset = lustre_kset;
->> +	rc = kobject_init_and_add(&type->typ_kobj, &class_ktype,
->> +				  &lustre_kset->kobj, "%s", name);
->
->I don't know that I would actually cause a problem, but I don't like
->"add"ing and object (above) before fully initializing it (below).  So
->I've kept the split from my version where kobject_init() happens early
->and kobject_add() happens later.
->I've included the other changes that you made.
->
->Thanks,
->NeilBrown
+> On Mon, May 20 2019, James Simmons wrote:
+> 
+> > llite is very different from the other types of lustre devices.
+> > Since this is the case llite should register independently. Doing
+> > this allows us to cleanup the debugfs registering in the release
+> > function of struct kobj_type.
+> >
+> > Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
+> > Reviewed-on: https://review.whamcloud.com/34292
+> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> > Reviewed-by: Ben Evans <bevans@cray.com>
+> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  fs/lustre/llite/lproc_llite.c | 41 ++++++++++++++++++++++++++++++-----------
+> >  1 file changed, 30 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+> > index 5de8462..91b0a50 100644
+> > --- a/fs/lustre/llite/lproc_llite.c
+> > +++ b/fs/lustre/llite/lproc_llite.c
+> > @@ -42,18 +42,40 @@
+> >  static struct kobject *llite_kobj;
+> >  static struct dentry *llite_root;
+> >  
+> > +static void llite_kobj_release(struct kobject *kobj)
+> > +{
+> > +	if (!IS_ERR_OR_NULL(llite_root)) {
+> > +		debugfs_remove(llite_root);
+> > +		llite_root = NULL;
+> > +	}
+> > +
+> > +	kfree(kobj);
+> > +}
+> > +
+> > +static struct kobj_type llite_kobj_ktype = {
+> > +	.release	= llite_kobj_release,
+> > +	.sysfs_ops	= &lustre_sysfs_ops,
+> > +};
+> > +
+> >  int llite_tunables_register(void)
+> >  {
+> > -	int rc = 0;
+> > +	int rc;
+> > +
+> > +	llite_kobj = kzalloc(sizeof(*llite_kobj), GFP_KERNEL);
+> > +	if (!llite_kobj)
+> > +		return -ENOMEM;
+> >  
+> > -	llite_kobj = class_setup_tunables("llite");
+> > -	if (IS_ERR(llite_kobj))
+> > -		return PTR_ERR(llite_kobj);
+> > +	llite_kobj->kset = lustre_kset;
+> > +	rc = kobject_init_and_add(llite_kobj, &llite_kobj_ktype,
+> > +				  &lustre_kset->kobj, "%s", "llite");
+> > +	if (rc)
+> > +		goto free_kobj;
+> >  
+> >  	llite_root = debugfs_create_dir("llite", debugfs_lustre_root);
+> >  	if (IS_ERR_OR_NULL(llite_root)) {
+> >  		rc = llite_root ? PTR_ERR(llite_root) : -ENOMEM;
+> >  		llite_root = NULL;
+> > +free_kobj:
+> >  		kobject_put(llite_kobj);
+> >  		llite_kobj = NULL;
+> 
+> eeek.  Goto into the inside of an if/then clause is .... not my
+> favourite.
+> 
+> > +	rc = kobject_init_and_add(llite_kobj, &llite_kobj_ktype,
+> > +				  &lustre_kset->kobj, "%s", "llite");
+> > +	if (rc)
+> > +		goto free_kobj;
+> >  
+> >  	llite_root = debugfs_create_dir("llite", debugfs_lustre_root);
+> >  	if (IS_ERR_OR_NULL(llite_root)) {
+> >  		rc = llite_root ? PTR_ERR(llite_root) : -ENOMEM;
+> >  		llite_root = NULL;
+>                 goto free_kobj;
+>         }
+>         return 0;
+> > +free_kobj:
+> > 	kobject_put(llite_kobj);
+> > 	llite_kobj = NULL;
+>         return rc;
+> 
+> Isn't that much cleaner?
+> 
+> Otherwise, I like the patch.
 
-The reason I did it that way was to handle the server case down the road.
-So for the case when both client and server are on the same node, and yes
-people do such setups for testing this is important.
+Sure that is fine. Just did it that way since Greg would grip about
+how having more than one return in a function is not proper kernel
+coding style. So I tend to write code this that way. 
 
-Consider the case we have both the lov and lod layer on a single node. 
-Both layers attempt to create "lov" obd_type. When the lov module loads 
-first then a complete obd_type is created. Once lod loads then it just 
-uses real lov obd_type and creates the needed symlinks. You end up with
-
-ls -al /sys/fs/lustre/lov/
-total 0
-drwxr-xr-x  2 root root 0 May 22 14:27 .
-drwxr-xr-x 14 root root 0 May 22 14:27 ..
-lrwxrwxrwx  1 root root 0 May 22 14:27 lustre-MDT0000-mdtlov -> 
-../lod/lustre-MDT0000-mdtlov
-lrwxrwxrwx  1 root root 0 May 22 14:27 lustre-MDT0002-mdtlov -> 
-../lod/lustre-MDT0002-mdtlov
-
-Plus the real lov obd devices.
-
-Now if lod loads first then the lod module creates a "lov" obd_type
-using class_create_symlink() but is not fully initialized nor does
-it need to be. If the client lov module is present and it loads then
-it takes the "lov" obd_type create by the lod and finishes initializing
-it.
-
-Looking at the final code and added in server case:
-
-        type = class_search_type(name);
-        if (type) {
-                kobject_put(&type->typ_kobj);
-		if (strcmp(name, LUSTRE_LOV_NAME) == 0 ||
-                    strcmp(name, LUSTRE_OSC_NAME) == 0)
-                        goto dir_exist;
-		CDEBUG(D_IOCTL, "Type %s already registered\n", name);
-                return -EEXIST;
-        }
-
-        type = kzalloc(sizeof(*type), GFP_NOFS);
-        if (!type)
-                return rc;
-
-        type->typ_kobj.kset = lustre_kset;
-        kobject_init(&type->typ_kobj, &class_ktype);
-
-        type->typ_dt_ops = dt_ops;  /* lov obd_type is never set to the 
-				     * correct values if lod created it.
-				     */
-        type->typ_md_ops = md_ops;
-
-        rc = kobject_add(&type->typ_kobj, &lustre_kset->kobj, "%s", name);
-        if (rc)
-                goto failed;
-
-        type->typ_debugfs_entry = debugfs_create_dir(type->typ_name,
-                                                     debugfs_lustre_root);
-dir_exit:
-
-Now if this needed for the later module handling patches I guess we could
-do:
-
-	if (strcmp(name, LUSTRE_LOV_NAME) == 0 ||
-            strcmp(name, LUSTRE_OSC_NAME) == 0) {
-		type->typ_dt_ops = dt_ops;
-		type->typ_md_ops = md_ops;
-		goto dir_exist;
-	}
-
-Is that the case?
+> Thanks,
+> NeilBrown
+> 
+> 
+> >  	}
+> > @@ -65,9 +87,6 @@ void llite_tunables_unregister(void)
+> >  {
+> >  	kobject_put(llite_kobj);
+> >  	llite_kobj = NULL;
+> > -
+> > -	debugfs_remove(llite_root);
+> > -	llite_root = NULL;
+> >  }
+> >  
+> >  /* debugfs llite mount point registration */
+> > @@ -1216,17 +1235,17 @@ static ssize_t ll_nosquash_nids_seq_write(struct file *file,
+> >  	NULL,
+> >  };
+> >  
+> > -static void llite_kobj_release(struct kobject *kobj)
+> > +static void sbi_kobj_release(struct kobject *kobj)
+> >  {
+> >  	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+> >  					      ll_kset.kobj);
+> >  	complete(&sbi->ll_kobj_unregister);
+> >  }
+> >  
+> > -static struct kobj_type llite_ktype = {
+> > +static struct kobj_type sbi_ktype = {
+> >  	.default_attrs	= llite_attrs,
+> >  	.sysfs_ops	= &lustre_sysfs_ops,
+> > -	.release	= llite_kobj_release,
+> > +	.release	= sbi_kobj_release,
+> >  };
+> >  
+> >  static const struct llite_file_opcode {
+> > @@ -1384,7 +1403,7 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
+> >  out_ll_kset:
+> >  	/* Yes we also register sysfs mount kset here as well */
+> >  	sbi->ll_kset.kobj.parent = llite_kobj;
+> > -	sbi->ll_kset.kobj.ktype = &llite_ktype;
+> > +	sbi->ll_kset.kobj.ktype = &sbi_ktype;
+> >  	init_completion(&sbi->ll_kobj_unregister);
+> >  	err = kobject_set_name(&sbi->ll_kset.kobj, "%s", name);
+> >  	if (err)
+> > -- 
+> > 1.8.3.1
+> 
