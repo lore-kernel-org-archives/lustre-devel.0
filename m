@@ -1,17 +1,32 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 23 May 2019 09:26:47 +1000
+From: Patrick Farrell <pfarrell@whamcloud.com>
+Date: Thu, 23 May 2019 00:13:59 +0000
 Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
-In-Reply-To: <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>
+In-Reply-To: <87r28qul3c.fsf@notabene.neil.brown.name>
 References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
  <1558356671-29599-2-git-send-email-jsimmons@infradead.org>
  <87blzvw3cy.fsf@notabene.neil.brown.name>
- <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>
-Message-ID: <87r28qul3c.fsf@notabene.neil.brown.name>
+ <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>,
+ <87r28qul3c.fsf@notabene.neil.brown.name>
+Message-ID: <DM6PR19MB25084C2AF24E5A7DF6A97DDBC5010@DM6PR19MB2508.namprd19.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Neil,
+
+Memory has surfaced here.  There was a not-documented-where-I-can-find-it report of a null pointer on ?page? here that came in around the same time running - I believe - racer (a big messy ?do random things from many threads? test).  No obvious explanation for how we got the problem but I added the check since it was simple enough.
+
+But I?m perfectly comfortable with you removing it and seeing if something occurs again.
+
+- Patrick
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Wednesday, May 22, 2019 6:26:47 PM
+To: Patrick Farrell; James Simmons; Andreas Dilger; Oleg Drokin
+Cc: Lustre Development List
+Subject: Re: [PATCH v2 01/29] lustre: llite: ll_fault fixes
 
 On Wed, May 22 2019, Patrick Farrell wrote:
 
@@ -32,7 +47,7 @@ into VM_FAULT_NOPAGE.
 
 The test
 
- 	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
+         if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
 
 in ll_fault() doesn't notice VM_FAULT_NOPAGE (it is not part of
 VM_FAULT_ERROR), so the 'then' branch is run, which triggers the
@@ -87,22 +102,18 @@ index 1865db1237ce..59fb40029306 100644
 --- a/fs/lustre/llite/llite_mmap.c
 +++ b/fs/lustre/llite/llite_mmap.c
 @@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
- 	case 0:
- 		result = VM_FAULT_LOCKED;
- 		break;
--	case -EFAULT:
--		result = VM_FAULT_NOPAGE;
--		break;
- 	case -ENOMEM:
- 		result = VM_FAULT_OOM;
- 		break;
--- 
+         case 0:
+                 result = VM_FAULT_LOCKED;
+                 break;
+-       case -EFAULT:
+-               result = VM_FAULT_NOPAGE;
+-               break;
+         case -ENOMEM:
+                 result = VM_FAULT_OOM;
+                 break;
+--
 2.14.0.rc0.dirty
 
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190523/22d8361d/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190523/8dded084/attachment-0001.html>
