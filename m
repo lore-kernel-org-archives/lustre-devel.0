@@ -1,119 +1,34 @@
-From: Patrick Farrell <pfarrell@whamcloud.com>
-Date: Thu, 23 May 2019 00:13:59 +0000
-Subject: [lustre-devel] [PATCH v2 01/29] lustre: llite: ll_fault fixes
-In-Reply-To: <87r28qul3c.fsf@notabene.neil.brown.name>
-References: <1558356671-29599-1-git-send-email-jsimmons@infradead.org>
- <1558356671-29599-2-git-send-email-jsimmons@infradead.org>
- <87blzvw3cy.fsf@notabene.neil.brown.name>
- <DM6PR19MB25088E22AA6132C60758A34DC5000@DM6PR19MB2508.namprd19.prod.outlook.com>,
- <87r28qul3c.fsf@notabene.neil.brown.name>
-Message-ID: <DM6PR19MB25084C2AF24E5A7DF6A97DDBC5010@DM6PR19MB2508.namprd19.prod.outlook.com>
+From: Degremont, Aurelien <degremoa@amazon.com>
+Date: Fri, 24 May 2019 16:28:28 +0000
+Subject: [lustre-devel] lnet ip2nets option broken in master?
+Message-ID: <B4B45E3C-B0AF-4EC9-AD05-FB61CF6ACE62@amazon.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Neil,
+Hi all,
 
-Memory has surfaced here.  There was a not-documented-where-I-can-find-it report of a null pointer on ?page? here that came in around the same time running - I believe - racer (a big messy ?do random things from many threads? test).  No obvious explanation for how we got the problem but I added the check since it was simple enough.
+I'm doing several tests with LNET and I realized lnet module option 'ip2nets' does not work anymore.
+I git-bisected the regression down to:
 
-But I?m perfectly comfortable with you removing it and seeing if something occurs again.
+commit f5991afd8779fe747778e28e998277a10242a57d
+Author: NeilBrown <neilb@suse.com>
+Date:   Mon Jan 7 14:23:19 2019 -0500
 
-- Patrick
-________________________________
-From: NeilBrown <neilb@suse.com>
-Sent: Wednesday, May 22, 2019 6:26:47 PM
-To: Patrick Farrell; James Simmons; Andreas Dilger; Oleg Drokin
-Cc: Lustre Development List
-Subject: Re: [PATCH v2 01/29] lustre: llite: ll_fault fixes
-
-On Wed, May 22 2019, Patrick Farrell wrote:
-
-> Neil,
->
-> If you can?t find any, I imagine they don?t exist, at least in your branch, given that difference you cited.
->
-> The particular case we had is here:
-> https://jira.whamcloud.com/browse/LU-11403
->
-> Which is when the file exists but has no striping info, and hence no data.
-
-Hi Patrick,
-Thanks for the reply.  Looking at that issue it appears that the root
-cause is -EFAULT being returned from lov_io_init_empty, which then got
-returned by ll_fault_io_init and then was converted by to_fault_error
-into VM_FAULT_NOPAGE.
-
-The test
-
-         if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
-
-in ll_fault() doesn't notice VM_FAULT_NOPAGE (it is not part of
-VM_FAULT_ERROR), so the 'then' branch is run, which triggers the
-problem.
-
-Just changing to_fault_error() to convert  -EFAULT to VM_FAULT_SIGBUS,
-as you did, cause the 'if' to do "the right thing", as VM_FAULT_SIGBUS
-is one of the flags in VM_FAULT_ERROR.
-
-So the extra test on vmf->page is redundant.  If there has been no
-error, and we don't need to retry, then vmf->page *must* exist.
+    LU-11838 lnet: change lnet_ipaddr_enumerate() to use for_each_netdev()
 
 
-I've changed the commit message to explain this, so what I have now is
-below.
+Am I doing something wrong? Is that already known and there is some patchs around for it?
 
-Thanks,
-NeilBrown
+Funny thing is that the normal way to use it does not work, but if I specify IP address in the reverse order, it works. (Could be just a side effect/red herring)
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
-Date: Mon, 20 May 2019 08:50:43 -0400
-Subject: [PATCH] lustre: llite: ll_fault fix
+Ie: ip2nets="tcp2(eth0) 172.32.47.137".  -> ERROR (correct IP)
+ip2net="tcp2(eth0) 137.47.32.172" -> OK
 
-Error conditions in the fault path such as a fault on a file without
-stripes (see lov_io_init_emtpy()) can cause us to
-not return a page in vm_fault, and to report -EFAULT.
+I was not able to understand the bug.
 
--EFAULT is currently mapped to VM_FAULT_NOPAGE by to_fault_error(),
-and ll_fault doesn't recognize this as an error which might leave
-->page unset, and tries to dereference vmf->page.
+If it makes sense, I can open a ticket.
 
-VM_FAULT_NOPAGE is *not* a valid status for .fault, only for
-.page_mkwrite and .pfn_mkwrite.  So change to_fault_error() to
-instead map -EFAULT to VM_FAULT_SIGBUS.  This is part of
-VM_FAULT_ERROR, so ll_fault will *not* dereference vmf->page when that
-error code is set.
-
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11403
-Reviewed-on: https://review.whamcloud.com/34247
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- fs/lustre/llite/llite_mmap.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-index 1865db1237ce..59fb40029306 100644
---- a/fs/lustre/llite/llite_mmap.c
-+++ b/fs/lustre/llite/llite_mmap.c
-@@ -238,9 +238,6 @@ static inline vm_fault_t to_fault_error(int result)
-         case 0:
-                 result = VM_FAULT_LOCKED;
-                 break;
--       case -EFAULT:
--               result = VM_FAULT_NOPAGE;
--               break;
-         case -ENOMEM:
-                 result = VM_FAULT_OOM;
-                 break;
---
-2.14.0.rc0.dirty
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190523/8dded084/attachment-0001.html>
+Aur?lien
