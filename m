@@ -1,200 +1,293 @@
-From: Oleg Drokin <green@whamcloud.com>
-Date: Wed, 5 Jun 2019 06:41:26 +0000
-Subject: [lustre-devel] New tag 2.12.54
-Message-ID: <45C1AB6D-E8F5-4F50-9921-CC00C237BC67@whamcloud.com>
+From: Shaun Tancheff <shaun@tancheff.com>
+Date: Thu,  6 Jun 2019 17:31:10 -0500
+Subject: [lustre-devel] [PATCH] Place a memory barrier around cp_state
+ changes
+Message-ID: <20190606223110.15725-1-stancheff@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Ensure all uses of cl_page->cp_state are smp-safe.
 
- I just tagged 2.12.54 in lustre development branch.
+LBUG Output:
+In __cl_page_state_set()
+..
+  old = page->cp_state;
+  PASSERT(env, page, allowed_transitions[old][state]);
+..
+Asserted with the following:
+  page at ffff80be1fcd6600[3 ffff80be1fca5cc0 0 1 ffff809e60e2 8cc0]
 
-Here?s the changelog:
+However cp_state 0 (CPS_CACHED) to 1 (CPS_OWNED) is a valid transition
+leading to the conclusion that cp_state became 0 during the
+assertion.
 
-Alex Zhuravlev (7):
-      LU-11233 build: support for gcc8
-      LU-2233 tests: improve tests sanityn/40-47
-      LU-10754 tests: sanityn/47b to sleep for 1s
-      LU-12013 lfsck: use correct buffer
-      LU-11233 utils: fix build warnings for gcc8
-      LU-11233 tests: fix gcc8 build warnings
-      LU-12034 obdclass: put all service's env on the list
+Signed-off-by: Shaun Tancheff <stancheff@cray.com>
+---
+ fs/lustre/include/cl_object.h   | 11 +++++++++++
+ fs/lustre/llite/rw26.c          |  2 +-
+ fs/lustre/llite/vvp_page.c      |  6 +++---
+ fs/lustre/obdclass/cl_page.c    | 34 +++++++++++++++++++--------------
+ fs/lustre/obdecho/echo_client.c |  2 +-
+ fs/lustre/osc/osc_cache.c       | 18 +++++++++--------
+ 6 files changed, 46 insertions(+), 27 deletions(-)
 
-Alexander Boyko (1):
-      LU-12140 lnet: adds checking msg len
-
-Amir Shehata (1):
-      LU-12279 lnet: use number of wrs to calculate CQEs
-
-Andreas Dilger (3):
-      LU-12159 utils: improve lfs getname functionality
-      LU-11233 utils: fix double-free of params fields
-      LU-10602 utils: fix file heat support
-
-Andrew Perepechko (2):
-      LU-6951 tests: sanity test_27m failure
-      LU-12352 libcfs: crashes with certain cpu part numbers
-
-Andriy Skulysh (3):
-      LU-12218 ptlrpc: Bulk assertion fails on -ENOMEM
-      LU-11090 quota: Oops in qsd_config
-      LU-12095 ptlrpc: ocd_connect_flags are wrong during reconnect
-
-Ann Koehler (1):
-      LU-12221 statahead: sa_handle_callback get lli_sa_lock earlier
-
-Arshad Hussain (12):
-      LU-9010 ptlrpc: Change static defines to use macro for gss_krb5_mech.c
-      LU-6142 ldlm: Fix style issues for interval_tree.c
-      LU-6142 ptlrpc: Fix style issues for sec_null.c
-      LU-6142 ptlrpc: Fix style issues for service.c
-      LU-12314 tests: Add Missing Description to sanity test 258a
-      LU-6142 ldlm: Fix style issues for ldlm_resource.c
-      LU-6142 ptlrpc: Fix style issues for sec_plain.c
-      LU-6142 ptlrpc: Fix style issues for sec_gc.c
-      LU-6142 ptlrpc: Fix style issues for sec.c
-      LU-6142 ptlrpc: Fix style issues for client.c
-      LU-6142 ptlrpc: Fix style issues for llog_client.c
-      LU-6142 ldlm: Fix style issues for ldlm_plain.c
-
-Artem Blagodarenko (2):
-      LU-12335 ldiskfs: fixed size preallocation table
-      LU-12345 ldiskfs: optimize nodelalloc mode
-
-Aurelien Degremont (2):
-      LU-12227 scripts: check for mounted ZFS devices too
-      LU-12236 gss: remove unused code in gss_svc_upcall.c
-
-Ben Menadue (3):
-      LU-12269 build: fix hardened builds in rpm spec file
-      LU-12269 build: remove %{fullrelease} from Provides
-      LU-12269 build: add value to definition of with_gss in spec
-
-Bruno Faccini (2):
-      LU-11376 lov: new foreign LOV format
-      LU-11376 lmv: new foreign LMV format
-
-Chris Horn (3):
-      LU-12302 lnet: Fix NI status in proc for loopback ni
-      LU-12333 ptlrpc: Add more flags to DEBUG_REQ_FLAGS macro
-      LU-12323 libcfs: check if save_stack_trace_tsk is exported
-
-Dmitry Eremin (1):
-      LU-8066 ptlrpc: move sptlrpc procfs entry to debugfs
-
-G?tz Waschk (1):
-      LU-12342 spec: mark lsvcgss as a config file in the rpm
-
-Hongchao Zhang (1):
-      LU-12232 test: commit before df
-
-James Nunez (1):
-      LU-9581 tests: remove recovery-small test from ALWAYS_EXCEPT
-
-James Simmons (5):
-      LU-11803 obd: replace class_uuid with linux kernel version.
-      LU-11157 obd: round values to nearest MiB for *_mb syfs files
-      LU-11771 ldlm: use hrtimer for recovery to fix timeout messages
-      LU-11893 ksocklnd: add secondary IP address handling
-      LU-11893 o2iblnd: add secondary IP address handling
-
-Jian Yu (5):
-      LU-12276 lnet: check const parameters for ib_post_send and ib_post_recv
-      LU-12139 kernel: kernel update [SLES12 SP3 4.4.176-94.88]
-      LU-12242 kernel: kernel update RHEL7.6 [3.10.0-957.12.1.el7]
-      LU-12269 kernel: new kernel [RHEL 8.0 4.18.0-80.el8]
-      LU-12306 kernel: kernel update RHEL7.6 [3.10.0-957.12.2.el7]
-
-Lai Siyao (2):
-      LU-11907 dne: allow access to striped dir with broken layout
-      LU-11213 dne: add new dir hash type "space"
-
-Li Dongyang (7):
-      LU-11838 lnet: getname dropping addrlen argument
-      LU-12248 lov: fix ost objects calculation in lod_statfs
-      LU-12093 osc: don't check capability for every page
-      LU-11838 osp: atomic64_read() returns s64
-      LU-11838 ldlm: struct timespec64.tv_sec type change
-      LU-11838 llite: address_space ->page_tree renamed ->i_pages
-      LU-12270 o2iblnd: pci_unmap_addr() removed in 4.19
-
-Mikhail Pershin (5):
-      LU-12212 mdt: fix SECCTX reply buffer handling
-      LU-11359 mdt: fix mdt_dom_discard_data() timeouts
-      LU-10894 dom: per-resource ELC for WRITE lock enqueue
-      LU-10894 dom: mdc_lock_flush() improvement
-      LU-12120 grants: prevent negative ted_grant value
-
-Minh Diep (2):
-      LU-12282 build: export IB_OPTIONS before build
-      LU-11041 kernel: Enable tons of kernel debug options
-
-Nathaniel Clark (3):
-      Revert "LU-8384 scripts: Add scripts to systemd for EL7"
-      LU-12298 init: Add init info to lustre sysvinit script
-      LU-12309 osd-zfs: Support disabled project quotas
-
-NeilBrown (6):
-      LU-8066 obd: embed typ_kobj in obd_type
-      LU-11089 obdclass: remove locking from lu_context_exit()
-      LU-11838: lnet: remove lnet_ipif_enumerate()
-      LU-11089 obd: use wait_event_var() in lu_context_key_degister()
-      LU-11089 obd: remove lock from key register/degister
-      LU-10467 ptlrpc: discard SVC_SIGNAL and related functions
-
-Olaf Faaland (2):
-      LU-11946 build: no zlib check during configure --enable-dist
-      LU-11946 build: no yaml check during configure --enable-dist
-
-Oleg Drokin (6):
-      LU-12263 build: push depreciation of LMV_HASH_FLAG_DEAD to 2.12.55
-      LU-12324 mdd: Do not record xattr size get in changelogs
-      LU-10948 llite: Revalidate dentries in ll_intent_file_open
-      LU-11623 llite: hash just created files if lock allows
-      LU-12341 tests: Add kmemleak awareness to test-framework
-      New tag 2.12.54
-
-Patrick Farrell (7):
-      LU-9846 obd: Add overstriping CONNECT flag
-      LU-11403 tests: Fix $tfile usage
-      LU-11690 lod: fix LBUG with wide striping
-      LU-10754 tests: Clear mdc locks before tests
-      LU-9846 lod: Add overstriping support
-      LU-12350 tests: Do not use background failover
-      LU-11963 osd: Add nonrotational flag to statfs
-
-Qian Yingjin (1):
-      LU-11526 rpc: support maximum 64MB I/O RPC
-
-Sebastien Buisson (5):
-      LU-12131 tests: only create lgssc.conf file if necessary
-      LU-12266 mdd: fix up non-dir creation in SGID dirs
-      LU-12098 mdd: explicitly clear changelogs on deregister
-      LU-12131 tests: fix SSK handling in tests
-      LU-12267 tests: update filter in acl for SElinux case
-
-Sergey Cheremencev (1):
-      LU-11760 ofd: formatted OST recognition change
-
-Thomas Stibor (1):
-      LU-12019 build: Recognize Debian Kernel and set KMP dir
-
-Vitaly Fertman (1):
-      LU-11251 mdt: ASSERTION (req_transno < next_transno) failed
-
-Vladimir Saveliev (1):
-      LU-12206 mdt: mdt_init0 failure handling
-
-Wang Shilong (6):
-      LU-12043 llite, readahead: fix to call ll_ras_enter() properly
-      LU-12225 obdclass: fix race access vs removal of jobid_hash
-      LU-12225 obdclass: improve jobid memory reclaim policy
-      LU-12299 libcfs: fix panic for too large cpu partions
-      LU-11872 utils: don't follow link files in default
-      LU-12361 lov: fix wrong calculated length for fiemap
-
-Yang Sheng (1):
-      LU-11851 ldiskfs: reschedule for htree thread.
+diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
+index 691c2f5da53a..d6e1f6f05f50 100644
+--- a/fs/lustre/include/cl_object.h
++++ b/fs/lustre/include/cl_object.h
+@@ -752,6 +752,17 @@ struct cl_page {
+ 	struct cl_sync_io		*cp_sync_io;
+ };
+ 
++static inline enum cl_page_state cl_page_state_get(const struct cl_page *pg)
++{
++	/*
++	 * Paired with smp_store_release in cl_page_state_set_trust
++	 * and ensures that we see the most recent value of cp_state
++	 * even when the last modification was not performed on the
++	 * current processor
++	 */
++	return smp_load_acquire(&pg->cp_state);
++}
++
+ /**
+  * Per-layer part of cl_page.
+  *
+diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
+index e4ce3b6f5772..364dec208ccd 100644
+--- a/fs/lustre/llite/rw26.c
++++ b/fs/lustre/llite/rw26.c
+@@ -200,7 +200,7 @@ static ssize_t ll_direct_IO_seg(const struct lu_env *env, struct cl_io *io,
+ 
+ 		rc = cl_page_own(env, io, clp);
+ 		if (rc) {
+-			LASSERT(clp->cp_state == CPS_FREEING);
++			LASSERT(cl_page_state_get(clp) == CPS_FREEING);
+ 			cl_page_put(env, clp);
+ 			break;
+ 		}
+diff --git a/fs/lustre/llite/vvp_page.c b/fs/lustre/llite/vvp_page.c
+index 590e5f5e43c9..38b8c488d765 100644
+--- a/fs/lustre/llite/vvp_page.c
++++ b/fs/lustre/llite/vvp_page.c
+@@ -323,18 +323,18 @@ static int vvp_page_make_ready(const struct lu_env *env,
+ 
+ 	lock_page(vmpage);
+ 	if (clear_page_dirty_for_io(vmpage)) {
+-		LASSERT(pg->cp_state == CPS_CACHED);
++		LASSERT(cl_page_state_get(pg) == CPS_CACHED);
+ 		/* This actually clears the dirty bit in the radix tree. */
+ 		set_page_writeback(vmpage);
+ 		CL_PAGE_HEADER(D_PAGE, env, pg, "readied\n");
+-	} else if (pg->cp_state == CPS_PAGEOUT) {
++	} else if (cl_page_state_get(pg) == CPS_PAGEOUT) {
+ 		/* is it possible for osc_flush_async_page() to already
+ 		 * make it ready?
+ 		 */
+ 		result = -EALREADY;
+ 	} else {
+ 		CL_PAGE_DEBUG(D_ERROR, env, pg, "Unexpecting page state %d.\n",
+-			      pg->cp_state);
++			      cl_page_state_get(pg));
+ 		LBUG();
+ 	}
+ 	unlock_page(vmpage);
+diff --git a/fs/lustre/obdclass/cl_page.c b/fs/lustre/obdclass/cl_page.c
+index 349f19e014e0..da4429b82932 100644
+--- a/fs/lustre/obdclass/cl_page.c
++++ b/fs/lustre/obdclass/cl_page.c
+@@ -97,7 +97,7 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
+ 
+ 	PASSERT(env, page, list_empty(&page->cp_batch));
+ 	PASSERT(env, page, !page->cp_owner);
+-	PASSERT(env, page, page->cp_state == CPS_FREEING);
++	PASSERT(env, page, cl_page_state_get(page) == CPS_FREEING);
+ 
+ 	while ((slice = list_first_entry_or_null(&page->cp_layers,
+ 						 struct cl_page_slice,
+@@ -119,8 +119,14 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
+ static inline void cl_page_state_set_trust(struct cl_page *page,
+ 					   enum cl_page_state state)
+ {
+-	/* bypass const. */
+-	*(enum cl_page_state *)&page->cp_state = state;
++	/*
++	 * Paired with smp_load_acquire in cl_page_state_get
++	 * and ensures that we see the most recent value of cp_state
++	 * is available even when the next access is not performed on the
++	 * current processor.
++	 * Note we also cast away const as the only modifier of cp_state.
++	 */
++	smp_store_release((enum cl_page_state *)&page->cp_state, state);
+ }
+ 
+ struct cl_page *cl_page_alloc(const struct lu_env *env,
+@@ -270,10 +276,10 @@ static void __cl_page_state_set(const struct lu_env *env,
+ 		}
+ 	};
+ 
+-	old = page->cp_state;
++	old = cl_page_state_get(page);
+ 	PASSERT(env, page, allowed_transitions[old][state]);
+ 	CL_PAGE_HEADER(D_TRACE, env, page, "%d -> %d\n", old, state);
+-	PASSERT(env, page, page->cp_state == old);
++	PASSERT(env, page, cl_page_state_get(page) == old);
+ 	PASSERT(env, page, equi(state == CPS_OWNED, page->cp_owner));
+ 	cl_page_state_set_trust(page, state);
+ }
+@@ -313,7 +319,7 @@ void cl_page_put(const struct lu_env *env, struct cl_page *page)
+ 		       refcount_read(&page->cp_ref));
+ 
+ 	if (refcount_dec_and_test(&page->cp_ref)) {
+-		LASSERT(page->cp_state == CPS_FREEING);
++		LASSERT(cl_page_state_get(page) == CPS_FREEING);
+ 
+ 		LASSERT(refcount_read(&page->cp_ref) == 0);
+ 		PASSERT(env, page, !page->cp_owner);
+@@ -378,7 +384,7 @@ void __cl_page_disown(const struct lu_env *env,
+ 	const struct cl_page_slice *slice;
+ 	enum cl_page_state state;
+ 
+-	state = pg->cp_state;
++	state = cl_page_state_get(pg);
+ 	cl_page_owner_clear(pg);
+ 
+ 	if (state == CPS_OWNED)
+@@ -402,7 +408,7 @@ int cl_page_is_owned(const struct cl_page *pg, const struct cl_io *io)
+ 	struct cl_io *top = cl_io_top((struct cl_io *)io);
+ 
+ 	LINVRNT(cl_object_same(pg->cp_obj, io->ci_obj));
+-	return pg->cp_state == CPS_OWNED && pg->cp_owner == top;
++	return cl_page_state_get(pg) == CPS_OWNED && pg->cp_owner == top;
+ }
+ EXPORT_SYMBOL(cl_page_is_owned);
+ 
+@@ -434,7 +440,7 @@ static int __cl_page_own(const struct lu_env *env, struct cl_io *io,
+ 
+ 	io = cl_io_top(io);
+ 
+-	if (pg->cp_state == CPS_FREEING) {
++	if (cl_page_state_get(pg) == CPS_FREEING) {
+ 		result = -ENOENT;
+ 		goto out;
+ 	}
+@@ -453,7 +459,7 @@ static int __cl_page_own(const struct lu_env *env, struct cl_io *io,
+ 		PASSERT(env, pg, !pg->cp_owner);
+ 		pg->cp_owner = cl_io_top(io);
+ 		cl_page_owner_set(pg);
+-		if (pg->cp_state != CPS_FREEING) {
++		if (cl_page_state_get(pg) != CPS_FREEING) {
+ 			cl_page_state_set(env, pg, CPS_OWNED);
+ 		} else {
+ 			__cl_page_disown(env, io, pg);
+@@ -593,7 +599,7 @@ static void __cl_page_delete(const struct lu_env *env, struct cl_page *pg)
+ {
+ 	const struct cl_page_slice *slice;
+ 
+-	PASSERT(env, pg, pg->cp_state != CPS_FREEING);
++	PASSERT(env, pg, cl_page_state_get(pg) != CPS_FREEING);
+ 
+ 	/*
+ 	 * Sever all ways to obtain new pointers to @pg.
+@@ -756,7 +762,7 @@ void cl_page_completion(const struct lu_env *env,
+ 	const struct cl_page_slice *slice;
+ 
+ 	PASSERT(env, pg, crt < CRT_NR);
+-	PASSERT(env, pg, pg->cp_state == cl_req_type_state(crt));
++	PASSERT(env, pg, cl_page_state_get(pg) == cl_req_type_state(crt));
+ 
+ 	CL_PAGE_HEADER(D_TRACE, env, pg, "%d %d\n", crt, ioret);
+ 
+@@ -805,7 +811,7 @@ int cl_page_make_ready(const struct lu_env *env, struct cl_page *pg,
+ 	}
+ 
+ 	if (result >= 0) {
+-		PASSERT(env, pg, pg->cp_state == CPS_CACHED);
++		PASSERT(env, pg, cl_page_state_get(pg) == CPS_CACHED);
+ 		cl_page_io_start(env, pg, crt);
+ 		result = 0;
+ 	}
+@@ -870,7 +876,7 @@ void cl_page_header_print(const struct lu_env *env, void *cookie,
+ 	(*printer)(env, cookie,
+ 		   "page@%p[%d %p %d %d %p]\n",
+ 		   pg, refcount_read(&pg->cp_ref), pg->cp_obj,
+-		   pg->cp_state, pg->cp_type,
++		   cl_page_state_get(pg), pg->cp_type,
+ 		   pg->cp_owner);
+ }
+ EXPORT_SYMBOL(cl_page_header_print);
+diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
+index 317123fd27cb..d879f109e641 100644
+--- a/fs/lustre/obdecho/echo_client.c
++++ b/fs/lustre/obdecho/echo_client.c
+@@ -1046,7 +1046,7 @@ static int cl_echo_object_brw(struct echo_object *eco, int rw, u64 offset,
+ 
+ 		rc = cl_page_own(env, io, clp);
+ 		if (rc) {
+-			LASSERT(clp->cp_state == CPS_FREEING);
++			LASSERT(cl_page_state_get(clp) == CPS_FREEING);
+ 			cl_page_put(env, clp);
+ 			break;
+ 		}
+diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
+index f8fddbfe6a7e..75984b98b229 100644
+--- a/fs/lustre/osc/osc_cache.c
++++ b/fs/lustre/osc/osc_cache.c
+@@ -1045,7 +1045,7 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
+ 			cl_page_discard(env, io, page);
+ 			cl_page_disown(env, io, page);
+ 		} else {
+-			LASSERT(page->cp_state == CPS_FREEING);
++			LASSERT(cl_page_state_get(page) == CPS_FREEING);
+ 			LASSERT(0);
+ 		}
+ 
+@@ -1356,10 +1356,12 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
+ 	int srvlock;
+ 
+ 	cmd &= ~OBD_BRW_NOQUOTA;
+-	LASSERTF(equi(page->cp_state == CPS_PAGEIN, cmd == OBD_BRW_READ),
+-		 "cp_state:%u, cmd:%d\n", page->cp_state, cmd);
+-	LASSERTF(equi(page->cp_state == CPS_PAGEOUT, cmd == OBD_BRW_WRITE),
+-		 "cp_state:%u, cmd:%d\n", page->cp_state, cmd);
++	LASSERTF(equi(cl_page_state_get(page) == CPS_PAGEIN,
++		      cmd == OBD_BRW_READ),
++		 "cp_state:%u, cmd:%d\n", cl_page_state_get(page), cmd);
++	LASSERTF(equi(cl_page_state_get(page) == CPS_PAGEOUT,
++		      cmd == OBD_BRW_WRITE),
++		 "cp_state:%u, cmd:%d\n", cl_page_state_get(page), cmd);
+ 	LASSERT(opg->ops_transfer_pinned);
+ 
+ 	crt = cmd == OBD_BRW_READ ? CRT_READ : CRT_WRITE;
+@@ -3061,7 +3063,7 @@ bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 
+ 			page = ops->ops_cl.cpl_page;
+ 			LASSERT(page->cp_type == CPT_CACHEABLE);
+-			if (page->cp_state == CPS_FREEING)
++			if (cl_page_state_get(page) == CPS_FREEING)
+ 				continue;
+ 
+ 			cl_page_get(page);
+@@ -3142,7 +3144,7 @@ static bool check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+ 			cl_page_discard(env, io, page);
+ 			cl_page_disown(env, io, page);
+ 		} else {
+-			LASSERT(page->cp_state == CPS_FREEING);
++			LASSERT(cl_page_state_get(page) == CPS_FREEING);
+ 		}
+ 	}
+ 
+@@ -3169,7 +3171,7 @@ static bool discard_cb(const struct lu_env *env, struct cl_io *io,
+ 		cl_page_discard(env, io, page);
+ 		cl_page_disown(env, io, page);
+ 	} else {
+-		LASSERT(page->cp_state == CPS_FREEING);
++		LASSERT(cl_page_state_get(page) == CPS_FREEING);
+ 	}
+ 
+ 	return true;
+-- 
+2.17.1
