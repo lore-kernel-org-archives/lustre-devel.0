@@ -1,148 +1,99 @@
-From: Matthew Ahrens <mahrens@delphix.com>
-Date: Thu, 27 Jun 2019 11:13:20 -0700
+From: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
+Date: Fri, 28 Jun 2019 11:50:12 +0200
 Subject: [lustre-devel] Request arc buffer, zerocopy
-In-Reply-To: <1561554708.16396.0@informatik.uni-hamburg.de>
+In-Reply-To: <CAJjvXiGT_kjDAwQv8WgJY+i47itMLzpT4iBumOyxa9qGLnwTzQ@mail.gmail.com>
 References: <1560426887.3392.0@informatik.uni-hamburg.de>
  <1561554708.16396.0@informatik.uni-hamburg.de>
-Message-ID: <CAJjvXiGT_kjDAwQv8WgJY+i47itMLzpT4iBumOyxa9qGLnwTzQ@mail.gmail.com>
+ <CAJjvXiGT_kjDAwQv8WgJY+i47itMLzpT4iBumOyxa9qGLnwTzQ@mail.gmail.com>
+Message-ID: <1561715412.12733.3@informatik.uni-hamburg.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Jun 26, 2019 at 6:11 AM Anna Fuchs <
-anna.fuchs@informatik.uni-hamburg.de> wrote:
+Hello Matt,
 
-> Dear all,
->
-> one more question related to ZFS-buffers in Lustre.
->
-> There is a function osd_grow_blocksize(obj, oh, ...) called after the fist
-> portion of data (first rnb?)
-> has been committed to ZFS.
-> There are some restrictions for block size changing:
-> dmu_object_set_blocksize says:
-> The object cannot have any blocks allcated beyond the first. If
-> * the first block is allocated already, the new size must be greater
-> * than the current block size.
-> and later on
-> /*
->  * Try to change the block size for the indicated dnode.  This can only
->  * succeed if there are no blocks allocated or dirty beyond first block
->  */
->
-> I am now interested on the frist block's size, which seems to be set when
-> creating the dnode.
-> This size comes from ZFS and is something like
-> dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT or SPA_MINBLOCKSIZE (not sure).
->
+thanks for your reply.
 
- The block size in bytes is `dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT`.
-FYI, SPA_MINBLOCKSIZE == 1<<SPA_MINBLOCKSHIFT
+> 
+> You can set the block size (of the first and only block) using 
+> dmu_object_set_blocksize().  FYI, I think that this comment is 
+> incorrect:
+>  * If the first block is allocated already, the new size must be 
+> greater
+>  * than the current block size.
+> 
+> You can increase or decrease the block size with this routine.
 
->
-> I would like to specify this size on Lustre's side, not just take what ZFS
-> offers.
-> E.g. make the first block 128K instead of 4K.
->
+This is a deeper call of Lustre's osd_grow_blocksize I mentioned 
+before. If I understand it correctly, they are called in the context of 
+transactions, right?
+If so, I can not use it - I need the blocksize to be set in the buffer 
+preparation stage, before comitting in a transaction.
+Lustre's original routine looks simplified as follows:
 
-You can set the block size (of the first and only block) using
-dmu_object_set_blocksize().  FYI, I think that this comment is incorrect:
- * If the first block is allocated already, the new size must be greater
+osd_bufs_get_write
+	bs = dn->dn_datablksz
+	while (len > 0)
+		if (sz_in_block == bs) 		/* full block, try zerocopy */
+			abuf = osd_request_arcbuf(dn, bs);
+		else 				/* can't use zerocopy, allocate temp. buffers */
+			... alloc_page ...
+			here going later on the dmu_write path (pagewise!)
 
- * than the current block size.
-You can increase or decrease the block size with this routine.
+Currently, in the very first iteration this blocksize (bs) is taken 
+from the dnode and is e.g. 4K.
+When writing a chunk of 16K, I get 4 arcbufs 4K each. For the next 
+chunk the block size might be grown up to x (recordsize?).
+Here I need the blocksize to be set to 16K (or 128K or later some 
+generic value defined by the Lustre client) before the first arcbuf is 
+requested,
+because the compressed chunk sent from client is logically this size.
+At this point I don't have any dmu_tx yet to grow the blocksize saved 
+in dn->dn_datablksz before the while loop.
+So I am not sure how deep to go? This min size is set on dnode creation 
+by ZFS, how can I "reset" it?
 
-Is it possible? Could I just overwrite the block size before the
-> corresponsing memory for the block is allocated?
->
-> I am not able to call osd_grow_blocksize for the first block, since I do
-> not have any thread context there, not yet.
-> Do I need to grab into dnode_allocate and dnode_create?
->
-> And for better understanding, does one dnode always represent one lustre
-> object?
->
-> I would be greatful for any suggestions.
->
-> ***
->
-> Some context for my questions:
->
-> I have compressed data chunks coming from the Lustre client. I want to
-> hand them over to ZFS like they
-> were compressed by ZFS. ZFS offers some structures, e.g. compressed
-> arc-buffers, which know how the data has been
-> compressed (which algo, physical and logical sizes). I want and need my
-> chunks to be aligned to the records (arc buffers).
-> We have already extended the interfaces of the internal ZFS compression
-> structures. But currently ZFS (or osd-zfs) first defines
-> the sizes of buffers and the data is put in there. In my case, the data
-> should "dictate" how many buffers there are and how large they can be.
->
->
-I'd recommend that you hand the compressed data to ZFS similarly to how
-"zfs receive" does (for compressed send streams).  It sounds like the is
-the direction you're going, which is great.  FYI, here are some of the
-routines you'd want to use (copied from dmu_recv.c):
+> 
+> I'd recommend that you hand the compressed data to ZFS similarly to 
+> how "zfs receive" does (for compressed send streams).  It sounds like 
+> the is the direction you're going, which is great.  FYI, here are 
+> some of the routines you'd want to use (copied from dmu_recv.c):
+> 
+> 			abuf = arc_loan_compressed_buf(
+> 
+> 			   dmu_objset_spa(drc->drc_os),
+> 
+> 			   drrw->drr_compressed_size, drrw->drr_logical_size,
+> 
+> 			   drrw->drr_compressiontype);
+> 
+> 
+> 	dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx);
+> 
+>  (or dmu_assign_arcbuf_dnode())
+> 
+> 
+> 			dmu_return_arcbuf(rrd->write_buf);
+> 
 
-abuf = arc_loan_compressed_buf(
+Yes, thanks for that. We have two paths how Lustre interacts with ZFS - 
+requesting arc buffers or dmu_write.
+The common dmu_request_arcbuf goes over arc_loan_buf, so we introduced 
+dmu_request_compressed_arcbuf to go over arc_loan_compressed_buf to 
+reuse the receive functionality.
+We try to make as few changes as possible on Lustre's interface since 
+we want mix compressed and uncompressed data chunks (and be at the same 
+time compatible with ZFS' on disk format..)
+The dmu_write path will be tricky, though.
 
-    dmu_objset_spa(drc->drc_os),
-
-    drrw->drr_compressed_size, drrw->drr_logical_size,
-
-    drrw->drr_compressiontype);
-
-
-dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx);
-
- (or dmu_assign_arcbuf_dnode())
-
-
-dmu_return_arcbuf(rrd->write_buf);
-
---matt
+Any comments are welcome.
 
 Best regards
-> Anna
->
-> --
-> Anna Fuchs
-> Universit?t Hamburg
->
-> On Thu, Jun 13, 2019 at 1:54 PM, Anna Fuchs <
-> anna.fuchs at informatik.uni-hamburg.de> wrote:
->
-> Dear all,
->
-> in osd-zfs/osd_io.c:osd_bufs_get_write you can find a comment regarding
-> zerocopy:
->
-> /*
-> * currently only full blocks are subject to zerocopy approach:
-> * so that we're sure nobody is trying to update the same block
-> */
->
-> Whenever a block to be written is full, an arc buffer is requested,
-> otherwise alloc_page.
->
-> I do not really understand the conclusion. Why and how do full blocks
-> prevent updates?
-> And put it differently - why not to try zerocopy for not full blocks?
-> What could happen if I tried to request an arc buffer for e.g. a block
-> with missin g last page?
->
-> I would be greateful for details.
-> Best regards
-> Anna
->
->
->
->
->
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190627/1d2f2a65/attachment.html>
+Anna
+
+--
+
+Anna Fuchs
+Universit?t Hamburg
