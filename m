@@ -1,157 +1,138 @@
-From: Jacek Tomaka <jacekt@dug.com>
-Date: Fri, 5 Jul 2019 09:13:59 +0800
-Subject: [lustre-devel] Kernel panic - not syncing: LBUG:
- llite_mmap.c:71:our_vma()
-In-Reply-To: <CAKVxXCXC90mHHABc1Hc+fYV6qRBMtXP7ALEz5PQDnYXBkwkSsw@mail.gmail.com>
-References: <CAKVxXCWdEtazYGhKE2bF3sxWQxyr-ZQ2chHmUmdr+b-4P5fWvA@mail.gmail.com>
- <B3E35B12-C70F-40E7-8F2E-D9018614E430@whamcloud.com>
- <CAKVxXCXC90mHHABc1Hc+fYV6qRBMtXP7ALEz5PQDnYXBkwkSsw@mail.gmail.com>
-Message-ID: <CAKVxXCVy=W1d3oMOS=WcpuvrOxmvS+yx7_WBfh_eH+LqMX5wkg@mail.gmail.com>
+From: Matthew Ahrens <mahrens@delphix.com>
+Date: Fri, 5 Jul 2019 11:15:01 -0700
+Subject: [lustre-devel] Request arc buffer, zerocopy
+In-Reply-To: <1561715412.12733.3@informatik.uni-hamburg.de>
+References: <1560426887.3392.0@informatik.uni-hamburg.de>
+ <1561554708.16396.0@informatik.uni-hamburg.de>
+ <CAJjvXiGT_kjDAwQv8WgJY+i47itMLzpT4iBumOyxa9qGLnwTzQ@mail.gmail.com>
+ <1561715412.12733.3@informatik.uni-hamburg.de>
+Message-ID: <CAJjvXiG_NEnL1ZVTZ9dpjSsekOd_-S7KsNORcobJudXUoXUiTg@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-https://jira.whamcloud.com/browse/LU-12508
-Regards.
-Jacek Tomaka
+On Fri, Jun 28, 2019 at 2:50 AM Anna Fuchs <
+anna.fuchs@informatik.uni-hamburg.de> wrote:
+
+> Hello Matt,
+>
+> thanks for your reply.
+>
+> >
+> > You can set the block size (of the first and only block) using
+> > dmu_object_set_blocksize().  FYI, I think that this comment is
+> > incorrect:
+> >  * If the first block is allocated already, the new size must be
+> > greater
+> >  * than the current block size.
+> >
+> > You can increase or decrease the block size with this routine.
+>
+> This is a deeper call of Lustre's osd_grow_blocksize I mentioned
+> before. If I understand it correctly, they are called in the context of
+> transactions, right?
+>
+
+It is not possible to change the block size of a ZFS object outside of a
+transaction.
 
 
-On Fri, Jul 5, 2019 at 9:07 AM Jacek Tomaka <jacekt@dug.com> wrote:
+> If so, I can not use it - I need the blocksize to be set in the buffer
+> preparation stage, before comitting in a transaction.
+> Lustre's original routine looks simplified as follows:
 >
-> Hi Andreas,
-> Linux version 3.10.0-693.5.2.el7.x86_64 (builder at kbuilder.dev.centos.org) (gcc version 4.8.5 20150623 (Red Hat 4.8.5-16) (GCC) ) #1 SMP Fri Oct 20 20:
-> 32:50 UTC 2017
-> Lustre: Lustre: Build Version: 2.10.1
-> Intel(R) Xeon Phi(TM) CPU 7210 @ 1.30GHz
+> osd_bufs_get_write
+>         bs = dn->dn_datablksz
+>         while (len > 0)
+>                 if (sz_in_block == bs)          /* full block, try
+> zerocopy */
+>                         abuf = osd_request_arcbuf(dn, bs);
+>                 else                            /* can't use zerocopy,
+> allocate temp. buffers */
+>                         ... alloc_page ...
+>                         here going later on the dmu_write path (pagewise!)
 >
-> It is reading in up to 256 threads. And writing 16 files in up to 16 threads.
+> Currently, in the very first iteration this blocksize (bs) is taken
+> from the dnode and is e.g. 4K.
+> When writing a chunk of 16K, I get 4 arcbufs 4K each. For the next
+> chunk the block size might be grown up to x (recordsize?).
+> Here I need the blocksize to be set to 16K (or 128K or later some
+> generic value defined by the Lustre client) before the first arcbuf is
+> requested,
+> because the compressed chunk sent from client is logically this size.
+> At this point I don't have any dmu_tx yet to grow the blocksize saved
+> in dn->dn_datablksz before the while loop.
+> So I am not sure how deep to go? This min size is set on dnode creation
+> by ZFS, how can I "reset" it?
 >
-> It is reproducible (but does not fail every time) on this particular machine, which might just be a particular network timing.
-> I will try to reproduce it on another machine and get back to you if successful.
+
+I think that you are saying that you want to be loaned an ARC buffer of the
+size provided by the client, which may be different from the object's
+current blocksize.  You will later (within a transaction) change the
+object's blocksize to the size specified by the client, and write the data
+(using the loaned ARC buffer).  You can do exactly that using the routines
+I mentioned.
+
+In your example code above, you are providing the dnode when requesting the
+arc buf, which leads to the problem you described (needing that dnode's
+block size to match the size provided by the client before you change the
+blocksize of the object).  However, this is an unnecessary restriction,
+because arc_loan_compressed_buf() does not need to know the dnode, or its
+current block size.
+
+--matt
+
+
+
 >
-> Any ideas why this lock would have failed?
-> A quick analysis shows that the only place where our_vma is called is lustre/llite/vvp_io.c:453, and it only acquires read lock:
-> vvp_mmap_locks:
-> 452                 down_read(&mm->mmap_sem);
->  453                 while((vma = our_vma(mm, addr, count)) != NULL) {
->  454                         struct dentry *de = file_dentry(vma->vm_file);
->  455                         struct inode *inode = de->d_inode;
->  456                         int flags = CEF_MUST;
+> >
+> > I'd recommend that you hand the compressed data to ZFS similarly to
+> > how "zfs receive" does (for compressed send streams).  It sounds like
+> > the is the direction you're going, which is great.  FYI, here are
+> > some of the routines you'd want to use (copied from dmu_recv.c):
+> >
+> >                       abuf = arc_loan_compressed_buf(
+> >
+> >                          dmu_objset_spa(drc->drc_os),
+> >
+> >                          drrw->drr_compressed_size,
+> drrw->drr_logical_size,
+> >
+> >                          drrw->drr_compressiontype);
+> >
+> >
+> >       dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx);
+> >
+> >  (or dmu_assign_arcbuf_dnode())
+> >
+> >
+> >                       dmu_return_arcbuf(rrd->write_buf);
+> >
 >
-> whereas our_vma has this:
-> 70         /* mmap_sem must have been held by caller. */
-> 71         LASSERT(!down_write_trylock(&mm->mmap_sem));
+> Yes, thanks for that. We have two paths how Lustre interacts with ZFS -
+> requesting arc buffers or dmu_write.
+> The common dmu_request_arcbuf goes over arc_loan_buf, so we introduced
+> dmu_request_compressed_arcbuf to go over arc_loan_compressed_buf to
+> reuse the receive functionality.
+> We try to make as few changes as possible on Lustre's interface since
+> we want mix compressed and uncompressed data chunks (and be at the same
+> time compatible with ZFS' on disk format..)
+> The dmu_write path will be tricky, though.
 >
-> So i guess if there are multiple threads in vvp_mmap_locks and more than one happen to acquire read_lock, or one of them acquires write lock then the other would fail, no?
-> I will put these details into JIRA.
-> Jacek Tomaka
+> Any comments are welcome.
 >
-> On Tue, Jul 2, 2019 at 3:45 PM Andreas Dilger <adilger@whamcloud.com> wrote:
->>
->> The best place to report Lustre bugs is at https://jira.whamcloud.com/
->>
->> Please include the Lustre version number you are running, and any details you can provide about what kind of IO the Java application was doing at the time, if this is even possible for Java :-). It looks like it is doing AIO?  Also, is this repeatable, or a one-time event?
->>
->> Cheers, Andreas
->>
->> > On Jul 2, 2019, at 01:20, Jacek Tomaka <jacekt@dug.com> wrote:
->> >
->> > Hello,
->> > I was wondering if you would be interested in the following failed assertion:
->> >
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: LustreError:
->> > 251884:0:(llite_mmap.c:71:our_vma()) ASSERTION(
->> > !down_write_trylock(&mm->mmap_sem) ) failed:
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: LustreError:
->> > 251884:0:(llite_mmap.c:71:our_vma()) LBUG
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: Pid: 251884, comm: java
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: #012Call Trace:
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc03d67ae>]
->> > libcfs_call_trace+0x4e/0x60 [libcfs]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc03d683c>]
->> > lbug_with_loc+0x4c/0xb0 [libcfs]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc116e66b>]
->> > our_vma+0x16b/0x170 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc11857f9>]
->> > vvp_io_rw_lock+0x409/0x6e0 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc0fbb312>] ?
->> > lov_io_iter_init+0x302/0x8b0 [lov]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc1185b29>]
->> > vvp_io_write_lock+0x59/0xf0 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc063ebec>]
->> > cl_io_lock+0x5c/0x3d0 [obdclass]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc063f1db>]
->> > cl_io_loop+0x11b/0xc90 [obdclass]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc1133258>]
->> > ll_file_io_generic+0x498/0xc40 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc1133cdd>]
->> > ll_file_aio_write+0x12d/0x1f0 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffffc1133e6e>]
->> > ll_file_write+0xce/0x1e0 [lustre]
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffff81200cad>]
->> > vfs_write+0xbd/0x1e0
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffff8111f394>] ?
->> > __audit_syscall_entry+0xb4/0x110
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffff81201abf>]
->> > SyS_write+0x7f/0xe0
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: [<ffffffff816b5292>]
->> > tracesys+0xdd/0xe2
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel:
->> > 2019-07-02T01:45:11-05:00 nanny1926 kernel: Kernel panic - not syncing: LBUG
->> >
->> > Is there any other place where you would want it reported?
->> >
->> > --
->> > Jacek Tomaka
->> > Geophysical Software Developer
->> >
->> >
->> >
->> >
->> > DownUnder GeoSolutions
->> >
->> > 76 Kings Park Road
->> > West Perth 6005 WA, Australia
->> > tel +61 8 9287 4143
->> > jacekt at dug.com
->> > www.dug.com
->> > _______________________________________________
->> > lustre-devel mailing list
->> > lustre-devel at lists.lustre.org
->> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
->
+> Best regards
+> Anna
 >
 > --
-> Jacek Tomaka
-> Geophysical Software Developer
+>
+> Anna Fuchs
+> Universit?t Hamburg
 >
 >
 >
->
-> DownUnder GeoSolutions
->
-> 76 Kings Park Road
-> West Perth 6005 WA, Australia
-> tel +61 8 9287 4143
-> jacekt at dug.com
-> www.dug.com
-
-
-
--- 
-Jacek Tomaka
-Geophysical Software Developer
-
-
-
-
-DownUnder GeoSolutions
-
-76 Kings Park Road
-West Perth 6005 WA, Australia
-tel +61 8 9287 4143
-jacekt at dug.com
-www.dug.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190705/da855dc7/attachment.html>
