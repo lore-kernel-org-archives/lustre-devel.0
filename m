@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 22:12:14 -0400
-Subject: [lustre-devel] [PATCH 02/10] lustre: lprocfs: use log2.h macros
- instead of shift loop.
+Date: Sun, 21 Jul 2019 22:12:17 -0400
+Subject: [lustre-devel] [PATCH 05/10] lustre: don't declare extern variables
+ in C files.
 In-Reply-To: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
 References: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563761542-3708-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563761542-3708-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,60 +13,64 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-These shift loops seem to be trying to avoid doing a
-multiplication.
-The same effect can be achieved more transparently using
-rounddown_pow_of_two().  Even though there is a multiplication
-in the C code, the resulting machine code just does a single shift.
-
-As rounddown_pow_of_two() is not defined for 0, and as we cannot be
-positively use the blk_size is non-zero, use blk_size ?: 1.
+'extern' declarations should only appear in .h files.
+All these names are declared in .h files as needed,
+and these duplicate declarations in .c files can
+be removed.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-4423
-Reviewed-on: https://review.whamcloud.com/35274
+Reviewed-on: https://review.whamcloud.com/35294
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lprocfs_status.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ fs/lustre/ldlm/ldlm_resource.c   | 2 --
+ fs/lustre/ptlrpc/import.c        | 1 -
+ fs/lustre/ptlrpc/ptlrpc_module.c | 5 -----
+ 3 files changed, 8 deletions(-)
 
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index c5f5807..2b4302e 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -373,9 +373,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
- 		u32 blk_size = osfs.os_bsize >> 10;
- 		u64 result = osfs.os_blocks;
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 45b2e97..372a290 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -681,8 +681,6 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ }
+ EXPORT_SYMBOL(ldlm_namespace_new);
  
--		while (blk_size >>= 1)
--			result <<= 1;
+-extern struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
 -
-+		result *= rounddown_pow_of_two(blk_size ?: 1);
- 		return sprintf(buf, "%llu\n", result);
- 	}
+ /**
+  * Cancel and destroy all locks on a resource.
+  *
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index d49707a..67a66a5 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -1572,7 +1572,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ EXPORT_SYMBOL(ptlrpc_disconnect_import);
  
-@@ -396,8 +394,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
- 		u32 blk_size = osfs.os_bsize >> 10;
- 		u64 result = osfs.os_bfree;
+ /* Adaptive Timeout utils */
+-extern unsigned int at_min, at_max, at_history;
  
--		while (blk_size >>= 1)
--			result <<= 1;
-+		result *= rounddown_pow_of_two(blk_size ?: 1);
+ /*
+  *Update at_current with the specified value (bounded by at_min and at_max),
+diff --git a/fs/lustre/ptlrpc/ptlrpc_module.c b/fs/lustre/ptlrpc/ptlrpc_module.c
+index f73ba41..6888df9 100644
+--- a/fs/lustre/ptlrpc/ptlrpc_module.c
++++ b/fs/lustre/ptlrpc/ptlrpc_module.c
+@@ -40,11 +40,6 @@
  
- 		return sprintf(buf, "%llu\n", result);
- 	}
-@@ -419,8 +416,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
- 		u32 blk_size = osfs.os_bsize >> 10;
- 		u64 result = osfs.os_bavail;
+ #include "ptlrpc_internal.h"
  
--		while (blk_size >>= 1)
--			result <<= 1;
-+		result *= rounddown_pow_of_two(blk_size ?: 1);
+-extern spinlock_t ptlrpc_last_xid_lock;
+-#if RS_DEBUG
+-extern spinlock_t ptlrpc_rs_debug_lock;
+-#endif
+-
+ DEFINE_MUTEX(ptlrpc_startup);
+ static int ptlrpc_active;
  
- 		return sprintf(buf, "%llu\n", result);
- 	}
 -- 
 1.8.3.1
