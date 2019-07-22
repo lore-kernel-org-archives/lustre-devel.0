@@ -1,16 +1,16 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:52:14 -0400
-Subject: [lustre-devel] [PATCH 07/11] lustre: osc: checkpatch cleanup
+Date: Sun, 21 Jul 2019 21:52:17 -0400
+Subject: [lustre-devel] [PATCH 10/11] lustre: ldlm: checkpatch cleanup
 In-Reply-To: <1563760338-806-1-git-send-email-jsimmons@infradead.org>
 References: <1563760338-806-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563760338-806-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563760338-806-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Many checkpatch errors exist in the osc layer. This address
+Many checkpatch errors exist in the ldlm layer. This address
 a good chuck of them. Other are left since future patches will
 cleanup those areas. Others will need more code rework so this
 patch handles the simple cases. This is a good step forward
@@ -18,292 +18,311 @@ toward proper kernel code style compliance.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/osc/lproc_osc.c    |  7 ++++---
- fs/lustre/osc/osc_cache.c    | 15 +++++----------
- fs/lustre/osc/osc_internal.h |  6 ++++--
- fs/lustre/osc/osc_lock.c     |  6 ++++--
- fs/lustre/osc/osc_object.c   |  6 ++++--
- fs/lustre/osc/osc_page.c     |  3 ++-
- fs/lustre/osc/osc_quota.c    | 20 ++++++++++++--------
- fs/lustre/osc/osc_request.c  | 38 ++++++++++++++++----------------------
- 8 files changed, 51 insertions(+), 50 deletions(-)
+ fs/lustre/ldlm/ldlm_extent.c   |  1 -
+ fs/lustre/ldlm/ldlm_flock.c    | 15 ++++++++-------
+ fs/lustre/ldlm/ldlm_internal.h |  5 +++--
+ fs/lustre/ldlm/ldlm_lib.c      |  4 ++--
+ fs/lustre/ldlm/ldlm_lock.c     |  8 +++-----
+ fs/lustre/ldlm/ldlm_lockd.c    | 22 +++++++++++++---------
+ fs/lustre/ldlm/ldlm_pool.c     |  3 ++-
+ fs/lustre/ldlm/ldlm_request.c  | 18 ++++++++----------
+ 8 files changed, 39 insertions(+), 37 deletions(-)
 
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index 299a69f..eb724f4 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -197,7 +197,8 @@ static ssize_t osc_cached_mb_seq_write(struct file *file,
- 				       const char __user *buffer,
- 				       size_t count, loff_t *off)
- {
--	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
-+	struct seq_file *m = file->private_data;
-+	struct obd_device *dev = m->private;
- 	struct client_obd *cli = &dev->u.cli;
- 	long pages_number, rc;
- 	char kernbuf[128];
-@@ -251,7 +252,6 @@ static ssize_t cur_dirty_bytes_show(struct kobject *kobj,
- 	struct client_obd *cli = &dev->u.cli;
+diff --git a/fs/lustre/ldlm/ldlm_extent.c b/fs/lustre/ldlm/ldlm_extent.c
+index 99aef0b..0695f7e 100644
+--- a/fs/lustre/ldlm/ldlm_extent.c
++++ b/fs/lustre/ldlm/ldlm_extent.c
+@@ -79,7 +79,6 @@ u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, u64 old_kms)
+ 	ldlm_set_kms_ignore(lock);
  
- 	return sprintf(buf, "%lu\n", cli->cl_dirty_pages << PAGE_SHIFT);
+ 	list_for_each_entry(lck, &res->lr_granted, l_res_link) {
 -
- }
- LUSTRE_RO_ATTR(cur_dirty_bytes);
+ 		if (ldlm_is_kms_ignore(lck))
+ 			continue;
  
-@@ -405,7 +405,8 @@ static ssize_t osc_checksum_type_seq_write(struct file *file,
- 					   const char __user *buffer,
- 					   size_t count, loff_t *off)
- {
--	struct obd_device *obd = ((struct seq_file *)file->private_data)->private;
-+	struct seq_file *m = file->private_data;
-+	struct obd_device *obd = m->private;
- 	DECLARE_CKSUM_NAME;
- 	char kernbuf[10];
- 	int i;
-diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
-index f8fddbf..46d578e 100644
---- a/fs/lustre/osc/osc_cache.c
-+++ b/fs/lustre/osc/osc_cache.c
-@@ -393,13 +393,6 @@ static void osc_extent_free(struct kref *kref)
- 		LDLM_LOCK_PUT(ext->oe_dlmlock);
- 		ext->oe_dlmlock = NULL;
+diff --git a/fs/lustre/ldlm/ldlm_flock.c b/fs/lustre/ldlm/ldlm_flock.c
+index 4316b2b..d2b4f0d 100644
+--- a/fs/lustre/ldlm/ldlm_flock.c
++++ b/fs/lustre/ldlm/ldlm_flock.c
+@@ -118,7 +118,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 	struct ldlm_lock *new2 = NULL;
+ 	enum ldlm_mode mode = req->l_req_mode;
+ 	int added = (mode == LCK_NL);
+-	int splitted = 0;
++	int split = 0;
+ 	const struct ldlm_callback_suite null_cbs = { };
+ 
+ 	CDEBUG(D_DLMTRACE,
+@@ -146,7 +146,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 	 * We may have to merge or split existing locks.
+ 	 */
+ 	list_for_each_entry_safe_from(lock, tmp, &res->lr_granted, l_res_link) {
+-
+ 		if (!ldlm_same_flock_owner(lock, new))
+ 			break;
+ 
+@@ -246,7 +245,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 			goto reprocess;
+ 		}
+ 
+-		splitted = 1;
++		split = 1;
+ 
+ 		new2->l_granted_mode = lock->l_granted_mode;
+ 		new2->l_policy_data.l_flock.pid =
+@@ -273,7 +272,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
  	}
--#if 0
--	// When cl_object_put drop the need for 'env',
--	// this code can be enabled.
--	cl_object_put(osc2cl(ext->oe_obj));
+ 
+ 	/* if new2 is created but never used, destroy it*/
+-	if (splitted == 0 && new2)
++	if (split == 0 && new2)
+ 		ldlm_lock_destroy_nolock(new2);
+ 
+ 	/* At this point we're granting the lock request. */
+@@ -345,12 +344,14 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 		   "client-side enqueue returned a blocked lock, sleeping");
+ 
+ 	/* Go to sleep until the lock is granted. */
+-	rc = l_wait_event_abortable(lock->l_waitq, is_granted_or_cancelled(lock));
 -
--	kmem_cache_free(osc_extent_kmem, ext);
--#endif
- }
++	rc = l_wait_event_abortable(lock->l_waitq,
++				    is_granted_or_cancelled(lock));
+ 	if (rc) {
+ 		lock_res_and_lock(lock);
  
- static struct osc_extent *osc_extent_get(struct osc_extent *ext)
-@@ -1547,19 +1540,21 @@ static bool osc_enter_cache_try(struct client_obd *cli,
- 				struct osc_async_page *oap,
- 				int bytes)
+-		/* client side - set flag to prevent lock from being put on LRU list */
++		/* client side - set flag to prevent lock from being put on
++		 * LRU list
++		 */
+ 		ldlm_set_cbpending(lock);
+ 		unlock_res_and_lock(lock);
+ 
+diff --git a/fs/lustre/ldlm/ldlm_internal.h b/fs/lustre/ldlm/ldlm_internal.h
+index d8dcf8a..05d5b08 100644
+--- a/fs/lustre/ldlm/ldlm_internal.h
++++ b/fs/lustre/ldlm/ldlm_internal.h
+@@ -146,6 +146,7 @@ void ldlm_lock_addref_internal_nolock(struct ldlm_lock *lock,
+ void ldlm_lock_decref_internal(struct ldlm_lock *lock, enum ldlm_mode mode);
+ void ldlm_lock_decref_internal_nolock(struct ldlm_lock *lock,
+ 				      enum ldlm_mode mode);
++struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
+ int ldlm_run_ast_work(struct ldlm_namespace *ns, struct list_head *rpc_list,
+ 		      enum ldlm_desc_ast_t ast_type);
+ int ldlm_lock_remove_from_lru_check(struct ldlm_lock *lock, time_t last_use);
+@@ -212,8 +213,8 @@ enum ldlm_policy_res {
+ #define LDLM_POOL_SYSFS_SET_int(a, b) { a = b; }
+ #define LDLM_POOL_SYSFS_PRINT_u64(v) sprintf(buf, "%lld\n", v)
+ #define LDLM_POOL_SYSFS_SET_u64(a, b) { a = b; }
+-#define LDLM_POOL_SYSFS_PRINT_atomic(v) sprintf(buf, "%d\n", atomic_read(&v))
+-#define LDLM_POOL_SYSFS_SET_atomic(a, b) atomic_set(&a, b)
++#define LDLM_POOL_SYSFS_PRINT_atomic(v) sprintf(buf, "%d\n", atomic_read(&(v)))
++#define LDLM_POOL_SYSFS_SET_atomic(a, b) atomic_set(&(a), b)
+ 
+ #define LDLM_POOL_SYSFS_READER_SHOW(var, type)				    \
+ 	static ssize_t var##_show(struct kobject *kobj,			    \
+diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+index 9c61b33..887507d 100644
+--- a/fs/lustre/ldlm/ldlm_lib.c
++++ b/fs/lustre/ldlm/ldlm_lib.c
+@@ -832,9 +832,9 @@ int ldlm_error2errno(enum ldlm_error error)
+ 		result = -EBADF;
+ 		break;
+ 	default:
+-		if (((int)error) < 0)  /* cast to signed type */
++		if (((int)error) < 0) {	/* cast to signed type */
+ 			result = error; /* as enum ldlm_error can be unsigned */
+-		else {
++		} else {
+ 			CERROR("Invalid DLM result code: %d\n", error);
+ 			result = -EPROTO;
+ 		}
+diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
+index 7ec5fc9..2f2b1ab 100644
+--- a/fs/lustre/ldlm/ldlm_lock.c
++++ b/fs/lustre/ldlm/ldlm_lock.c
+@@ -874,7 +874,6 @@ static void search_granted_lock(struct list_head *queue,
+ 	struct ldlm_lock *lock, *mode_end, *policy_end;
+ 
+ 	list_for_each_entry(lock, queue, l_res_link) {
+-
+ 		mode_end = list_prev_entry(lock, l_sl_mode);
+ 
+ 		if (lock->l_req_mode != req->l_req_mode) {
+@@ -1354,8 +1353,7 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, u64 flags,
+ 
+ 		/* check user's security context */
+ 		if (lock->l_conn_export &&
+-		    sptlrpc_import_check_ctx(
+-				class_exp2cliimp(lock->l_conn_export))) {
++		    sptlrpc_import_check_ctx(class_exp2cliimp(lock->l_conn_export))) {
+ 			if (!(flags & LDLM_FL_TEST_LOCK))
+ 				ldlm_lock_decref_internal(lock, mode);
+ 			rc = 0;
+@@ -1443,7 +1441,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
+ 			if (loc == RCL_CLIENT)
+ 				lvb = req_capsule_client_swab_get(pill,
+ 								  &RMF_DLM_LVB,
+-							lustre_swab_ost_lvb_v1);
++								  lustre_swab_ost_lvb_v1);
+ 			else
+ 				lvb = req_capsule_server_sized_swab_get(pill,
+ 						&RMF_DLM_LVB, size,
+@@ -1744,7 +1742,7 @@ static int ldlm_work_gl_ast_lock(struct ptlrpc_request_set *rqset, void *opaq)
+ 		return -ENOENT;
+ 
+ 	gl_work = list_first_entry(arg->list, struct ldlm_glimpse_work,
+-			     gl_list);
++				   gl_list);
+ 	list_del_init(&gl_work->gl_list);
+ 
+ 	lock = gl_work->gl_lock;
+diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
+index 589b89d..56f042c 100644
+--- a/fs/lustre/ldlm/ldlm_lockd.c
++++ b/fs/lustre/ldlm/ldlm_lockd.c
+@@ -210,9 +210,9 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 
+ 	if (lock->l_resource->lr_type != LDLM_PLAIN) {
+ 		ldlm_convert_policy_to_local(req->rq_export,
+-					  dlm_req->lock_desc.l_resource.lr_type,
+-					  &dlm_req->lock_desc.l_policy_data,
+-					  &lock->l_policy_data);
++					     dlm_req->lock_desc.l_resource.lr_type,
++					     &dlm_req->lock_desc.l_policy_data,
++					     &lock->l_policy_data);
+ 		LDLM_DEBUG(lock, "completion AST, new policy data");
+ 	}
+ 
+@@ -222,7 +222,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 		   sizeof(lock->l_resource->lr_name)) != 0) {
+ 		unlock_res_and_lock(lock);
+ 		rc = ldlm_lock_change_resource(ns, lock,
+-				&dlm_req->lock_desc.l_resource.lr_name);
++					       &dlm_req->lock_desc.l_resource.lr_name);
+ 		if (rc < 0) {
+ 			LDLM_ERROR(lock, "Failed to allocate resource");
+ 			goto out;
+@@ -286,7 +286,7 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
+ 				    struct ldlm_request *dlm_req,
+ 				    struct ldlm_lock *lock)
  {
-+	bool rc = false;
-+
- 	OSC_DUMP_GRANT(D_CACHE, cli, "need:%d\n", bytes);
+-	int rc = -ENOSYS;
++	int rc = -ENXIO;
  
- 	if (osc_reserve_grant(cli, bytes) < 0)
--		return false;
+ 	LDLM_DEBUG(lock, "client glimpse AST callback handler");
+ 
+@@ -396,8 +396,10 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+ 			     struct list_head *cancels, int count,
+ 			     enum ldlm_cancel_flags cancel_flags)
+ {
++	int rc = 0;
++
+ 	if (cancels && count == 0)
+-		return 0;
 +		return rc;
  
- 	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
- 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
- 		osc_consume_write_grant(cli, &oap->oap_brw_page);
--		return true;
-+		rc = true;
+ 	if (cancel_flags & LCF_ASYNC) {
+ 		struct ldlm_bl_work_item *blwi;
+@@ -407,7 +409,7 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+ 			return -ENOMEM;
+ 		init_blwi(blwi, ns, ld, cancels, count, lock, cancel_flags);
+ 
+-		return __ldlm_bl_to_thread(blwi, cancel_flags);
++		rc = __ldlm_bl_to_thread(blwi, cancel_flags);
  	} else {
- 		__osc_unreserve_grant(cli, bytes, bytes);
--		return false;
+ 		/* if it is synchronous call do minimum mem alloc, as it could
+ 		 * be triggered from kernel shrinker
+@@ -416,8 +418,9 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+ 
+ 		memset(&blwi, 0, sizeof(blwi));
+ 		init_blwi(&blwi, ns, ld, cancels, count, lock, cancel_flags);
+-		return __ldlm_bl_to_thread(&blwi, cancel_flags);
++		rc = __ldlm_bl_to_thread(&blwi, cancel_flags);
  	}
 +	return rc;
  }
  
- #define __wait_event_idle_exclusive_timeout_cmd(wq_head, condition,	\
-diff --git a/fs/lustre/osc/osc_internal.h b/fs/lustre/osc/osc_internal.h
-index 4033365..95f5b93 100644
---- a/fs/lustre/osc/osc_internal.h
-+++ b/fs/lustre/osc/osc_internal.h
-@@ -48,7 +48,8 @@ enum async_flags {
- 					* added to an rpc
- 					*/
- 	ASYNC_URGENT		= 0x2, /* page must be put into an RPC
--					* before return */
-+					* before return
-+					*/
- 	ASYNC_COUNT_STABLE	= 0x4, /* ap_refresh_count will not be
- 					* called to give the caller a
- 					* chance to update or cancel
-@@ -178,7 +179,8 @@ struct osc_device {
+ int ldlm_bl_to_thread_lock(struct ldlm_namespace *ns, struct ldlm_lock_desc *ld,
+@@ -446,7 +449,7 @@ static int ldlm_handle_setinfo(struct ptlrpc_request *req)
+ 	char *key;
+ 	void *val;
+ 	int keylen, vallen;
+-	int rc = -ENOSYS;
++	int rc = -ENXIO;
  
- static inline struct osc_device *obd2osc_dev(const struct obd_device *d)
+ 	DEBUG_REQ(D_HSM, req, "%s: handle setinfo\n", obd->obd_name);
+ 
+@@ -875,6 +878,7 @@ int ldlm_get_ref(void)
+ void ldlm_put_ref(void)
  {
--	return container_of_safe(d->obd_lu_dev, struct osc_device, od_cl.cd_lu_dev);
-+	return container_of_safe(d->obd_lu_dev, struct osc_device,
-+				 od_cl.cd_lu_dev);
- }
- 
- extern struct lu_kmem_descr osc_caches[];
-diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
-index 612305a..65b734ea 100644
---- a/fs/lustre/osc/osc_lock.c
-+++ b/fs/lustre/osc/osc_lock.c
-@@ -212,12 +212,14 @@ static void osc_lock_lvb_update(const struct lu_env *env,
- 		if (size > dlmlock->l_policy_data.l_extent.end)
- 			size = dlmlock->l_policy_data.l_extent.end + 1;
- 		if (size >= oinfo->loi_kms) {
--			LDLM_DEBUG(dlmlock, "lock acquired, setting rss=%llu, kms=%llu",
-+			LDLM_DEBUG(dlmlock,
-+				   "lock acquired, setting rss=%llu, kms=%llu",
- 				   lvb->lvb_size, size);
- 			valid |= CAT_KMS;
- 			attr->cat_kms = size;
- 		} else {
--			LDLM_DEBUG(dlmlock, "lock acquired, setting rss=%llu; leaving kms=%llu, end=%llu",
-+			LDLM_DEBUG(dlmlock,
-+				   "lock acquired, setting rss=%llu; leaving kms=%llu, end=%llu",
- 				   lvb->lvb_size, oinfo->loi_kms,
- 				   dlmlock->l_policy_data.l_extent.end);
- 		}
-diff --git a/fs/lustre/osc/osc_object.c b/fs/lustre/osc/osc_object.c
-index 98a0b6c..7468729 100644
---- a/fs/lustre/osc/osc_object.c
-+++ b/fs/lustre/osc/osc_object.c
-@@ -125,7 +125,8 @@ static void osc_object_free(const struct lu_env *env, struct lu_object *obj)
- int osc_lvb_print(const struct lu_env *env, void *cookie,
- 		  lu_printer_t p, const struct ost_lvb *lvb)
- {
--	return (*p)(env, cookie, "size: %llu mtime: %llu atime: %llu ctime: %llu blocks: %llu",
-+	return (*p)(env, cookie,
-+		    "size: %llu mtime: %llu atime: %llu ctime: %llu blocks: %llu",
- 		    lvb->lvb_size, lvb->lvb_mtime, lvb->lvb_atime,
- 		    lvb->lvb_ctime, lvb->lvb_blocks);
- }
-@@ -137,7 +138,8 @@ static int osc_object_print(const struct lu_env *env, void *cookie,
- 	struct lov_oinfo *oinfo = osc->oo_oinfo;
- 	struct osc_async_rc *ar = &oinfo->loi_ar;
- 
--	(*p)(env, cookie, "id: " DOSTID " idx: %d gen: %d kms_valid: %u kms %llu rc: %d force_sync: %d min_xid: %llu ",
-+	(*p)(env, cookie,
-+	     "id: " DOSTID " idx: %d gen: %d kms_valid: %u kms %llu rc: %d force_sync: %d min_xid: %llu ",
- 	     POSTID(&oinfo->loi_oi), oinfo->loi_ost_idx,
- 	     oinfo->loi_ost_gen, oinfo->loi_kms_valid, oinfo->loi_kms,
- 	     ar->ar_rc, ar->ar_force_sync, ar->ar_min_xid);
-diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
-index ce911b8..8d541df 100644
---- a/fs/lustre/osc/osc_page.c
-+++ b/fs/lustre/osc/osc_page.c
-@@ -284,7 +284,8 @@ void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
- {
- 	struct osc_async_page *oap = &opg->ops_oap;
- 
--	LASSERTF(oap->oap_magic == OAP_MAGIC, "Bad oap magic: oap %p, magic 0x%x\n",
-+	LASSERTF(oap->oap_magic == OAP_MAGIC,
-+		 "Bad oap magic: oap %p, magic 0x%x\n",
- 		 oap, oap->oap_magic);
- 	LASSERT(oap->oap_async_flags & ASYNC_READY);
- 	LASSERT(oap->oap_async_flags & ASYNC_COUNT_STABLE);
-diff --git a/fs/lustre/osc/osc_quota.c b/fs/lustre/osc/osc_quota.c
-index 555f1be..5fa85c6 100644
---- a/fs/lustre/osc/osc_quota.c
-+++ b/fs/lustre/osc/osc_quota.c
-@@ -52,8 +52,8 @@ int osc_quota_chkdq(struct client_obd *cli, const unsigned int qid[])
- 	for (type = 0; type < MAXQUOTAS; type++) {
- 		struct osc_quota_info *oqi;
- 
--		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type], &qid[type],
--					     quota_hash_params);
-+		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type],
-+					     &qid[type], quota_hash_params);
- 		if (oqi) {
- 			/* Must not access oqi here, it could have been
- 			 * freed by osc_quota_setdq()
-@@ -73,7 +73,8 @@ int osc_quota_chkdq(struct client_obd *cli, const unsigned int qid[])
- 
- static void osc_quota_free(struct rcu_head *head)
- {
--	struct osc_quota_info *oqi = container_of(head, struct osc_quota_info, rcu);
-+	struct osc_quota_info *oqi = container_of(head, struct osc_quota_info,
-+						  rcu);
- 
- 	kmem_cache_free(osc_quota_kmem, oqi);
- }
-@@ -123,8 +124,8 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 
- 		/* lookup the ID in the per-type hash table */
- 		rcu_read_lock();
--		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type], &qid[type],
--					     quota_hash_params);
-+		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type],
-+					     &qid[type], quota_hash_params);
- 		if ((flags & fl_quota_flag(type)) != 0) {
- 			/* This ID is getting close to its quota limit, let's
- 			 * switch to sync I/O
-@@ -140,7 +141,8 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 			}
- 
- 			rc = rhashtable_lookup_insert_fast(&cli->cl_quota_hash[type],
--							   &oqi->oqi_hash, quota_hash_params);
-+							   &oqi->oqi_hash,
-+							   quota_hash_params);
- 			/* race with others? */
- 			if (rc) {
- 				kmem_cache_free(osc_quota_kmem, oqi);
-@@ -162,7 +164,8 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 				continue;
- 			}
- 			if (rhashtable_remove_fast(&cli->cl_quota_hash[type],
--						   &oqi->oqi_hash, quota_hash_params) == 0)
-+						   &oqi->oqi_hash,
-+						   quota_hash_params) == 0)
- 				call_rcu(&oqi->rcu, osc_quota_free);
- 			rcu_read_unlock();
- 			CDEBUG(D_QUOTA, "%s: setdq to remove for %s %d (%p)\n",
-@@ -187,7 +190,8 @@ int osc_quota_setup(struct obd_device *obd)
- 	int i, type;
- 
- 	for (type = 0; type < MAXQUOTAS; type++) {
--		if (rhashtable_init(&cli->cl_quota_hash[type], &quota_hash_params) != 0)
-+		if (rhashtable_init(&cli->cl_quota_hash[type],
-+				    &quota_hash_params) != 0)
- 			break;
- 	}
- 
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 9484b9a..a64b8ab 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -1413,32 +1413,26 @@ static int check_write_checksum(struct obdo *oa,
- 				      aa->aa_ppga, OST_WRITE, cksum_type);
- 
- 	if (cksum_type != cksum_type_unpack(aa->aa_oa->o_flags))
--		msg = "the server did not use the checksum type specified in the original request - likely a protocol problem"
--			;
-+		msg = "the server did not use the checksum type specified in the original request - likely a protocol problem";
- 	else if (new_cksum == server_cksum)
--		msg = "changed on the client after we checksummed it - likely false positive due to mmap IO (bug 11742)"
--			;
-+		msg = "changed on the client after we checksummed it - likely false positive due to mmap IO (bug 11742)";
- 	else if (new_cksum == client_cksum)
- 		msg = "changed in transit before arrival at OST";
- 	else
--		msg = "changed in transit AND doesn't match the original - likely false positive due to mmap IO (bug 11742)"
--			;
--
--	LCONSOLE_ERROR_MSG(
--		0x132,
--		"%s: BAD WRITE CHECKSUM: %s: from %s inode " DFID
--		" object " DOSTID
--		" extent [%llu-%llu], original client csum %x (type %x), server csum %x (type %x), client csum now %x\n",
--		aa->aa_cli->cl_import->imp_obd->obd_name,
--		msg, libcfs_nid2str(peer->nid),
--		oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : (u64)0,
--		oa->o_valid & OBD_MD_FLFID ? oa->o_parent_oid : 0,
--		oa->o_valid & OBD_MD_FLFID ? oa->o_parent_ver : 0,
--		POSTID(&oa->o_oi), aa->aa_ppga[0]->off,
--		aa->aa_ppga[aa->aa_page_count - 1]->off +
--		aa->aa_ppga[aa->aa_page_count - 1]->count - 1,
--		client_cksum, cksum_type_unpack(aa->aa_oa->o_flags),
--		server_cksum, cksum_type, new_cksum);
-+		msg = "changed in transit AND doesn't match the original - likely false positive due to mmap IO (bug 11742)";
+ 	int rc = 0;
 +
-+	LCONSOLE_ERROR_MSG(0x132,
-+			   "%s: BAD WRITE CHECKSUM: %s: from %s inode " DFID " object " DOSTID " extent [%llu-%llu], original client csum %x (type %x), server csum %x (type %x), client csum now %x\n",
-+			   aa->aa_cli->cl_import->imp_obd->obd_name,
-+			   msg, libcfs_nid2str(peer->nid),
-+			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : (u64)0,
-+			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_oid : 0,
-+			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_ver : 0,
-+			   POSTID(&oa->o_oi), aa->aa_ppga[0]->off,
-+			   aa->aa_ppga[aa->aa_page_count - 1]->off +
-+			   aa->aa_ppga[aa->aa_page_count - 1]->count - 1,
-+			   client_cksum, cksum_type_unpack(aa->aa_oa->o_flags),
-+			   server_cksum, cksum_type, new_cksum);
+ 	mutex_lock(&ldlm_ref_mutex);
+ 	if (ldlm_refcount == 1) {
+ 		rc = ldlm_cleanup();
+diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+index 1f81795..6714c30 100644
+--- a/fs/lustre/ldlm/ldlm_pool.c
++++ b/fs/lustre/ldlm/ldlm_pool.c
+@@ -360,7 +360,8 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
+ 	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+ 	if (recalc_interval_sec > 0) {
+ 		spin_lock(&pl->pl_lock);
+-		recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
++		recalc_interval_sec = ktime_get_real_seconds() -
++				      pl->pl_recalc_time;
  
- 	return 1;
+ 		if (recalc_interval_sec > 0) {
+ 			/*
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index a614d74..b7dcfda 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -438,7 +438,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 			       PLDLMRES(lock->l_resource));
+ 
+ 			rc = ldlm_lock_change_resource(ns, lock,
+-					&reply->lock_desc.l_resource.lr_name);
++						       &reply->lock_desc.l_resource.lr_name);
+ 			if (rc || !lock->l_resource) {
+ 				rc = -ENOMEM;
+ 				goto cleanup;
+@@ -450,9 +450,9 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 			      !(exp_connect_flags(exp) & OBD_CONNECT_IBITS)))
+ 				/* We assume lock type cannot change on server*/
+ 				ldlm_convert_policy_to_local(exp,
+-						lock->l_resource->lr_type,
+-						&reply->lock_desc.l_policy_data,
+-						&lock->l_policy_data);
++							     lock->l_resource->lr_type,
++							     &reply->lock_desc.l_policy_data,
++							     &lock->l_policy_data);
+ 		if (type != LDLM_PLAIN)
+ 			LDLM_DEBUG(lock,
+ 				   "client-side enqueue, new policy data");
+@@ -927,8 +927,7 @@ static int ldlm_cli_cancel_req(struct obd_export *exp,
+ 		if (rc == LUSTRE_ESTALE) {
+ 			CDEBUG(D_DLMTRACE,
+ 			       "client/server (nid %s) out of sync -- not fatal\n",
+-			       libcfs_nid2str(req->rq_import->
+-					      imp_connection->c_peer.nid));
++			       libcfs_nid2str(req->rq_import->imp_connection->c_peer.nid));
+ 			rc = 0;
+ 		} else if (rc == -ETIMEDOUT && /* check there was no reconnect*/
+ 			   req->rq_import_generation == imp->imp_generation) {
+@@ -1290,10 +1289,9 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
+ 		LDLM_POLICY_KEEP_LOCK : LDLM_POLICY_CANCEL_LOCK;
  }
+ 
+-typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
+-						      struct ldlm_namespace *,
+-						      struct ldlm_lock *, int,
+-						      int, int);
++typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(struct ldlm_namespace *,
++							 struct ldlm_lock *,
++							 int, int, int);
+ 
+ static ldlm_cancel_lru_policy_t
+ ldlm_cancel_lru_policy(struct ldlm_namespace *ns, int lru_flags)
 -- 
 1.8.3.1
