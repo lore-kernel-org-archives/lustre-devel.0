@@ -1,13 +1,11 @@
 From: Oleg Drokin <green@whamcloud.com>
-Date: Mon, 22 Jul 2019 06:56:24 +0000
-Subject: [lustre-devel] [PATCH 19/22] ext4: don't check before replay
-In-Reply-To: <87wogak1n7.fsf@notabene.neil.brown.name>
+Date: Mon, 22 Jul 2019 07:16:06 +0000
+Subject: [lustre-devel] [PATCH 04/22] ext4: export inode management
+In-Reply-To: <87o91mpu11.fsf@notabene.neil.brown.name>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-20-git-send-email-jsimmons@infradead.org>
- <87pnm2ocvr.fsf@notabene.neil.brown.name>
- <506765DD-0068-469E-ADA4-2C71B8B60114@cloudlinux.com>
- <87wogak1n7.fsf@notabene.neil.brown.name>
-Message-ID: <82691452-7473-4CAB-BE70-0C89238D5720@whamcloud.com>
+ <1563758631-29550-5-git-send-email-jsimmons@infradead.org>
+ <87o91mpu11.fsf@notabene.neil.brown.name>
+Message-ID: <700E5EAE-5BD9-4F40-95CF-3419F69070D3@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,83 +14,26 @@ To: lustre-devel@lists.lustre.org
 
 
 
-> On Jul 22, 2019, at 2:46 AM, NeilBrown <neilb@suse.com> wrote:
+> On Jul 22, 2019, at 12:34 AM, NeilBrown <neilb@suse.com> wrote:
 > 
-> On Mon, Jul 22 2019, Alexey Lyashkov wrote:
+> On Sun, Jul 21 2019, James Simmons wrote:
 > 
->> Why?
->> Purpose of this patch is simple and don?t addressed a failover in general.
->> Crash can occurred in commit time - when journal _partially_ flushed to the FS. Checking any FS metadata in this time is wrong, because we have no guarantee to be consistence.
->> But checking an after journal replay is fine, it check have verification no corruption hit and FS is fine. 
+>> Make ext4_delete_entry() exportable for osd-ldiskfs. Also add
+>> exportable ext4_create_inode().
 > 
-> If the corruption can occur in non-ldiskfs usage, and would be fixed by
-> a journal replay, then yes - the patch looks like a good idea.
-> 
-> Possibly I misunderstood the source of the corruption... maybe if that
-> could be made clearer in the commit message, that would help.
+> Why can't lustre use vfs_unlink like everyone else?  And vfs_mknod()?
+> My hope is that what we land upstream will use generic interfaces only.
+> If there is something that osd needs to do that the generic interfaces
+> cannot support, then we need to look at how to add that to the generic
+> interface.
 
-I think the argument is: wtf do we even look at metadata (or anything, really)
-before journal replay.
-The patch is actually good because it does move the read after the journal replay
-though?
+That?s probably going to be a tough thing to do. At times we need certain things
+that are bad from vfs standpoint in general sense, but because we have various
+outside guarantees from locking and such - we can still do them.
 
+nothing precise comes to mind now, but I remember various games with
+nlink count/moving and resurrecting such files.
 
-> 
->> 
->> 
->>> 22 ???? 2019 ?., ? 8:29, NeilBrown <neilb@suse.com> ???????(?):
->>> 
->>> On Sun, Jul 21 2019, James Simmons wrote:
->>> 
->>>> When ldiskfs run in failover mode whith read-only disk.
->>>> Part of allocation updates are lost and ldiskfs may fail
->>>> while mounting this is due to inconsistent state of
->>>> group-descriptor. Group-descriptor check is added after
->>>> journal replay.
->>> 
->>> I think this needs to be enabled by a mount option or super-block flag.
->>> 
->>> NeilBrown
->>> 
->>> 
->>>> 
->>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
->>>> ---
->>>> fs/ext4/super.c | 11 ++++++-----
->>>> 1 file changed, 6 insertions(+), 5 deletions(-)
->>>> 
->>>> diff --git a/fs/ext4/super.c b/fs/ext4/super.c
->>>> index a3179b2..b818acb 100644
->>>> --- a/fs/ext4/super.c
->>>> +++ b/fs/ext4/super.c
->>>> @@ -4255,11 +4255,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
->>>> 		}
->>>> 	}
->>>> 	sbi->s_gdb_count = db_count;
->>>> -	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
->>>> -		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
->>>> -		ret = -EFSCORRUPTED;
->>>> -		goto failed_mount2;
->>>> -	}
->>>> 
->>>> 	timer_setup(&sbi->s_err_report, print_daily_error_info, 0);
->>>> 
->>>> @@ -4401,6 +4396,12 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
->>>> 	sbi->s_journal->j_commit_callback = ext4_journal_commit_callback;
->>>> 
->>>> no_journal:
->>>> +	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
->>>> +		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
->>>> +		ret = -EFSCORRUPTED;
->>>> +		goto failed_mount_wq;
->>>> +	}
->>>> +
->>>> 	if (!test_opt(sb, NO_MBCACHE)) {
->>>> 		sbi->s_ea_block_cache = ext4_xattr_create_cache();
->>>> 		if (!sbi->s_ea_block_cache) {
->>>> -- 
->>>> 1.8.3.1
->>> _______________________________________________
->>> lustre-devel mailing list
->>> lustre-devel at lists.lustre.org
->>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+We also have wider ?transaction boundaries?. Where say normal via-vfs transaction
+is metadata only, we can request certain data (from ext4 perspective, but metadata
+from Lustre) to be part of a particular transaction.
