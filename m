@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:51 -0400
-Subject: [lustre-devel] [PATCH 22/22] ext4: export mb stream allocator
- variables
+Date: Sun, 21 Jul 2019 21:23:47 -0400
+Subject: [lustre-devel] [PATCH 18/22] ext4: attach jinode in writepages
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-23-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-19-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,108 +12,53 @@ To: lustre-devel@lists.lustre.org
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/ext4/ext4.h    |  2 ++
- fs/ext4/mballoc.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
- fs/ext4/sysfs.c   |  4 ++++
- 3 files changed, 65 insertions(+)
+ fs/ext4/ext4.h  | 1 +
+ fs/ext4/inode.c | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
 diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
-index 0ee4606..46f2619 100644
+index 5f73e19..0ee4606 100644
 --- a/fs/ext4/ext4.h
 +++ b/fs/ext4/ext4.h
-@@ -2620,6 +2620,8 @@ extern int ext4_init_inode_table(struct super_block *sb,
- /* mballoc.c */
- extern const struct file_operations ext4_seq_prealloc_table_fops;
- extern const struct seq_operations ext4_mb_seq_groups_ops;
-+extern const struct file_operations ext4_seq_mb_last_group_fops;
-+extern int ext4_mb_seq_last_start_seq_show(struct seq_file *m, void *v);
- extern long ext4_mb_stats;
- extern long ext4_mb_max_to_scan;
- extern int ext4_mb_init(struct super_block *);
-diff --git a/fs/ext4/mballoc.c b/fs/ext4/mballoc.c
-index 82398b0..8270e35 100644
---- a/fs/ext4/mballoc.c
-+++ b/fs/ext4/mballoc.c
-@@ -2459,6 +2459,65 @@ static struct kmem_cache *get_groupinfo_cache(int blocksize_bits)
- 	return cachep;
- }
+@@ -2643,6 +2643,7 @@ extern int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
+ extern void ext4_process_freed_data(struct super_block *sb, tid_t commit_tid);
  
-+#define EXT4_MB_MAX_INPUT_STRING_SIZE 32
-+
-+static ssize_t ext4_mb_last_group_write(struct file *file,
-+					const char __user *buf,
-+					size_t cnt, loff_t *pos)
-+{
-+	char dummy[EXT4_MB_MAX_INPUT_STRING_SIZE + 1];
-+	struct super_block *sb = PDE_DATA(file_inode(file));
-+	struct ext4_sb_info *sbi = EXT4_SB(sb);
-+	unsigned long val;
-+	char *end;
-+
-+	if (cnt > EXT4_MB_MAX_INPUT_STRING_SIZE)
-+		return -EINVAL;
-+	if (copy_from_user(dummy, buf, cnt))
-+		return -EFAULT;
-+	dummy[cnt] = '\0';
-+	val = simple_strtoul(dummy, &end, 0);
-+	if (dummy == end)
-+		return -EINVAL;
-+	if (val >= ext4_get_groups_count(sb))
-+		return -ERANGE;
-+	spin_lock(&sbi->s_md_lock);
-+	sbi->s_mb_last_group = val;
-+	sbi->s_mb_last_start = 0;
-+	spin_unlock(&sbi->s_md_lock);
-+	return cnt;
-+}
-+
-+static int ext4_mb_seq_last_group_seq_show(struct seq_file *m, void *v)
-+{
-+	struct ext4_sb_info *sbi = EXT4_SB(m->private);
-+
-+	seq_printf(m , "%ld\n", sbi->s_mb_last_group);
-+	return 0;
-+}
-+
-+static int ext4_mb_seq_last_group_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, ext4_mb_seq_last_group_seq_show, PDE_DATA(inode));
-+}
-+
-+const struct file_operations ext4_seq_mb_last_group_fops = {
-+	.owner		= THIS_MODULE,
-+	.open		= ext4_mb_seq_last_group_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= seq_release,
-+	.write		= ext4_mb_last_group_write,
-+};
-+
-+int ext4_mb_seq_last_start_seq_show(struct seq_file *m, void *v)
-+{
-+	struct ext4_sb_info *sbi = EXT4_SB(m->private);
-+
-+	seq_printf(m , "%ld\n", sbi->s_mb_last_start);
-+	return 0;
-+}
-+
- /*
-  * Allocate the top-level s_group_info array for the specified number
-  * of groups
-diff --git a/fs/ext4/sysfs.c b/fs/ext4/sysfs.c
-index 575f318..6bcb455 100644
---- a/fs/ext4/sysfs.c
-+++ b/fs/ext4/sysfs.c
-@@ -425,6 +425,10 @@ int ext4_register_sysfs(struct super_block *sb)
- 				&ext4_mb_seq_groups_ops, sb);
- 		proc_create_data("prealloc_table", S_IRUGO, sbi->s_proc,
- 				 &ext4_seq_prealloc_table_fops, sb);
-+		proc_create_data("mb_last_group", S_IRUGO, sbi->s_proc,
-+				 &ext4_seq_mb_last_group_fops, sb);
-+		proc_create_single_data("mb_last_start", S_IRUGO, sbi->s_proc,
-+					ext4_mb_seq_last_start_seq_show, sb);
+ /* inode.c */
++#define HAVE_LDISKFS_INFO_JINODE
+ int ext4_inode_is_fast_symlink(struct inode *inode);
+ struct buffer_head *ext4_getblk(handle_t *, struct inode *, ext4_lblk_t, int);
+ struct buffer_head *ext4_bread(handle_t *, struct inode *, ext4_lblk_t, int);
+diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
+index 9296611..bf00dfc 100644
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -731,6 +731,9 @@ int ext4_map_blocks(handle_t *handle, struct inode *inode,
+ 		    !(flags & EXT4_GET_BLOCKS_ZERO) &&
+ 		    !ext4_is_quota_file(inode) &&
+ 		    ext4_should_order_data(inode)) {
++			ret = ext4_inode_attach_jinode(inode);
++			if (ret)
++				return ret;
+ 			if (flags & EXT4_GET_BLOCKS_IO_SUBMIT)
+ 				ret = ext4_jbd2_inode_add_wait(handle, inode);
+ 			else
+@@ -2815,6 +2818,9 @@ static int ext4_writepages(struct address_space *mapping,
+ 		mpd.last_page = wbc->range_end >> PAGE_SHIFT;
  	}
+ 
++	ret = ext4_inode_attach_jinode(inode);
++	if (ret)
++		return ret;
+ 	mpd.inode = inode;
+ 	mpd.wbc = wbc;
+ 	ext4_io_submit_init(&mpd.io_submit, wbc);
+@@ -4432,6 +4438,7 @@ int ext4_inode_attach_jinode(struct inode *inode)
+ 		jbd2_free_inode(jinode);
  	return 0;
  }
++EXPORT_SYMBOL(ext4_inode_attach_jinode);
+ 
+ /*
+  * ext4_truncate()
 -- 
 1.8.3.1
