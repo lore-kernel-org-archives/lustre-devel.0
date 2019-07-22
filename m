@@ -1,54 +1,31 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:48 -0400
-Subject: [lustre-devel] [PATCH 19/22] ext4: don't check before replay
+Date: Sun, 21 Jul 2019 21:23:50 -0400
+Subject: [lustre-devel] [PATCH 21/22] ext4: export ext4_orphan_add
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-22-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-When ldiskfs run in failover mode whith read-only disk.
-Part of allocation updates are lost and ldiskfs may fail
-while mounting this is due to inconsistent state of
-group-descriptor. Group-descriptor check is added after
-journal replay.
-
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/ext4/super.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ fs/ext4/namei.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/fs/ext4/super.c b/fs/ext4/super.c
-index a3179b2..b818acb 100644
---- a/fs/ext4/super.c
-+++ b/fs/ext4/super.c
-@@ -4255,11 +4255,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
- 		}
- 	}
- 	sbi->s_gdb_count = db_count;
--	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
--		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
--		ret = -EFSCORRUPTED;
--		goto failed_mount2;
--	}
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 9b30cc6..6cb3f63 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -3615,6 +3615,7 @@ int ext4_orphan_add(handle_t *handle, struct inode *inode)
+ 	ext4_std_error(sb, err);
+ 	return err;
+ }
++EXPORT_SYMBOL(ext4_orphan_add);
  
- 	timer_setup(&sbi->s_err_report, print_daily_error_info, 0);
- 
-@@ -4401,6 +4396,12 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
- 	sbi->s_journal->j_commit_callback = ext4_journal_commit_callback;
- 
- no_journal:
-+	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
-+		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
-+		ret = -EFSCORRUPTED;
-+		goto failed_mount_wq;
-+	}
-+
- 	if (!test_opt(sb, NO_MBCACHE)) {
- 		sbi->s_ea_block_cache = ext4_xattr_create_cache();
- 		if (!sbi->s_ea_block_cache) {
+ /*
+  * ext4_orphan_del() removes an unlinked or truncated inode from the list
 -- 
 1.8.3.1
