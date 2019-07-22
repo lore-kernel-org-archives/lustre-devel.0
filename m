@@ -1,48 +1,72 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 22:12:12 -0400
-Subject: [lustre-devel] [PATCH 00/10] lustre: push patches ready from
- lustre-testing
-Message-ID: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 21 Jul 2019 22:12:14 -0400
+Subject: [lustre-devel] [PATCH 02/10] lustre: lprocfs: use log2.h macros
+ instead of shift loop.
+In-Reply-To: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
+References: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563761542-3708-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Several patches from lustre-testing have been reviewed and tested.
-They are ready to land to the main lustre branch. One patch in
-lustre-testing to remove set_cblist in ptlrpc has been replaced by
-a patch from John Hammond that removed even more.
+From: NeilBrown <neilb@suse.com>
 
-John L. Hammond (1):
-  lustre: ptlrpc: simplify struct ptlrpc_request_set
+These shift loops seem to be trying to avoid doing a
+multiplication.
+The same effect can be achieved more transparently using
+rounddown_pow_of_two().  Even though there is a multiplication
+in the C code, the resulting machine code just does a single shift.
 
-NeilBrown (9):
-  lustre: ldlm: discard varname in ldlm_pool.
-  lustre: lprocfs: use log2.h macros instead of shift loop.
-  lustre: ptlrpc: make ptlrpc_bulk_frag_ops always const.
-  lustre: mgc: remove llog_process_lock
-  lustre: don't declare extern variables in C files.
-  lnet: socklnd: fix infinite loop in ksocknal_push()
-  lustre: ptlrpc: remove inline on non-inlined functions.
-  lustre: convert rsi_sem to a spinlock.
-  lustre: ptlrpc: make ptlrpc_last_xid an atomic64_t
+As rounddown_pow_of_two() is not defined for 0, and as we cannot be
+positively use the blk_size is non-zero, use blk_size ?: 1.
 
- fs/lustre/include/lustre_net.h      | 47 +-------------------
- fs/lustre/include/obd_class.h       | 25 +----------
- fs/lustre/ldlm/ldlm_internal.h      |  2 -
- fs/lustre/ldlm/ldlm_pool.c          | 18 +++-----
- fs/lustre/ldlm/ldlm_resource.c      |  2 -
- fs/lustre/llite/llite_lib.c         |  8 ++--
- fs/lustre/llite/lproc_llite.c       |  4 +-
- fs/lustre/lov/lov_obd.c             | 85 ++++++++++++-------------------------
- fs/lustre/mgc/mgc_request.c         |  6 +--
- fs/lustre/obdclass/lprocfs_status.c | 18 +++-----
- fs/lustre/ptlrpc/client.c           | 82 ++++++++++++++---------------------
- fs/lustre/ptlrpc/import.c           |  1 -
- fs/lustre/ptlrpc/ptlrpc_module.c    |  5 ---
- net/lnet/klnds/socklnd/socklnd.c    |  2 +-
- 14 files changed, 82 insertions(+), 223 deletions(-)
+Signed-off-by: NeilBrown <neilb@suse.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4423
+Reviewed-on: https://review.whamcloud.com/35274
+Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ fs/lustre/obdclass/lprocfs_status.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index c5f5807..2b4302e 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -373,9 +373,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_blocks;
+ 
+-		while (blk_size >>= 1)
+-			result <<= 1;
+-
++		result *= rounddown_pow_of_two(blk_size ?: 1);
+ 		return sprintf(buf, "%llu\n", result);
+ 	}
+ 
+@@ -396,8 +394,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_bfree;
+ 
+-		while (blk_size >>= 1)
+-			result <<= 1;
++		result *= rounddown_pow_of_two(blk_size ?: 1);
+ 
+ 		return sprintf(buf, "%llu\n", result);
+ 	}
+@@ -419,8 +416,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
+ 		u32 blk_size = osfs.os_bsize >> 10;
+ 		u64 result = osfs.os_bavail;
+ 
+-		while (blk_size >>= 1)
+-			result <<= 1;
++		result *= rounddown_pow_of_two(blk_size ?: 1);
+ 
+ 		return sprintf(buf, "%llu\n", result);
+ 	}
 -- 
 1.8.3.1
