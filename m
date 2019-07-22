@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:49 -0400
-Subject: [lustre-devel] [PATCH 20/22] ext4: use GFP_NOFS in
- ext4_inode_attach_jinode
+Date: Sun, 21 Jul 2019 21:23:51 -0400
+Subject: [lustre-devel] [PATCH 22/22] ext4: export mb stream allocator
+ variables
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-21-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-23-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,21 +13,108 @@ To: lustre-devel@lists.lustre.org
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/ext4/inode.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/ext4/ext4.h    |  2 ++
+ fs/ext4/mballoc.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ fs/ext4/sysfs.c   |  4 ++++
+ 3 files changed, 65 insertions(+)
 
-diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
-index bf00dfc..ca72097 100644
---- a/fs/ext4/inode.c
-+++ b/fs/ext4/inode.c
-@@ -4422,7 +4422,7 @@ int ext4_inode_attach_jinode(struct inode *inode)
- 	if (ei->jinode || !EXT4_SB(inode->i_sb)->s_journal)
- 		return 0;
+diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
+index 0ee4606..46f2619 100644
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -2620,6 +2620,8 @@ extern int ext4_init_inode_table(struct super_block *sb,
+ /* mballoc.c */
+ extern const struct file_operations ext4_seq_prealloc_table_fops;
+ extern const struct seq_operations ext4_mb_seq_groups_ops;
++extern const struct file_operations ext4_seq_mb_last_group_fops;
++extern int ext4_mb_seq_last_start_seq_show(struct seq_file *m, void *v);
+ extern long ext4_mb_stats;
+ extern long ext4_mb_max_to_scan;
+ extern int ext4_mb_init(struct super_block *);
+diff --git a/fs/ext4/mballoc.c b/fs/ext4/mballoc.c
+index 82398b0..8270e35 100644
+--- a/fs/ext4/mballoc.c
++++ b/fs/ext4/mballoc.c
+@@ -2459,6 +2459,65 @@ static struct kmem_cache *get_groupinfo_cache(int blocksize_bits)
+ 	return cachep;
+ }
  
--	jinode = jbd2_alloc_inode(GFP_KERNEL);
-+	jinode = jbd2_alloc_inode(GFP_NOFS);
- 	spin_lock(&inode->i_lock);
- 	if (!ei->jinode) {
- 		if (!jinode) {
++#define EXT4_MB_MAX_INPUT_STRING_SIZE 32
++
++static ssize_t ext4_mb_last_group_write(struct file *file,
++					const char __user *buf,
++					size_t cnt, loff_t *pos)
++{
++	char dummy[EXT4_MB_MAX_INPUT_STRING_SIZE + 1];
++	struct super_block *sb = PDE_DATA(file_inode(file));
++	struct ext4_sb_info *sbi = EXT4_SB(sb);
++	unsigned long val;
++	char *end;
++
++	if (cnt > EXT4_MB_MAX_INPUT_STRING_SIZE)
++		return -EINVAL;
++	if (copy_from_user(dummy, buf, cnt))
++		return -EFAULT;
++	dummy[cnt] = '\0';
++	val = simple_strtoul(dummy, &end, 0);
++	if (dummy == end)
++		return -EINVAL;
++	if (val >= ext4_get_groups_count(sb))
++		return -ERANGE;
++	spin_lock(&sbi->s_md_lock);
++	sbi->s_mb_last_group = val;
++	sbi->s_mb_last_start = 0;
++	spin_unlock(&sbi->s_md_lock);
++	return cnt;
++}
++
++static int ext4_mb_seq_last_group_seq_show(struct seq_file *m, void *v)
++{
++	struct ext4_sb_info *sbi = EXT4_SB(m->private);
++
++	seq_printf(m , "%ld\n", sbi->s_mb_last_group);
++	return 0;
++}
++
++static int ext4_mb_seq_last_group_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, ext4_mb_seq_last_group_seq_show, PDE_DATA(inode));
++}
++
++const struct file_operations ext4_seq_mb_last_group_fops = {
++	.owner		= THIS_MODULE,
++	.open		= ext4_mb_seq_last_group_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= seq_release,
++	.write		= ext4_mb_last_group_write,
++};
++
++int ext4_mb_seq_last_start_seq_show(struct seq_file *m, void *v)
++{
++	struct ext4_sb_info *sbi = EXT4_SB(m->private);
++
++	seq_printf(m , "%ld\n", sbi->s_mb_last_start);
++	return 0;
++}
++
+ /*
+  * Allocate the top-level s_group_info array for the specified number
+  * of groups
+diff --git a/fs/ext4/sysfs.c b/fs/ext4/sysfs.c
+index 575f318..6bcb455 100644
+--- a/fs/ext4/sysfs.c
++++ b/fs/ext4/sysfs.c
+@@ -425,6 +425,10 @@ int ext4_register_sysfs(struct super_block *sb)
+ 				&ext4_mb_seq_groups_ops, sb);
+ 		proc_create_data("prealloc_table", S_IRUGO, sbi->s_proc,
+ 				 &ext4_seq_prealloc_table_fops, sb);
++		proc_create_data("mb_last_group", S_IRUGO, sbi->s_proc,
++				 &ext4_seq_mb_last_group_fops, sb);
++		proc_create_single_data("mb_last_start", S_IRUGO, sbi->s_proc,
++					ext4_mb_seq_last_start_seq_show, sb);
+ 	}
+ 	return 0;
+ }
 -- 
 1.8.3.1
