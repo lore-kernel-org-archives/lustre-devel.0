@@ -1,9 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:30 -0400
-Subject: [lustre-devel] [PATCH 01/22] ext4: add i_fs_version
+Date: Sun, 21 Jul 2019 21:23:31 -0400
+Subject: [lustre-devel] [PATCH 02/22] ext4: use d_find_alias() in ext4_lookup
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,60 +12,52 @@ To: lustre-devel@lists.lustre.org
 
 From: James Simmons <uja.ornl@yahoo.com>
 
-Add inode version field that osd-ldiskfs uses.
+Really old bug that might not even exist anymore?
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/ext4/ext4.h   | 2 ++
- fs/ext4/ialloc.c | 1 +
- fs/ext4/inode.c  | 4 ++--
- 3 files changed, 5 insertions(+), 2 deletions(-)
+ fs/ext4/namei.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
-index 1cb6785..8abbcab 100644
---- a/fs/ext4/ext4.h
-+++ b/fs/ext4/ext4.h
-@@ -1063,6 +1063,8 @@ struct ext4_inode_info {
- 	struct dquot *i_dquot[MAXQUOTAS];
- #endif
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index cd01c4a..a616f58 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -1664,6 +1664,35 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
+ 		}
+ 	}
  
-+	u64 i_fs_version;
++	/* ".." shouldn't go into dcache to preserve dcache hierarchy
++	 * otherwise we'll get parent being a child of actual child.
++	 * see bug 10458 for details -bzzz
++	 */
++	if (inode && (dentry->d_name.name[0] == '.' &&
++		      (dentry->d_name.len == 1 || (dentry->d_name.len == 2 &&
++						   dentry->d_name.name[1] == '.')))) {
++		struct dentry *goal = NULL;
 +
- 	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
- 	__u32 i_csum_seed;
- 
-diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
-index 764ff4c..09ae4a4 100644
---- a/fs/ext4/ialloc.c
-+++ b/fs/ext4/ialloc.c
-@@ -1100,6 +1100,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
- 	ei->i_dtime = 0;
- 	ei->i_block_group = group;
- 	ei->i_last_alloc_group = ~0;
-+	ei->i_fs_version = 0;
- 
- 	ext4_set_inode_flags(inode);
- 	if (IS_DIRSYNC(inode))
-diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
-index c7f77c6..6e66175 100644
---- a/fs/ext4/inode.c
-+++ b/fs/ext4/inode.c
-@@ -4806,14 +4806,14 @@ static inline void ext4_inode_set_iversion_queried(struct inode *inode, u64 val)
- 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
- 		inode_set_iversion_raw(inode, val);
- 	else
--		inode_set_iversion_queried(inode, val);
-+		EXT4_I(inode)->i_fs_version = val;
- }
- static inline u64 ext4_inode_peek_iversion(const struct inode *inode)
- {
- 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
- 		return inode_peek_iversion_raw(inode);
- 	else
--		return inode_peek_iversion(inode);
-+		return EXT4_I(inode)->i_fs_version;
- }
- 
- struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
++		/* first, look for an existing dentry - any one is good */
++		goal = d_find_any_alias(inode);
++		if (!goal) {
++			spin_lock(&dentry->d_lock);
++			/* there is no alias, we need to make current dentry:
++			 *  a) inaccessible for __d_lookup()
++			 *  b) inaccessible for iopen
++			 */
++			J_ASSERT(hlist_unhashed(&dentry->d_u.d_alias));
++			dentry->d_flags |= DCACHE_NFSFS_RENAMED;
++			/* this is d_instantiate() ... */
++			hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
++			dentry->d_inode = inode;
++			spin_unlock(&dentry->d_lock);
++		}
++		if (goal)
++			iput(inode);
++		return goal;
++	}
++
+ #ifdef CONFIG_UNICODE
+ 	if (!inode && IS_CASEFOLDED(dir)) {
+ 		/* Eventually we want to call d_add_ci(dentry, NULL)
 -- 
 1.8.3.1
