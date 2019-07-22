@@ -1,59 +1,39 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:43 -0400
-Subject: [lustre-devel] [PATCH 14/22] ext4: remove inode_lock handling
+Date: Sun, 21 Jul 2019 21:23:46 -0400
+Subject: [lustre-devel] [PATCH 17/22] ext4: optimize
+ ext4_journal_callback_add
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-There will cause a deadlock if invoke ext4_truncate with i_mutex locked
-in lustre. Since lustre has own lock to provide protect so we don't
-need this check at all.
+Change list_add_tail to list_add. It gives advantages to ldiskfs
+in tgt_cb_last_committed. In the beginning of list will be placed
+thandles with the highest transaction numbers. So at the first
+iterations we will have the highest transno. It will save from
+extra call of ptlrpc_commit_replies.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/ext4/inode.c | 2 --
- fs/ext4/namei.c | 4 ----
- 2 files changed, 6 deletions(-)
+ fs/ext4/ext4_jbd2.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
-index 5561351..9296611 100644
---- a/fs/ext4/inode.c
-+++ b/fs/ext4/inode.c
-@@ -4474,8 +4474,6 @@ int ext4_truncate(struct inode *inode)
- 	 * or it's a completely new inode. In those cases we might not
- 	 * have i_mutex locked because it's not necessary.
- 	 */
--	if (!(inode->i_state & (I_NEW|I_FREEING)))
--		WARN_ON(!inode_is_locked(inode));
- 	trace_ext4_truncate_enter(inode);
+diff --git a/fs/ext4/ext4_jbd2.h b/fs/ext4/ext4_jbd2.h
+index 75a5309..5ebf8ee 100644
+--- a/fs/ext4/ext4_jbd2.h
++++ b/fs/ext4/ext4_jbd2.h
+@@ -169,7 +169,7 @@ static inline void _ext4_journal_callback_add(handle_t *handle,
+ 			struct ext4_journal_cb_entry *jce)
+ {
+ 	/* Add the jce to transaction's private list */
+-	list_add_tail(&jce->jce_list, &handle->h_transaction->t_private_list);
++	list_add(&jce->jce_list, &handle->h_transaction->t_private_list);
+ }
  
- 	if (!ext4_can_truncate(inode))
-diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
-index 0153c4d..1b6d22a 100644
---- a/fs/ext4/namei.c
-+++ b/fs/ext4/namei.c
-@@ -3485,8 +3485,6 @@ int ext4_orphan_add(handle_t *handle, struct inode *inode)
- 	if (!sbi->s_journal || is_bad_inode(inode))
- 		return 0;
- 
--	WARN_ON_ONCE(!(inode->i_state & (I_NEW | I_FREEING)) &&
--		     !inode_is_locked(inode));
- 	/*
- 	 * Exit early if inode already is on orphan list. This is a big speedup
- 	 * since we don't have to contend on the global s_orphan_lock.
-@@ -3569,8 +3567,6 @@ int ext4_orphan_del(handle_t *handle, struct inode *inode)
- 	if (!sbi->s_journal && !(sbi->s_mount_state & EXT4_ORPHAN_FS))
- 		return 0;
- 
--	WARN_ON_ONCE(!(inode->i_state & (I_NEW | I_FREEING)) &&
--		     !inode_is_locked(inode));
- 	/* Do this quick check before taking global s_orphan_lock. */
- 	if (list_empty(&ei->i_orphan))
- 		return 0;
+ static inline void ext4_journal_callback_add(handle_t *handle,
 -- 
 1.8.3.1
