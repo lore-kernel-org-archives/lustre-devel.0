@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 22:12:17 -0400
-Subject: [lustre-devel] [PATCH 05/10] lustre: don't declare extern variables
- in C files.
+Date: Sun, 21 Jul 2019 22:12:20 -0400
+Subject: [lustre-devel] [PATCH 08/10] lustre: convert rsi_sem to a spinlock.
 In-Reply-To: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
 References: <1563761542-3708-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563761542-3708-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563761542-3708-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,64 +12,123 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-'extern' declarations should only appear in .h files.
-All these names are declared in .h files as needed,
-and these duplicate declarations in .c files can
-be removed.
+This lock is never held over code that sleeps, and is
+only ever held for short periods of time.
+So a simple spinlock is best.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-4423
-Reviewed-on: https://review.whamcloud.com/35294
+Reviewed-on: https://review.whamcloud.com/35279
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_resource.c   | 2 --
- fs/lustre/ptlrpc/import.c        | 1 -
- fs/lustre/ptlrpc/ptlrpc_module.c | 5 -----
- 3 files changed, 8 deletions(-)
+ fs/lustre/include/obd_class.h       | 3 +--
+ fs/lustre/llite/llite_lib.c         | 6 +++---
+ fs/lustre/llite/lproc_llite.c       | 4 ++--
+ fs/lustre/obdclass/lprocfs_status.c | 8 ++++----
+ 4 files changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
-index 45b2e97..372a290 100644
---- a/fs/lustre/ldlm/ldlm_resource.c
-+++ b/fs/lustre/ldlm/ldlm_resource.c
-@@ -681,8 +681,6 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index 34a8511..2f02efe 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -1689,12 +1689,11 @@ static inline void class_uuid_unparse(class_uuid_t uu, struct obd_uuid *out)
+ void statfs_unpack(struct kstatfs *sfs, struct obd_statfs *osfs);
+ 
+ /* root squash info */
+-struct rw_semaphore;
+ struct root_squash_info {
+ 	uid_t			rsi_uid;
+ 	gid_t			rsi_gid;
+ 	struct list_head	rsi_nosquash_nids;
+-	struct rw_semaphore	rsi_sem;
++	spinlock_t		rsi_lock;	/* protects rsi_nosquash_nids */
+ };
+ 
+ /* linux-module.c */
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 4e09f0f..b933f37 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -131,7 +131,7 @@ static struct ll_sb_info *ll_init_sbi(void)
+ 	sbi->ll_squash.rsi_uid = 0;
+ 	sbi->ll_squash.rsi_gid = 0;
+ 	INIT_LIST_HEAD(&sbi->ll_squash.rsi_nosquash_nids);
+-	init_rwsem(&sbi->ll_squash.rsi_sem);
++	spin_lock_init(&sbi->ll_squash.rsi_lock);
+ 
+ 	return sbi;
  }
- EXPORT_SYMBOL(ldlm_namespace_new);
+@@ -2578,7 +2578,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 	int i;
  
--extern struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
--
+ 	/* Update norootsquash flag */
+-	down_write(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (list_empty(&squash->rsi_nosquash_nids)) {
+ 		spin_lock(&sbi->ll_lock);
+ 		sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
+@@ -2606,7 +2606,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 			sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
+ 		spin_unlock(&sbi->ll_lock);
+ 	}
+-	up_write(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
+ }
+ 
  /**
-  * Cancel and destroy all locks on a resource.
-  *
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index d49707a..67a66a5 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -1572,7 +1572,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
- EXPORT_SYMBOL(ptlrpc_disconnect_import);
+diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+index 99e8a82..69f4f25 100644
+--- a/fs/lustre/llite/lproc_llite.c
++++ b/fs/lustre/llite/lproc_llite.c
+@@ -1157,7 +1157,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
+ 	struct root_squash_info *squash = &sbi->ll_squash;
+ 	int len;
  
- /* Adaptive Timeout utils */
--extern unsigned int at_min, at_max, at_history;
+-	down_read(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (!list_empty(&squash->rsi_nosquash_nids)) {
+ 		len = cfs_print_nidlist(m->buf + m->count, m->size - m->count,
+ 					&squash->rsi_nosquash_nids);
+@@ -1166,7 +1166,7 @@ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
+ 	} else {
+ 		seq_puts(m, "NONE\n");
+ 	}
+-	up_read(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
  
- /*
-  *Update at_current with the specified value (bounded by at_min and at_max),
-diff --git a/fs/lustre/ptlrpc/ptlrpc_module.c b/fs/lustre/ptlrpc/ptlrpc_module.c
-index f73ba41..6888df9 100644
---- a/fs/lustre/ptlrpc/ptlrpc_module.c
-+++ b/fs/lustre/ptlrpc/ptlrpc_module.c
-@@ -40,11 +40,6 @@
+ 	return 0;
+ }
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 2b4302e..01b8f90 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -1747,10 +1747,10 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+ 	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
+ 	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
+ 		/* empty string is special case */
+-		down_write(&squash->rsi_sem);
++		spin_lock(&squash->rsi_lock);
+ 		if (!list_empty(&squash->rsi_nosquash_nids))
+ 			cfs_free_nidlist(&squash->rsi_nosquash_nids);
+-		up_write(&squash->rsi_sem);
++		spin_unlock(&squash->rsi_lock);
+ 		LCONSOLE_INFO("%s: nosquash_nids is cleared\n", name);
+ 		kfree(kernbuf);
+ 		return count;
+@@ -1767,11 +1767,11 @@ int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+ 	kfree(kernbuf);
+ 	kernbuf = NULL;
  
- #include "ptlrpc_internal.h"
+-	down_write(&squash->rsi_sem);
++	spin_lock(&squash->rsi_lock);
+ 	if (!list_empty(&squash->rsi_nosquash_nids))
+ 		cfs_free_nidlist(&squash->rsi_nosquash_nids);
+ 	list_splice(&tmp, &squash->rsi_nosquash_nids);
+-	up_write(&squash->rsi_sem);
++	spin_unlock(&squash->rsi_lock);
  
--extern spinlock_t ptlrpc_last_xid_lock;
--#if RS_DEBUG
--extern spinlock_t ptlrpc_rs_debug_lock;
--#endif
--
- DEFINE_MUTEX(ptlrpc_startup);
- static int ptlrpc_active;
+ 	return count;
  
 -- 
 1.8.3.1
