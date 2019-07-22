@@ -1,127 +1,95 @@
-From: Quentin BOUGET <quentin.bouget@gmail.com>
-Date: Fri, 19 Jul 2019 21:52:46 +0200
-Subject: [lustre-devel] sanity-hsm and libtool
-In-Reply-To: <B264B956-FB39-46EF-A72D-0214B316833F@amazon.com>
-References: <B0E37F29-E0D1-4432-A6DB-712D27E078CB@amazon.com>
- <alpine.LFD.2.21.1907191611160.17024@casper.infradead.org>
- <B264B956-FB39-46EF-A72D-0214B316833F@amazon.com>
-Message-ID: <CAFhUgOQ_bLGvPEkmjGYxGWwViTA4_rprAmPY+GBGmr8Ndicswg@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sun, 21 Jul 2019 21:23:33 -0400
+Subject: [lustre-devel] [PATCH 04/22] ext4: export inode management
+In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
+References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Le ven. 19 juil. 2019 ? 17:44, Degremont, Aurelien <degremoa@amazon.com> a
-?crit :
+Make ext4_delete_entry() exportable for osd-ldiskfs. Also add
+exportable ext4_create_inode().
 
->
->
-> ?Le 19/07/2019 17:21, ? James Simmons ? <jsimmons@infradead.org> a ?crit :
->
->
->     > Hi!
->     >
->     >
->     >
->     > I'm trying to run sanity-hsm.sh tests in my lustre source directory
-> as I'm used to.
->     >
->     > Since libtool patch was landed, tools like lhsmtool_posix are
-> executed through a wrapper and appear in process list as
-> 'lt-lhsmtool_posix'.
->     >
->     > Some tests try to find and kill them, relying on command like:
->     >
->     >
->     >
->     > "ps -C $HSMTOOL"
->     >
->     >
->     >
->     > Even if run through "libtool execute ps -C $HSMTOOL" (as it is in
-> the source right now) this command does not catch the proper process and
->     > so fail the test.
->     >
->     >
->     >
->     > I'm wondering what the proper way to run the test suite to have it
-> working and how this is working in Maloo?
->     >
->     > I'm doing:
->     >
->     >
->     >
->     > git clone
->     >
->     > autogen
->     >
->     > configure
->     >
->     > make
->     >
->     > sudo REFORMAT=: ./lustre/tests/sanity-hsm.sh
->     >
->     >
->     >
->     >
->     >
->     >
->     >
->     > By the way, when hsm helper functions were moved from sanity-hsm.sh
-> to test-framework.sh (f172b1168, for PCC), some of them were just
->     > copied and not moved. So there are several duplicates between these
-> 2 files. I think that's not on purpose?
->
->     What version of lustre are you testing with? Their was a patch landed
-> to
->     handle this.
->
->     LU-11742 test: have libtool execute the test binaries
->
->     which is lustre commit f9e5224fbb60bb8b44753b7be10cb06108627f89. This
-> has
->     been back ported to 2.12 LTS. Can you see if your lustre tree has this
->     fix.
->
->     See
-> https://www.gnu.org/software/libtool/manual/html_node/Debugging-executables.html
->     for details about using libtool against the binary wrappers.
->
-> I'm running master.
-> That's exactly the patch which is giving me issue.
-> I can run sanity-hsm successfully prior to this patch, not after.
->
-> Aur?lien
->
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ fs/ext4/ext4.h  |  6 ++++++
+ fs/ext4/namei.c | 30 ++++++++++++++++++++++++++----
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
-I concur : I cannot run sanity-hsm on master. Works fine when checking out
-the commit right before the libtool patch , breaks if the patch is applied.
-
-With some testing it appears this is because "libtool execute" does does
-not use the PATH environment variable when it resolves paths :
-
-$> pwd
-/home/user/lustre-release
-$> export PATH=lustre/utils:/usr/bin
-$> which lhsmtool_posix
-/home/user/lustre-release/lustre/utils/lhsmtool_posix
-$> libtool execute echo lhsmtool_posix
-lhsmtool_posix
-$> libtool execute echo lustre/utils/lhsmtool_posix
-/home/user/lustre-release/luster/utils/.libs/lhsmtool_posix
-
-I suspect this works on Maloo because Maloo does not run tests from the git
-repo but rather from installed rpms (=> no libtool wrappers).
-
-@James, I can see you asked me a follow-up review on the patch that
-introduces this regressions, and I did not answer, Sorry about that. I will
-try to keep better track of patches I reviewed at least once... In this
-spirit, I will try to update my review of this change
-<https://review.whamcloud.com/#/c/33572/> this weekend. =)
-
-Cheers,
-Quentin
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190719/805da1ad/attachment-0001.html>
+diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
+index 423ab4d..50f0c50 100644
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -2579,6 +2579,12 @@ extern int ext4_dirent_csum_verify(struct inode *inode,
+ 				   struct ext4_dir_entry *dirent);
+ extern int ext4_orphan_add(handle_t *, struct inode *);
+ extern int ext4_orphan_del(handle_t *, struct inode *);
++extern struct inode *ext4_create_inode(handle_t *handle,
++				       struct inode *dir, int mode,
++				       uid_t *owner);
++extern int ext4_delete_entry(handle_t *handle, struct inode * dir,
++			     struct ext4_dir_entry_2 *de_del,
++			     struct buffer_head *bh);
+ extern int ext4_htree_fill_tree(struct file *dir_file, __u32 start_hash,
+ 				__u32 start_minor_hash, __u32 *next_hash);
+ extern int ext4_search_dir(struct buffer_head *bh,
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index a52b311..a42a2db 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -2459,10 +2459,9 @@ int ext4_generic_delete_entry(handle_t *handle,
+ 	return -ENOENT;
+ }
+ 
+-static int ext4_delete_entry(handle_t *handle,
+-			     struct inode *dir,
+-			     struct ext4_dir_entry_2 *de_del,
+-			     struct buffer_head *bh)
++int ext4_delete_entry(handle_t *handle, struct inode *dir,
++		      struct ext4_dir_entry_2 *de_del,
++		      struct buffer_head *bh)
+ {
+ 	int err, csum_size = 0;
+ 
+@@ -2499,6 +2498,7 @@ static int ext4_delete_entry(handle_t *handle,
+ 		ext4_std_error(dir->i_sb, err);
+ 	return err;
+ }
++EXPORT_SYMBOL(ext4_delete_entry);
+ 
+ /*
+  * Set directory link count to 1 if nlinks > EXT4_LINK_MAX, or if nlinks == 2
+@@ -2545,6 +2545,28 @@ static int ext4_add_nondir(handle_t *handle,
+ 	return err;
+ }
+ 
++/* Return locked inode, then the caller can modify the inode's states/flags
++ * before others finding it. The caller should unlock the inode by itself.
++ */
++struct inode *ext4_create_inode(handle_t *handle, struct inode *dir, int mode,
++				uid_t *owner)
++{
++	struct inode *inode;
++
++	inode = ext4_new_inode(handle, dir, mode, NULL, 0, owner, 0);
++	if (!IS_ERR(inode)) {
++		if (S_ISCHR(mode) || S_ISBLK(mode) || S_ISFIFO(mode)) {
++			inode->i_op = &ext4_special_inode_operations;
++		} else {
++			inode->i_op = &ext4_file_inode_operations;
++			inode->i_fop = &ext4_file_operations;
++			ext4_set_aops(inode);
++		}
++	}
++	return inode;
++}
++EXPORT_SYMBOL(ext4_create_inode);
++
+ /*
+  * By the time this is called, we already have created
+  * the directory cache entry for the new file, but it
+-- 
+1.8.3.1
