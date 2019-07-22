@@ -1,51 +1,71 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Jul 2019 21:23:42 -0400
-Subject: [lustre-devel] [PATCH 13/22] ext4: Add a proc interface for
- max_dir_size.
+Date: Sun, 21 Jul 2019 21:23:30 -0400
+Subject: [lustre-devel] [PATCH 01/22] ext4: add i_fs_version
 In-Reply-To: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1563758631-29550-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1563758631-29550-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- fs/ext4/sysfs.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+From: James Simmons <uja.ornl@yahoo.com>
 
-diff --git a/fs/ext4/sysfs.c b/fs/ext4/sysfs.c
-index 1375815..3a71a16 100644
---- a/fs/ext4/sysfs.c
-+++ b/fs/ext4/sysfs.c
-@@ -180,6 +180,8 @@ static ssize_t journal_task_show(struct ext4_sb_info *sbi, char *buf)
- EXT4_ATTR_OFFSET(inode_readahead_blks, 0644, inode_readahead,
- 		 ext4_sb_info, s_inode_readahead_blks);
- EXT4_RW_ATTR_SBI_UI(inode_goal, s_inode_goal);
-+EXT4_RW_ATTR_SBI_UI(max_dir_size, s_max_dir_size_kb);
-+EXT4_RW_ATTR_SBI_UI(max_dir_size_kb, s_max_dir_size_kb);
- EXT4_RW_ATTR_SBI_UI(mb_stats, s_mb_stats);
- EXT4_RW_ATTR_SBI_UI(mb_max_to_scan, s_mb_max_to_scan);
- EXT4_RW_ATTR_SBI_UI(mb_min_to_scan, s_mb_min_to_scan);
-@@ -210,6 +212,8 @@ static ssize_t journal_task_show(struct ext4_sb_info *sbi, char *buf)
- 	ATTR_LIST(reserved_clusters),
- 	ATTR_LIST(inode_readahead_blks),
- 	ATTR_LIST(inode_goal),
-+	ATTR_LIST(max_dir_size),
-+	ATTR_LIST(max_dir_size_kb),
- 	ATTR_LIST(mb_stats),
- 	ATTR_LIST(mb_max_to_scan),
- 	ATTR_LIST(mb_min_to_scan),
-@@ -350,6 +354,8 @@ static ssize_t ext4_attr_store(struct kobject *kobj,
- 		ret = kstrtoul(skip_spaces(buf), 0, &t);
- 		if (ret)
- 			return ret;
-+		if (strcmp("max_dir_size", a->attr.name) == 0)
-+			t >>= 10;
- 		if (a->attr_ptr == ptr_ext4_super_block_offset)
- 			*((__le32 *) ptr) = cpu_to_le32(t);
- 		else
+Add inode version field that osd-ldiskfs uses.
+
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+---
+ fs/ext4/ext4.h   | 2 ++
+ fs/ext4/ialloc.c | 1 +
+ fs/ext4/inode.c  | 4 ++--
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
+index 1cb6785..8abbcab 100644
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -1063,6 +1063,8 @@ struct ext4_inode_info {
+ 	struct dquot *i_dquot[MAXQUOTAS];
+ #endif
+ 
++	u64 i_fs_version;
++
+ 	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
+ 	__u32 i_csum_seed;
+ 
+diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
+index 764ff4c..09ae4a4 100644
+--- a/fs/ext4/ialloc.c
++++ b/fs/ext4/ialloc.c
+@@ -1100,6 +1100,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
+ 	ei->i_dtime = 0;
+ 	ei->i_block_group = group;
+ 	ei->i_last_alloc_group = ~0;
++	ei->i_fs_version = 0;
+ 
+ 	ext4_set_inode_flags(inode);
+ 	if (IS_DIRSYNC(inode))
+diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
+index c7f77c6..6e66175 100644
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -4806,14 +4806,14 @@ static inline void ext4_inode_set_iversion_queried(struct inode *inode, u64 val)
+ 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
+ 		inode_set_iversion_raw(inode, val);
+ 	else
+-		inode_set_iversion_queried(inode, val);
++		EXT4_I(inode)->i_fs_version = val;
+ }
+ static inline u64 ext4_inode_peek_iversion(const struct inode *inode)
+ {
+ 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
+ 		return inode_peek_iversion_raw(inode);
+ 	else
+-		return inode_peek_iversion(inode);
++		return EXT4_I(inode)->i_fs_version;
+ }
+ 
+ struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
 -- 
 1.8.3.1
