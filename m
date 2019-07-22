@@ -1,11 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 22 Jul 2019 15:18:38 +1000
-Subject: [lustre-devel] [PATCH 15/22] ext4: remove bitmap corruption
- warnings
-In-Reply-To: <1563758631-29550-16-git-send-email-jsimmons@infradead.org>
+Date: Mon, 22 Jul 2019 15:24:29 +1000
+Subject: [lustre-devel] [PATCH 16/22] ext4: add warning for directory
+ htree growth
+In-Reply-To: <1563758631-29550-17-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-16-git-send-email-jsimmons@infradead.org>
-Message-ID: <87y30qode9.fsf@notabene.neil.brown.name>
+ <1563758631-29550-17-git-send-email-jsimmons@infradead.org>
+Message-ID: <87v9vuod4i.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,284 +14,185 @@ To: lustre-devel@lists.lustre.org
 
 On Sun, Jul 21 2019, James Simmons wrote:
 
-> Since we could skip corrupt block groups, this patch
-> use ext4_warning() intead of ext4_error() to make FS not
-> mount RO in default.
+You have really out-done yourself with the commit message here !!!
 
-Does this related to the previous patch:
-  ext4: add extra checks for mballoc
+I think this allows lustre to generate warnings if any single directory
+exceeds some particular size ??
+Any be default, the max size is 33% larger than the first directory that
+anything is added to??
+I guess lustre just uses one big directory??
 
-??
-If so, it seems like a good idea, but the two patches should be
-consecutive.
-The description could read "Now that we skip corrupt ....".
+I appreciate that this might be useful functionality.  I suspect a
+better interface is needed.
 
 NeilBrown
 
 
->
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  fs/ext4/balloc.c  | 10 ++++-----
->  fs/ext4/ialloc.c  |  6 ++---
->  fs/ext4/mballoc.c | 66 +++++++++++++++++++++++--------------------------------
->  3 files changed, 35 insertions(+), 47 deletions(-)
+>  fs/ext4/ext4.h  |  1 +
+>  fs/ext4/namei.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  fs/ext4/super.c |  2 ++
+>  fs/ext4/sysfs.c |  2 ++
+>  4 files changed, 72 insertions(+), 2 deletions(-)
 >
-> diff --git a/fs/ext4/balloc.c b/fs/ext4/balloc.c
-> index bca75c1..aff3981 100644
-> --- a/fs/ext4/balloc.c
-> +++ b/fs/ext4/balloc.c
-> @@ -374,7 +374,7 @@ static int ext4_validate_block_bitmap(struct super_block *sb,
->  	if (unlikely(!ext4_block_bitmap_csum_verify(sb, block_group,
->  			desc, bh))) {
->  		ext4_unlock_group(sb, block_group);
-> -		ext4_error(sb, "bg %u: bad block bitmap checksum", block_group);
-> +		ext4_warning(sb, "bg %u: bad block bitmap checksum", block_group);
->  		ext4_mark_group_bitmap_corrupted(sb, block_group,
->  					EXT4_GROUP_INFO_BBITMAP_CORRUPT);
->  		return -EFSBADCRC;
-> @@ -382,8 +382,8 @@ static int ext4_validate_block_bitmap(struct super_block *sb,
->  	blk = ext4_valid_block_bitmap(sb, desc, block_group, bh);
->  	if (unlikely(blk != 0)) {
->  		ext4_unlock_group(sb, block_group);
-> -		ext4_error(sb, "bg %u: block %llu: invalid block bitmap",
-> -			   block_group, blk);
-> +		ext4_warning(sb, "bg %u: block %llu: invalid block bitmap",
-> +			     block_group, blk);
->  		ext4_mark_group_bitmap_corrupted(sb, block_group,
->  					EXT4_GROUP_INFO_BBITMAP_CORRUPT);
->  		return -EFSCORRUPTED;
-> @@ -459,8 +459,8 @@ struct buffer_head *
->  		ext4_unlock_group(sb, block_group);
->  		unlock_buffer(bh);
->  		if (err) {
-> -			ext4_error(sb, "Failed to init block bitmap for group "
-> -				   "%u: %d", block_group, err);
-> +			ext4_warning(sb, "Failed to init block bitmap for group "
-> +				     "%u: %d", block_group, err);
->  			goto out;
->  		}
->  		goto verify;
-> diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
-> index 68d41e6..a72fe63 100644
-> --- a/fs/ext4/ialloc.c
-> +++ b/fs/ext4/ialloc.c
-> @@ -96,8 +96,8 @@ static int ext4_validate_inode_bitmap(struct super_block *sb,
->  	if (!ext4_inode_bitmap_csum_verify(sb, block_group, desc, bh,
->  					   EXT4_INODES_PER_GROUP(sb) / 8)) {
->  		ext4_unlock_group(sb, block_group);
-> -		ext4_error(sb, "Corrupt inode bitmap - block_group = %u, "
-> -			   "inode_bitmap = %llu", block_group, blk);
-> +		ext4_warning(sb, "Corrupt inode bitmap - block_group = %u, "
-> +			     "inode_bitmap = %llu", block_group, blk);
->  		ext4_mark_group_bitmap_corrupted(sb, block_group,
->  					EXT4_GROUP_INFO_IBITMAP_CORRUPT);
->  		return -EFSBADCRC;
-> @@ -346,7 +346,7 @@ void ext4_free_inode(handle_t *handle, struct inode *inode)
->  		if (!fatal)
->  			fatal = err;
->  	} else {
-> -		ext4_error(sb, "bit already cleared for inode %lu", ino);
-> +		ext4_warning(sb, "bit already cleared for inode %lu", ino);
->  		ext4_mark_group_bitmap_corrupted(sb, block_group,
->  					EXT4_GROUP_INFO_IBITMAP_CORRUPT);
->  	}
-> diff --git a/fs/ext4/mballoc.c b/fs/ext4/mballoc.c
-> index 463fba6..82398b0 100644
-> --- a/fs/ext4/mballoc.c
-> +++ b/fs/ext4/mballoc.c
-> @@ -741,10 +741,15 @@ int ext4_mb_generate_buddy(struct super_block *sb,
->  	grp->bb_fragments = fragments;
+> diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
+> index bf74c7c..5f73e19 100644
+> --- a/fs/ext4/ext4.h
+> +++ b/fs/ext4/ext4.h
+> @@ -1472,6 +1472,7 @@ struct ext4_sb_info {
+>  	unsigned int s_mb_group_prealloc;
+>  	unsigned long *s_mb_prealloc_table;
+>  	unsigned int s_max_dir_size_kb;
+> +	unsigned long s_warning_dir_size;
+>  	/* where last allocation was done - for stream allocation */
+>  	unsigned long s_mb_last_group;
+>  	unsigned long s_mb_last_start;
+> diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+> index 1b6d22a..9b30cc6 100644
+> --- a/fs/ext4/namei.c
+> +++ b/fs/ext4/namei.c
+> @@ -757,12 +757,20 @@ struct ext4_dir_lock_data {
+>  #define ext4_htree_lock_data(l)	((struct ext4_dir_lock_data *)(l)->lk_private)
+>  #define ext4_find_entry(dir, name, dirent, inline) \
+>  			ext4_find_entry_locked(dir, name, dirent, inline, NULL)
+> -#define ext4_add_entry(handle, dentry, inode) \
+> -		       ext4_add_entry_locked(handle, dentry, inode, NULL)
 >  
->  	if (free != grp->bb_free) {
-> -		ext4_grp_locked_error(sb, group, 0, 0,
-> -				      "block bitmap and bg descriptor "
-> -				      "inconsistent: %u vs %u free clusters",
-> -				      free, grp->bb_free);
-> +		struct ext4_group_desc *gdp;
+>  /* NB: ext4_lblk_t is 32 bits so we use high bits to identify invalid blk */
+>  #define EXT4_HTREE_NODE_CHANGED		(0xcafeULL << 32)
+>  
+> +inline int ext4_add_entry(handle_t *handle, struct dentry *dentry,
+> +			  struct inode *inode)
+> +{
+> +	int ret = ext4_add_entry_locked(handle, dentry, inode, NULL);
 > +
-> +		gdp = ext4_get_group_desc(sb, group, NULL);
-> +		ext4_warning(sb, "group %lu: block bitmap and bg descriptor "
-> +			     "inconsistent: %u vs %u free clusters "
-> +			     "%u in gd, %lu pa's",
-> +			     (long unsigned int)group, free, grp->bb_free,
-> +			     ext4_free_group_clusters(sb, gdp),
-> +			     grp->bb_prealloc_nr);
->  		/*
->  		 * If we intend to continue, we consider group descriptor
->  		 * corrupt and update bb_free using bitmap value
-> @@ -1106,7 +1111,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group, gfp_t gfp)
->  	int block;
->  	int pnum;
->  	int poff;
-> -	struct page *page;
-> +	struct page *page = NULL;
->  	int ret;
->  	struct ext4_group_info *grp;
->  	struct ext4_sb_info *sbi = EXT4_SB(sb);
-> @@ -1132,7 +1137,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group, gfp_t gfp)
->  		 */
->  		ret = ext4_mb_init_group(sb, group, gfp);
->  		if (ret)
-> -			return ret;
-> +			goto err;
->  	}
->  
->  	/*
-> @@ -1235,6 +1240,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group, gfp_t gfp)
->  		put_page(e4b->bd_buddy_page);
->  	e4b->bd_buddy = NULL;
->  	e4b->bd_bitmap = NULL;
-> +	ext4_warning(sb, "Error loading buddy information for %u", group);
->  	return ret;
->  }
->  
-> @@ -3631,8 +3637,10 @@ int ext4_mb_check_ondisk_bitmap(struct super_block *sb, void *bitmap,
->  	}
->  
->  	if (free != free_in_gdp) {
-> -		ext4_error(sb, "on-disk bitmap for group %d corrupted: %u blocks free in bitmap, %u - in gd\n",
-> -			   group, free, free_in_gdp);
-> +		ext4_warning(sb, "on-disk bitmap for group %d corrupted: %u blocks free in bitmap, %u - in gd\n",
-> +			     group, free, free_in_gdp);
-> +		ext4_mark_group_bitmap_corrupted(sb, group,
-> +						 EXT4_GROUP_INFO_BBITMAP_CORRUPT);
->  		return -EIO;
->  	}
->  	return 0;
-> @@ -4015,14 +4023,6 @@ static int ext4_mb_new_preallocation(struct ext4_allocation_context *ac)
->  	 * otherwise maybe leave some free blocks unavailable, no need to BUG.
->  	 */
->  	if ((free > pa->pa_free && !pa->pa_error) || (free < pa->pa_free)) {
-> -		ext4_error(sb, "pa free mismatch: [pa %p] "
-> -				"[phy %lu] [logic %lu] [len %u] [free %u] "
-> -				"[error %u] [inode %lu] [freed %u]", pa,
-> -				(unsigned long)pa->pa_pstart,
-> -				(unsigned long)pa->pa_lstart,
-> -				(unsigned)pa->pa_len, (unsigned)pa->pa_free,
-> -				(unsigned)pa->pa_error, pa->pa_inode->i_ino,
-> -				free);
->  		ext4_grp_locked_error(sb, group, 0, 0, "free %u, pa_free %u",
->  					free, pa->pa_free);
->  		/*
-> @@ -4086,15 +4086,11 @@ static int ext4_mb_new_preallocation(struct ext4_allocation_context *ac)
->  	bitmap_bh = ext4_read_block_bitmap(sb, group);
->  	if (IS_ERR(bitmap_bh)) {
->  		err = PTR_ERR(bitmap_bh);
-> -		ext4_error(sb, "Error %d reading block bitmap for %u",
-> -			   err, group);
->  		return 0;
->  	}
->  
->  	err = ext4_mb_load_buddy(sb, group, &e4b);
->  	if (err) {
-> -		ext4_warning(sb, "Error %d loading buddy information for %u",
-> -			     err, group);
->  		put_bh(bitmap_bh);
->  		return 0;
->  	}
-> @@ -4255,17 +4251,12 @@ void ext4_discard_preallocations(struct inode *inode)
->  
->  		err = ext4_mb_load_buddy_gfp(sb, group, &e4b,
->  					     GFP_NOFS|__GFP_NOFAIL);
-> -		if (err) {
-> -			ext4_error(sb, "Error %d loading buddy information for %u",
-> -				   err, group);
-> +		if (err)
->  			return;
-> -		}
->  
->  		bitmap_bh = ext4_read_block_bitmap(sb, group);
->  		if (IS_ERR(bitmap_bh)) {
->  			err = PTR_ERR(bitmap_bh);
-> -			ext4_error(sb, "Error %d reading block bitmap for %u",
-> -					err, group);
->  			ext4_mb_unload_buddy(&e4b);
->  			continue;
->  		}
-> @@ -4527,11 +4518,8 @@ static void ext4_mb_group_or_file(struct ext4_allocation_context *ac)
->  		group = ext4_get_group_number(sb, pa->pa_pstart);
->  		err = ext4_mb_load_buddy_gfp(sb, group, &e4b,
->  					     GFP_NOFS|__GFP_NOFAIL);
-> -		if (err) {
-> -			ext4_error(sb, "Error %d loading buddy information for %u",
-> -				   err, group);
-> +		if (err)
->  			continue;
-> -		}
->  		ext4_lock_group(sb, group);
->  		list_del(&pa->pa_group_list);
->  		ext4_get_group_info(sb, group)->bb_prealloc_nr--;
-> @@ -4785,7 +4773,7 @@ ext4_fsblk_t ext4_mb_new_blocks(handle_t *handle,
->  			 * not revert pa_free back, just mark pa_error
->  			 */
->  			pa->pa_error++;
-> -			ext4_error(sb,
-> +			ext4_warning(sb,
->  				   "Updating bitmap error: [err %d] "
->  				   "[pa %p] [phy %lu] [logic %lu] "
->  				   "[len %u] [free %u] [error %u] "
-> @@ -4796,6 +4784,7 @@ ext4_fsblk_t ext4_mb_new_blocks(handle_t *handle,
->  				   (unsigned)pa->pa_free,
->  				   (unsigned)pa->pa_error,
->  				   pa->pa_inode ? pa->pa_inode->i_ino : 0);
-> +			ext4_mark_group_bitmap_corrupted(sb, 0, 0);
->  		}
->  	}
->  	ext4_mb_release_context(ac);
-> @@ -5081,7 +5070,7 @@ void ext4_free_blocks(handle_t *handle, struct inode *inode,
->  	err = ext4_mb_load_buddy_gfp(sb, block_group, &e4b,
->  				     GFP_NOFS|__GFP_NOFAIL);
->  	if (err)
-> -		goto error_return;
-> +		goto error_brelse;
->  
->  	/*
->  	 * We need to make sure we don't reuse the freed block until after the
-> @@ -5171,8 +5160,9 @@ void ext4_free_blocks(handle_t *handle, struct inode *inode,
->  		goto do_more;
->  	}
->  error_return:
-> -	brelse(bitmap_bh);
->  	ext4_std_error(sb, err);
-> +error_brelse:
-> +	brelse(bitmap_bh);
->  	return;
->  }
->  
-> @@ -5272,7 +5262,7 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
->  
->  	err = ext4_mb_load_buddy(sb, block_group, &e4b);
->  	if (err)
-> -		goto error_return;
-> +		goto error_brelse;
->  
->  	/*
->  	 * need to update group_info->bb_free and bitmap
-> @@ -5310,8 +5300,9 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
->  		err = ret;
->  
->  error_return:
-> -	brelse(bitmap_bh);
->  	ext4_std_error(sb, err);
-> +error_brelse:
-> +	brelse(bitmap_bh);
+> +	if (ret == -ENOBUFS)
+> +		ret = 0;
+> +	return ret;
+> +}
+> +
+>  static void ext4_htree_event_cb(void *target, void *event)
+>  {
+>  	u64 *block = (u64 *)target;
+> @@ -2612,6 +2620,55 @@ static int ext4_update_dotdot(handle_t *handle, struct dentry *dentry,
 >  	return err;
 >  }
 >  
-> @@ -5386,11 +5377,8 @@ static int ext4_trim_extent(struct super_block *sb, int start, int count,
->  	trace_ext4_trim_all_free(sb, group, start, max);
+> +static unsigned long __ext4_max_dir_size(struct dx_frame *frames,
+> +					 struct dx_frame *frame,
+> +					 struct inode *dir)
+> +{
+> +	unsigned long max_dir_size;
+> +
+> +	if (EXT4_SB(dir->i_sb)->s_max_dir_size_kb) {
+> +		max_dir_size = EXT4_SB(dir->i_sb)->s_max_dir_size_kb << 10;
+> +	} else {
+> +		max_dir_size = EXT4_BLOCK_SIZE(dir->i_sb);
+> +		while (frame >= frames) {
+> +			max_dir_size *= dx_get_limit(frame->entries);
+> +			if (frame == frames)
+> +				break;
+> +			frame--;
+> +		}
+> +		/* use 75% of max dir size in average */
+> +		max_dir_size = max_dir_size / 4 * 3;
+> +	}
+> +	return max_dir_size;
+> +}
+> +
+> +/*
+> + * With hash tree growing, it is easy to hit ENOSPC, but it is hard
+> + * to predict when it will happen. let's give administrators warning
+> + * when reaching 3/5 and 2/3 of limit
+> + */
+> +static inline bool dir_size_in_warning_range(struct dx_frame *frames,
+> +					     struct dx_frame *frame,
+> +					     struct inode *dir)
+> +{
+> +	struct super_block *sb = dir->i_sb;
+> +	unsigned long size1, size2;
+> +
+> +	if (unlikely(!EXT4_SB(sb)->s_warning_dir_size))
+> +		EXT4_SB(sb)->s_warning_dir_size =
+> +			__ext4_max_dir_size(frames, frame, dir);
+> +
+> +	size1 = EXT4_SB(sb)->s_warning_dir_size / 16 * 10;
+> +	size1 = size1 & ~(EXT4_BLOCK_SIZE(sb) - 1);
+> +	size2 = EXT4_SB(sb)->s_warning_dir_size / 16 * 11;
+> +	size2 = size2 & ~(EXT4_BLOCK_SIZE(sb) - 1);
+> +	if (in_range(dir->i_size, size1, EXT4_BLOCK_SIZE(sb)) ||
+> +	    in_range(dir->i_size, size2, EXT4_BLOCK_SIZE(sb)))
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+>  /*
+>   *	ext4_add_entry()
+>   *
+> @@ -2739,6 +2796,7 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
+>  	struct buffer_head *bh;
+>  	struct super_block *sb = dir->i_sb;
+>  	struct ext4_dir_entry_2 *de;
+> +	bool ret_warn = false;
+>  	int restart;
+>  	int err;
 >  
->  	ret = ext4_mb_load_buddy(sb, group, &e4b);
-> -	if (ret) {
-> -		ext4_warning(sb, "Error %d loading buddy information for %u",
-> -			     ret, group);
-> +	if (ret)
->  		return ret;
-> -	}
->  	bitmap = e4b.bd_bitmap;
+> @@ -2769,6 +2827,11 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
+>  	/* Block full, should compress but for now just split */
+>  	dxtrace(printk(KERN_DEBUG "using %u of %u node entries\n",
+>  		       dx_get_count(entries), dx_get_limit(entries)));
+> +
+> +	if (frame - frames + 1 >= ext4_dir_htree_level(sb) ||
+> +	    EXT4_SB(sb)->s_warning_dir_size)
+> +		ret_warn = dir_size_in_warning_range(frames, frame, dir);
+> +
+>  	/* Need to split index? */
+>  	if (dx_get_count(entries) == dx_get_limit(entries)) {
+>  		ext4_lblk_t newblock;
+> @@ -2935,6 +2998,8 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
+>  	 */
+>  	if (restart && err == 0)
+>  		goto again;
+> +	if (err == 0 && ret_warn)
+> +		err = -ENOBUFS;
+>  	return err;
+>  }
 >  
->  	ext4_lock_group(sb, group);
+> diff --git a/fs/ext4/super.c b/fs/ext4/super.c
+> index 07242d7..a3179b2 100644
+> --- a/fs/ext4/super.c
+> +++ b/fs/ext4/super.c
+> @@ -1901,6 +1901,8 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
+>  		sbi->s_li_wait_mult = arg;
+>  	} else if (token == Opt_max_dir_size_kb) {
+>  		sbi->s_max_dir_size_kb = arg;
+> +		/* reset s_warning_dir_size and make it re-calculated */
+> +		sbi->s_warning_dir_size = 0;
+>  	} else if (token == Opt_stripe) {
+>  		sbi->s_stripe = arg;
+>  	} else if (token == Opt_resuid) {
+> diff --git a/fs/ext4/sysfs.c b/fs/ext4/sysfs.c
+> index 3a71a16..575f318 100644
+> --- a/fs/ext4/sysfs.c
+> +++ b/fs/ext4/sysfs.c
+> @@ -182,6 +182,7 @@ static ssize_t journal_task_show(struct ext4_sb_info *sbi, char *buf)
+>  EXT4_RW_ATTR_SBI_UI(inode_goal, s_inode_goal);
+>  EXT4_RW_ATTR_SBI_UI(max_dir_size, s_max_dir_size_kb);
+>  EXT4_RW_ATTR_SBI_UI(max_dir_size_kb, s_max_dir_size_kb);
+> +EXT4_RW_ATTR_SBI_UI(warning_dir_size, s_warning_dir_size);
+>  EXT4_RW_ATTR_SBI_UI(mb_stats, s_mb_stats);
+>  EXT4_RW_ATTR_SBI_UI(mb_max_to_scan, s_mb_max_to_scan);
+>  EXT4_RW_ATTR_SBI_UI(mb_min_to_scan, s_mb_min_to_scan);
+> @@ -214,6 +215,7 @@ static ssize_t journal_task_show(struct ext4_sb_info *sbi, char *buf)
+>  	ATTR_LIST(inode_goal),
+>  	ATTR_LIST(max_dir_size),
+>  	ATTR_LIST(max_dir_size_kb),
+> +	ATTR_LIST(warning_dir_size),
+>  	ATTR_LIST(mb_stats),
+>  	ATTR_LIST(mb_max_to_scan),
+>  	ATTR_LIST(mb_min_to_scan),
 > -- 
 > 1.8.3.1
 -------------- next part --------------
@@ -300,4 +201,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190722/2a84fac1/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190722/e1069c6e/attachment-0001.sig>
