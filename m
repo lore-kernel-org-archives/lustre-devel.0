@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 22 Jul 2019 14:34:02 +1000
-Subject: [lustre-devel] [PATCH 04/22] ext4: export inode management
-In-Reply-To: <1563758631-29550-5-git-send-email-jsimmons@infradead.org>
+Date: Mon, 22 Jul 2019 14:37:00 +1000
+Subject: [lustre-devel] [PATCH 06/22] ext4: add extra checks for mballoc
+In-Reply-To: <1563758631-29550-7-git-send-email-jsimmons@infradead.org>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-5-git-send-email-jsimmons@infradead.org>
-Message-ID: <87o91mpu11.fsf@notabene.neil.brown.name>
+ <1563758631-29550-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <87lfwqptw3.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,20 +13,38 @@ To: lustre-devel@lists.lustre.org
 
 On Sun, Jul 21 2019, James Simmons wrote:
 
-> Make ext4_delete_entry() exportable for osd-ldiskfs. Also add
-> exportable ext4_create_inode().
+> Handle mballoc corruptions.
 
-Why can't lustre use vfs_unlink like everyone else?  And vfs_mknod()?
-My hope is that what we land upstream will use generic interfaces only.
-If there is something that osd needs to do that the generic interfaces
-cannot support, then we need to look at how to add that to the generic
-interface.
+"Handle" here mean "return -EIO if corruptions are found" ??
+
+Sounds like a good thing to do.  I cannot comment on the code without
+understand the fs more, but...
+
+> diff --git a/fs/ext4/mballoc.h b/fs/ext4/mballoc.h
+> index 88c98f1..8325ad9 100644
+> --- a/fs/ext4/mballoc.h
+> +++ b/fs/ext4/mballoc.h
+> @@ -70,7 +70,7 @@
+>  /*
+>   * for which requests use 2^N search using buddies
+>   */
+> -#define MB_DEFAULT_ORDER2_REQS		2
+> +#define MB_DEFAULT_ORDER2_REQS		8
+
+I don't think this belongs with the reset of the patch.
 
 NeilBrown
+
+
+>  
+>  /*
+>   * default group prealloc size 512 blocks
+> -- 
+> 1.8.3.1
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190722/3881f8b8/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190722/59f2a4c0/attachment.sig>
