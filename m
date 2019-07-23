@@ -1,11 +1,11 @@
-From: Oleg Drokin <green@whamcloud.com>
-Date: Mon, 22 Jul 2019 07:16:06 +0000
-Subject: [lustre-devel] [PATCH 04/22] ext4: export inode management
-In-Reply-To: <87o91mpu11.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 23 Jul 2019 01:07:38 +0100 (BST)
+Subject: [lustre-devel] [PATCH 01/22] ext4: add i_fs_version
+In-Reply-To: <87wogapuz2.fsf@notabene.neil.brown.name>
 References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-5-git-send-email-jsimmons@infradead.org>
- <87o91mpu11.fsf@notabene.neil.brown.name>
-Message-ID: <700E5EAE-5BD9-4F40-95CF-3419F69070D3@whamcloud.com>
+ <1563758631-29550-2-git-send-email-jsimmons@infradead.org>
+ <87wogapuz2.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1907230057370.23817@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,27 +13,80 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-
-> On Jul 22, 2019, at 12:34 AM, NeilBrown <neilb@suse.com> wrote:
+> > From: James Simmons <uja.ornl@yahoo.com>
+> >
+> > Add inode version field that osd-ldiskfs uses.
 > 
-> On Sun, Jul 21 2019, James Simmons wrote:
+> We need more words here.  What is i_fs_version used for?
 > 
->> Make ext4_delete_entry() exportable for osd-ldiskfs. Also add
->> exportable ext4_create_inode().
+> (I'll probably find out as I keep reading, but I need to know
+>  the intention first, or I cannot properly review the patches
+>  that make use of it.
+> )
+
+Sadly these patches don't contain much in terms of why they exist.
+I did some digging and it seems at one time Lustre did use the 
+i_version field directly for it recovery process. It seems ext4 stomps
+on its i_version independently of lustre so it can't be trusted in
+use of recovery.
+
+> NeilBrown
 > 
-> Why can't lustre use vfs_unlink like everyone else?  And vfs_mknod()?
-> My hope is that what we land upstream will use generic interfaces only.
-> If there is something that osd needs to do that the generic interfaces
-> cannot support, then we need to look at how to add that to the generic
-> interface.
-
-That?s probably going to be a tough thing to do. At times we need certain things
-that are bad from vfs standpoint in general sense, but because we have various
-outside guarantees from locking and such - we can still do them.
-
-nothing precise comes to mind now, but I remember various games with
-nlink count/moving and resurrecting such files.
-
-We also have wider ?transaction boundaries?. Where say normal via-vfs transaction
-is metadata only, we can request certain data (from ext4 perspective, but metadata
-from Lustre) to be part of a particular transaction.
+> 
+> >
+> > Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+> > ---
+> >  fs/ext4/ext4.h   | 2 ++
+> >  fs/ext4/ialloc.c | 1 +
+> >  fs/ext4/inode.c  | 4 ++--
+> >  3 files changed, 5 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
+> > index 1cb6785..8abbcab 100644
+> > --- a/fs/ext4/ext4.h
+> > +++ b/fs/ext4/ext4.h
+> > @@ -1063,6 +1063,8 @@ struct ext4_inode_info {
+> >  	struct dquot *i_dquot[MAXQUOTAS];
+> >  #endif
+> >  
+> > +	u64 i_fs_version;
+> > +
+> >  	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
+> >  	__u32 i_csum_seed;
+> >  
+> > diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
+> > index 764ff4c..09ae4a4 100644
+> > --- a/fs/ext4/ialloc.c
+> > +++ b/fs/ext4/ialloc.c
+> > @@ -1100,6 +1100,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
+> >  	ei->i_dtime = 0;
+> >  	ei->i_block_group = group;
+> >  	ei->i_last_alloc_group = ~0;
+> > +	ei->i_fs_version = 0;
+> >  
+> >  	ext4_set_inode_flags(inode);
+> >  	if (IS_DIRSYNC(inode))
+> > diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
+> > index c7f77c6..6e66175 100644
+> > --- a/fs/ext4/inode.c
+> > +++ b/fs/ext4/inode.c
+> > @@ -4806,14 +4806,14 @@ static inline void ext4_inode_set_iversion_queried(struct inode *inode, u64 val)
+> >  	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
+> >  		inode_set_iversion_raw(inode, val);
+> >  	else
+> > -		inode_set_iversion_queried(inode, val);
+> > +		EXT4_I(inode)->i_fs_version = val;
+> >  }
+> >  static inline u64 ext4_inode_peek_iversion(const struct inode *inode)
+> >  {
+> >  	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
+> >  		return inode_peek_iversion_raw(inode);
+> >  	else
+> > -		return inode_peek_iversion(inode);
+> > +		return EXT4_I(inode)->i_fs_version;
+> >  }
+> >  
+> >  struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
+> > -- 
+> > 1.8.3.1
+> 
