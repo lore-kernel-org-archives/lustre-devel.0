@@ -1,43 +1,51 @@
-From: Oleg Drokin <green@whamcloud.com>
-Date: Tue, 23 Jul 2019 01:40:48 +0000
-Subject: [lustre-devel] sanity-hsm and libtool
-In-Reply-To: <alpine.LFD.2.21.1907230114090.23817@casper.infradead.org>
-References: <B0E37F29-E0D1-4432-A6DB-712D27E078CB@amazon.com>
- <alpine.LFD.2.21.1907191611160.17024@casper.infradead.org>
- <B264B956-FB39-46EF-A72D-0214B316833F@amazon.com>
- <CAFhUgOQ_bLGvPEkmjGYxGWwViTA4_rprAmPY+GBGmr8Ndicswg@mail.gmail.com>
- <alpine.LFD.2.21.1907230114090.23817@casper.infradead.org>
-Message-ID: <3BEAD335-B8BA-42EE-940F-B482B3FB3B1C@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Tue, 23 Jul 2019 01:56:56 +0000
+Subject: [lustre-devel] [PATCH 20/22] ext4: use GFP_NOFS in
+ ext4_inode_attach_jinode
+In-Reply-To: <87muh6octs.fsf@notabene.neil.brown.name>
+References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
+ <1563758631-29550-21-git-send-email-jsimmons@infradead.org>,
+ <87muh6octs.fsf@notabene.neil.brown.name>
+Message-ID: <B3F2C578-1466-4E17-A8A7-303B5441D528@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+That interface has only existed for a handful of kernel releases, so was/is
+not a viable option for earlier kernels. 
 
->> I concur : I cannot run sanity-hsm on master. Works fine when checking out the commit right before the libtool patch , breaks if the patch
->> is applied.
->> 
->> With some testing it appears this is because "libtool execute" does does not use the PATH environment variable when it resolves paths :
->> 
->> $> pwd
->> /home/user/lustre-release
->> $> export PATH=lustre/utils:/usr/bin
->> $> which lhsmtool_posix
->> /home/user/lustre-release/lustre/utils/lhsmtool_posix
->> $> libtool execute echo lhsmtool_posix
->> lhsmtool_posix
->> $> libtool execute echo lustre/utils/lhsmtool_posix
->> /home/user/lustre-release/luster/utils/.libs/lhsmtool_posix
->> 
->> I suspect this works on Maloo because Maloo does not run tests from the git repo but rather from installed rpms (=> no libtool wrappers).
->> 
->> @James, I can see you asked me a follow-up review on the patch that introduces this regressions, and I did not answer, Sorry about that. I
->> will try to keep better track of patches I reviewed at least once... In this spirit, I will try to update my review of this change this
->> weekend. =)
+Cheers, Andreas
+
+> On Jul 21, 2019, at 23:31, NeilBrown <neilb@suse.com> wrote:
 > 
-> This is strange since Oleg does his testing in the lustre source tree 
-> directly. I would think he would have encounter this issue. I need 
-> to looking how libtool does its path searches.
-
-I build with configure --disable-shared to sidestep this issue.
+> On Sun, Jul 21 2019, James Simmons wrote:
+> 
+> If you need to call this from a context where GFP_KERNEL is not safe,
+> use memalloc_nofs_{save,restore}().
+> 
+> NeilBrown
+> 
+> 
+> 
+>> Signed-off-by: James Simmons <jsimmons@infradead.org>
+>> ---
+>> fs/ext4/inode.c | 2 +-
+>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
+>> index bf00dfc..ca72097 100644
+>> --- a/fs/ext4/inode.c
+>> +++ b/fs/ext4/inode.c
+>> @@ -4422,7 +4422,7 @@ int ext4_inode_attach_jinode(struct inode *inode)
+>>    if (ei->jinode || !EXT4_SB(inode->i_sb)->s_journal)
+>>        return 0;
+>> 
+>> -    jinode = jbd2_alloc_inode(GFP_KERNEL);
+>> +    jinode = jbd2_alloc_inode(GFP_NOFS);
+>>    spin_lock(&inode->i_lock);
+>>    if (!ei->jinode) {
+>>        if (!jinode) {
+>> -- 
+>> 1.8.3.1
