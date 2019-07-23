@@ -1,11 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 23 Jul 2019 01:07:38 +0100 (BST)
-Subject: [lustre-devel] [PATCH 01/22] ext4: add i_fs_version
-In-Reply-To: <87wogapuz2.fsf@notabene.neil.brown.name>
-References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-2-git-send-email-jsimmons@infradead.org>
- <87wogapuz2.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1907230057370.23817@casper.infradead.org>
+Date: Tue, 23 Jul 2019 01:23:20 +0100 (BST)
+Subject: [lustre-devel] sanity-hsm and libtool
+In-Reply-To: <CAFhUgOQ_bLGvPEkmjGYxGWwViTA4_rprAmPY+GBGmr8Ndicswg@mail.gmail.com>
+References: <B0E37F29-E0D1-4432-A6DB-712D27E078CB@amazon.com>
+ <alpine.LFD.2.21.1907191611160.17024@casper.infradead.org>
+ <B264B956-FB39-46EF-A72D-0214B316833F@amazon.com>
+ <CAFhUgOQ_bLGvPEkmjGYxGWwViTA4_rprAmPY+GBGmr8Ndicswg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.21.1907230114090.23817@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,80 +14,98 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > From: James Simmons <uja.ornl@yahoo.com>
-> >
-> > Add inode version field that osd-ldiskfs uses.
+>       ?Le 19/07/2019 17:21, ? James Simmons ? <jsimmons@infradead.org> a ?crit :
 > 
-> We need more words here.  What is i_fs_version used for?
 > 
-> (I'll probably find out as I keep reading, but I need to know
->  the intention first, or I cannot properly review the patches
->  that make use of it.
-> )
+>       ? ? > Hi!
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > I'm trying to run sanity-hsm.sh tests in my lustre source directory as I'm used to.
+>       ? ? >
+>       ? ? > Since libtool patch was landed, tools like lhsmtool_posix are executed through a wrapper and appear in process list as
+>       'lt-lhsmtool_posix'.
+>       ? ? >
+>       ? ? > Some tests try to find and kill them, relying on command like:
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > "ps -C $HSMTOOL"
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > Even if run through "libtool execute ps -C $HSMTOOL" (as it is in the source right now) this command does not catch the
+>       proper process and
+>       ? ? > so fail the test.
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > I'm wondering what the proper way to run the test suite to have it working and how this is working in Maloo?
+>       ? ? >
+>       ? ? > I'm doing:
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > git clone
+>       ? ? >
+>       ? ? > autogen
+>       ? ? >
+>       ? ? > configure
+>       ? ? >
+>       ? ? > make
+>       ? ? >
+>       ? ? > sudo REFORMAT=: ./lustre/tests/sanity-hsm.sh
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? >?
+>       ? ? >
+>       ? ? > By the way, when hsm helper functions were moved from sanity-hsm.sh to test-framework.sh (f172b1168, for PCC), some of
+>       them were just
+>       ? ? > copied and not moved. So there are several duplicates between these 2 files. I think that's not on purpose?
+> 
+>       ? ? What version of lustre are you testing with? Their was a patch landed to
+>       ? ? handle this.
+> 
+>       ? ? LU-11742 test: have libtool execute the test binaries
+> 
+>       ? ? which is lustre commit f9e5224fbb60bb8b44753b7be10cb06108627f89. This has
+>       ? ? been back ported to 2.12 LTS. Can you see if your lustre tree has this
+>       ? ? fix.
+> 
+>       ? ? See https://www.gnu.org/software/libtool/manual/html_node/Debugging-executables.html
+>       ? ? for details about using libtool against the binary wrappers.
+> 
+>       I'm running master.
+>       That's exactly the patch which is giving me issue.
+>       I can run sanity-hsm successfully prior to this patch, not after.
+> 
+>       Aur?lien
+> 
+> 
+> I concur : I cannot run sanity-hsm on master. Works fine when checking out the commit right before the libtool patch , breaks if the patch
+> is applied.
+> 
+> With some testing it appears this is because "libtool execute" does does not use the PATH environment variable when it resolves paths :
+> 
+> $> pwd
+> /home/user/lustre-release
+> $> export PATH=lustre/utils:/usr/bin
+> $> which lhsmtool_posix
+> /home/user/lustre-release/lustre/utils/lhsmtool_posix
+> $> libtool execute echo lhsmtool_posix
+> lhsmtool_posix
+> $> libtool execute echo lustre/utils/lhsmtool_posix
+> /home/user/lustre-release/luster/utils/.libs/lhsmtool_posix
+> 
+> I suspect this works on Maloo because Maloo does not run tests from the git repo but rather from installed rpms (=> no libtool wrappers).
+> 
+> @James, I can see you asked me a follow-up review on the patch that introduces this regressions, and I did not answer, Sorry about that. I
+> will try to keep better track of patches I reviewed at least once... In this spirit, I will try to update my review of this change this
+> weekend. =)
 
-Sadly these patches don't contain much in terms of why they exist.
-I did some digging and it seems at one time Lustre did use the 
-i_version field directly for it recovery process. It seems ext4 stomps
-on its i_version independently of lustre so it can't be trusted in
-use of recovery.
-
-> NeilBrown
-> 
-> 
-> >
-> > Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-> > ---
-> >  fs/ext4/ext4.h   | 2 ++
-> >  fs/ext4/ialloc.c | 1 +
-> >  fs/ext4/inode.c  | 4 ++--
-> >  3 files changed, 5 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
-> > index 1cb6785..8abbcab 100644
-> > --- a/fs/ext4/ext4.h
-> > +++ b/fs/ext4/ext4.h
-> > @@ -1063,6 +1063,8 @@ struct ext4_inode_info {
-> >  	struct dquot *i_dquot[MAXQUOTAS];
-> >  #endif
-> >  
-> > +	u64 i_fs_version;
-> > +
-> >  	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
-> >  	__u32 i_csum_seed;
-> >  
-> > diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
-> > index 764ff4c..09ae4a4 100644
-> > --- a/fs/ext4/ialloc.c
-> > +++ b/fs/ext4/ialloc.c
-> > @@ -1100,6 +1100,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
-> >  	ei->i_dtime = 0;
-> >  	ei->i_block_group = group;
-> >  	ei->i_last_alloc_group = ~0;
-> > +	ei->i_fs_version = 0;
-> >  
-> >  	ext4_set_inode_flags(inode);
-> >  	if (IS_DIRSYNC(inode))
-> > diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
-> > index c7f77c6..6e66175 100644
-> > --- a/fs/ext4/inode.c
-> > +++ b/fs/ext4/inode.c
-> > @@ -4806,14 +4806,14 @@ static inline void ext4_inode_set_iversion_queried(struct inode *inode, u64 val)
-> >  	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
-> >  		inode_set_iversion_raw(inode, val);
-> >  	else
-> > -		inode_set_iversion_queried(inode, val);
-> > +		EXT4_I(inode)->i_fs_version = val;
-> >  }
-> >  static inline u64 ext4_inode_peek_iversion(const struct inode *inode)
-> >  {
-> >  	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
-> >  		return inode_peek_iversion_raw(inode);
-> >  	else
-> > -		return inode_peek_iversion(inode);
-> > +		return EXT4_I(inode)->i_fs_version;
-> >  }
-> >  
-> >  struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
-> > -- 
-> > 1.8.3.1
-> 
+This is strange since Oleg does his testing in the lustre source tree 
+directly. I would think he would have encounter this issue. I need 
+to looking how libtool does its path searches.
