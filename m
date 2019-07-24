@@ -1,14 +1,11 @@
-From: Alexey Lyashkov <umka@cloudlinux.com>
-Date: Mon, 22 Jul 2019 12:51:02 +0300
-Subject: [lustre-devel] [PATCH 19/22] ext4: don't check before replay
-In-Reply-To: <82691452-7473-4CAB-BE70-0C89238D5720@whamcloud.com>
-References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-20-git-send-email-jsimmons@infradead.org>
- <87pnm2ocvr.fsf@notabene.neil.brown.name>
- <506765DD-0068-469E-ADA4-2C71B8B60114@cloudlinux.com>
- <87wogak1n7.fsf@notabene.neil.brown.name>
- <82691452-7473-4CAB-BE70-0C89238D5720@whamcloud.com>
-Message-ID: <AF63C3EE-CA7F-474E-9C93-AEDDD67009AF@cloudlinux.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 24 Jul 2019 04:37:00 +0100 (BST)
+Subject: [lustre-devel] [PATCH 10/11] lustre: ldlm: checkpatch cleanup
+In-Reply-To: <87tvbdjwa7.fsf@notabene.neil.brown.name>
+References: <1563760338-806-1-git-send-email-jsimmons@infradead.org>
+ <1563760338-806-11-git-send-email-jsimmons@infradead.org>
+ <87tvbdjwa7.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1907240433050.12135@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,99 +13,149 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> 22 ???? 2019 ?., ? 9:56, Oleg Drokin <green@whamcloud.com> ???????(?):
+> > @@ -286,7 +286,7 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
+> >  				    struct ldlm_request *dlm_req,
+> >  				    struct ldlm_lock *lock)
+> >  {
+> > -	int rc = -ENOSYS;
+> > +	int rc = -ENXIO;
 > 
+> Is this really a checkpatch warning?
+> Is it safe?
+> Is there a visible behaviour change here, or is the error status only
+> used internally?
 > 
+> There seem to be a few others ... maybe checkpatch doesn't like ENOSYS -
+> probably reasonable.
 > 
->> On Jul 22, 2019, at 2:46 AM, NeilBrown <neilb@suse.com> wrote:
->> 
->> On Mon, Jul 22 2019, Alexey Lyashkov wrote:
->> 
->>> Why?
->>> Purpose of this patch is simple and don?t addressed a failover in general.
->>> Crash can occurred in commit time - when journal _partially_ flushed to the FS. Checking any FS metadata in this time is wrong, because we have no guarantee to be consistence.
->>> But checking an after journal replay is fine, it check have verification no corruption hit and FS is fine. 
->> 
->> If the corruption can occur in non-ldiskfs usage, and would be fixed by
->> a journal replay, then yes - the patch looks like a good idea.
-Yes, bug should fixed by journal replay. BUT this check was run _before_ journal replay and patch move groups check _after_ journal replay done.
+> Everything else looks OK.
+> 
+> Thanks for these!
 
-
->> 
->> Possibly I misunderstood the source of the corruption... maybe if that
->> could be made clearer in the commit message, that would help.
-> 
-> I think the argument is: wtf do we even look at metadata (or anything, really)
-> before journal replay.
-> The patch is actually good because it does move the read after the journal replay
-> though?
-
-Oleg,
-
-you are right. 
+From checkpatch - "ENOSYS means 'invalid syscall nr' and nothing else"
+So using ENOSYS is no no. We get away with this because people rarely
+actually handle each error code individually. Only the MDT coordinator
+really looks to see if the errno code is ENOSYS.
+ 
+> NeilBrown
 > 
 > 
->> 
->>> 
->>> 
->>>> 22 ???? 2019 ?., ? 8:29, NeilBrown <neilb@suse.com> ???????(?):
->>>> 
->>>> On Sun, Jul 21 2019, James Simmons wrote:
->>>> 
->>>>> When ldiskfs run in failover mode whith read-only disk.
->>>>> Part of allocation updates are lost and ldiskfs may fail
->>>>> while mounting this is due to inconsistent state of
->>>>> group-descriptor. Group-descriptor check is added after
->>>>> journal replay.
->>>> 
->>>> I think this needs to be enabled by a mount option or super-block flag.
->>>> 
->>>> NeilBrown
->>>> 
->>>> 
->>>>> 
->>>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
->>>>> ---
->>>>> fs/ext4/super.c | 11 ++++++-----
->>>>> 1 file changed, 6 insertions(+), 5 deletions(-)
->>>>> 
->>>>> diff --git a/fs/ext4/super.c b/fs/ext4/super.c
->>>>> index a3179b2..b818acb 100644
->>>>> --- a/fs/ext4/super.c
->>>>> +++ b/fs/ext4/super.c
->>>>> @@ -4255,11 +4255,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
->>>>> 		}
->>>>> 	}
->>>>> 	sbi->s_gdb_count = db_count;
->>>>> -	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
->>>>> -		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
->>>>> -		ret = -EFSCORRUPTED;
->>>>> -		goto failed_mount2;
->>>>> -	}
->>>>> 
->>>>> 	timer_setup(&sbi->s_err_report, print_daily_error_info, 0);
->>>>> 
->>>>> @@ -4401,6 +4396,12 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
->>>>> 	sbi->s_journal->j_commit_callback = ext4_journal_commit_callback;
->>>>> 
->>>>> no_journal:
->>>>> +	if (!ext4_check_descriptors(sb, logical_sb_block, &first_not_zeroed)) {
->>>>> +		ext4_msg(sb, KERN_ERR, "group descriptors corrupted!");
->>>>> +		ret = -EFSCORRUPTED;
->>>>> +		goto failed_mount_wq;
->>>>> +	}
->>>>> +
->>>>> 	if (!test_opt(sb, NO_MBCACHE)) {
->>>>> 		sbi->s_ea_block_cache = ext4_xattr_create_cache();
->>>>> 		if (!sbi->s_ea_block_cache) {
->>>>> -- 
->>>>> 1.8.3.1
->>>> _______________________________________________
->>>> lustre-devel mailing list
->>>> lustre-devel at lists.lustre.org
->>>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> >  
+> >  	LDLM_DEBUG(lock, "client glimpse AST callback handler");
+> >  
+> > @@ -396,8 +396,10 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+> >  			     struct list_head *cancels, int count,
+> >  			     enum ldlm_cancel_flags cancel_flags)
+> >  {
+> > +	int rc = 0;
+> > +
+> >  	if (cancels && count == 0)
+> > -		return 0;
+> > +		return rc;
+> >  
+> >  	if (cancel_flags & LCF_ASYNC) {
+> >  		struct ldlm_bl_work_item *blwi;
+> > @@ -407,7 +409,7 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+> >  			return -ENOMEM;
+> >  		init_blwi(blwi, ns, ld, cancels, count, lock, cancel_flags);
+> >  
+> > -		return __ldlm_bl_to_thread(blwi, cancel_flags);
+> > +		rc = __ldlm_bl_to_thread(blwi, cancel_flags);
+> >  	} else {
+> >  		/* if it is synchronous call do minimum mem alloc, as it could
+> >  		 * be triggered from kernel shrinker
+> > @@ -416,8 +418,9 @@ static int ldlm_bl_to_thread(struct ldlm_namespace *ns,
+> >  
+> >  		memset(&blwi, 0, sizeof(blwi));
+> >  		init_blwi(&blwi, ns, ld, cancels, count, lock, cancel_flags);
+> > -		return __ldlm_bl_to_thread(&blwi, cancel_flags);
+> > +		rc = __ldlm_bl_to_thread(&blwi, cancel_flags);
+> >  	}
+> > +	return rc;
+> >  }
+> >  
+> >  int ldlm_bl_to_thread_lock(struct ldlm_namespace *ns, struct ldlm_lock_desc *ld,
+> > @@ -446,7 +449,7 @@ static int ldlm_handle_setinfo(struct ptlrpc_request *req)
+> >  	char *key;
+> >  	void *val;
+> >  	int keylen, vallen;
+> > -	int rc = -ENOSYS;
+> > +	int rc = -ENXIO;
+> >  
+> >  	DEBUG_REQ(D_HSM, req, "%s: handle setinfo\n", obd->obd_name);
+> >  
+> > @@ -875,6 +878,7 @@ int ldlm_get_ref(void)
+> >  void ldlm_put_ref(void)
+> >  {
+> >  	int rc = 0;
+> > +
+> >  	mutex_lock(&ldlm_ref_mutex);
+> >  	if (ldlm_refcount == 1) {
+> >  		rc = ldlm_cleanup();
+> > diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+> > index 1f81795..6714c30 100644
+> > --- a/fs/lustre/ldlm/ldlm_pool.c
+> > +++ b/fs/lustre/ldlm/ldlm_pool.c
+> > @@ -360,7 +360,8 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
+> >  	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+> >  	if (recalc_interval_sec > 0) {
+> >  		spin_lock(&pl->pl_lock);
+> > -		recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+> > +		recalc_interval_sec = ktime_get_real_seconds() -
+> > +				      pl->pl_recalc_time;
+> >  
+> >  		if (recalc_interval_sec > 0) {
+> >  			/*
+> > diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+> > index a614d74..b7dcfda 100644
+> > --- a/fs/lustre/ldlm/ldlm_request.c
+> > +++ b/fs/lustre/ldlm/ldlm_request.c
+> > @@ -438,7 +438,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+> >  			       PLDLMRES(lock->l_resource));
+> >  
+> >  			rc = ldlm_lock_change_resource(ns, lock,
+> > -					&reply->lock_desc.l_resource.lr_name);
+> > +						       &reply->lock_desc.l_resource.lr_name);
+> >  			if (rc || !lock->l_resource) {
+> >  				rc = -ENOMEM;
+> >  				goto cleanup;
+> > @@ -450,9 +450,9 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+> >  			      !(exp_connect_flags(exp) & OBD_CONNECT_IBITS)))
+> >  				/* We assume lock type cannot change on server*/
+> >  				ldlm_convert_policy_to_local(exp,
+> > -						lock->l_resource->lr_type,
+> > -						&reply->lock_desc.l_policy_data,
+> > -						&lock->l_policy_data);
+> > +							     lock->l_resource->lr_type,
+> > +							     &reply->lock_desc.l_policy_data,
+> > +							     &lock->l_policy_data);
+> >  		if (type != LDLM_PLAIN)
+> >  			LDLM_DEBUG(lock,
+> >  				   "client-side enqueue, new policy data");
+> > @@ -927,8 +927,7 @@ static int ldlm_cli_cancel_req(struct obd_export *exp,
+> >  		if (rc == LUSTRE_ESTALE) {
+> >  			CDEBUG(D_DLMTRACE,
+> >  			       "client/server (nid %s) out of sync -- not fatal\n",
+> > -			       libcfs_nid2str(req->rq_import->
+> > -					      imp_connection->c_peer.nid));
+> > +			       libcfs_nid2str(req->rq_import->imp_connection->c_peer.nid));
+> >  			rc = 0;
+> >  		} else if (rc == -ETIMEDOUT && /* check there was no reconnect*/
+> >  			   req->rq_import_generation == imp->imp_generation) {
+> > @@ -1290,10 +1289,9 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
+> >  		LDLM_POLICY_KEEP_LOCK : LDLM_POLICY_CANCEL_LOCK;
+> >  }
+> >  
+> > -typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
+> > -						      struct ldlm_namespace *,
+> > -						      struct ldlm_lock *, int,
+> > -						      int, int);
+> > +typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(struct ldlm_namespace *,
+> > +							 struct ldlm_lock *,
+> > +							 int, int, int);
+> >  
+> >  static ldlm_cancel_lru_policy_t
+> >  ldlm_cancel_lru_policy(struct ldlm_namespace *ns, int lru_flags)
+> > -- 
+> > 1.8.3.1
 > 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
