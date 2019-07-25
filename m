@@ -1,70 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 24 Jul 2019 22:44:06 -0400
-Subject: [lustre-devel] [PATCH 7/8] lustre: tests: testcases for multiple
- modify RPCs feature
+Date: Wed, 24 Jul 2019 22:44:04 -0400
+Subject: [lustre-devel] [PATCH 5/8] lustre: fld: retry fld rpc until the
+ import is closed
 In-Reply-To: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1564022647-17351-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1564022647-17351-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Gregoire Pichon <gregoire.pichon@bull.net>
+From: Wang Di <di.wang@intel.com>
 
-This patch creates new testcases in the Auster test suite to
-test the support of multiple modify RPCs in flight feature.
+Since LWP is not replayable, it should retry RPC until
+the import is closed, otherwise it would cause unnecessary
+failure of the application.
 
-Two new OBD_FAIL codes are added to allow several failure occurences
-of the reint requests or replies. This is needed because the current
-fail checks impose the OBD_FAIL_ONCE flag.
-
-Added testcases are :
-- sanity         245
-- conf-sanity    90a 90b 90c 90d
-- replay-single  102a 102b 102c 102d
-
-This patch also removes replay-single tests 53a and 53b
-from the ALWAYS_EXCEPT list.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-5319
-Lustre-commit: c2d27a0f12688c0d029880919f8b002e557b540c
-Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
-Reviewed-on: http://review.whamcloud.com/14861
-Reviewed-by: Jian Yu <yujian@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-5312
+Lustre-commit: 07d481957c16832c782bb7d0c1fc436bcb148ea6
+Signed-off-by: Wang Di <di.wang@intel.com>
+Reviewed-on: http://review.whamcloud.com/11039
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- fs/lustre/include/obd_support.h | 2 ++
- fs/lustre/ldlm/ldlm_lib.c       | 3 +++
- 2 files changed, 5 insertions(+)
+ fs/lustre/fld/fld_request.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 3e15cac..7999ac6 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -189,6 +189,8 @@
- #define OBD_FAIL_MDS_SWAP_LAYOUTS_NET			0x14f
- #define OBD_FAIL_MDS_HSM_ACTION_NET			0x150
- #define OBD_FAIL_MDS_CHANGELOG_INIT			0x151
-+#define OBD_FAIL_MDS_REINT_MULTI_NET			0x159
-+#define OBD_FAIL_MDS_REINT_MULTI_NET_REP		0x15a
- 
- /* layout lock */
- #define OBD_FAIL_MDS_NO_LL_GETATTR			0x170
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index 887507d..a3b8df4 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -689,6 +689,9 @@ int target_pack_pool_reply(struct ptlrpc_request *req)
- 		DEBUG_REQ(D_ERROR, req, "dropping reply");
- 		return -ECOMM;
- 	}
-+	if (unlikely(lustre_msg_get_opc(req->rq_reqmsg) == MDS_REINT &&
-+		     OBD_FAIL_CHECK(OBD_FAIL_MDS_REINT_MULTI_NET_REP)))
-+		return -ECOMM;
- 
- 	if (unlikely(rc)) {
- 		DEBUG_REQ(D_NET, req, "processing error (%d)", rc);
+diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
+index ba0ef82..60e7105 100644
+--- a/fs/lustre/fld/fld_request.c
++++ b/fs/lustre/fld/fld_request.c
+@@ -367,12 +367,10 @@ int fld_client_rpc(struct obd_export *exp,
+ 	rc = ptlrpc_queue_wait(req);
+ 	obd_put_request_slot(&exp->exp_obd->u.cli);
+ 	if (rc != 0) {
+-		if (rc == -EWOULDBLOCK || rc == -ESHUTDOWN) {
+-			/* For no_delay req(see above), EWOULDBLOCK and
+-			 * ESHUTDOWN means the connection is being evicted,
+-			 * but this seq lookup should not return error,
+-			 * since it would cause unecessary failure of the
+-			 * application, instead it should retry here
++		if (imp->imp_state != LUSTRE_IMP_CLOSED) {
++			/* Since LWP is not replayable, so it will keep
++			 * trying unless umount happens, otherwise it would
++			 * cause unecessary failure of the application.
+ 			 */
+ 			ptlrpc_req_finished(req);
+ 			goto again;
 -- 
 1.8.3.1
