@@ -1,81 +1,92 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 25 Jul 2019 19:46:14 +0100 (BST)
-Subject: [lustre-devel] [PATCH] lustre: lnet: fix needed headers for
- lnet headers
-In-Reply-To: <87k1c6n28p.fsf@notabene.neil.brown.name>
-References: <1564001154-2944-1-git-send-email-jsimmons@infradead.org>
- <87k1c6n28p.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1907251944560.19654@casper.infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 26 Jul 2019 09:55:12 +1000
+Subject: [lustre-devel] [PATCH 1/8] lustre: seq: make
+ seq_proc_write_common() safer
+In-Reply-To: <1564022647-17351-2-git-send-email-jsimmons@infradead.org>
+References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
+ <1564022647-17351-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <87h879mzz3.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Wed, Jul 24 2019, James Simmons wrote:
 
-> On Wed, Jul 24 2019, James Simmons wrote:
-> 
-> > The linux kernel now has a sanity check for the global headers and
-> > LNet are missing a few headers to allow them to build properly.
-> 
-> Thanks.
-> I've modified the above to:
-> 
->     The linux kernel now has a sanity check for the global headers,
->     activated by  CONFIG_HEADER_TEST=y and CONFIG_KERNEL_HEADER_TEST=y.
->     Some LNet headers are missing a few headers to allow them to build properly.
-> 
-> and applied the patch.
-> 
+> From: Andreas Dilger <adilger@whamcloud.com>
+>
+> Don't allow seq_proc_write_common() to specify arbitrary ranges,
+> since this can permanently corrupt the sequence controller and/or
+> sequnece server.  That would allow duplicate FID allocation, or
+> possibly prevent any new files to be created or servers to be added
+> to the filesystem.
+>
+> Instead, limit the sequence range that can be written via /proc to
+> a subset of the sequence range currently allocated to that node.
+> Add the "clear" keyword to allow dropping the entire local sequence
+> and force a new one to be fetched from the sequence server.
+>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-3642
+> Lustre-commit: 05f69f5ee20eeffcc26f643333cedcfb53ba6669
+> Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+> Reviewed-on: http://review.whamcloud.com/7123
+> Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+> Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+> Reviewed-by: James Simmons <uja.ornl@gmail.com>
+> Reviewed-by: Oleg Drokin <green@whamclould.com>
+> ---
+>  fs/lustre/fid/lproc_fid.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 
-Acked-by: James Simmons <jsimmons@infradead.org>
+I already have this is my backport branch.
+ a8ab6db57383
+
+NeilBrown
 
 
-> > ---
-> >  include/linux/libcfs/libcfs_fail.h    | 1 +
-> >  include/linux/libcfs/libcfs_private.h | 3 +++
-> >  include/uapi/linux/lnet/lnetst.h      | 2 ++
-> >  3 files changed, 6 insertions(+)
-> >
-> > diff --git a/include/linux/libcfs/libcfs_fail.h b/include/linux/libcfs/libcfs_fail.h
-> > index 0e73eef..f52a82a 100644
-> > --- a/include/linux/libcfs/libcfs_fail.h
-> > +++ b/include/linux/libcfs/libcfs_fail.h
-> > @@ -35,6 +35,7 @@
-> >  
-> >  #include <linux/sched.h>
-> >  #include <linux/wait.h>
-> > +#include <linux/libcfs/libcfs_debug.h>
-> >  
-> >  extern unsigned long cfs_fail_loc;
-> >  extern unsigned int cfs_fail_val;
-> > diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
-> > index 515fd63..2e8cff6 100644
-> > --- a/include/linux/libcfs/libcfs_private.h
-> > +++ b/include/linux/libcfs/libcfs_private.h
-> > @@ -39,6 +39,9 @@
-> >  #ifndef __LIBCFS_PRIVATE_H__
-> >  #define __LIBCFS_PRIVATE_H__
-> >  
-> > +#include <linux/sched.h>
-> > +#include <linux/libcfs/libcfs_debug.h>
-> > +
-> >  #ifndef DEBUG_SUBSYSTEM
-> >  # define DEBUG_SUBSYSTEM S_UNDEFINED
-> >  #endif
-> > diff --git a/include/uapi/linux/lnet/lnetst.h b/include/uapi/linux/lnet/lnetst.h
-> > index 27fcd91..449c5e6 100644
-> > --- a/include/uapi/linux/lnet/lnetst.h
-> > +++ b/include/uapi/linux/lnet/lnetst.h
-> > @@ -38,6 +38,8 @@
-> >  #define __LNET_ST_H__
-> >  
-> >  #include <linux/types.h>
-> > +#include <linux/time.h>
-> > +#include <linux/lnet/lnet-types.h>
-> >  
-> >  #define LST_FEAT_NONE		(0)
-> >  #define LST_FEAT_BULK_LEN	(1 << 0)	/* enable variable page size */
-> > -- 
-> > 1.8.3.1
-> 
+>
+> diff --git a/fs/lustre/fid/lproc_fid.c b/fs/lustre/fid/lproc_fid.c
+> index 94869d4..e2e47df 100644
+> --- a/fs/lustre/fid/lproc_fid.c
+> +++ b/fs/lustre/fid/lproc_fid.c
+> @@ -52,14 +52,18 @@
+>  /* Format: [0x64BIT_INT - 0x64BIT_INT] + 32 bytes just in case */
+>  #define MAX_FID_RANGE_STRLEN (32 + 2 * 2 * sizeof(u64))
+>  /*
+> - * Note: this function is only used for testing, it is no safe for production
+> - * use.
+> + * Reduce the SEQ range allocated to a node to a strict subset of the range
+> + * currently-allocated SEQ range.  If the specified range is "clear", then
+> + * drop all allocated sequences and request a new one from the master.
+> + *
+> + * Note: this function should only be used for testing, it is not necessarily
+> + * safe for production use.
+>   */
+>  static int
+>  ldebugfs_fid_write_common(const char __user *buffer, size_t count,
+>  			  struct lu_seq_range *range)
+>  {
+> -	struct lu_seq_range tmp;
+> +	struct lu_seq_range tmp = { 0, };
+>  	int rc;
+>  	char kernbuf[MAX_FID_RANGE_STRLEN];
+>  
+> @@ -82,8 +86,6 @@
+>  	rc = sscanf(kernbuf, "[%llx - %llx]\n",
+>  		    (unsigned long long *)&tmp.lsr_start,
+>  		    (unsigned long long *)&tmp.lsr_end);
+> -	if (rc != 2)
+> -		return -EINVAL;
+>  	if (!lu_seq_range_is_sane(&tmp) || lu_seq_range_is_zero(&tmp) ||
+>  	    tmp.lsr_start < range->lsr_start || tmp.lsr_end > range->lsr_end)
+>  		return -EINVAL;
+> -- 
+> 1.8.3.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190726/bc2590d3/attachment.sig>
