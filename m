@@ -1,56 +1,87 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 24 Jul 2019 22:44:03 -0400
-Subject: [lustre-devel] [PATCH 4/8] lustre: fld: retry fld rpc even for
- ESHUTDOWN
-In-Reply-To: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
-References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 25 Jul 2019 14:53:58 +1000
+Subject: [lustre-devel] [PATCH] lustre: lnet: fix needed headers for
+ lnet headers
+In-Reply-To: <1564001154-2944-1-git-send-email-jsimmons@infradead.org>
+References: <1564001154-2944-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <87k1c6n28p.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: wang di <di.wang@intel.com>
+On Wed, Jul 24 2019, James Simmons wrote:
 
-when LWP is being evicted, because it is not replayable,
-the request might return ESHUTDOWN or EWOULDBLOCK, instead
-of failed, which might cause application failure, fld
-client will retry RPC, until the connection is being setup
-again or the LWP is being closed.
+> The linux kernel now has a sanity check for the global headers and
+> LNet are missing a few headers to allow them to build properly.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-4420
-Lustre-commit: d335e310d4bf490509998ddbb1824e38cff20998
-Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/10285
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Johann Lombardi <johann.lombardi@intel.com>
----
- fs/lustre/fld/fld_request.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Thanks.
+I've modified the above to:
 
-diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-index ec45ea6..ba0ef82 100644
---- a/fs/lustre/fld/fld_request.c
-+++ b/fs/lustre/fld/fld_request.c
-@@ -367,12 +367,12 @@ int fld_client_rpc(struct obd_export *exp,
- 	rc = ptlrpc_queue_wait(req);
- 	obd_put_request_slot(&exp->exp_obd->u.cli);
- 	if (rc != 0) {
--		if (rc == -EWOULDBLOCK) {
--			/* For no_delay req(see above), EWOULDBLOCK means the
--			 * connection is being evicted, but this seq lookup
--			 * should not return error, since it would cause
--			 * unecessary failure of the application, instead
--			 * it should retry here
-+		if (rc == -EWOULDBLOCK || rc == -ESHUTDOWN) {
-+			/* For no_delay req(see above), EWOULDBLOCK and
-+			 * ESHUTDOWN means the connection is being evicted,
-+			 * but this seq lookup should not return error,
-+			 * since it would cause unecessary failure of the
-+			 * application, instead it should retry here
- 			 */
- 			ptlrpc_req_finished(req);
- 			goto again;
--- 
-1.8.3.1
+    The linux kernel now has a sanity check for the global headers,
+    activated by  CONFIG_HEADER_TEST=y and CONFIG_KERNEL_HEADER_TEST=y.
+    Some LNet headers are missing a few headers to allow them to build properly.
+
+and applied the patch.
+
+NeilBrown
+
+ 
+
+>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  include/linux/libcfs/libcfs_fail.h    | 1 +
+>  include/linux/libcfs/libcfs_private.h | 3 +++
+>  include/uapi/linux/lnet/lnetst.h      | 2 ++
+>  3 files changed, 6 insertions(+)
+>
+> diff --git a/include/linux/libcfs/libcfs_fail.h b/include/linux/libcfs/libcfs_fail.h
+> index 0e73eef..f52a82a 100644
+> --- a/include/linux/libcfs/libcfs_fail.h
+> +++ b/include/linux/libcfs/libcfs_fail.h
+> @@ -35,6 +35,7 @@
+>  
+>  #include <linux/sched.h>
+>  #include <linux/wait.h>
+> +#include <linux/libcfs/libcfs_debug.h>
+>  
+>  extern unsigned long cfs_fail_loc;
+>  extern unsigned int cfs_fail_val;
+> diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
+> index 515fd63..2e8cff6 100644
+> --- a/include/linux/libcfs/libcfs_private.h
+> +++ b/include/linux/libcfs/libcfs_private.h
+> @@ -39,6 +39,9 @@
+>  #ifndef __LIBCFS_PRIVATE_H__
+>  #define __LIBCFS_PRIVATE_H__
+>  
+> +#include <linux/sched.h>
+> +#include <linux/libcfs/libcfs_debug.h>
+> +
+>  #ifndef DEBUG_SUBSYSTEM
+>  # define DEBUG_SUBSYSTEM S_UNDEFINED
+>  #endif
+> diff --git a/include/uapi/linux/lnet/lnetst.h b/include/uapi/linux/lnet/lnetst.h
+> index 27fcd91..449c5e6 100644
+> --- a/include/uapi/linux/lnet/lnetst.h
+> +++ b/include/uapi/linux/lnet/lnetst.h
+> @@ -38,6 +38,8 @@
+>  #define __LNET_ST_H__
+>  
+>  #include <linux/types.h>
+> +#include <linux/time.h>
+> +#include <linux/lnet/lnet-types.h>
+>  
+>  #define LST_FEAT_NONE		(0)
+>  #define LST_FEAT_BULK_LEN	(1 << 0)	/* enable variable page size */
+> -- 
+> 1.8.3.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190725/bf0ed17c/attachment.sig>
