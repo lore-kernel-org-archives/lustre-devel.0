@@ -1,51 +1,86 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 24 Jul 2019 22:44:07 -0400
-Subject: [lustre-devel] [PATCH 8/8] lustre: ldlm: Don't check opcode with
- NULL rq_reqmsg
+Date: Wed, 24 Jul 2019 22:44:02 -0400
+Subject: [lustre-devel] [PATCH 3/8] lustre: fld: resend seq lookup RPC if it
+ is on LWP
 In-Reply-To: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1564022647-17351-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1564022647-17351-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
+From: wang di <di.wang@intel.com>
 
-When GSS is enabled it's possible to have a NULL rq_reqmsg
-if a bad signature or no context is returned during the unwrap
-of the request.  Don't check the opcode in this case.
+Because Light Weight connection might be evicted after
+restart, then cause inflight RPC fails, to avoid this,
+we need resend seq lookup RPC.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7508
-Lustre-commit: 3f4572caef5f25f4a9b5347b2ccf933fdad9db9c
-Signed-off-by: Jeremy Filizetti <jeremy.filizetti@gmail.com>
-Reviewed-on: http://review.whamcloud.com/17414
+remove "-f" from "stop mdt" in sanity 17m, so umount can
+keep the the connection, and otherwise the OSP might be
+evicted.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4571
+Lustre-commit: cf7f66d87e52293535cde6e8cc7386e6c1bdfa46
+Signed-off-by: wang di <di.wang@intel.com>
+Reviewed-on: http://review.whamcloud.com/9106
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
 ---
- fs/lustre/ldlm/ldlm_lib.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ fs/lustre/fld/fld_request.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index a3b8df4..04982b8 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -689,8 +689,12 @@ int target_pack_pool_reply(struct ptlrpc_request *req)
- 		DEBUG_REQ(D_ERROR, req, "dropping reply");
- 		return -ECOMM;
- 	}
--	if (unlikely(lustre_msg_get_opc(req->rq_reqmsg) == MDS_REINT &&
--		     OBD_FAIL_CHECK(OBD_FAIL_MDS_REINT_MULTI_NET_REP)))
-+	/* We can have a null rq_reqmsg in the event of bad signature or
-+	 * no context when unwrapping
-+	 */
-+	if (req->rq_reqmsg &&
-+	    unlikely(lustre_msg_get_opc(req->rq_reqmsg) == MDS_REINT &&
-+	    OBD_FAIL_CHECK(OBD_FAIL_MDS_REINT_MULTI_NET_REP)))
- 		return -ECOMM;
+diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
+index 248fffa..ec45ea6 100644
+--- a/fs/lustre/fld/fld_request.c
++++ b/fs/lustre/fld/fld_request.c
+@@ -314,6 +314,7 @@ int fld_client_rpc(struct obd_export *exp,
  
- 	if (unlikely(rc)) {
+ 	LASSERT(exp);
+ 
++again:
+ 	imp = class_exp2cliimp(exp);
+ 	switch (fld_op) {
+ 	case FLD_QUERY:
+@@ -329,8 +330,15 @@ int fld_client_rpc(struct obd_export *exp,
+ 		op = req_capsule_client_get(&req->rq_pill, &RMF_FLD_OPC);
+ 		*op = FLD_LOOKUP;
+ 
+-		if (imp->imp_connect_flags_orig & OBD_CONNECT_MDS_MDS)
++		/* For MDS_MDS seq lookup, it will always use LWP connection,
++		 * but LWP will be evicted after restart, so cause the error.
++		 * so we will set no_delay for seq lookup request, once the
++		 * request fails because of the eviction. always retry here
++		 */
++		if (imp->imp_connect_flags_orig & OBD_CONNECT_MDS_MDS) {
+ 			req->rq_allow_replay = 1;
++			req->rq_no_delay = 1;
++		}
+ 		break;
+ 	case FLD_READ:
+ 		req = ptlrpc_request_alloc_pack(imp, &RQF_FLD_READ,
+@@ -358,8 +366,19 @@ int fld_client_rpc(struct obd_export *exp,
+ 	obd_get_request_slot(&exp->exp_obd->u.cli);
+ 	rc = ptlrpc_queue_wait(req);
+ 	obd_put_request_slot(&exp->exp_obd->u.cli);
+-	if (rc)
++	if (rc != 0) {
++		if (rc == -EWOULDBLOCK) {
++			/* For no_delay req(see above), EWOULDBLOCK means the
++			 * connection is being evicted, but this seq lookup
++			 * should not return error, since it would cause
++			 * unecessary failure of the application, instead
++			 * it should retry here
++			 */
++			ptlrpc_req_finished(req);
++			goto again;
++		}
+ 		goto out_req;
++	}
+ 
+ 	if (fld_op == FLD_QUERY) {
+ 		prange = req_capsule_server_get(&req->rq_pill, &RMF_FLD_MDFLD);
 -- 
 1.8.3.1
