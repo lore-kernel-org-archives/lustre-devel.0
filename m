@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 24 Jul 2019 22:44:05 -0400
-Subject: [lustre-devel] [PATCH 6/8] lustre: fld: fld client lookup should
- retry
+Date: Wed, 24 Jul 2019 22:44:03 -0400
+Subject: [lustre-devel] [PATCH 4/8] lustre: fld: retry fld rpc even for
+ ESHUTDOWN
 In-Reply-To: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1564022647-17351-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,79 +13,44 @@ To: lustre-devel@lists.lustre.org
 
 From: wang di <di.wang@intel.com>
 
-If FLD client lookup fails because of the remote target
-is shutdown (or deactive), it should retry another target,
-otherwise it will cause the application failure.
+when LWP is being evicted, because it is not replayable,
+the request might return ESHUTDOWN or EWOULDBLOCK, instead
+of failed, which might cause application failure, fld
+client will retry RPC, until the connection is being setup
+again or the LWP is being closed.
 
-And FLD client should stop retry if the import has
-been deactive.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6419
-Lustre-commit: 3ededde903c92f8485cae0dc9f958f194ff0b140
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4420
+Lustre-commit: d335e310d4bf490509998ddbb1824e38cff20998
 Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/14313
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-on: http://review.whamcloud.com/10285
 Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: Johann Lombardi <johann.lombardi@intel.com>
 ---
- fs/lustre/fld/fld_request.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+ fs/lustre/fld/fld_request.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-index 60e7105..dfd4ae9 100644
+index ec45ea6..ba0ef82 100644
 --- a/fs/lustre/fld/fld_request.c
 +++ b/fs/lustre/fld/fld_request.c
-@@ -367,7 +367,7 @@ int fld_client_rpc(struct obd_export *exp,
+@@ -367,12 +367,12 @@ int fld_client_rpc(struct obd_export *exp,
  	rc = ptlrpc_queue_wait(req);
  	obd_put_request_slot(&exp->exp_obd->u.cli);
  	if (rc != 0) {
--		if (imp->imp_state != LUSTRE_IMP_CLOSED) {
-+		if (imp->imp_state != LUSTRE_IMP_CLOSED && !imp->imp_deactive) {
- 			/* Since LWP is not replayable, so it will keep
- 			 * trying unless umount happens, otherwise it would
- 			 * cause unecessary failure of the application.
-@@ -404,6 +404,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- {
- 	struct lu_seq_range res = { 0 };
- 	struct lu_fld_target *target;
-+	struct lu_fld_target *origin;
- 	int rc;
- 
- 	rc = fld_cache_lookup(fld->lcf_cache, seq, &res);
-@@ -415,7 +416,8 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- 	/* Can not find it in the cache */
- 	target = fld_client_get_target(fld, seq);
- 	LASSERT(target);
--
-+	origin = target;
-+again:
- 	CDEBUG(D_INFO,
- 	       "%s: Lookup fld entry (seq: %#llx) on target %s (idx %llu)\n",
- 	       fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
-@@ -424,6 +426,23 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- 	fld_range_set_type(&res, flags);
- 	rc = fld_client_rpc(target->ft_exp, &res, FLD_QUERY, NULL);
- 
-+	if (rc == -ESHUTDOWN) {
-+		/* If fld lookup failed because the target has been shutdown,
-+		 * then try next target in the list, until trying all targets
-+		 * or fld lookup succeeds
-+		 */
-+		spin_lock(&fld->lcf_lock);
-+		if (target->ft_chain.next == fld->lcf_targets.prev)
-+			target = list_entry(fld->lcf_targets.next,
-+					    struct lu_fld_target, ft_chain);
-+		else
-+			target = list_entry(target->ft_chain.next,
-+						 struct lu_fld_target,
-+						 ft_chain);
-+		spin_unlock(&fld->lcf_lock);
-+		if (target != origin)
-+			goto again;
-+	}
- 	if (rc == 0) {
- 		*mds = res.lsr_index;
- 
+-		if (rc == -EWOULDBLOCK) {
+-			/* For no_delay req(see above), EWOULDBLOCK means the
+-			 * connection is being evicted, but this seq lookup
+-			 * should not return error, since it would cause
+-			 * unecessary failure of the application, instead
+-			 * it should retry here
++		if (rc == -EWOULDBLOCK || rc == -ESHUTDOWN) {
++			/* For no_delay req(see above), EWOULDBLOCK and
++			 * ESHUTDOWN means the connection is being evicted,
++			 * but this seq lookup should not return error,
++			 * since it would cause unecessary failure of the
++			 * application, instead it should retry here
+ 			 */
+ 			ptlrpc_req_finished(req);
+ 			goto again;
 -- 
 1.8.3.1
