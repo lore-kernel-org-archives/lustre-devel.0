@@ -1,48 +1,75 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 24 Jul 2019 22:43:59 -0400
-Subject: [lustre-devel] [PATCH 0/8] lustre: some old patches from whamcloud
- tree
-Message-ID: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
+Date: Wed, 24 Jul 2019 22:44:00 -0400
+Subject: [lustre-devel] [PATCH 1/8] lustre: seq: make
+ seq_proc_write_common() safer
+In-Reply-To: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
+References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1564022647-17351-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Some old patches missing from the linux lustre client. I suspect
-these weren't port since they most are likely server side only
-but I want to make sure. Also we are missing patch:
+From: Andreas Dilger <adilger@whamcloud.com>
 
-http://review.whamcloud.com/20939 from LU-8319 but I don't know
-if that is needed anymore with the earlier changes done.
-Feedback welcomed.
+Don't allow seq_proc_write_common() to specify arbitrary ranges,
+since this can permanently corrupt the sequence controller and/or
+sequnece server.  That would allow duplicate FID allocation, or
+possibly prevent any new files to be created or servers to be added
+to the filesystem.
 
-Andreas Dilger (1):
-  lustre: seq: make seq_proc_write_common() safer
+Instead, limit the sequence range that can be written via /proc to
+a subset of the sequence range currently allocated to that node.
+Add the "clear" keyword to allow dropping the entire local sequence
+and force a new one to be fetched from the sequence server.
 
-Gregoire Pichon (1):
-  lustre: tests: testcases for multiple modify RPCs feature
+WC-bug-id: https://jira.whamcloud.com/browse/LU-3642
+Lustre-commit: 05f69f5ee20eeffcc26f643333cedcfb53ba6669
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: http://review.whamcloud.com/7123
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Oleg Drokin <green@whamclould.com>
+---
+ fs/lustre/fid/lproc_fid.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-Jeremy Filizetti (1):
-  lustre: ldlm: Don't check opcode with NULL rq_reqmsg
-
-Li Wei (1):
-  lustre: ptlrpc: Fix an rq_no_reply assertion failure
-
-Wang Di (1):
-  lustre: fld: retry fld rpc until the import is closed
-
-wang di (3):
-  lustre: fld: resend seq lookup RPC if it is on LWP
-  lustre: fld: retry fld rpc even for ESHUTDOWN
-  lustre: fld: fld client lookup should retry
-
- fs/lustre/fid/lproc_fid.c       | 12 +++++++-----
- fs/lustre/fld/fld_request.c     | 42 ++++++++++++++++++++++++++++++++++++++---
- fs/lustre/include/obd_support.h |  2 ++
- fs/lustre/ldlm/ldlm_lib.c       |  7 +++++++
- fs/lustre/ptlrpc/service.c      | 10 ++++++++++
- 5 files changed, 65 insertions(+), 8 deletions(-)
-
+diff --git a/fs/lustre/fid/lproc_fid.c b/fs/lustre/fid/lproc_fid.c
+index 94869d4..e2e47df 100644
+--- a/fs/lustre/fid/lproc_fid.c
++++ b/fs/lustre/fid/lproc_fid.c
+@@ -52,14 +52,18 @@
+ /* Format: [0x64BIT_INT - 0x64BIT_INT] + 32 bytes just in case */
+ #define MAX_FID_RANGE_STRLEN (32 + 2 * 2 * sizeof(u64))
+ /*
+- * Note: this function is only used for testing, it is no safe for production
+- * use.
++ * Reduce the SEQ range allocated to a node to a strict subset of the range
++ * currently-allocated SEQ range.  If the specified range is "clear", then
++ * drop all allocated sequences and request a new one from the master.
++ *
++ * Note: this function should only be used for testing, it is not necessarily
++ * safe for production use.
+  */
+ static int
+ ldebugfs_fid_write_common(const char __user *buffer, size_t count,
+ 			  struct lu_seq_range *range)
+ {
+-	struct lu_seq_range tmp;
++	struct lu_seq_range tmp = { 0, };
+ 	int rc;
+ 	char kernbuf[MAX_FID_RANGE_STRLEN];
+ 
+@@ -82,8 +86,6 @@
+ 	rc = sscanf(kernbuf, "[%llx - %llx]\n",
+ 		    (unsigned long long *)&tmp.lsr_start,
+ 		    (unsigned long long *)&tmp.lsr_end);
+-	if (rc != 2)
+-		return -EINVAL;
+ 	if (!lu_seq_range_is_sane(&tmp) || lu_seq_range_is_zero(&tmp) ||
+ 	    tmp.lsr_start < range->lsr_start || tmp.lsr_end > range->lsr_end)
+ 		return -EINVAL;
 -- 
 1.8.3.1
