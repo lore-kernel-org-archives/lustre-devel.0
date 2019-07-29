@@ -1,12 +1,15 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 26 Jul 2019 04:31:09 +0100 (BST)
-Subject: [lustre-devel] [PATCH 1/8] lustre: seq: make
- seq_proc_write_common() safer
-In-Reply-To: <87h879mzz3.fsf@notabene.neil.brown.name>
-References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
- <1564022647-17351-2-git-send-email-jsimmons@infradead.org>
- <87h879mzz3.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1907260428430.5708@casper.infradead.org>
+Date: Mon, 29 Jul 2019 20:40:28 +0100 (BST)
+Subject: [lustre-devel] [PATCH 10/11] lustre: ldlm: checkpatch cleanup
+In-Reply-To: <ACCFCCDF-B63A-40A9-8992-A8959FD94079@amazon.com>
+References: <1563760338-806-1-git-send-email-jsimmons@infradead.org>
+ <1563760338-806-11-git-send-email-jsimmons@infradead.org>
+ <87tvbdjwa7.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1907240433050.12135@casper.infradead.org>
+ <1BDF7232-853F-4B2D-AC0B-AC49E78F6884@amazon.com>
+ <alpine.LFD.2.21.1907250246001.19895@casper.infradead.org>
+ <ACCFCCDF-B63A-40A9-8992-A8959FD94079@amazon.com>
+Message-ID: <alpine.LFD.2.21.1907291958590.18208@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,75 +17,49 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > From: Andreas Dilger <adilger@whamcloud.com>
-> >
-> > Don't allow seq_proc_write_common() to specify arbitrary ranges,
-> > since this can permanently corrupt the sequence controller and/or
-> > sequnece server.  That would allow duplicate FID allocation, or
-> > possibly prevent any new files to be created or servers to be added
-> > to the filesystem.
-> >
-> > Instead, limit the sequence range that can be written via /proc to
-> > a subset of the sequence range currently allocated to that node.
-> > Add the "clear" keyword to allow dropping the entire local sequence
-> > and force a new one to be fetched from the sequence server.
-> >
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-3642
-> > Lustre-commit: 05f69f5ee20eeffcc26f643333cedcfb53ba6669
-> > Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-> > Reviewed-on: http://review.whamcloud.com/7123
-> > Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-> > Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-> > Reviewed-by: James Simmons <uja.ornl@gmail.com>
-> > Reviewed-by: Oleg Drokin <green@whamclould.com>
-> > ---
-> >  fs/lustre/fid/lproc_fid.c | 12 +++++++-----
-> >  1 file changed, 7 insertions(+), 5 deletions(-)
+> ?Le 25/07/2019 03:54, ? James Simmons ? <jsimmons@infradead.org> a ?crit :
 > 
-> I already have this is my backport branch.
->  a8ab6db57383
+>     
+>     > Le 24/07/2019 05:38, ? lustre-devel au nom de James Simmons ? <lustre-devel-bounces at lists.lustre.org au nom de jsimmons@infradead.org> a ?crit :
+>     >     
+>     >     From checkpatch - "ENOSYS means 'invalid syscall nr' and nothing else"
+>     >     So using ENOSYS is no no. We get away with this because people rarely
+>     >     actually handle each error code individually.
+>     > .
+>     >     
+>     > As a general comment about this, I think we should improve this in the futur. Some people asked me "what's the error code when this or that happens in Lustre?". And I've got no real answer for that.
+>     > Indeed people, most of the time, only checks returned code against 0. That does not help when looking at specific Lustre issues.
+>     
+>     perf probe 'lustre_function%return $retval'
+>     
+>     Does the same thing as lctl set_param debug=+trace except dynamic probes 
+>     can work on any kernel function without code modification!!!
+>     
+> I mean from userspace.
+> When some applications want to adapt its behaviour depending on what is happening in Lustre. 
 
-I pushed the first batch from your backport branch. I remember 
-remember pushing some patches before for fid / fld that ended up
-being server only patches. Its not really clear what is server or
-client in that code. I was hoping for some feedback from Andreas
-and / or Oleg about this patch collect being server only.
+Ah I see what you mean. Actually I'm working on such a project. See
+ 
+https://jira.whamcloud.com/browse/LU-10756
 
-> > diff --git a/fs/lustre/fid/lproc_fid.c b/fs/lustre/fid/lproc_fid.c
-> > index 94869d4..e2e47df 100644
-> > --- a/fs/lustre/fid/lproc_fid.c
-> > +++ b/fs/lustre/fid/lproc_fid.c
-> > @@ -52,14 +52,18 @@
-> >  /* Format: [0x64BIT_INT - 0x64BIT_INT] + 32 bytes just in case */
-> >  #define MAX_FID_RANGE_STRLEN (32 + 2 * 2 * sizeof(u64))
-> >  /*
-> > - * Note: this function is only used for testing, it is no safe for production
-> > - * use.
-> > + * Reduce the SEQ range allocated to a node to a strict subset of the range
-> > + * currently-allocated SEQ range.  If the specified range is "clear", then
-> > + * drop all allocated sequences and request a new one from the master.
-> > + *
-> > + * Note: this function should only be used for testing, it is not necessarily
-> > + * safe for production use.
-> >   */
-> >  static int
-> >  ldebugfs_fid_write_common(const char __user *buffer, size_t count,
-> >  			  struct lu_seq_range *range)
-> >  {
-> > -	struct lu_seq_range tmp;
-> > +	struct lu_seq_range tmp = { 0, };
-> >  	int rc;
-> >  	char kernbuf[MAX_FID_RANGE_STRLEN];
-> >  
-> > @@ -82,8 +86,6 @@
-> >  	rc = sscanf(kernbuf, "[%llx - %llx]\n",
-> >  		    (unsigned long long *)&tmp.lsr_start,
-> >  		    (unsigned long long *)&tmp.lsr_end);
-> > -	if (rc != 2)
-> > -		return -EINVAL;
-> >  	if (!lu_seq_range_is_sane(&tmp) || lu_seq_range_is_zero(&tmp) ||
-> >  	    tmp.lsr_start < range->lsr_start || tmp.lsr_end > range->lsr_end)
-> >  		return -EINVAL;
-> > -- 
-> > 1.8.3.1
-> 
+I also gave a LUG talk about this work this year. Currently you can do 
+this with sysfs tunables. So if you do a lctl set_param -P on the MGS
+server on the clients an udev event is created. Normally udev rules
+are used to managed these changes but you can write applications that
+responsed to these changes. You just need to use libudev for this type
+of monitoring. This is planned to be expanded to other areas for Lustre
+2.14. One is the import state which a early patch exist for:
+
+https://review.whamcloud.com/#/c/31407
+
+For this work the import state change is reported using udev to systemed.
+The changes seen in this case cover recovery state, evictions, idle etc.
+Bascially any state covered in enum lustre_imp_state from lustre_import.h.
+
+Additionally the sysfs work for LNet will always open new possibilities.
+We will be able to use udev events to report the network health state and
+well as network timeouts etc.
+
+Those are the areas for 2.14. Any others you can think of ? So this kind
+of functionality is being added to Lustre. If Amazon is interested in such
+work I can add you as a reviewer :-)
