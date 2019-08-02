@@ -1,113 +1,188 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 31 Jul 2019 22:03:44 +0000
-Subject: [lustre-devel] [PATCH 01/22] ext4: add i_fs_version
-In-Reply-To: <87wogapuz2.fsf@notabene.neil.brown.name>
-References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-2-git-send-email-jsimmons@infradead.org>
- <87wogapuz2.fsf@notabene.neil.brown.name>
-Message-ID: <FE17B718-29E5-44D6-AFFA-F89B38AA3CEE@whamcloud.com>
+Date: Fri, 2 Aug 2019 11:04:47 +0000
+Subject: [lustre-devel] Auster and no facet /usr/sbin/lctl
+In-Reply-To: <CAPiwApzoSRzYv0QmJYo-rQDjXrLFrttVGa23Kxh=6rAfNzz+9w@mail.gmail.com>
+References: <CAPiwApyrJcArje3zYGFdHNff26JUdP7JLu7iK20ymNg4DaU1qQ@mail.gmail.com>
+ <7AE1C6EF-B45C-4256-A28A-9A5E73C2BBCC@whamcloud.com>
+ <CAPiwApzC41YqCCsWzgEHP_OJCtRJ0e8L6LUooY3rtu3vr_=1=g@mail.gmail.com>
+ <257DDBDC-58B6-4D0E-904F-B141A4761C4C@whamcloud.com>,
+ <CAPiwApzoSRzYv0QmJYo-rQDjXrLFrttVGa23Kxh=6rAfNzz+9w@mail.gmail.com>
+Message-ID: <8C3DBC03-6061-4D8C-B220-8E4B3E5145A7@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jul 21, 2019, at 22:13, NeilBrown <neilb@suse.com> wrote:
-> 
-> On Sun, Jul 21 2019, James Simmons wrote:
-> 
->> From: James Simmons <uja.ornl@yahoo.com>
->> 
->> Add inode version field that osd-ldiskfs uses.
-> 
-> We need more words here.  What is i_fs_version used for?
-> 
-> (I'll probably find out as I keep reading, but I need to know
-> the intention first, or I cannot properly review the patches
-> that make use of it.
+I thought I replied to this email, but maybe it was lost.
 
-We use the 64-bit i_version field to store the Lustre transno in
-which the inode was last modified.  This maintains the NFS
-required semantics that the version change when the inode is
-modified, but the number has a specific meaning so we don't
-want the ext4 code or VFS to just increment it.
+It looks like you have "$SINGLEMDS" unset in your test config. It should
+just be "mds1".  That is causing the error:
 
-When a client modifies an inode, the old version is returned in
-the RPC reply to the client.  The old version number can be used
-during Lustre recovery (RPC replay using "Version Based Recovery",
-VBR) after an MDS crash to determine if it is safe to apply this
-change to the inode, in the case that some clients have been
-evicted and we don't have a full stream of RPCs to replay.
+    MDS: No host defined for facet /usr/sbin/lctl
 
-If we could get some way to prevent the kernel from updating the
-inode->i_version (which is now also a 64-bit value) then we could
-remove one more patch from our code.  In the meantime, the current
-kernel is not conducive to hijacking inode->i_version so we need
-to store our own value in the ext4_inode_info and write that to
-disk instead of the kernel version.
+I don't know if that is causing your other problem or something else,
+but may as well fix it and see.
+
+You could also run with "sh -vx" to get all the gory details from bash
+to see what is being executed.
 
 Cheers, Andreas
 
-> 
->> 
->> Signed-off-by: James Simmons <uja.ornl@yahoo.com>
->> ---
->> fs/ext4/ext4.h   | 2 ++
->> fs/ext4/ialloc.c | 1 +
->> fs/ext4/inode.c  | 4 ++--
->> 3 files changed, 5 insertions(+), 2 deletions(-)
->> 
->> diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
->> index 1cb6785..8abbcab 100644
->> --- a/fs/ext4/ext4.h
->> +++ b/fs/ext4/ext4.h
->> @@ -1063,6 +1063,8 @@ struct ext4_inode_info {
->> 	struct dquot *i_dquot[MAXQUOTAS];
->> #endif
->> 
->> +	u64 i_fs_version;
->> +
->> 	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
->> 	__u32 i_csum_seed;
->> 
->> diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
->> index 764ff4c..09ae4a4 100644
->> --- a/fs/ext4/ialloc.c
->> +++ b/fs/ext4/ialloc.c
->> @@ -1100,6 +1100,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
->> 	ei->i_dtime = 0;
->> 	ei->i_block_group = group;
->> 	ei->i_last_alloc_group = ~0;
->> +	ei->i_fs_version = 0;
->> 
->> 	ext4_set_inode_flags(inode);
->> 	if (IS_DIRSYNC(inode))
->> diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
->> index c7f77c6..6e66175 100644
->> --- a/fs/ext4/inode.c
->> +++ b/fs/ext4/inode.c
->> @@ -4806,14 +4806,14 @@ static inline void ext4_inode_set_iversion_queried(struct inode *inode, u64 val)
->> 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
->> 		inode_set_iversion_raw(inode, val);
->> 	else
->> -		inode_set_iversion_queried(inode, val);
->> +		EXT4_I(inode)->i_fs_version = val;
->> }
->> static inline u64 ext4_inode_peek_iversion(const struct inode *inode)
->> {
->> 	if (unlikely(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL))
->> 		return inode_peek_iversion_raw(inode);
->> 	else
->> -		return inode_peek_iversion(inode);
->> +		return EXT4_I(inode)->i_fs_version;
->> }
->> 
->> struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
->> -- 
->> 1.8.3.1
+On Jul 23, 2019, at 02:33, Baptiste Gerondeau <baptiste.gerondeau at linaro.org<mailto:baptiste.gerondeau@linaro.org>> wrote:
+
+After testing it out on an ARM64 client (hostname : lustrerhel, running RHEL8, compiled from master), it seems it has the same problem.
+
+I can successfully llmount.sh and llmountcleanup.sh and write and read files from the client.
+That said, sanity.sh is not working for me : it never gets to the tests part, it just stops at 'cat /proc/mounts on OSS'.
+dmesg says nothing more, and I can't seem to get a more info (an error) from the logs.
+I have confirmed that I can 'cat /proc/mounts' just fine on all the machines.
+
+Client: Lustre version: 2.12.0
+MDS: No host defined for facet /usr/sbin/lctl
+OSS: Lustre version: 2.12.0
+CMD: lustrerhel,x8602 PATH=/usr/lib64/lustre/tests:/usr/lib/lustre/tests:/usr/lib64/lustre/tests:/usr/lib64/lustre/tests/mpi:/usr/lib64/lustre/tests/racer:/usr/lib64/lustre/../lustre-iokit/sgpdd-survey:/usr/lib64/lustre/tests:/usr/lib64/lustre/utils/gss:/usr/lib64/lustre/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/sbin::/sbin:/bin:/usr/sbin: NAME=local bash rpc.sh check_config_client /lustre
+x8602: x8602: executing check_config_client /lustre
+lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+x8602: Checking config lustre mounted on /lustre
+lustrerhel: lustrerhel: executing check_config_client /lustre
+lustrerhel: Checking config lustre mounted on /lustre
+Checking servers environments
+[...]
+CMD: x86ohpc e2label /dev/sda2 2>/dev/null
+x86ohpc: Warning: Permanently added 'x86ohpc,10.40.24.210' (ECDSA) to the list of known hosts.
+CMD: x86ohpc cat /proc/mounts
+x86ohpc: Warning: Permanently added 'x86ohpc,10.40.24.210' (ECDSA) to the list of known hosts.
+CMD: x8601 e2label /dev/sda2 2>/dev/null
+CMD: x8601 cat /proc/mounts
+
+Thanks a lot for your support,
+Best regards,
+
+On Thu, 18 Jul 2019 at 20:56, Andreas Dilger <adilger at whamcloud.com<mailto:adilger@whamcloud.com>> wrote:
+On Jul 18, 2019, at 04:29, Baptiste Gerondeau <baptiste.gerondeau at linaro.org<mailto:baptiste.gerondeau@linaro.org>> wrote:
+>
+> Thank you very much for your quick help !
+> I reformatted and remounted everything from scratch and can confirm that mounting works, and that the client can communicate with the MDS (210, OSS is 211 and client 212):
+[snip]
+> [root at x8602 tests]# lctl which_nid 10.40.24.210 at tcp
+> 10.40.24.210 at tcp
+> [root at x8602 tests]# lfs df -ih
+> UUID                      Inodes       IUsed       IFree IUse% Mounted on
+> test-MDT0000_UUID           4.0M         272        4.0M   1% /lustre[MDT:0]
+> test-OST0000_UUID         640.0K         267      639.7K   0% /lustre[OST:0]
+>
+> filesystem_summary:       640.0K         272      639.7K   0% /lustre
+>
+> [root at x8602 tests]#  ls -lsah /lustre/
+> total 12K
+> 4.0K drwxr-xr-x   3 root root 4.0K Jul 18 11:03 .
+> 4.0K dr-xr-xr-x. 19 root root 4.0K Jun 28 11:43 ..
+> 4.0K -rw-r--r--   1 root root   14 Jul 18 11:03 test.txt
+>
+> I get the same output from auster though:
+> Client: Lustre version: 2.12.0
+> MDS: No host defined for facet /usr/sbin/lctl
+
+This looks like some kind of problem with the test configuration file, where an environment variable is not set (e.g. mds_HOST) and it is interpreting the next argument (the lctl command) as the target facet when calling do_facet() or similar?
+
+If "llmount.sh" works, then you are also able to run tests directly like:
+
+client# cd lustre/tests
+client# sh sanity.sh
+
+I don't use auster myself (it is just a wrapper around lower-level scripts), so I can't really comment where the problem might be.
+
+Cheers, Andreas
+
+> OSS: Lustre version: 2.12.0
+>
+> From the client I can ssh into the other nodes (and from each node I can ssh into the others).
+> I had tried to debug the scripts behind the above auster output but was unable to track down where it failed...
+>
+> On Tue, 16 Jul 2019 at 23:09, Andreas Dilger <adilger at whamcloud.com<mailto:adilger@whamcloud.com>> wrote:
+> On Jul 16, 2019, at 06:11, Baptiste Gerondeau <baptiste.gerondeau at linaro.org<mailto:baptiste.gerondeau@linaro.org>> wrote:
+> >
+> > Hi,
+> >
+> > I'm currently in the process of bringing up the "3 node" x86 cluster and running "verbose=true ./auster -f multinode -rsv runtests" (on CentOS 7.6 x86 client & server, installed from repos), I keep getting "MDS: No host defined for facet /usr/sbin/lctl".
+> >
+> > Auster then prints out some pdsh stuff, "Failures : 0" and exits after 16s obviously without running any tests.
+> >
+> > Any suggestions?
+> > Thanks a lot,
+> >
+> >
+> > PS : My multinode config is attached
+> > PPS: I posted to the devel list because it concerned auster, if I need to post it elsewhere please let me know
+>
+> Before running auster, which tries to launch a lot of tests, start with just a plain mount to see if that is working:
+>
+> master.sh:
+> > MOUNT=/mnt/lustre
+> > MOUNT2=/mnt/master2
+>
+> This is a bit odd for tests, which normally have e.g. /mnt/master and /mnt/master2, but I'm
+> not sure i there will be a problem or not.
+>
+> ### assume modules/utils are built
+> ### modules/utils are installed or you are running out of the build directory
+> ### ssh to the MDS and OSS nodes works without a password
+> ### if you are not using @tcp0 for LNet, /etc/modprobe.d/lnet.conf is correct
+>
+> all# modprobe ptlrpc            ### on client and OSS and MDS to start LNet
+> x8602# lctl ping x86ohpc        ### should print NID(s) of x860hpc
+> x8602# lctl ping x8601          ### should print NID(s) of x8601
+> x8602# export NAME=master       ### get config from lustre/tests/cfg/master.sh
+> x8602# sh llmount.sh            ### should format x86ohpc:/dev/sda2 and x8601:/dev/sda2
+> x8602# lfs df                   ### should show master-MDT0000 and master-OST0000
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Principal Lustre Architect
+> Whamcloud
+>
+>
+>
+>
+>
+>
+>
+>
+> --
+> Baptiste Gerondeau
+> Engineer - HPC SIG - LDCG - Linaro
+> #irc : BaptisteGer
 
 Cheers, Andreas
 --
 Andreas Dilger
 Principal Lustre Architect
 Whamcloud
+
+
+
+
+
+
+
+
+--
+Baptiste Gerondeau
+Engineer - HPC SIG - LDCG - Linaro
+#irc : BaptisteGer
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190802/17bd8a13/attachment-0001.html>
