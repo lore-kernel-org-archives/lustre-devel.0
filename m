@@ -1,25 +1,18 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 14 Aug 2019 16:58:52 +0000
-Subject: [lustre-devel] [PATCH 3/8] lustre: fld: resend seq lookup RPC
- if it is on LWP
-In-Reply-To: <1564022647-17351-4-git-send-email-jsimmons@infradead.org>
+Date: Wed, 14 Aug 2019 16:58:54 +0000
+Subject: [lustre-devel] [PATCH 6/8] lustre: fld: fld client lookup
+ should retry
+In-Reply-To: <1564022647-17351-7-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
- <1564022647-17351-4-git-send-email-jsimmons@infradead.org>
-Message-ID: <422455A8-A692-438E-863E-AB71C345565D@whamcloud.com>
+ <1564022647-17351-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <11351613-84B0-4C87-91D8-88848D74DFBF@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This is functionality used only by the server (LWP connection and also
-MDS-MDS connection flag).  But as I wrote previously, it will be tough to
-track this patch to only apply it when the server code is landed. Instead,
-it would likely just be a hard-to-find bug that needs to be tracked down
-again and fixed again. 
-
-My preference would be to land this and other similar patches in shared
-code that is not easily separated into client- and server-only sections. 
+This is definitely client code. 
 
 Cheers, Andreas
 
@@ -27,75 +20,80 @@ Cheers, Andreas
 > 
 > From: wang di <di.wang@intel.com>
 > 
-> Because Light Weight connection might be evicted after
-> restart, then cause inflight RPC fails, to avoid this,
-> we need resend seq lookup RPC.
+> If FLD client lookup fails because of the remote target
+> is shutdown (or deactive), it should retry another target,
+> otherwise it will cause the application failure.
 > 
-> remove "-f" from "stop mdt" in sanity 17m, so umount can
-> keep the the connection, and otherwise the OSP might be
-> evicted.
+> And FLD client should stop retry if the import has
+> been deactive.
 > 
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-4571
-> Lustre-commit: cf7f66d87e52293535cde6e8cc7386e6c1bdfa46
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-6419
+> Lustre-commit: 3ededde903c92f8485cae0dc9f958f194ff0b140
 > Signed-off-by: wang di <di.wang@intel.com>
-> Reviewed-on: http://review.whamcloud.com/9106
-> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-> Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+> Reviewed-on: http://review.whamcloud.com/14313
+> Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 > ---
 > fs/lustre/fld/fld_request.c | 23 +++++++++++++++++++++--
 > 1 file changed, 21 insertions(+), 2 deletions(-)
 > 
 > diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-> index 248fffa..ec45ea6 100644
+> index 60e7105..dfd4ae9 100644
 > --- a/fs/lustre/fld/fld_request.c
 > +++ b/fs/lustre/fld/fld_request.c
-> @@ -314,6 +314,7 @@ int fld_client_rpc(struct obd_export *exp,
-> 
->    LASSERT(exp);
-> 
-> +again:
->    imp = class_exp2cliimp(exp);
->    switch (fld_op) {
->    case FLD_QUERY:
-> @@ -329,8 +330,15 @@ int fld_client_rpc(struct obd_export *exp,
->        op = req_capsule_client_get(&req->rq_pill, &RMF_FLD_OPC);
->        *op = FLD_LOOKUP;
-> 
-> -        if (imp->imp_connect_flags_orig & OBD_CONNECT_MDS_MDS)
-> +        /* For MDS_MDS seq lookup, it will always use LWP connection,
-> +         * but LWP will be evicted after restart, so cause the error.
-> +         * so we will set no_delay for seq lookup request, once the
-> +         * request fails because of the eviction. always retry here
-> +         */
-> +        if (imp->imp_connect_flags_orig & OBD_CONNECT_MDS_MDS) {
->            req->rq_allow_replay = 1;
-> +            req->rq_no_delay = 1;
-> +        }
->        break;
->    case FLD_READ:
->        req = ptlrpc_request_alloc_pack(imp, &RQF_FLD_READ,
-> @@ -358,8 +366,19 @@ int fld_client_rpc(struct obd_export *exp,
->    obd_get_request_slot(&exp->exp_obd->u.cli);
+> @@ -367,7 +367,7 @@ int fld_client_rpc(struct obd_export *exp,
 >    rc = ptlrpc_queue_wait(req);
 >    obd_put_request_slot(&exp->exp_obd->u.cli);
-> -    if (rc)
-> +    if (rc != 0) {
-> +        if (rc == -EWOULDBLOCK) {
-> +            /* For no_delay req(see above), EWOULDBLOCK means the
-> +             * connection is being evicted, but this seq lookup
-> +             * should not return error, since it would cause
-> +             * unecessary failure of the application, instead
-> +             * it should retry here
-> +             */
-> +            ptlrpc_req_finished(req);
-> +            goto again;
-> +        }
->        goto out_req;
-> +    }
+>    if (rc != 0) {
+> -        if (imp->imp_state != LUSTRE_IMP_CLOSED) {
+> +        if (imp->imp_state != LUSTRE_IMP_CLOSED && !imp->imp_deactive) {
+>            /* Since LWP is not replayable, so it will keep
+>             * trying unless umount happens, otherwise it would
+>             * cause unecessary failure of the application.
+> @@ -404,6 +404,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
+> {
+>    struct lu_seq_range res = { 0 };
+>    struct lu_fld_target *target;
+> +    struct lu_fld_target *origin;
+>    int rc;
 > 
->    if (fld_op == FLD_QUERY) {
->        prange = req_capsule_server_get(&req->rq_pill, &RMF_FLD_MDFLD);
+>    rc = fld_cache_lookup(fld->lcf_cache, seq, &res);
+> @@ -415,7 +416,8 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
+>    /* Can not find it in the cache */
+>    target = fld_client_get_target(fld, seq);
+>    LASSERT(target);
+> -
+> +    origin = target;
+> +again:
+>    CDEBUG(D_INFO,
+>           "%s: Lookup fld entry (seq: %#llx) on target %s (idx %llu)\n",
+>           fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
+> @@ -424,6 +426,23 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
+>    fld_range_set_type(&res, flags);
+>    rc = fld_client_rpc(target->ft_exp, &res, FLD_QUERY, NULL);
+> 
+> +    if (rc == -ESHUTDOWN) {
+> +        /* If fld lookup failed because the target has been shutdown,
+> +         * then try next target in the list, until trying all targets
+> +         * or fld lookup succeeds
+> +         */
+> +        spin_lock(&fld->lcf_lock);
+> +        if (target->ft_chain.next == fld->lcf_targets.prev)
+> +            target = list_entry(fld->lcf_targets.next,
+> +                        struct lu_fld_target, ft_chain);
+> +        else
+> +            target = list_entry(target->ft_chain.next,
+> +                         struct lu_fld_target,
+> +                         ft_chain);
+> +        spin_unlock(&fld->lcf_lock);
+> +        if (target != origin)
+> +            goto again;
+> +    }
+>    if (rc == 0) {
+>        *mds = res.lsr_index;
+> 
 > -- 
 > 1.8.3.1
 > 
