@@ -1,66 +1,78 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 14 Aug 2019 16:58:42 +0000
-Subject: [lustre-devel] [PATCH 4/8] lustre: fld: retry fld rpc even for
- ESHUTDOWN
-In-Reply-To: <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
+Date: Wed, 14 Aug 2019 16:58:45 +0000
+Subject: [lustre-devel] [PATCH 7/8] lustre: tests: testcases for
+ multiple modify RPCs feature
+In-Reply-To: <1564022647-17351-8-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
- <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
-Message-ID: <04591359-31D0-44BA-B9F0-732101057FFB@whamcloud.com>
+ <1564022647-17351-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1E7DFD89-80B0-4609-ADB3-AF102F264500@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-While FLD is used on both client and server, the LWP connections are only used on clients. However, I don't see any harm to keep this code consistent with the master branch. 
-
-Otherwise, you would have to remember to apply this patch at some point in the future when the server code is landed, which is more likely to leave the bug in place 
+This is needed on the client for the test cases to work. 
 
 Cheers, Andreas
 
 > On Jul 24, 2019, at 19:44, James Simmons <jsimmons@infradead.org> wrote:
 > 
-> From: wang di <di.wang@intel.com>
+> From: Gregoire Pichon <gregoire.pichon@bull.net>
 > 
-> when LWP is being evicted, because it is not replayable,
-> the request might return ESHUTDOWN or EWOULDBLOCK, instead
-> of failed, which might cause application failure, fld
-> client will retry RPC, until the connection is being setup
-> again or the LWP is being closed.
+> This patch creates new testcases in the Auster test suite to
+> test the support of multiple modify RPCs in flight feature.
 > 
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-4420
-> Lustre-commit: d335e310d4bf490509998ddbb1824e38cff20998
-> Signed-off-by: wang di <di.wang@intel.com>
-> Reviewed-on: http://review.whamcloud.com/10285
-> Reviewed-by: Fan Yong <fan.yong@intel.com>
-> Reviewed-by: Johann Lombardi <johann.lombardi@intel.com>
+> Two new OBD_FAIL codes are added to allow several failure occurences
+> of the reint requests or replies. This is needed because the current
+> fail checks impose the OBD_FAIL_ONCE flag.
+> 
+> Added testcases are :
+> - sanity         245
+> - conf-sanity    90a 90b 90c 90d
+> - replay-single  102a 102b 102c 102d
+> 
+> This patch also removes replay-single tests 53a and 53b
+> from the ALWAYS_EXCEPT list.
+> 
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-5319
+> Lustre-commit: c2d27a0f12688c0d029880919f8b002e557b540c
+> Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
+> Reviewed-on: http://review.whamcloud.com/14861
+> Reviewed-by: Jian Yu <yujian@whamcloud.com>
+> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 > ---
-> fs/lustre/fld/fld_request.c | 12 ++++++------
-> 1 file changed, 6 insertions(+), 6 deletions(-)
+> fs/lustre/include/obd_support.h | 2 ++
+> fs/lustre/ldlm/ldlm_lib.c       | 3 +++
+> 2 files changed, 5 insertions(+)
 > 
-> diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-> index ec45ea6..ba0ef82 100644
-> --- a/fs/lustre/fld/fld_request.c
-> +++ b/fs/lustre/fld/fld_request.c
-> @@ -367,12 +367,12 @@ int fld_client_rpc(struct obd_export *exp,
->    rc = ptlrpc_queue_wait(req);
->    obd_put_request_slot(&exp->exp_obd->u.cli);
->    if (rc != 0) {
-> -        if (rc == -EWOULDBLOCK) {
-> -            /* For no_delay req(see above), EWOULDBLOCK means the
-> -             * connection is being evicted, but this seq lookup
-> -             * should not return error, since it would cause
-> -             * unecessary failure of the application, instead
-> -             * it should retry here
-> +        if (rc == -EWOULDBLOCK || rc == -ESHUTDOWN) {
-> +            /* For no_delay req(see above), EWOULDBLOCK and
-> +             * ESHUTDOWN means the connection is being evicted,
-> +             * but this seq lookup should not return error,
-> +             * since it would cause unecessary failure of the
-> +             * application, instead it should retry here
->             */
->            ptlrpc_req_finished(req);
->            goto again;
+> diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+> index 3e15cac..7999ac6 100644
+> --- a/fs/lustre/include/obd_support.h
+> +++ b/fs/lustre/include/obd_support.h
+> @@ -189,6 +189,8 @@
+> #define OBD_FAIL_MDS_SWAP_LAYOUTS_NET            0x14f
+> #define OBD_FAIL_MDS_HSM_ACTION_NET            0x150
+> #define OBD_FAIL_MDS_CHANGELOG_INIT            0x151
+> +#define OBD_FAIL_MDS_REINT_MULTI_NET            0x159
+> +#define OBD_FAIL_MDS_REINT_MULTI_NET_REP        0x15a
+> 
+> /* layout lock */
+> #define OBD_FAIL_MDS_NO_LL_GETATTR            0x170
+> diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+> index 887507d..a3b8df4 100644
+> --- a/fs/lustre/ldlm/ldlm_lib.c
+> +++ b/fs/lustre/ldlm/ldlm_lib.c
+> @@ -689,6 +689,9 @@ int target_pack_pool_reply(struct ptlrpc_request *req)
+>        DEBUG_REQ(D_ERROR, req, "dropping reply");
+>        return -ECOMM;
+>    }
+> +    if (unlikely(lustre_msg_get_opc(req->rq_reqmsg) == MDS_REINT &&
+> +             OBD_FAIL_CHECK(OBD_FAIL_MDS_REINT_MULTI_NET_REP)))
+> +        return -ECOMM;
+> 
+>    if (unlikely(rc)) {
+>        DEBUG_REQ(D_NET, req, "processing error (%d)", rc);
 > -- 
 > 1.8.3.1
 > 
