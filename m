@@ -1,18 +1,20 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 14 Aug 2019 16:58:40 +0000
+Date: Wed, 14 Aug 2019 16:58:42 +0000
 Subject: [lustre-devel] [PATCH 4/8] lustre: fld: retry fld rpc even for
  ESHUTDOWN
 In-Reply-To: <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
  <1564022647-17351-5-git-send-email-jsimmons@infradead.org>
-Message-ID: <E5593A74-10DB-4DAC-85B8-07678BCBB907@whamcloud.com>
+Message-ID: <04591359-31D0-44BA-B9F0-732101057FFB@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This is mostly useful only on the servers, but clients also allocate "sequences" of 1, so it doesn't hurt to apply it to clients as well. 
+While FLD is used on both client and server, the LWP connections are only used on clients. However, I don't see any harm to keep this code consistent with the master branch. 
+
+Otherwise, you would have to remember to apply this patch at some point in the future when the server code is landed, which is more likely to leave the bug in place 
 
 Cheers, Andreas
 
