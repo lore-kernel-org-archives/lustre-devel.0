@@ -1,78 +1,92 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 14 Aug 2019 16:58:45 +0000
-Subject: [lustre-devel] [PATCH 7/8] lustre: tests: testcases for
- multiple modify RPCs feature
-In-Reply-To: <1564022647-17351-8-git-send-email-jsimmons@infradead.org>
+Date: Wed, 14 Aug 2019 16:58:49 +0000
+Subject: [lustre-devel] [PATCH 2/8] lustre: ptlrpc: Fix an rq_no_reply
+ assertion failure
+In-Reply-To: <1564022647-17351-3-git-send-email-jsimmons@infradead.org>
 References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
- <1564022647-17351-8-git-send-email-jsimmons@infradead.org>
-Message-ID: <1E7DFD89-80B0-4609-ADB3-AF102F264500@whamcloud.com>
+ <1564022647-17351-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1F5F7B07-3D83-4CF2-B798-88F454EB69B8@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This is needed on the client for the test cases to work. 
+This is definitely server code.
 
 Cheers, Andreas
 
 > On Jul 24, 2019, at 19:44, James Simmons <jsimmons@infradead.org> wrote:
 > 
-> From: Gregoire Pichon <gregoire.pichon@bull.net>
+> From: Li Wei <wei.g.li@intel.com>
 > 
-> This patch creates new testcases in the Auster test suite to
-> test the support of multiple modify RPCs in flight feature.
+> An OSS had an assertion failure:
 > 
-> Two new OBD_FAIL codes are added to allow several failure occurences
-> of the reint requests or replies. This is needed because the current
-> fail checks impose the OBD_FAIL_ONCE flag.
+>  LustreError: 5366:0:(ldlm_lib.c:2689:target_bulk_io()) @@@ timeout
+>  on bulk GET after 0+0s  req at ffff88083a61b400
+>  x1476486691018500/t0(4300509964)
+>  o4->8dda3382-83f8-6445-5eea-828fd59e4a06 at 192.168.1.116@o2ib1:0/0
+>  lens 504/448 e 391470 to 0 dl 1408494729 ref 2 fl Complete:/4/0 rc
+>  0/0
+>  LustreError: 5432:0:(niobuf.c:550:ptlrpc_send_reply()) ASSERTION(
+>  req->rq_no_reply == 0 ) failed:
+>  Lustre: soaked-OST0000: Bulk IO write error with
+>  8dda3382-83f8-6445-5eea-828fd59e4a06 (at 192.168.1.116 at o2ib1),
+>  client will retry: rc -110
+>  LustreError: 5432:0:(niobuf.c:550:ptlrpc_send_reply()) LBUG
+>  Pid: 5432, comm: ll_ost_io03_003
 > 
-> Added testcases are :
-> - sanity         245
-> - conf-sanity    90a 90b 90c 90d
-> - replay-single  102a 102b 102c 102d
+>  Call Trace:
+>  [<ffffffffa0641895>] libcfs_debug_dumpstack+0x55/0x80 [libcfs]
+>  [<ffffffffa0641e97>] lbug_with_loc+0x47/0xb0 [libcfs]
+>  [<ffffffffa09cda4c>] ptlrpc_send_reply+0x4ec/0x7f0 [ptlrpc]
+>  [<ffffffffa09d4aae>] ? lustre_pack_reply_flags+0xae/0x1f0 [ptlrpc]
+>  [<ffffffffa09e4d75>] ptlrpc_at_check_timed+0xcd5/0x1370 [ptlrpc]
+>  [<ffffffffa09dc1e9>] ? ptlrpc_wait_event+0xa9/0x2d0 [ptlrpc]
+>  [<ffffffffa09e66f8>] ptlrpc_main+0x12e8/0x1990 [ptlrpc]
+>  [<ffffffff81069290>] ? pick_next_task_fair+0xd0/0x130
+>  [<ffffffff81529246>] ? schedule+0x176/0x3b0
+>  [<ffffffffa09e5410>] ? ptlrpc_main+0x0/0x1990 [ptlrpc]
+>  [<ffffffff8109abf6>] kthread+0x96/0xa0
+>  [<ffffffff8100c20a>] child_rip+0xa/0x20
+>  [<ffffffff8109ab60>] ? kthread+0x0/0xa0
+>  [<ffffffff8100c200>] ? child_rip+0x0/0x20
 > 
-> This patch also removes replay-single tests 53a and 53b
-> from the ALWAYS_EXCEPT list.
+> The thread in tgt_brw_write() had decided not to reply by setting
+> rq_no_reply, right before another thread tried to send an early reply
+> for the request.
 > 
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-5319
-> Lustre-commit: c2d27a0f12688c0d029880919f8b002e557b540c
-> Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
-> Reviewed-on: http://review.whamcloud.com/14861
-> Reviewed-by: Jian Yu <yujian@whamcloud.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-5537
+> Lustre-commit: a8d448e4cd5978c546911f98067232bcdd30b651
+> Signed-off-by: Li Wei <wei.g.li@intel.com>
+> Reviewed-on: http://review.whamcloud.com/11740
 > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> Reviewed-by: Johann Lombardi <johann.lombardi@intel.com>
 > ---
-> fs/lustre/include/obd_support.h | 2 ++
-> fs/lustre/ldlm/ldlm_lib.c       | 3 +++
-> 2 files changed, 5 insertions(+)
+> fs/lustre/ptlrpc/service.c | 10 ++++++++++
+> 1 file changed, 10 insertions(+)
 > 
-> diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-> index 3e15cac..7999ac6 100644
-> --- a/fs/lustre/include/obd_support.h
-> +++ b/fs/lustre/include/obd_support.h
-> @@ -189,6 +189,8 @@
-> #define OBD_FAIL_MDS_SWAP_LAYOUTS_NET            0x14f
-> #define OBD_FAIL_MDS_HSM_ACTION_NET            0x150
-> #define OBD_FAIL_MDS_CHANGELOG_INIT            0x151
-> +#define OBD_FAIL_MDS_REINT_MULTI_NET            0x159
-> +#define OBD_FAIL_MDS_REINT_MULTI_NET_REP        0x15a
+> diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+> index a40e964..c9ab9c3 100644
+> --- a/fs/lustre/ptlrpc/service.c
+> +++ b/fs/lustre/ptlrpc/service.c
+> @@ -1098,6 +1098,16 @@ static int ptlrpc_at_send_early_reply(struct ptlrpc_request *req)
+>    reqcopy->rq_reqmsg = reqmsg;
+>    memcpy(reqmsg, req->rq_reqmsg, req->rq_reqlen);
 > 
-> /* layout lock */
-> #define OBD_FAIL_MDS_NO_LL_GETATTR            0x170
-> diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-> index 887507d..a3b8df4 100644
-> --- a/fs/lustre/ldlm/ldlm_lib.c
-> +++ b/fs/lustre/ldlm/ldlm_lib.c
-> @@ -689,6 +689,9 @@ int target_pack_pool_reply(struct ptlrpc_request *req)
->        DEBUG_REQ(D_ERROR, req, "dropping reply");
->        return -ECOMM;
->    }
-> +    if (unlikely(lustre_msg_get_opc(req->rq_reqmsg) == MDS_REINT &&
-> +             OBD_FAIL_CHECK(OBD_FAIL_MDS_REINT_MULTI_NET_REP)))
-> +        return -ECOMM;
-> 
->    if (unlikely(rc)) {
->        DEBUG_REQ(D_NET, req, "processing error (%d)", rc);
+> +    /*
+> +     * tgt_brw_read() and tgt_brw_write() may have decided not to reply.
+> +     * Without this check, we would fail the rq_no_reply assertion in
+> +     * ptlrpc_send_reply().
+> +     */
+> +    if (reqcopy->rq_no_reply) {
+> +        rc = -ETIMEDOUT;
+> +        goto out;
+> +    }
+> +
+>    LASSERT(atomic_read(&req->rq_refcount));
+>    /** if it is last refcount then early reply isn't needed */
+>    if (atomic_read(&req->rq_refcount) == 1) {
 > -- 
 > 1.8.3.1
 > 
