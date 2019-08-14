@@ -1,31 +1,61 @@
-From: Artem Blagodarenko <c17828@cray.com>
-Date: Mon, 5 Aug 2019 07:31:14 +0000
-Subject: [lustre-devel] [PATCH 08/22] ext4: kill off struct dx_root
-In-Reply-To: <87ftmypt62.fsf@notabene.neil.brown.name>
-References: <1563758631-29550-1-git-send-email-jsimmons@infradead.org>
- <1563758631-29550-9-git-send-email-jsimmons@infradead.org>
- <87ftmypt62.fsf@notabene.neil.brown.name>
-Message-ID: <7EE075AC-4F75-4A5F-A13B-88D1E15E714C@cray.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Wed, 14 Aug 2019 16:58:32 +0000
+Subject: [lustre-devel] [PATCH 5/8] lustre: fld: retry fld rpc until the
+ import is closed
+In-Reply-To: <1564022647-17351-6-git-send-email-jsimmons@infradead.org>
+References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
+ <1564022647-17351-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <321A4238-00F5-43C3-8FD6-D3F7D17146C4@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We need this for dirdata feature.
+You may as well merge this with the previous patch. 
 
-?On 22/07/2019, 07:52, "NeilBrown" <neilb@suse.com> wrote:
+Cheers, Andreas
 
-    On Sun, Jul 21 2019, James Simmons wrote:
-    
-    > Use struct dx_root_info directly.
-    
-    This looks like a style change.
-    Instead of a 'struct' that models the start of an on-disk directory
-    block, the location of some fields is done using calculations instead.
-    
-    Why would we want to do that?  Might we want dx_root_info to be at a
-    different offset in the directory ??
-    
-    NeilBrown
-    
+> On Jul 24, 2019, at 19:44, James Simmons <jsimmons@infradead.org> wrote:
+> 
+> From: Wang Di <di.wang@intel.com>
+> 
+> Since LWP is not replayable, it should retry RPC until
+> the import is closed, otherwise it would cause unnecessary
+> failure of the application.
+> 
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-5312
+> Lustre-commit: 07d481957c16832c782bb7d0c1fc436bcb148ea6
+> Signed-off-by: Wang Di <di.wang@intel.com>
+> Reviewed-on: http://review.whamcloud.com/11039
+> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> ---
+> fs/lustre/fld/fld_request.c | 10 ++++------
+> 1 file changed, 4 insertions(+), 6 deletions(-)
+> 
+> diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
+> index ba0ef82..60e7105 100644
+> --- a/fs/lustre/fld/fld_request.c
+> +++ b/fs/lustre/fld/fld_request.c
+> @@ -367,12 +367,10 @@ int fld_client_rpc(struct obd_export *exp,
+>    rc = ptlrpc_queue_wait(req);
+>    obd_put_request_slot(&exp->exp_obd->u.cli);
+>    if (rc != 0) {
+> -        if (rc == -EWOULDBLOCK || rc == -ESHUTDOWN) {
+> -            /* For no_delay req(see above), EWOULDBLOCK and
+> -             * ESHUTDOWN means the connection is being evicted,
+> -             * but this seq lookup should not return error,
+> -             * since it would cause unecessary failure of the
+> -             * application, instead it should retry here
+> +        if (imp->imp_state != LUSTRE_IMP_CLOSED) {
+> +            /* Since LWP is not replayable, so it will keep
+> +             * trying unless umount happens, otherwise it would
+> +             * cause unecessary failure of the application.
+>             */
+>            ptlrpc_req_finished(req);
+>            goto again;
+> -- 
+> 1.8.3.1
+> 
