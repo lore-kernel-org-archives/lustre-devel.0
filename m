@@ -1,99 +1,254 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Wed, 14 Aug 2019 16:58:54 +0000
-Subject: [lustre-devel] [PATCH 6/8] lustre: fld: fld client lookup
- should retry
-In-Reply-To: <1564022647-17351-7-git-send-email-jsimmons@infradead.org>
-References: <1564022647-17351-1-git-send-email-jsimmons@infradead.org>
- <1564022647-17351-7-git-send-email-jsimmons@infradead.org>
-Message-ID: <11351613-84B0-4C87-91D8-88848D74DFBF@whamcloud.com>
+From: Baptiste Gerondeau <baptiste.gerondeau@linaro.org>
+Date: Thu, 22 Aug 2019 10:36:11 +0200
+Subject: [lustre-devel] Auster and no facet /usr/sbin/lctl
+In-Reply-To: <8C3DBC03-6061-4D8C-B220-8E4B3E5145A7@whamcloud.com>
+References: <CAPiwApyrJcArje3zYGFdHNff26JUdP7JLu7iK20ymNg4DaU1qQ@mail.gmail.com>
+ <7AE1C6EF-B45C-4256-A28A-9A5E73C2BBCC@whamcloud.com>
+ <CAPiwApzC41YqCCsWzgEHP_OJCtRJ0e8L6LUooY3rtu3vr_=1=g@mail.gmail.com>
+ <257DDBDC-58B6-4D0E-904F-B141A4761C4C@whamcloud.com>
+ <CAPiwApzoSRzYv0QmJYo-rQDjXrLFrttVGa23Kxh=6rAfNzz+9w@mail.gmail.com>
+ <8C3DBC03-6061-4D8C-B220-8E4B3E5145A7@whamcloud.com>
+Message-ID: <CAPiwApz__RzLpUZ5m+4jJKTLt=i9KSqTO5dsQrTowwdUswZR5w@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This is definitely client code. 
+Hi Andreas,
 
-Cheers, Andreas
+Thanks again for the help, "SINGLEMDS=mds1" does the trick !
+We have hit some issues with tainted kernel modules and hanging now
+(working on RHEL8 on ARM64),
+but we need to update to latest kernel update, and install latest Lustre
+master and we'll see !
 
-> On Jul 24, 2019, at 19:44, James Simmons <jsimmons@infradead.org> wrote:
-> 
-> From: wang di <di.wang@intel.com>
-> 
-> If FLD client lookup fails because of the remote target
-> is shutdown (or deactive), it should retry another target,
-> otherwise it will cause the application failure.
-> 
-> And FLD client should stop retry if the import has
-> been deactive.
-> 
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-6419
-> Lustre-commit: 3ededde903c92f8485cae0dc9f958f194ff0b140
-> Signed-off-by: wang di <di.wang@intel.com>
-> Reviewed-on: http://review.whamcloud.com/14313
-> Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-> Reviewed-by: Fan Yong <fan.yong@intel.com>
-> Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> ---
-> fs/lustre/fld/fld_request.c | 23 +++++++++++++++++++++--
-> 1 file changed, 21 insertions(+), 2 deletions(-)
-> 
-> diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-> index 60e7105..dfd4ae9 100644
-> --- a/fs/lustre/fld/fld_request.c
-> +++ b/fs/lustre/fld/fld_request.c
-> @@ -367,7 +367,7 @@ int fld_client_rpc(struct obd_export *exp,
->    rc = ptlrpc_queue_wait(req);
->    obd_put_request_slot(&exp->exp_obd->u.cli);
->    if (rc != 0) {
-> -        if (imp->imp_state != LUSTRE_IMP_CLOSED) {
-> +        if (imp->imp_state != LUSTRE_IMP_CLOSED && !imp->imp_deactive) {
->            /* Since LWP is not replayable, so it will keep
->             * trying unless umount happens, otherwise it would
->             * cause unecessary failure of the application.
-> @@ -404,6 +404,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
-> {
->    struct lu_seq_range res = { 0 };
->    struct lu_fld_target *target;
-> +    struct lu_fld_target *origin;
->    int rc;
-> 
->    rc = fld_cache_lookup(fld->lcf_cache, seq, &res);
-> @@ -415,7 +416,8 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
->    /* Can not find it in the cache */
->    target = fld_client_get_target(fld, seq);
->    LASSERT(target);
-> -
-> +    origin = target;
-> +again:
->    CDEBUG(D_INFO,
->           "%s: Lookup fld entry (seq: %#llx) on target %s (idx %llu)\n",
->           fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
-> @@ -424,6 +426,23 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
->    fld_range_set_type(&res, flags);
->    rc = fld_client_rpc(target->ft_exp, &res, FLD_QUERY, NULL);
-> 
-> +    if (rc == -ESHUTDOWN) {
-> +        /* If fld lookup failed because the target has been shutdown,
-> +         * then try next target in the list, until trying all targets
-> +         * or fld lookup succeeds
-> +         */
-> +        spin_lock(&fld->lcf_lock);
-> +        if (target->ft_chain.next == fld->lcf_targets.prev)
-> +            target = list_entry(fld->lcf_targets.next,
-> +                        struct lu_fld_target, ft_chain);
-> +        else
-> +            target = list_entry(target->ft_chain.next,
-> +                         struct lu_fld_target,
-> +                         ft_chain);
-> +        spin_unlock(&fld->lcf_lock);
-> +        if (target != origin)
-> +            goto again;
-> +    }
->    if (rc == 0) {
->        *mds = res.lsr_index;
-> 
-> -- 
-> 1.8.3.1
-> 
+Sorry for the late reply, was off/away from Lustre !
+
+Cheers,
+
+
+On Fri, 2 Aug 2019 at 13:04, Andreas Dilger <adilger@whamcloud.com> wrote:
+
+> I thought I replied to this email, but maybe it was lost.
+>
+> It looks like you have "$SINGLEMDS" unset in your test config. It should
+> just be "mds1".  That is causing the error:
+>
+>     MDS: No host defined for facet /usr/sbin/lctl
+>
+> I don't know if that is causing your other problem or something else,
+> but may as well fix it and see.
+>
+> You could also run with "sh -vx" to get all the gory details from bash
+> to see what is being executed.
+>
+> Cheers, Andreas
+>
+> On Jul 23, 2019, at 02:33, Baptiste Gerondeau <
+> baptiste.gerondeau at linaro.org> wrote:
+>
+> After testing it out on an ARM64 client (hostname : lustrerhel, running
+> RHEL8, compiled from master), it seems it has the same problem.
+>
+> I can *successfully* llmount.sh and llmountcleanup.sh and write and read
+> files from the client.
+> That said, sanity.sh is *not* working for me : it never gets to the tests
+> part, it just stops at 'cat /proc/mounts on OSS'.
+> dmesg says nothing more, and I can't seem to get a more info (an error)
+> from the logs.
+> I have confirmed that I can 'cat /proc/mounts' just fine on all the
+> machines.
+>
+> Client: Lustre version: 2.12.0
+> MDS: No host defined for facet /usr/sbin/lctl
+> OSS: Lustre version: 2.12.0
+> CMD: lustrerhel,x8602
+> PATH=/usr/lib64/lustre/tests:/usr/lib/lustre/tests:/usr/lib64/lustre/tests:/usr/lib64/lustre/tests/mpi:/usr/lib64/lustre/tests/racer:/usr/lib64/lustre/../lustre-iokit/sgpdd-survey:/usr/lib64/lustre/tests:/usr/lib64/lustre/utils/gss:/usr/lib64/lustre/utils:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/sbin::/sbin:/bin:/usr/sbin:
+> NAME=local bash rpc.sh check_config_client /lustre
+> x8602: x8602: executing check_config_client /lustre
+> lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version
+> 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+> lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version
+> 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+> lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version
+> 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+> lustrerhel: CMD: lustrerhel /usr/sbin/lctl get_param -n version
+> 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl lustre_build_version 2>/dev/null ||
+> lustrerhel: /usr/sbin/lctl --version 2>/dev/null | cut -d' ' -f2
+> x8602: Checking config lustre mounted on /lustre
+> lustrerhel: lustrerhel: executing check_config_client /lustre
+> lustrerhel: Checking config lustre mounted on /lustre
+> Checking servers environments
+> [...]
+> CMD: x86ohpc e2label /dev/sda2 2>/dev/null
+> x86ohpc: Warning: Permanently added 'x86ohpc,10.40.24.210' (ECDSA) to the
+> list of known hosts.
+> CMD: x86ohpc cat /proc/mounts
+> x86ohpc: Warning: Permanently added 'x86ohpc,10.40.24.210' (ECDSA) to the
+> list of known hosts.
+> CMD: x8601 e2label /dev/sda2 2>/dev/null
+> CMD: x8601 cat /proc/mounts
+>
+> Thanks a lot for your support,
+> Best regards,
+>
+> On Thu, 18 Jul 2019 at 20:56, Andreas Dilger <adilger@whamcloud.com>
+> wrote:
+>
+>> On Jul 18, 2019, at 04:29, Baptiste Gerondeau <
+>> baptiste.gerondeau at linaro.org> wrote:
+>> >
+>> > Thank you very much for your quick help !
+>> > I reformatted and remounted everything from scratch and can confirm
+>> that mounting works, and that the client can communicate with the MDS (210,
+>> OSS is 211 and client 212):
+>> [snip]
+>> > [root at x8602 tests]# lctl which_nid 10.40.24.210 at tcp
+>> > 10.40.24.210 at tcp
+>> > [root at x8602 tests]# lfs df -ih
+>> > UUID                      Inodes       IUsed       IFree IUse% Mounted
+>> on
+>> > test-MDT0000_UUID           4.0M         272        4.0M   1%
+>> /lustre[MDT:0]
+>> > test-OST0000_UUID         640.0K         267      639.7K   0%
+>> /lustre[OST:0]
+>> >
+>> > filesystem_summary:       640.0K         272      639.7K   0% /lustre
+>> >
+>> > [root at x8602 tests]#  ls -lsah /lustre/
+>> > total 12K
+>> > 4.0K drwxr-xr-x   3 root root 4.0K Jul 18 11:03 .
+>> > 4.0K dr-xr-xr-x. 19 root root 4.0K Jun 28 11:43 ..
+>> > 4.0K -rw-r--r--   1 root root   14 Jul 18 11:03 test.txt
+>> >
+>> > I get the same output from auster though:
+>> > Client: Lustre version: 2.12.0
+>> > MDS: No host defined for facet /usr/sbin/lctl
+>>
+>> This looks like some kind of problem with the test configuration file,
+>> where an environment variable is not set (e.g. mds_HOST) and it is
+>> interpreting the next argument (the lctl command) as the target facet when
+>> calling do_facet() or similar?
+>>
+>> If "llmount.sh" works, then you are also able to run tests directly like:
+>>
+>> client# cd lustre/tests
+>> client# sh sanity.sh
+>>
+>> I don't use auster myself (it is just a wrapper around lower-level
+>> scripts), so I can't really comment where the problem might be.
+>>
+>> Cheers, Andreas
+>>
+>> > OSS: Lustre version: 2.12.0
+>> >
+>> > From the client I can ssh into the other nodes (and from each node I
+>> can ssh into the others).
+>> > I had tried to debug the scripts behind the above auster output but was
+>> unable to track down where it failed...
+>> >
+>> > On Tue, 16 Jul 2019 at 23:09, Andreas Dilger <adilger@whamcloud.com>
+>> wrote:
+>> > On Jul 16, 2019, at 06:11, Baptiste Gerondeau <
+>> baptiste.gerondeau at linaro.org> wrote:
+>> > >
+>> > > Hi,
+>> > >
+>> > > I'm currently in the process of bringing up the "3 node" x86 cluster
+>> and running "verbose=true ./auster -f multinode -rsv runtests" (on CentOS
+>> 7.6 x86 client & server, installed from repos), I keep getting "MDS: No
+>> host defined for facet /usr/sbin/lctl".
+>> > >
+>> > > Auster then prints out some pdsh stuff, "Failures : 0" and exits
+>> after 16s obviously without running any tests.
+>> > >
+>> > > Any suggestions?
+>> > > Thanks a lot,
+>> > >
+>> > >
+>> > > PS : My multinode config is attached
+>> > > PPS: I posted to the devel list because it concerned auster, if I
+>> need to post it elsewhere please let me know
+>> >
+>> > Before running auster, which tries to launch a lot of tests, start with
+>> just a plain mount to see if that is working:
+>> >
+>> > master.sh:
+>> > > MOUNT=/mnt/lustre
+>> > > MOUNT2=/mnt/master2
+>> >
+>> > This is a bit odd for tests, which normally have e.g. /mnt/master and
+>> /mnt/master2, but I'm
+>> > not sure i there will be a problem or not.
+>> >
+>> > ### assume modules/utils are built
+>> > ### modules/utils are installed or you are running out of the build
+>> directory
+>> > ### ssh to the MDS and OSS nodes works without a password
+>> > ### if you are not using @tcp0 for LNet, /etc/modprobe.d/lnet.conf is
+>> correct
+>> >
+>> > all# modprobe ptlrpc            ### on client and OSS and MDS to start
+>> LNet
+>> > x8602# lctl ping x86ohpc        ### should print NID(s) of x860hpc
+>> > x8602# lctl ping x8601          ### should print NID(s) of x8601
+>> > x8602# export NAME=master       ### get config from
+>> lustre/tests/cfg/master.sh
+>> > x8602# sh llmount.sh            ### should format x86ohpc:/dev/sda2 and
+>> x8601:/dev/sda2
+>> > x8602# lfs df                   ### should show master-MDT0000 and
+>> master-OST0000
+>> >
+>> > Cheers, Andreas
+>> > --
+>> > Andreas Dilger
+>> > Principal Lustre Architect
+>> > Whamcloud
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> > --
+>> > Baptiste Gerondeau
+>> > Engineer - HPC SIG - LDCG - Linaro
+>> > #irc : BaptisteGer
+>>
+>> Cheers, Andreas
+>> --
+>> Andreas Dilger
+>> Principal Lustre Architect
+>> Whamcloud
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>
+> --
+> Baptiste Gerondeau
+> Engineer - HPC SIG - LDCG - Linaro
+> #irc : BaptisteGer
+>
+>
+
+-- 
+Baptiste Gerondeau
+Engineer - HPC SIG - LDCG - Linaro
+#irc : BaptisteGer
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190822/16b9186e/attachment.html>
