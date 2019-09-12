@@ -1,16 +1,19 @@
-From: Degremont, Aurelien <degremoa@amazon.com>
-Date: Thu, 12 Sep 2019 10:20:16 +0000
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Thu, 12 Sep 2019 10:38:22 +0000
 Subject: [lustre-devel] [lustre-discuss] Do not recreate OST objects on
  OST replacement
-In-Reply-To: <7B07B797-354B-4F09-AE5F-7DA1BA274C0D@whamcloud.com>
+In-Reply-To: <A5388C56-3806-4FBA-AE78-2AACFB5F056A@amazon.com>
 References: <765FE877-E7A8-476C-823C-2A01EC6F1787@amazon.com>
  <7B07B797-354B-4F09-AE5F-7DA1BA274C0D@whamcloud.com>
-Message-ID: <A5388C56-3806-4FBA-AE78-2AACFB5F056A@amazon.com>
+ <A5388C56-3806-4FBA-AE78-2AACFB5F056A@amazon.com>
+Message-ID: <B6BEE58E-083A-4278-941B-D58DE9DB65EC@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+On Sep 12, 2019, at 04:20, Degremont, Aurelien <degremoa at amazon.com<mailto:degremoa@amazon.com>> wrote:
 
 (Relocation this to lustre-devel)
 
@@ -20,26 +23,31 @@ If you replace this OST and some files are still referring it, you will have 2 d
   *   If the object was not recreated, you will get some error accessing it (likely ENOENT)
   *   If the object was recreated, the file will be accessible without error BUT:
 
+
 If the object is recreated and the stripe count is 1, file is empty, size is 0.
 If stripe count was greater than 1, you will have different behavior with file size between 0 and the original size and file content with holes.
 But, from the user point of view the file will look OK, without any error, even if the data were severely impacted.
 That's why I'm not fond of this behavior were files with missing data looks nice from a user point of view.
 
-If admins want to recreate the file objects because it is better for them, lfsck with create object option will take care of that. No need for the OST to do it automatically.
-If admins prefer to not recreate those file objects, that's not possible now.
+The reason that only recent objects are recreated is to handle files that were just created.
+
+If admins want to recreate the file objects because it is better for them, lfsck with create object option will take care of that. No need for the OST to do it automatically.  If admins prefer to not recreate those file objects, that's not possible now.
 
 Looking at the code, the OST is recreating the last batch of object creation when starting after being replaced.
 What do you think of not doing that in this case if the current object ID is 0.
+
+For files that were recently created, instead of creating all of the possible objects in that range, it would also be possible to have the OST create new objects for the case they are missing and the client tries to write to them.  If no clients try to write to those objects then they will not be recreated.
+
 Looking for OBD_FL_DELORPHAN flag and ofd_seq_last_oid() == 0 ?
 Do you see side effects?
 
 
 Aur?lien
 
-De : Andreas Dilger <adilger@whamcloud.com>
+De : Andreas Dilger <adilger at whamcloud.com<mailto:adilger@whamcloud.com>>
 Date : jeudi 12 septembre 2019 ? 11:45
-? : "Degremont, Aurelien" <degremoa@amazon.com>
-Cc : "lustre-discuss at lists.lustre.org" <lustre-discuss@lists.lustre.org>
+? : "Degremont, Aurelien" <degremoa at amazon.com<mailto:degremoa@amazon.com>>
+Cc : "lustre-discuss at lists.lustre.org<mailto:lustre-discuss@lists.lustre.org>" <lustre-discuss at lists.lustre.org<mailto:lustre-discuss@lists.lustre.org>>
 Objet : Re: [lustre-discuss] Do not recreate OST objects on OST replacement
 
 
@@ -64,10 +72,17 @@ Andreas Dilger
 Principal Lustre Architect
 Whamcloud
 
+Cheers, Andreas
+--
+Andreas Dilger
+Principal Lustre Architect
+Whamcloud
+
+
 
 
 
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190912/9c12f7a1/attachment.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20190912/6e807027/attachment-0001.html>
