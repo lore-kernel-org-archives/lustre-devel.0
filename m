@@ -1,54 +1,67 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:54:56 -0400
-Subject: [lustre-devel] [PATCH 037/151] lnet: Handle ping buffer with only
- loopback NID
+Date: Mon, 30 Sep 2019 14:54:20 -0400
+Subject: [lustre-devel] [PATCH 001/151] lnet: fix needed headers for lnet
+ headers
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-38-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Olaf Weber <olaf.weber@hpe.com>
+The linux kernel now has a sanity check for the global headers,
+activated by  CONFIG_HEADER_TEST=y and CONFIG_KERNEL_HEADER_TEST=y.
+Some LNet headers are missing a few headers to allow them to build
+properly.
 
-During startup lnet_peer_data_resent() can see a ping buffer
-for the local node which contains only the loopback NID. This
-shows up as pi_nnis == 1, and there is nothing to be done (or
-that needs to be done) in that case.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9933
-Lustre-commit: 002e25b92779 ("LU-9933 lnet: Handle ping buffer with only loopback NID")
-Signed-off-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-on: https://review.whamcloud.com/28811
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- net/lnet/lnet/peer.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ include/linux/libcfs/libcfs_fail.h    | 1 +
+ include/linux/libcfs/libcfs_private.h | 3 +++
+ include/uapi/linux/lnet/lnetst.h      | 2 ++
+ 3 files changed, 6 insertions(+)
 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index d7a2e3b..9fdb6a9 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -2589,10 +2589,12 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
- 	 *
- 	 * The peer for the loopback interface is a special case: this
- 	 * is the peer for the local node, and we want to set its
--	 * primary NID to the correct value here.
-+	 * primary NID to the correct value here. Moreover, this peer
-+	 * can show up with only the loopback NID in the ping buffer.
- 	 */
--	if (pbuf->pb_info.pi_nnis > 1)
--		nid = pbuf->pb_info.pi_ni[1].ns_nid;
-+	if (pbuf->pb_info.pi_nnis <= 1)
-+		goto out;
-+	nid = pbuf->pb_info.pi_ni[1].ns_nid;
- 	if (LNET_NETTYP(LNET_NIDNET(lp->lp_primary_nid)) == LOLND) {
- 		rc = lnet_peer_set_primary_nid(lp, nid, flags);
- 		if (!rc)
+diff --git a/include/linux/libcfs/libcfs_fail.h b/include/linux/libcfs/libcfs_fail.h
+index 0e73eef..f52a82a 100644
+--- a/include/linux/libcfs/libcfs_fail.h
++++ b/include/linux/libcfs/libcfs_fail.h
+@@ -35,6 +35,7 @@
+ 
+ #include <linux/sched.h>
+ #include <linux/wait.h>
++#include <linux/libcfs/libcfs_debug.h>
+ 
+ extern unsigned long cfs_fail_loc;
+ extern unsigned int cfs_fail_val;
+diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
+index 515fd63..2e8cff6 100644
+--- a/include/linux/libcfs/libcfs_private.h
++++ b/include/linux/libcfs/libcfs_private.h
+@@ -39,6 +39,9 @@
+ #ifndef __LIBCFS_PRIVATE_H__
+ #define __LIBCFS_PRIVATE_H__
+ 
++#include <linux/sched.h>
++#include <linux/libcfs/libcfs_debug.h>
++
+ #ifndef DEBUG_SUBSYSTEM
+ # define DEBUG_SUBSYSTEM S_UNDEFINED
+ #endif
+diff --git a/include/uapi/linux/lnet/lnetst.h b/include/uapi/linux/lnet/lnetst.h
+index 27fcd91..449c5e6 100644
+--- a/include/uapi/linux/lnet/lnetst.h
++++ b/include/uapi/linux/lnet/lnetst.h
+@@ -38,6 +38,8 @@
+ #define __LNET_ST_H__
+ 
+ #include <linux/types.h>
++#include <linux/time.h>
++#include <linux/lnet/lnet-types.h>
+ 
+ #define LST_FEAT_NONE		(0)
+ #define LST_FEAT_BULK_LEN	(1 << 0)	/* enable variable page size */
 -- 
 1.8.3.1
