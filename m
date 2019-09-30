@@ -1,325 +1,111 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:13 -0400
-Subject: [lustre-devel] [PATCH 114/151] lustre: acl: prepare small buffer
- for ACL RPC reply
+Date: Mon, 30 Sep 2019 14:56:18 -0400
+Subject: [lustre-devel] [PATCH 119/151] lustre: uapi: rename LCM_FL_NOT_FLR
+ to LCM_FL_NONE
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-115-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-120-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Fan Yong <fan.yong@intel.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-For most of files, their ACL entries are very limited, under
-such case, it is unnecessary to prepare very large reply buffer
-to hold unknown-sized ACL entries for the getattr/open RPCs.
-Instead, we can prepare some relative small buffer, such as the
-LUSTRE_POSIX_ACL_MAX_SIZE_OLD (260) bytes, that is equal to the
-ACL size before patch 64b2fad22a4eb4727315709e014d8f74c5a7f289.
-If the target file has too many ACL entries and exceeds the
-prepared reply buffer, then the MDT will reply -ERANGE failure
-to the client, and then the client can prepare more large buffer
-and try again. Since the file with large ACL is rare case, such
-retrying getattr/open RPCs will not affect the real performance
-too much.
+Having "lfs getstripe" print out "lcm_flags: not_flr" is not very
+useful, as the composite files may not relate to FLR (e.g. PFL).
+Rename "LCM_FL_NOT_FLR" to "LCM_FL_NONE" so it is more clear there
+are no composite flags on the layout.
 
-The advantage is that it reduces the client side RAM pressure.
+Print out "0" for flags if no flags are set, to match old behaviour.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10513
-Lustre-commit: 416e88938f68 ("LU-10513 acl: prepare small buffer for ACL RPC reply")
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Reviewed-on: https://review.whamcloud.com/28116
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9771
+Lustre-commit: fa15e5347c2e ("LU-9771 util: rename LCM_FL_NOT_FLR to LCM_FL_NONE")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/31047
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_locks.c       | 43 +++++++++++++++++++++--------
- fs/lustre/mdc/mdc_request.c     | 61 +++++++++++++++++++++++++++++++----------
- fs/lustre/ptlrpc/pack_generic.c |  1 +
- fs/lustre/ptlrpc/sec.c          |  1 +
- 4 files changed, 79 insertions(+), 27 deletions(-)
+ fs/lustre/lov/lov_cl_internal.h         | 4 ++--
+ fs/lustre/lov/lov_object.c              | 4 ++--
+ fs/lustre/ptlrpc/wiretest.c             | 4 ++--
+ include/uapi/linux/lustre/lustre_user.h | 2 +-
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
-index 2eb6e8a..0787ba3 100644
---- a/fs/lustre/mdc/mdc_locks.c
-+++ b/fs/lustre/mdc/mdc_locks.c
-@@ -44,6 +44,7 @@
- #include <lustre_net.h>
- #include <lustre_req_layout.h>
- #include <lustre_swab.h>
-+#include <lustre_acl.h>
- 
- #include "mdc_internal.h"
- 
-@@ -244,7 +245,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
- 
- static struct ptlrpc_request *
- mdc_intent_open_pack(struct obd_export *exp, struct lookup_intent *it,
--		     struct md_op_data *op_data)
-+		     struct md_op_data *op_data, u32 acl_bufsize)
+diff --git a/fs/lustre/lov/lov_cl_internal.h b/fs/lustre/lov/lov_cl_internal.h
+index 4ab8fba..875af37 100644
+--- a/fs/lustre/lov/lov_cl_internal.h
++++ b/fs/lustre/lov/lov_cl_internal.h
+@@ -354,14 +354,14 @@ static inline struct lov_stripe_md_entry *lov_lse(struct lov_object *lov, int i)
+ static inline unsigned int lov_flr_state(const struct lov_object *lov)
  {
- 	struct ptlrpc_request *req;
- 	struct obd_device *obddev = class_exp2obd(exp);
-@@ -333,8 +334,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+ 	if (lov->lo_type != LLT_COMP)
+-		return LCM_FL_NOT_FLR;
++		return LCM_FL_NONE;
  
- 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER,
- 			     obddev->u.cli.cl_max_mds_easize);
--	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
--			     req->rq_import->imp_connect_data.ocd_max_easize);
-+	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
- 
- 	ptlrpc_request_set_replen(req);
- 	return req;
-@@ -440,9 +440,9 @@ static struct ptlrpc_request *mdc_intent_unlink_pack(struct obd_export *exp,
- 	return req;
+ 	return lov->u.composite.lo_flags & LCM_FL_FLR_MASK;
  }
  
--static struct ptlrpc_request *mdc_intent_getattr_pack(struct obd_export *exp,
--						      struct lookup_intent *it,
--						     struct md_op_data *op_data)
-+static struct ptlrpc_request *
-+mdc_intent_getattr_pack(struct obd_export *exp, struct lookup_intent *it,
-+			struct md_op_data *op_data, u32 acl_bufsize)
+ static inline bool lov_is_flr(const struct lov_object *lov)
  {
- 	struct ptlrpc_request *req;
- 	struct obd_device *obddev = class_exp2obd(exp);
-@@ -480,8 +480,7 @@ static struct ptlrpc_request *mdc_intent_getattr_pack(struct obd_export *exp,
- 	mdc_getattr_pack(req, valid, it->it_flags, op_data, easize);
- 
- 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER, easize);
--	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
--			     req->rq_import->imp_connect_data.ocd_max_easize);
-+	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
- 	ptlrpc_request_set_replen(req);
- 	return req;
- }
-@@ -782,6 +781,8 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 	struct ldlm_res_id res_id;
- 	int generation, resends = 0;
- 	struct ldlm_reply *lockrep;
-+	struct obd_import *imp = class_exp2cliimp(exp);
-+	u32 acl_bufsize;
- 	enum lvb_type lvb_type = LVB_T_NONE;
- 	int rc;
- 
-@@ -804,6 +805,11 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 	}
- 
- 	generation = obddev->u.cli.cl_import->imp_generation;
-+	if (!it || (it->it_op & (IT_CREAT | IT_OPEN_CREAT)))
-+		acl_bufsize = imp->imp_connect_data.ocd_max_easize;
-+	else
-+		acl_bufsize = LUSTRE_POSIX_ACL_MAX_SIZE_OLD;
-+
- resend:
- 	flags = saved_flags;
- 	if (!it) {
-@@ -812,15 +818,15 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 			 einfo->ei_type);
- 		res_id.name[3] = LDLM_FLOCK;
- 	} else if (it->it_op & IT_OPEN) {
--		req = mdc_intent_open_pack(exp, it, op_data);
-+		req = mdc_intent_open_pack(exp, it, op_data, acl_bufsize);
- 	} else if (it->it_op & IT_UNLINK) {
- 		req = mdc_intent_unlink_pack(exp, it, op_data);
- 	} else if (it->it_op & (IT_GETATTR | IT_LOOKUP)) {
--		req = mdc_intent_getattr_pack(exp, it, op_data);
-+		req = mdc_intent_getattr_pack(exp, it, op_data, acl_bufsize);
- 	} else if (it->it_op & IT_READDIR) {
- 		req = mdc_enqueue_pack(exp, 0);
- 	} else if (it->it_op & IT_LAYOUT) {
--		if (!imp_connect_lvb_type(class_exp2cliimp(exp)))
-+		if (!imp_connect_lvb_type(imp))
- 			return -EOPNOTSUPP;
- 		req = mdc_intent_layout_pack(exp, it, op_data);
- 		lvb_type = LVB_T_LAYOUT;
-@@ -926,6 +932,15 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 		}
- 	}
- 
-+	if ((int)lockrep->lock_policy_res2 == -ERANGE &&
-+	    it->it_op & (IT_OPEN | IT_GETATTR | IT_LOOKUP) &&
-+	    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
-+		mdc_clear_replay_flag(req, -ERANGE);
-+		ptlrpc_req_finished(req);
-+		acl_bufsize = imp->imp_connect_data.ocd_max_easize;
-+		goto resend;
-+	}
-+
- 	rc = mdc_finish_enqueue(exp, req, einfo, it, lockh, rc);
- 	if (rc < 0) {
- 		if (lustre_handle_is_used(lockh)) {
-@@ -1284,7 +1299,11 @@ int mdc_intent_getattr_async(struct obd_export *exp,
- 	       PFID(&op_data->op_fid1), ldlm_it2str(it->it_op), it->it_flags);
- 
- 	fid_build_reg_res_name(&op_data->op_fid1, &res_id);
--	req = mdc_intent_getattr_pack(exp, it, op_data);
-+	/* If the MDT return -ERANGE because of large ACL, then the sponsor
-+	 * of the async getattr RPC will handle that by itself.
-+	 */
-+	req = mdc_intent_getattr_pack(exp, it, op_data,
-+				      LUSTRE_POSIX_ACL_MAX_SIZE_OLD);
- 	if (IS_ERR(req))
- 		return PTR_ERR(req);
- 
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index dd9ab5a..e344e78 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -188,10 +188,23 @@ static int mdc_getattr_common(struct obd_export *exp,
- 	return 0;
+-	return lov_flr_state(lov) != LCM_FL_NOT_FLR;
++	return lov_flr_state(lov) != LCM_FL_NONE;
  }
  
-+static void mdc_reset_acl_req(struct ptlrpc_request *req)
-+{
-+	spin_lock(&req->rq_early_free_lock);
-+	sptlrpc_cli_free_repbuf(req);
-+	req->rq_repbuf = NULL;
-+	req->rq_repbuf_len = 0;
-+	req->rq_repdata = NULL;
-+	req->rq_reqdata_len = 0;
-+	spin_unlock(&req->rq_early_free_lock);
-+}
-+
- static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
- 		       struct ptlrpc_request **request)
- {
- 	struct ptlrpc_request *req;
-+	struct obd_import *imp = class_exp2cliimp(exp);
-+	u32 acl_bufsize = LUSTRE_POSIX_ACL_MAX_SIZE_OLD;
- 	int rc;
+ static inline struct lov_layout_entry *lov_entry(struct lov_object *lov, int i)
+diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
+index 51b95f2..6ba821b 100644
+--- a/fs/lustre/lov/lov_object.c
++++ b/fs/lustre/lov/lov_object.c
+@@ -629,7 +629,7 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 	comp->lo_entry_count = lsm->lsm_entry_count;
+ 	comp->lo_preferred_mirror = -1;
  
- 	/* Single MDS without an LMV case */
-@@ -199,8 +212,9 @@ static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
- 		op_data->op_mds = 0;
- 		return 0;
- 	}
-+
- 	*request = NULL;
--	req = ptlrpc_request_alloc(class_exp2cliimp(exp), &RQF_MDS_GETATTR);
-+	req = ptlrpc_request_alloc(imp, &RQF_MDS_GETATTR);
- 	if (!req)
- 		return -ENOMEM;
+-	if (equi(flr_state == LCM_FL_NOT_FLR, comp->lo_mirror_count > 1))
++	if (equi(flr_state == LCM_FL_NONE, comp->lo_mirror_count > 1))
+ 		return -EINVAL;
  
-@@ -210,20 +224,28 @@ static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
- 		return rc;
- 	}
+ 	comp->lo_mirrors = kcalloc(comp->lo_mirror_count,
+@@ -669,7 +669,7 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 		lle->lle_extent = &lle->lle_lsme->lsme_extent;
+ 		lle->lle_valid = !(lle->lle_lsme->lsme_flags & LCME_FL_STALE);
  
-+again:
- 	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid,
- 		      op_data->op_mode, -1, 0);
--
--	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
--			     req->rq_import->imp_connect_data.ocd_max_easize);
-+	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
- 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER,
- 			     op_data->op_mode);
- 	ptlrpc_request_set_replen(req);
+-		if (flr_state != LCM_FL_NOT_FLR)
++		if (flr_state != LCM_FL_NONE)
+ 			mirror_id = mirror_id_of(lle->lle_lsme->lsme_id);
  
- 	rc = mdc_getattr_common(exp, req);
--	if (rc)
-+	if (rc) {
-+		if (rc == -ERANGE &&
-+		    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
-+			acl_bufsize = imp->imp_connect_data.ocd_max_easize;
-+			mdc_reset_acl_req(req);
-+			goto again;
-+		}
-+
- 		ptlrpc_req_finished(req);
--	else
-+	} else {
- 		*request = req;
-+	}
-+
- 	return rc;
- }
- 
-@@ -231,11 +253,12 @@ static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 			    struct ptlrpc_request **request)
- {
- 	struct ptlrpc_request *req;
-+	struct obd_import *imp = class_exp2cliimp(exp);
-+	u32 acl_bufsize = LUSTRE_POSIX_ACL_MAX_SIZE_OLD;
- 	int rc;
- 
- 	*request = NULL;
--	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
--				   &RQF_MDS_GETATTR_NAME);
-+	req = ptlrpc_request_alloc(imp, &RQF_MDS_GETATTR_NAME);
- 	if (!req)
- 		return -ENOMEM;
- 
-@@ -248,9 +271,6 @@ static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 		return rc;
- 	}
- 
--	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid,
--		      op_data->op_mode, op_data->op_suppgids[0], 0);
--
- 	if (op_data->op_name) {
- 		char *name = req_capsule_client_get(&req->rq_pill, &RMF_NAME);
- 
-@@ -259,17 +279,28 @@ static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 		memcpy(name, op_data->op_name, op_data->op_namelen);
- 	}
- 
-+again:
-+	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid,
-+		      op_data->op_mode, op_data->op_suppgids[0], 0);
- 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER,
- 			     op_data->op_mode);
--	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
--			     req->rq_import->imp_connect_data.ocd_max_easize);
-+	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
- 	ptlrpc_request_set_replen(req);
- 
- 	rc = mdc_getattr_common(exp, req);
--	if (rc)
-+	if (rc) {
-+		if (rc == -ERANGE &&
-+		    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
-+			acl_bufsize = imp->imp_connect_data.ocd_max_easize;
-+			mdc_reset_acl_req(req);
-+			goto again;
-+		}
-+
- 		ptlrpc_req_finished(req);
--	else
-+	} else {
- 		*request = req;
-+	}
-+
- 	return rc;
- }
- 
-diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
-index cac4b8d..1face33 100644
---- a/fs/lustre/ptlrpc/pack_generic.c
-+++ b/fs/lustre/ptlrpc/pack_generic.c
-@@ -164,6 +164,7 @@ u32 lustre_packed_msg_size(struct lustre_msg *msg)
- 		return 0;
- 	}
- }
-+EXPORT_SYMBOL(lustre_packed_msg_size);
- 
- void lustre_init_msg_v2(struct lustre_msg_v2 *msg, int count, u32 *lens,
- 			char **bufs)
-diff --git a/fs/lustre/ptlrpc/sec.c b/fs/lustre/ptlrpc/sec.c
-index 21055a3..54ca97c 100644
---- a/fs/lustre/ptlrpc/sec.c
-+++ b/fs/lustre/ptlrpc/sec.c
-@@ -1680,6 +1680,7 @@ void sptlrpc_cli_free_repbuf(struct ptlrpc_request *req)
- 	policy->sp_cops->free_repbuf(ctx->cc_sec, req);
- 	req->rq_repmsg = NULL;
- }
-+EXPORT_SYMBOL(sptlrpc_cli_free_repbuf);
- 
- static int sptlrpc_svc_install_rvs_ctx(struct obd_import *imp,
- 				       struct ptlrpc_svc_ctx *ctx)
+ 		lre = &comp->lo_mirrors[j];
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index e161fe6..70ed2cd 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1542,8 +1542,8 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF((int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entries[0]) == 48, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct lov_comp_md_v1 *)0)->lcm_entries[0]));
+ 	BUILD_BUG_ON(LOV_MAGIC_COMP_V1 != (0x0BD60000 | 0x0BD0));
+-	LASSERTF(LCM_FL_NOT_FLR == 0, "found %lld\n",
+-		 (long long)LCM_FL_NOT_FLR);
++	LASSERTF(LCM_FL_NONE == 0, "found %lld\n",
++		 (long long)LCM_FL_NONE);
+ 	LASSERTF(LCM_FL_RDONLY == 1, "found %lld\n",
+ 		 (long long)LCM_FL_RDONLY);
+ 	LASSERTF(LCM_FL_WRITE_PENDING == 2, "found %lld\n",
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index cea7d13..4e673cd 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -530,7 +530,7 @@ static inline __u16 mirror_id_of(__u32 id)
+  */
+ enum lov_comp_md_flags {
+ 	/* the least 2 bits are used by FLR to record file state */
+-	LCM_FL_NOT_FLR          = 0,
++	LCM_FL_NONE             = 0,
+ 	LCM_FL_RDONLY           = 1,
+ 	LCM_FL_WRITE_PENDING    = 2,
+ 	LCM_FL_SYNC_PENDING     = 3,
 -- 
 1.8.3.1
