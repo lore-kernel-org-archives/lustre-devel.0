@@ -1,62 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:55:55 -0400
-Subject: [lustre-devel] [PATCH 096/151] lustre: fid: improve seq allocation
- error messages
+Date: Mon, 30 Sep 2019 14:55:58 -0400
+Subject: [lustre-devel] [PATCH 099/151] lustre: vvp: Print discarded page
+ warning on -EIO
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-97-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-100-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Emoly Liu <emoly@whamcloud.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-When MDTs are waiting for MDT0000 to start the master sequence
-server and be granted a meta sequence for the first time, in case
-of "-EINPROGRESS", the limited console messages would be clearer
-and better than many error messages.
+On client eviction, the client sometimes has dirty pages
+outstanding, which are then discarded.  The client is
+supposed to print an error when this happens,
+from vvp_vmpage_error->ll_dirty_page_discard_warn.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10392
-Lustre-commit: 6f86519b3483 ("LU-10392 fid: improve seq allocation error messages")
-Signed-off-by: Emoly Liu <emoly@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/30623
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Yang Sheng <ys@whamcloud.com>
-Reviewed-by: Giuseppe Di Natale <dinatale2@llnl.gov>
+However, the client looks for specific errors, and newer
+Lustre clients will sometimes return -EIO to I/O requests
+on eviction, instead of -EINTR.  Since they can still
+return -EINTR, we must add -EIO as a new condition and
+keep -EINTR.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8358
+Lustre-commit: 5f327f6670d3 ("LU-8358 vvp: Print discarded page warning on -EIO")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/21111
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/fid/fid_request.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ fs/lustre/llite/vvp_page.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/fid/fid_request.c b/fs/lustre/fid/fid_request.c
-index 861ffbe..a54d1e5 100644
---- a/fs/lustre/fid/fid_request.c
-+++ b/fs/lustre/fid/fid_request.c
-@@ -171,8 +171,9 @@ static int seq_client_alloc_seq(const struct lu_env *env,
- 	if (lu_seq_range_is_exhausted(&seq->lcs_space)) {
- 		rc = seq_client_alloc_meta(env, seq);
- 		if (rc) {
--			CERROR("%s: Can't allocate new meta-sequence, rc %d\n",
--			       seq->lcs_name, rc);
-+			if (rc != -EINPROGRESS)
-+				CERROR("%s: Can't allocate new meta-sequence, rc = %d\n",
-+				       seq->lcs_name, rc);
- 			*seqnr = U64_MAX;
- 			return rc;
- 		}
-@@ -232,8 +233,9 @@ int seq_client_alloc_fid(const struct lu_env *env,
- 		wake_up(&seq->lcs_waitq);
+diff --git a/fs/lustre/llite/vvp_page.c b/fs/lustre/llite/vvp_page.c
+index beebea8..78a70b5 100644
+--- a/fs/lustre/llite/vvp_page.c
++++ b/fs/lustre/llite/vvp_page.c
+@@ -241,8 +241,8 @@ static void vvp_vmpage_error(struct inode *inode, struct page *vmpage,
+ 		SetPageError(vmpage);
+ 		mapping_set_error(inode->i_mapping, ioret);
  
- 		if (rc) {
--			CERROR("%s: Can't allocate new sequence, rc %d\n",
--			       seq->lcs_name, rc);
-+			if (rc != -EINPROGRESS)
-+				CERROR("%s: Can't allocate new sequence, rc %d\n",
-+				       seq->lcs_name, rc);
- 			spin_unlock(&seq->lcs_lock);
- 			return rc;
+-		if ((ioret == -ESHUTDOWN || ioret == -EINTR) &&
+-		    obj->vob_discard_page_warned == 0) {
++		if ((ioret == -ESHUTDOWN || ioret == -EINTR ||
++		     ioret == -EIO) && obj->vob_discard_page_warned == 0) {
+ 			obj->vob_discard_page_warned = 1;
+ 			ll_dirty_page_discard_warn(vmpage, ioret);
  		}
 -- 
 1.8.3.1
