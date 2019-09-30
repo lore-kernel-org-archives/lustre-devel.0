@@ -1,107 +1,105 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:55:51 -0400
-Subject: [lustre-devel] [PATCH 092/151] lustre: llite: change
- lli_glimpse_time to ktime
+Date: Mon, 30 Sep 2019 14:56:07 -0400
+Subject: [lustre-devel] [PATCH 108/151] lustre: lustre: move LA_* flags to
+ lustre_user.h
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-93-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-109-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Currently lli_glimpse_time is in jiffies which can vary between
-platforms. Migrate to ktime since we need more than second
-time resolution that is consistent on any platform. Replace the
-last cfs_time_current_sec() with ktime_get_real_seconds().
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
-Lustre-commit: 9a484620bdd9 ("LU-9019 llite: change lli_glimpse_time to ktime")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/30601
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+The LA_* flags are written to disk as part of the ChangeLog records
+in mdd_attr_set_changelog(), which means they are now part of the
+on-disk and network protocol, and cannot be changed (at least not the
+first 12 bits that are written).
+They need to be moved to lustre_user.h.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10485
+Lustre-commit: 2b14e545001b ("LU-10485 lustre: move LA_* flags to lustre_user.h")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/30825
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h | 4 ++--
- fs/lustre/llite/llite_lib.c      | 2 +-
- fs/lustre/llite/statahead.c      | 9 +++++----
- 3 files changed, 8 insertions(+), 7 deletions(-)
+ fs/lustre/include/lu_object.h           | 19 -------------------
+ include/uapi/linux/lustre/lustre_user.h | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 19 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index a44aec06..bdc90bb 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -194,7 +194,7 @@ struct ll_inode_info {
- 			struct range_lock_tree		lli_write_tree;
+diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
+index a938e64..e1979be 100644
+--- a/fs/lustre/include/lu_object.h
++++ b/fs/lustre/include/lu_object.h
+@@ -425,25 +425,6 @@ struct lu_attr {
+ 	u64	  la_valid;
+ };
  
- 			struct rw_semaphore		lli_glimpse_sem;
--			unsigned long			lli_glimpse_time;
-+			ktime_t				lli_glimpse_time;
- 			struct list_head		lli_agl_list;
- 			u64				lli_agl_index;
- 
-@@ -1193,7 +1193,7 @@ static inline int ll_glimpse_size(struct inode *inode)
- 
- 	down_read(&lli->lli_glimpse_sem);
- 	rc = cl_glimpse_size(inode);
--	lli->lli_glimpse_time = jiffies;
-+	lli->lli_glimpse_time = ktime_get();
- 	up_read(&lli->lli_glimpse_sem);
- 	return rc;
- }
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 12a68873..9e4c797 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -926,7 +926,7 @@ void ll_lli_init(struct ll_inode_info *lli)
- 		init_rwsem(&lli->lli_trunc_sem);
- 		range_lock_tree_init(&lli->lli_write_tree);
- 		init_rwsem(&lli->lli_glimpse_sem);
--		lli->lli_glimpse_time = 0;
-+		lli->lli_glimpse_time = ktime_set(0, 0);
- 		INIT_LIST_HEAD(&lli->lli_agl_list);
- 		lli->lli_agl_index = 0;
- 		lli->lli_async_rc = 0;
-diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
-index 8fc4471..2b7015d 100644
---- a/fs/lustre/llite/statahead.c
-+++ b/fs/lustre/llite/statahead.c
-@@ -494,10 +494,10 @@ static void ll_agl_trigger(struct inode *inode, struct ll_statahead_info *sai)
- {
- 	struct ll_inode_info *lli = ll_i2info(inode);
- 	u64 index = lli->lli_agl_index;
-+	ktime_t expire;
- 	int rc;
- 
- 	LASSERT(list_empty(&lli->lli_agl_list));
+-/** Bit-mask of valid attributes */
+-enum la_valid {
+-	LA_ATIME	= 1 << 0,
+-	LA_MTIME	= 1 << 1,
+-	LA_CTIME	= 1 << 2,
+-	LA_SIZE		= 1 << 3,
+-	LA_MODE		= 1 << 4,
+-	LA_UID		= 1 << 5,
+-	LA_GID		= 1 << 6,
+-	LA_BLOCKS	= 1 << 7,
+-	LA_TYPE		= 1 << 8,
+-	LA_FLAGS	= 1 << 9,
+-	LA_NLINK	= 1 << 10,
+-	LA_RDEV		= 1 << 11,
+-	LA_BLKSIZE	= 1 << 12,
+-	LA_KILL_SUID	= 1 << 13,
+-	LA_KILL_SGID	= 1 << 14,
+-};
 -
- 	/* AGL maybe fall behind statahead with one entry */
- 	if (is_omitted_entry(sai, index + 1)) {
- 		lli->lli_agl_index = 0;
-@@ -539,8 +539,9 @@ static void ll_agl_trigger(struct inode *inode, struct ll_statahead_info *sai)
- 	 *    relative rare. AGL can ignore such case, and it will not muchly
- 	 *    affect the performance.
- 	 */
--	if (lli->lli_glimpse_time != 0 &&
--	    time_before(jiffies - 1 * HZ, lli->lli_glimpse_time)) {
-+	expire = ktime_sub_ns(ktime_get(), NSEC_PER_SEC);
-+	if (ktime_to_ns(lli->lli_glimpse_time) &&
-+	    ktime_before(expire, lli->lli_glimpse_time)) {
- 		up_write(&lli->lli_glimpse_sem);
- 		lli->lli_agl_index = 0;
- 		iput(inode);
-@@ -552,7 +553,7 @@ static void ll_agl_trigger(struct inode *inode, struct ll_statahead_info *sai)
+ /**
+  * Layer in the layered object.
+  */
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 21dc1e9..d53e795 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -837,6 +837,35 @@ struct lustre_swap_layouts {
+ 	__u64	sl_dv2;
+ };
  
- 	cl_agl(inode);
- 	lli->lli_agl_index = 0;
--	lli->lli_glimpse_time = jiffies;
-+	lli->lli_glimpse_time = ktime_get();
- 	up_write(&lli->lli_glimpse_sem);
- 
- 	CDEBUG(D_READA, "Handled (init) async glimpse: inode= "
++/** Bit-mask of valid attributes */
++/* The LA_* flags are written to disk as part of the ChangeLog records
++ * so they are part of the on-disk and network protocol, and cannot be changed.
++ * Only the first 12 bits are currently saved.
++ */
++enum la_valid {
++	LA_ATIME	= 1 << 0,
++	LA_MTIME	= 1 << 1,
++	LA_CTIME	= 1 << 2,
++	LA_SIZE		= 1 << 3,
++	LA_MODE		= 1 << 4,
++	LA_UID		= 1 << 5,
++	LA_GID		= 1 << 6,
++	LA_BLOCKS	= 1 << 7,
++	LA_TYPE		= 1 << 8,
++	LA_FLAGS	= 1 << 9,
++	LA_NLINK	= 1 << 10,
++	LA_RDEV		= 1 << 11,
++	LA_BLKSIZE	= 1 << 12,
++	LA_KILL_SUID	= 1 << 13,
++	LA_KILL_SGID	= 1 << 14,
++	LA_PROJID	= 1 << 15,
++	LA_LAYOUT_VERSION = 1 << 16,
++	/**
++	 * Attributes must be transmitted to OST objects
++	 */
++	LA_REMOTE_ATTR_SET = (LA_UID | LA_GID | LA_PROJID | LA_LAYOUT_VERSION)
++};
++
+ /********* Changelogs **********/
+ /** Changelog record types */
+ enum changelog_rec_type {
 -- 
 1.8.3.1
