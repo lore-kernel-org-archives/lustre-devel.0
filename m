@@ -1,46 +1,40 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:48 -0400
-Subject: [lustre-devel] [PATCH 149/151] lustre: llite: remove // comments.
+Date: Mon, 30 Sep 2019 14:56:37 -0400
+Subject: [lustre-devel] [PATCH 138/151] lustre: update version to 2.10.99
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-150-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-139-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+With all of the the missing patches from the
+lustre 2.11 version merged upstream its time to update
+the upstream clients version.
 
-Apart from the SPDX-License-Identifier comments,
-the only remaining // comments are now themselves inside
-/* */ comments, so they don't really count as comments.
-
-The comments about rw_semaphore alignment are completely outdated.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h | 7 -------
- 1 file changed, 7 deletions(-)
+ include/uapi/linux/lustre/lustre_ver.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 2cb67b0..ee8d160 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -183,13 +183,6 @@ struct ll_inode_info {
- 		struct {
- 			struct mutex			lli_size_mutex;
- 			char			       *lli_symlink_name;
--			/*
--			 * struct rw_semaphore {
--			 *    signed long	count;     // align d.d_def_acl
--			 *    spinlock_t	wait_lock; // align d.d_sa_lock
--			 *    struct list_head wait_list;
--			 * }
--			 */
- 			struct rw_semaphore		lli_trunc_sem;
- 			struct range_lock_tree		lli_write_tree;
+diff --git a/include/uapi/linux/lustre/lustre_ver.h b/include/uapi/linux/lustre/lustre_ver.h
+index e7a2eda..d7c53c5 100644
+--- a/include/uapi/linux/lustre/lustre_ver.h
++++ b/include/uapi/linux/lustre/lustre_ver.h
+@@ -2,10 +2,10 @@
+ #define _LUSTRE_VER_H_
  
+ #define LUSTRE_MAJOR 2
+-#define LUSTRE_MINOR 9
++#define LUSTRE_MINOR 10
+ #define LUSTRE_PATCH 99
+ #define LUSTRE_FIX 0
+-#define LUSTRE_VERSION_STRING "2.9.99"
++#define LUSTRE_VERSION_STRING "2.10.99"
+ 
+ #define OBD_OCD_VERSION(major, minor, patch, fix)			\
+ 	(((major) << 24) + ((minor) << 16) + ((patch) << 8) + (fix))
 -- 
 1.8.3.1
