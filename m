@@ -1,49 +1,63 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:03 -0400
-Subject: [lustre-devel] [PATCH 104/151] lustre: lov: fill no-extent fiemap
- on object with no stripe.
+Date: Mon, 30 Sep 2019 14:56:06 -0400
+Subject: [lustre-devel] [PATCH 107/151] lustre: recovery: support setstripe
+ replay
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-105-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-108-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Dominique Martinet <dominique.martinet@cea.fr>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-This is useful for cp of large sparse files with no stripe info,
-as cp relies on fiemap to detect what to read.
+Regular file open will always reserve space for LOV ea, which is used
+to store user specified lov_user_md, or lov_mds_md for replay, but if
+this open is the first open in 'lfs setstripe', it doesn't have
+lov_user_md specified, or lov_mds_md for replay because
+O_LOV_DELAY_CREATE is set, but MDT will treat the EA field in the
+request as valid one, so fails in magic check in this open replay.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10405
-Lustre-commit: 113fa79b7dc9 ("LU-10405 lov: fill no-extent fiemap on object with no stripe")
-Signed-off-by: Dominique Martinet <dominique.martinet@cea.fr>
-Reviewed-on: https://review.whamcloud.com/30591
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+This patch contains the fix for the client side.
+
+1. client doesn't reserve space for LOV ea in
+   open(O_LOV_DELAY_CREATE), this change is not necessary, but to
+   make clean of the code.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10155
+Lustre-commit: 3a0a50f44f68 ("LU-10155 recovery: support setstripe replay")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/30704
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_object.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ fs/lustre/mdc/mdc_locks.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index d3ed5fc..51b95f2 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -1774,8 +1774,11 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	struct fiemap_state fs = { NULL };
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index 0b358b6..2eb6e8a 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -297,8 +297,14 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
  
- 	lsm = lov_lsm_addref(cl2lov(obj));
--	if (!lsm)
--		return -ENODATA;
-+	if (!lsm) {
-+		/* no extent: there is no object for mapping */
-+		fiemap->fm_mapped_extents = 0;
-+		return 0;
+ 	req_capsule_set_size(&req->rq_pill, &RMF_NAME, RCL_CLIENT,
+ 			     op_data->op_namelen + 1);
+-	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_CLIENT,
+-			     max(lmmsize, obddev->u.cli.cl_default_mds_easize));
++	if (cl_is_lov_delay_create(it->it_flags)) {
++		/* open(O_LOV_DELAY_CREATE) won't pack lmm */
++		LASSERT(lmmsize == 0);
++		req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_CLIENT, 0);
++	} else {
++		req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_CLIENT,
++			max(lmmsize, obddev->u.cli.cl_default_mds_easize));
 +	}
  
- 	if (!(fiemap->fm_flags & FIEMAP_FLAG_DEVICE_ORDER)) {
- 		/**
+ 	req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX_NAME,
+ 			     RCL_CLIENT, op_data->op_file_secctx_name ?
 -- 
 1.8.3.1
