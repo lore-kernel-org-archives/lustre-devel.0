@@ -1,547 +1,175 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:28 -0400
-Subject: [lustre-devel] [PATCH 129/151] lnet: fix contiguous range support
+Date: Mon, 30 Sep 2019 14:56:38 -0400
+Subject: [lustre-devel] [PATCH 139/151] lustre: ptlrpc: clarify 64 bit time
+ usage
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-130-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-140-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Kit Westneat <kit.westneat@gmail.com>
+In the lustre code various small bits are left for the move to
+64 bit time handling. This finishes some of the last bits left.
+To make clear that a value is in seconds change unsigned int
+values used for seconds to time64_t. Migrate scp_at_checktime
+to ktime.
 
-This patch fixes the contiguous range check to allow the addition of
-multiple "full" ([0-255]) ranges. As part of this change,
-is_contiguous and find_min_max are combined as they were always
-called together and the logic is fairly similar. This also removes
-the multiple range expression support, since it was broken.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-LU-8912
-Lustre-commit: eac95a6587af ("LU-8912 nodemap: fix contiguous range support")
-Signed-off-by: Kit Westneat <kit.westneat@gmail.com>
-Signed-off-by: Emoly Liu <emoly@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/24397
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
+Lustre-commit: fdb5d3d508ed ("libcfs: remove the remaining cfs_time wrappers")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/31068
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lnet/nidstr.h |   8 +-
- net/lnet/lnet/nidstrings.c       | 324 ++++++++++++++++-----------------------
- 2 files changed, 133 insertions(+), 199 deletions(-)
+ fs/lustre/include/lustre_net.h |  4 ++--
+ fs/lustre/ldlm/ldlm_pool.c     |  4 ++--
+ fs/lustre/ptlrpc/import.c      |  2 +-
+ fs/lustre/ptlrpc/service.c     | 19 ++++++++++---------
+ net/lnet/libcfs/debug.c        |  2 +-
+ 5 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
-index 8bff1fd..43ec232 100644
---- a/include/uapi/linux/lnet/nidstr.h
-+++ b/include/uapi/linux/lnet/nidstr.h
-@@ -97,9 +97,8 @@ static inline char *libcfs_nid2str(lnet_nid_t nid)
+diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
+index 22c9668..ffa6977 100644
+--- a/fs/lustre/include/lustre_net.h
++++ b/fs/lustre/include/lustre_net.h
+@@ -1558,7 +1558,7 @@ struct ptlrpc_service_part {
+ 	struct list_head		scp_rqbd_posted;
+ 	/** incoming reqs */
+ 	struct list_head		scp_req_incoming;
+-	/** timeout before re-posting reqs, in tick */
++	/** timeout before re-posting reqs, in jiffies */
+ 	long				scp_rqbd_timeout;
+ 	/**
+ 	 * all threads sleep on this. This wait-queue is signalled when new
+@@ -1611,7 +1611,7 @@ struct ptlrpc_service_part {
+ 	/** early reply timer */
+ 	struct timer_list		scp_at_timer;
+ 	/** debug */
+-	unsigned long			scp_at_checktime;
++	ktime_t				scp_at_checktime;
+ 	/** check early replies */
+ 	unsigned			scp_at_check;
+ 	/** @} */
+diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+index 25b1ada..04bf5de 100644
+--- a/fs/lustre/ldlm/ldlm_pool.c
++++ b/fs/lustre/ldlm/ldlm_pool.c
+@@ -887,7 +887,7 @@ static void ldlm_pools_recalc(struct work_struct *ws)
+ 	struct ldlm_namespace *ns;
+ 	struct ldlm_namespace *ns_old = NULL;
+ 	/* seconds of sleep if no active namespaces */
+-	int time = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
++	time64_t time = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
+ 	int nr;
  
- int cfs_ip_addr_parse(char *str, int len, struct list_head *list);
- int cfs_ip_addr_match(__u32 addr, struct list_head *list);
--bool cfs_nidrange_is_contiguous(struct list_head *nidlist);
--void cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
--			       char *max_nid, size_t nidstr_length);
-+int cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
-+			      char *max_nid, size_t nidstr_length);
+ 	/*
+@@ -953,7 +953,7 @@ static void ldlm_pools_recalc(struct work_struct *ws)
+ 		 * After setup is done - recalc the pool.
+ 		 */
+ 		if (!skip) {
+-			int ttime = ldlm_pool_recalc(&ns->ns_pool);
++			time64_t ttime = ldlm_pool_recalc(&ns->ns_pool);
  
- struct netstrfns {
- 	__u32	nf_type;
-@@ -112,8 +111,7 @@ struct netstrfns {
- 	int	(*nf_print_addrlist)(char *buffer, int count,
- 				     struct list_head *list);
- 	int	(*nf_match_addr)(__u32 addr, struct list_head *list);
--	bool	(*nf_is_contiguous)(struct list_head *nidlist);
--	void	(*nf_min_max)(struct list_head *nidlist, __u32 *min_nid,
-+	int	(*nf_min_max)(struct list_head *nidlist, __u32 *min_nid,
- 			      __u32 *max_nid);
- };
- 
-diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
-index b84708d..b4e38e5 100644
---- a/net/lnet/lnet/nidstrings.c
-+++ b/net/lnet/lnet/nidstrings.c
-@@ -456,38 +456,64 @@ int cfs_print_nidlist(char *buffer, int count, struct list_head *nidlist)
-  * numeric address range
-  *
-  * @ar
-- * @min_nid
-- * @max_nid
-+ * @min_nid	*min_nid __u32 representation of min NID
-+ * @max_nid	*max_nid __u32 representation of max NID
-+ *
-+ * Return:	-EINVAL unsupported LNET range
-+ *		-ERANGE non-contiguous LNET range
-  */
--static void cfs_ip_ar_min_max(struct addrrange *ar, u32 *min_nid,
--			      u32 *max_nid)
-+static int cfs_ip_ar_min_max(struct addrrange *ar, u32 *min_nid,
-+			     u32 *max_nid)
- {
--	struct cfs_expr_list *el;
--	struct cfs_range_expr *re;
--	u32 tmp_ip_addr = 0;
-+	struct cfs_expr_list *expr_list;
-+	struct cfs_range_expr *range;
- 	unsigned int min_ip[4] = { 0 };
- 	unsigned int max_ip[4] = { 0 };
--	int re_count = 0;
-+	int cur_octet = 0;
-+	bool expect_full_octet = false;
-+
-+	list_for_each_entry(expr_list, &ar->ar_numaddr_ranges, el_link) {
-+		int re_count = 0;
-+
-+		list_for_each_entry(range, &expr_list->el_exprs, re_link) {
-+		/* XXX: add support for multiple & non-contig. re's */
-+			if (re_count > 0)
-+				return -EINVAL;
-+
-+			/* if a previous octet was ranged, then all remaining
-+			 * octets must be full for contiguous range
-+			 */
-+			if (expect_full_octet && (range->re_lo != 0 ||
-+						  range->re_hi != 255))
-+				return -ERANGE;
-+
-+			if (range->re_stride != 1)
-+				return -ERANGE;
-+
-+			if (range->re_lo > range->re_hi)
-+				return -EINVAL;
-+
-+			if (range->re_lo != range->re_hi)
-+				expect_full_octet = true;
-+
-+			min_ip[cur_octet] = range->re_lo;
-+			max_ip[cur_octet] = range->re_hi;
- 
--	list_for_each_entry(el, &ar->ar_numaddr_ranges, el_link) {
--		list_for_each_entry(re, &el->el_exprs, re_link) {
--			min_ip[re_count] = re->re_lo;
--			max_ip[re_count] = re->re_hi;
- 			re_count++;
- 		}
--	}
- 
--	tmp_ip_addr = ((min_ip[0] << 24) | (min_ip[1] << 16) |
--		       (min_ip[2] << 8) | min_ip[3]);
-+		cur_octet++;
-+	}
- 
- 	if (min_nid)
--		*min_nid = tmp_ip_addr;
--
--	tmp_ip_addr = ((max_ip[0] << 24) | (max_ip[1] << 16) |
--		       (max_ip[2] << 8) | max_ip[3]);
-+		*min_nid = ((min_ip[0] << 24) | (min_ip[1] << 16) |
-+			    (min_ip[2] << 8) | min_ip[3]);
- 
- 	if (max_nid)
--		*max_nid = tmp_ip_addr;
-+		*max_nid = ((max_ip[0] << 24) | (max_ip[1] << 16) |
-+			    (max_ip[2] << 8) | max_ip[3]);
-+
-+	return 0;
+ 			if (ttime < time)
+ 				time = ttime;
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index 6fc0c6b..32bd218 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -242,7 +242,7 @@ void ptlrpc_deactivate_import(struct obd_import *imp)
+ 	return dl - now;
  }
  
- /**
-@@ -495,11 +521,13 @@ static void cfs_ip_ar_min_max(struct addrrange *ar, u32 *min_nid,
-  * numeric address range
-  *
-  * @ar
-- * @min_nid
-- * @max_nid
-+ * @min_nid	*min_nid __u32 representation of min NID
-+ * @max_nid	*max_nid __u32 representation of max NID
-+ *
-+ * Return:	-EINVAL unsupported LNET range
-  */
--static void cfs_num_ar_min_max(struct addrrange *ar, u32 *min_nid,
--			       u32 *max_nid)
-+static int cfs_num_ar_min_max(struct addrrange *ar, u32 *min_nid,
-+			      u32 *max_nid)
+-static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
++static time64_t ptlrpc_inflight_timeout(struct obd_import *imp)
  {
- 	struct cfs_expr_list *el;
- 	struct cfs_range_expr *re;
-@@ -507,11 +535,20 @@ static void cfs_num_ar_min_max(struct addrrange *ar, u32 *min_nid,
- 	unsigned int max_addr = 0;
+ 	time64_t now = ktime_get_real_seconds();
+ 	struct ptlrpc_request *req, *n;
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index 57c5e28..f07f549 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -342,7 +342,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+ 	svcpt = from_timer(svcpt, t, scp_at_timer);
  
- 	list_for_each_entry(el, &ar->ar_numaddr_ranges, el_link) {
-+		int re_count = 0;
-+
- 		list_for_each_entry(re, &el->el_exprs, re_link) {
-+			if (re_count > 0)
-+				return -EINVAL;
-+			if (re->re_lo > re->re_hi)
-+				return -EINVAL;
-+
- 			if (re->re_lo < min_addr || !min_addr)
- 				min_addr = re->re_lo;
- 			if (re->re_hi > max_addr)
- 				max_addr = re->re_hi;
-+
-+			re_count++;
- 		}
+ 	svcpt->scp_at_check = 1;
+-	svcpt->scp_at_checktime = jiffies;
++	svcpt->scp_at_checktime = ktime_get();
+ 	wake_up(&svcpt->scp_waitq);
+ }
+ 
+@@ -933,7 +933,7 @@ static int ptlrpc_check_req(struct ptlrpc_request *req)
+ static void ptlrpc_at_set_timer(struct ptlrpc_service_part *svcpt)
+ {
+ 	struct ptlrpc_at_array *array = &svcpt->scp_at_array;
+-	s32 next;
++	time64_t next;
+ 
+ 	if (array->paa_count == 0) {
+ 		del_timer(&svcpt->scp_at_timer);
+@@ -941,13 +941,14 @@ static void ptlrpc_at_set_timer(struct ptlrpc_service_part *svcpt)
  	}
  
-@@ -519,143 +556,8 @@ static void cfs_num_ar_min_max(struct addrrange *ar, u32 *min_nid,
- 		*min_nid = min_addr;
- 	if (max_nid)
- 		*max_nid = max_addr;
--}
--
--/**
-- * Determines whether an expression list in an nidrange contains exactly
-- * one contiguous address range. Calls the correct netstrfns for the LND
-- *
-- * @nidlist
-- *
-- * Return:	true if contiguous
-- *		false if not contiguous
-- */
--bool cfs_nidrange_is_contiguous(struct list_head *nidlist)
--{
--	struct nidrange *nr;
--	struct netstrfns *nf = NULL;
--	char *lndname = NULL;
--	int netnum = -1;
--
--	list_for_each_entry(nr, nidlist, nr_link) {
--		nf = nr->nr_netstrfns;
--		if (!lndname)
--			lndname = nf->nf_name;
--		if (netnum == -1)
--			netnum = nr->nr_netnum;
--
--		if (strcmp(lndname, nf->nf_name) ||
--		    netnum != nr->nr_netnum)
--			return false;
--	}
--
--	if (!nf)
--		return false;
--
--	if (!nf->nf_is_contiguous(nidlist))
--		return false;
--
--	return true;
--}
--EXPORT_SYMBOL(cfs_nidrange_is_contiguous);
--
--/**
-- * Determines whether an expression list in an num nidrange contains exactly
-- * one contiguous address range.
-- *
-- * @nidlist
-- *
-- * Return:	true if contiguous
-- *		false if not contiguous
-- */
--static bool cfs_num_is_contiguous(struct list_head *nidlist)
--{
--	struct nidrange *nr;
--	struct addrrange *ar;
--	struct cfs_expr_list *el;
--	struct cfs_range_expr *re;
--	int last_hi = 0;
--	u32 last_end_nid = 0;
--	u32 current_start_nid = 0;
--	u32 current_end_nid = 0;
--
--	list_for_each_entry(nr, nidlist, nr_link) {
--		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
--			cfs_num_ar_min_max(ar, &current_start_nid,
--					   &current_end_nid);
--			if (last_end_nid &&
--			    (current_start_nid - last_end_nid != 1))
--				return false;
--			last_end_nid = current_end_nid;
--			list_for_each_entry(el, &ar->ar_numaddr_ranges,
--					    el_link) {
--				list_for_each_entry(re, &el->el_exprs,
--						    re_link) {
--					if (re->re_stride > 1)
--						return false;
--					else if (last_hi &&
--						 re->re_hi - last_hi != 1)
--						return false;
--					last_hi = re->re_hi;
--				}
--			}
--		}
--	}
- 
--	return true;
--}
--
--/**
-- * Determines whether an expression list in an ip nidrange contains exactly
-- * one contiguous address range.
-- *
-- * @nidlist
-- *
-- * Return:	true if contiguous
-- *		false if not contiguous
-- */
--static bool cfs_ip_is_contiguous(struct list_head *nidlist)
--{
--	struct nidrange *nr;
--	struct addrrange *ar;
--	struct cfs_expr_list *el;
--	struct cfs_range_expr *re;
--	int expr_count;
--	int last_hi = 255;
--	int last_diff = 0;
--	u32 last_end_nid = 0;
--	u32 current_start_nid = 0;
--	u32 current_end_nid = 0;
--
--	list_for_each_entry(nr, nidlist, nr_link) {
--		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
--			last_hi = 255;
--			last_diff = 0;
--			cfs_ip_ar_min_max(ar, &current_start_nid,
--					  &current_end_nid);
--			if (last_end_nid &&
--			    (current_start_nid - last_end_nid != 1))
--				return false;
--			last_end_nid = current_end_nid;
--			list_for_each_entry(el, &ar->ar_numaddr_ranges,
--					    el_link) {
--				expr_count = 0;
--				list_for_each_entry(re, &el->el_exprs,
--						    re_link) {
--					expr_count++;
--					if (re->re_stride > 1 ||
--					    (last_diff > 0 && last_hi != 255) ||
--					    (last_diff > 0 && last_hi == 255 &&
--					     re->re_lo > 0))
--						return false;
--					last_hi = re->re_hi;
--					last_diff = re->re_hi - re->re_lo;
--				}
--			}
--		}
--	}
--
--	return true;
-+	return 0;
- }
- 
- /**
-@@ -663,29 +565,35 @@ static bool cfs_ip_is_contiguous(struct list_head *nidlist)
-  * and maximum nid and creates appropriate nid structures
-  *
-  * @nidlist
-- * @min_nid
-- * @max_nid
-+ * @min_nid	*min_nid string representation of min NID
-+ * @max_nid	*max_nid string representation of max NID
-+ *
-+ * Return:	-EINVAL unsupported LNET range
-+ *		-ERANGE non-contiguous LNET range
-  */
--void cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
--			       char *max_nid, size_t nidstr_length)
-+int cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
-+			      char *max_nid, size_t nidstr_length)
- {
--	struct nidrange *nr;
--	struct netstrfns *nf = NULL;
--	int netnum = -1;
-+	struct nidrange *first_nidrange;
-+	int netnum;
-+	struct netstrfns *nf;
-+	char *lndname;
- 	u32 min_addr;
- 	u32 max_addr;
--	char *lndname = NULL;
- 	char min_addr_str[IPSTRING_LENGTH];
- 	char max_addr_str[IPSTRING_LENGTH];
-+	int rc;
- 
--	list_for_each_entry(nr, nidlist, nr_link) {
--		nf = nr->nr_netstrfns;
--		lndname = nf->nf_name;
--		if (netnum == -1)
--			netnum = nr->nr_netnum;
-+	first_nidrange = list_entry(nidlist->next, struct nidrange, nr_link);
-+
-+	netnum = first_nidrange->nr_netnum;
-+	nf = first_nidrange->nr_netstrfns;
-+	lndname = nf->nf_name;
-+
-+	rc = nf->nf_min_max(nidlist, &min_addr, &max_addr);
-+	if (rc < 0)
-+		return rc;
- 
--		nf->nf_min_max(nidlist, &min_addr, &max_addr);
--	}
- 	nf->nf_addr2str(min_addr, min_addr_str, sizeof(min_addr_str));
- 	nf->nf_addr2str(max_addr, max_addr_str, sizeof(max_addr_str));
- 
-@@ -693,6 +601,8 @@ void cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
- 		 netnum);
- 	snprintf(max_nid, nidstr_length, "%s@%s%d", max_addr_str, lndname,
- 		 netnum);
-+
-+	return 0;
- }
- EXPORT_SYMBOL(cfs_nidrange_find_min_max);
- 
-@@ -700,11 +610,14 @@ void cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
-  * Determines the min and max NID values for num LNDs
-  *
-  * @nidlist
-- * @min_nid
-- * @max_nid
-+ * @min_nid	*min_nid if provided, returns string representation of min NID
-+ * @max_nid	*max_nid if provided, returns string representation of max NID
-+ *
-+ * Return:	-EINVAL unsupported LNET range
-+ *		-ERANGE non-contiguous LNET range
-  */
--static void cfs_num_min_max(struct list_head *nidlist, u32 *min_nid,
--			    u32 *max_nid)
-+static int cfs_num_min_max(struct list_head *nidlist, u32 *min_nid,
-+			   u32 *max_nid)
- {
- 	struct nidrange	*nr;
- 	struct addrrange *ar;
-@@ -712,19 +625,32 @@ static void cfs_num_min_max(struct list_head *nidlist, u32 *min_nid,
- 	unsigned int tmp_max_addr = 0;
- 	unsigned int min_addr = 0;
- 	unsigned int max_addr = 0;
-+	int nidlist_count = 0;
-+	int rc;
- 
- 	list_for_each_entry(nr, nidlist, nr_link) {
-+		if (nidlist_count > 0)
-+			return -EINVAL;
-+
- 		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
--			cfs_num_ar_min_max(ar, &tmp_min_addr,
--					   &tmp_max_addr);
-+			rc = cfs_num_ar_min_max(ar, &tmp_min_addr,
-+						&tmp_max_addr);
-+			if (rc)
-+				return rc;
-+
- 			if (tmp_min_addr < min_addr || !min_addr)
- 				min_addr = tmp_min_addr;
- 			if (tmp_max_addr > max_addr)
- 				max_addr = tmp_min_addr;
- 		}
+ 	/* Set timer for closest deadline */
+-	next = (s32)(array->paa_deadline - ktime_get_real_seconds() -
+-		       at_early_margin);
++	next = array->paa_deadline - ktime_get_real_seconds() -
++		at_early_margin;
+ 	if (next <= 0) {
+ 		ptlrpc_at_timer(&svcpt->scp_at_timer);
+ 	} else {
+-		mod_timer(&svcpt->scp_at_timer, jiffies + next * HZ);
+-		CDEBUG(D_INFO, "armed %s at %+ds\n",
++		mod_timer(&svcpt->scp_at_timer,
++			  jiffies + nsecs_to_jiffies(next * NSEC_PER_SEC));
++		CDEBUG(D_INFO, "armed %s at %+llds\n",
+ 		       svcpt->scp_service->srv_name, next);
  	}
--	*max_nid = max_addr;
--	*min_nid = min_addr;
-+
-+	if (max_nid)
-+		*max_nid = max_addr;
-+	if (min_nid)
-+		*min_nid = min_addr;
-+
-+	return 0;
  }
+@@ -1181,7 +1182,7 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 	u32 index, count;
+ 	time64_t deadline;
+ 	time64_t now = ktime_get_real_seconds();
+-	long delay;
++	s64 delay;
+ 	int first, counter = 0;
  
- /**
-@@ -732,11 +658,14 @@ static void cfs_num_min_max(struct list_head *nidlist, u32 *min_nid,
-  * ip addresses.
-  *
-  * @nidlist
-- * @min_nid
-- * @max_nid
-+ * @min_nid	*min_nid if provided, returns string representation of min NID
-+ * @max_nid	*max_nid if provided, returns string representation of max NID
-+ *
-+ * Return:	-EINVAL unsupported LNET range
-+ *		-ERANGE non-contiguous LNET range
-  */
--static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
--			   u32 *max_nid)
-+static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
-+			  u32 *max_nid)
- {
- 	struct nidrange *nr;
- 	struct addrrange *ar;
-@@ -744,22 +673,34 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	u32 tmp_max_ip_addr = 0;
- 	u32 min_ip_addr = 0;
- 	u32 max_ip_addr = 0;
-+	int nidlist_count = 0;
-+	int rc;
- 
- 	list_for_each_entry(nr, nidlist, nr_link) {
-+		if (nidlist_count > 0)
-+			return -EINVAL;
-+
- 		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
--			cfs_ip_ar_min_max(ar, &tmp_min_ip_addr,
--					  &tmp_max_ip_addr);
-+			rc = cfs_ip_ar_min_max(ar, &tmp_min_ip_addr,
-+					       &tmp_max_ip_addr);
-+			if (rc)
-+				return rc;
-+
- 			if (tmp_min_ip_addr < min_ip_addr || !min_ip_addr)
- 				min_ip_addr = tmp_min_ip_addr;
- 			if (tmp_max_ip_addr > max_ip_addr)
- 				max_ip_addr = tmp_max_ip_addr;
- 		}
-+
-+		nidlist_count++;
+ 	spin_lock(&svcpt->scp_at_lock);
+@@ -1189,7 +1190,7 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 		spin_unlock(&svcpt->scp_at_lock);
+ 		return;
  	}
+-	delay = jiffies - svcpt->scp_at_checktime;
++	delay = ktime_ms_delta(ktime_get(), svcpt->scp_at_checktime);
+ 	svcpt->scp_at_check = 0;
  
- 	if (min_nid)
- 		*min_nid = min_ip_addr;
- 	if (max_nid)
- 		*max_nid = max_ip_addr;
-+
-+	return 0;
+ 	if (array->paa_count == 0) {
+@@ -1254,7 +1255,7 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 		 */
+ 		LCONSOLE_WARN("%s: This server is not able to keep up with request traffic (cpu-bound).\n",
+ 			      svcpt->scp_service->srv_name);
+-		CWARN("earlyQ=%d reqQ=%d recA=%d, svcEst=%d, delay=%ld(jiff)\n",
++		CWARN("earlyQ=%d reqQ=%d recA=%d, svcEst=%d, delay=%lld\n",
+ 		      counter, svcpt->scp_nreqs_incoming,
+ 		      svcpt->scp_nreqs_active,
+ 		      at_get(&svcpt->scp_at_estimate), delay);
+diff --git a/net/lnet/libcfs/debug.c b/net/lnet/libcfs/debug.c
+index fd8ed81..6b8f783e6 100644
+--- a/net/lnet/libcfs/debug.c
++++ b/net/lnet/libcfs/debug.c
+@@ -129,7 +129,7 @@ static int param_get_delay(char *buffer, const struct kernel_param *kp)
+ {
+ 	unsigned int d = *(unsigned int *)kp->arg;
+ 
+-	return sprintf(buffer, "%u", (unsigned int)(d * 100) / HZ);
++	return sprintf(buffer, "%lu", jiffies_to_msecs(d * 10) / MSEC_PER_SEC);
  }
  
- static int
-@@ -966,7 +907,6 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	  .nf_parse_addrlist	= libcfs_num_parse,
- 	  .nf_print_addrlist	= libcfs_num_addr_range_print,
- 	  .nf_match_addr	= libcfs_num_match,
--	  .nf_is_contiguous	= cfs_num_is_contiguous,
- 	  .nf_min_max		= cfs_num_min_max },
- 	{ .nf_type		= SOCKLND,
- 	  .nf_name		= "tcp",
-@@ -976,7 +916,6 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
- 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
- 	  .nf_match_addr	= cfs_ip_addr_match,
--	  .nf_is_contiguous	= cfs_ip_is_contiguous,
- 	  .nf_min_max		= cfs_ip_min_max },
- 	{ .nf_type		= O2IBLND,
- 	  .nf_name		= "o2ib",
-@@ -986,7 +925,6 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
- 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
- 	  .nf_match_addr	= cfs_ip_addr_match,
--	  .nf_is_contiguous	= cfs_ip_is_contiguous,
- 	  .nf_min_max		= cfs_ip_min_max },
- 	{ .nf_type		= GNILND,
- 	  .nf_name		= "gni",
-@@ -996,7 +934,6 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	  .nf_parse_addrlist	= libcfs_num_parse,
- 	  .nf_print_addrlist	= libcfs_num_addr_range_print,
- 	  .nf_match_addr	= libcfs_num_match,
--	  .nf_is_contiguous	= cfs_num_is_contiguous,
- 	  .nf_min_max		= cfs_num_min_max },
- 	{ .nf_type		= GNIIPLND,
- 	  .nf_name		= "gip",
-@@ -1006,7 +943,6 @@ static void cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
- 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
- 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
- 	  .nf_match_addr	= cfs_ip_addr_match,
--	  .nf_is_contiguous	= cfs_ip_is_contiguous,
- 	  .nf_min_max		= cfs_ip_min_max },
- };
- 
+ unsigned int libcfs_console_max_delay;
 -- 
 1.8.3.1
