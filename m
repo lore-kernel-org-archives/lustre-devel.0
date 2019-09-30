@@ -1,90 +1,56 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:29 -0400
-Subject: [lustre-devel] [PATCH 130/151] lustre: osc: add a bit to indicate
- osc_page in cache tree
+Date: Mon, 30 Sep 2019 14:56:31 -0400
+Subject: [lustre-devel] [PATCH 132/151] lustre: llite: Add exit for filedata
+ allocation failed
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-131-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-133-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bobi Jam <bobijam@hotmail.com>
+From: Ben Evans <bevans@cray.com>
 
-Add osc_page::ops_intree to indicate whether the osc_page is in the
-osc_object's cache tree, so that when page cannot insert in the
-cache as race happens, the cleanup code won't try to remove it from
-the cache.
+When the filedata allocation fails, we need to exit to
+a later point than out_openerr, which calls
+deauthorize_statahead and ll_file_data_put, neither of
+which is valid. (This leads to a panic.)
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10244
-Lustre-commit: ed91ee6bd642 ("LU-10244 osc: add a bit to indicate osc_page in cache tree")
-Signed-off-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-on: https://review.whamcloud.com/30096
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10662
+Cray-bug-id: LUS-1321
+Lustre-commit: d9edfa50683a ('LU-10662 llite: Add exit for filedata allocation failed")
+Signed-off-by: Ben Evans <bevans@cray.com>
+Reviewed-on: https://review.whamcloud.com/31296
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_osc.h |  6 +++++-
- fs/lustre/osc/osc_page.c       | 17 ++++++++++++-----
- 2 files changed, 17 insertions(+), 6 deletions(-)
+ fs/lustre/llite/file.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index 38ae83a8..5ba4f97 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -524,7 +524,11 @@ struct osc_page {
- 	/*
- 	 * Set if the page must be transferred with OBD_BRW_SRVLOCK.
- 	 */
--				ops_srvlock:1;
-+				ops_srvlock:1,
-+	/**
-+	 * If the page is in osc_object::oo_tree.
-+	 */
-+				ops_intree:1;
- 	/*
- 	 * lru page list. See osc_lru_{del|use}() in osc_page.c for usage.
- 	 */
-diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
-index 731fd27..9236e02 100644
---- a/fs/lustre/osc/osc_page.c
-+++ b/fs/lustre/osc/osc_page.c
-@@ -192,12 +192,17 @@ static void osc_page_delete(const struct lu_env *env,
- 	osc_lru_del(osc_cli(obj), opg);
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index da5bf86..6732b68 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -540,7 +540,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 	fd = ll_file_data_get();
+ 	if (!fd) {
+ 		rc = -ENOMEM;
+-		goto out_openerr;
++		goto out_nofiledata;
+ 	}
  
- 	if (slice->cpl_page->cp_type == CPT_CACHEABLE) {
--		void *value;
-+		void *value = NULL;
+ 	fd->fd_file = file;
+@@ -723,6 +723,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 		ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_OPEN, 1);
+ 	}
  
- 		spin_lock(&obj->oo_tree_lock);
--		value = radix_tree_delete(&obj->oo_tree, osc_index(opg));
--		if (value)
--			--obj->oo_npages;
-+		if (opg->ops_intree) {
-+			value = radix_tree_delete(&obj->oo_tree,
-+						  osc_index(opg));
-+			if (value) {
-+				--obj->oo_npages;
-+				opg->ops_intree = 0;
-+			}
-+		}
- 		spin_unlock(&obj->oo_tree_lock);
- 
- 		LASSERT(ergo(value, value == opg));
-@@ -275,8 +280,10 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
- 				spin_lock(&osc->oo_tree_lock);
- 				result = radix_tree_insert(&osc->oo_tree,
- 							   index, opg);
--				if (result == 0)
-+				if (result == 0) {
- 					++osc->oo_npages;
-+					opg->ops_intree = 1;
-+				}
- 				spin_unlock(&osc->oo_tree_lock);
- 
- 				radix_tree_preload_end();
++out_nofiledata:
+ 	if (it && it_disposition(it, DISP_ENQ_OPEN_REF)) {
+ 		ptlrpc_req_finished(it->it_request);
+ 		it_clear_disposition(it, DISP_ENQ_OPEN_REF);
 -- 
 1.8.3.1
