@@ -1,113 +1,90 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:54:40 -0400
-Subject: [lustre-devel] [PATCH 021/151] lustre: llog: consolidate common
- error checking
+Date: Mon, 30 Sep 2019 14:54:48 -0400
+Subject: [lustre-devel] [PATCH 029/151] lnet: selftest: Use C99 struct
+ initializer in framework.c
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-22-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-30-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Steve Guminski <stephenx.guminski@intel.com>
 
-Consolidate error checking for corrupted and empty llog files
-detected when the llog file is being opened into a single
-routine llog_cat_process_common().
+This patch makes no functional changes.  The struct initializer in
+framework.c is updated to C99 syntax.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9153
-Lustre-commit: b522f7b4b1de ("LU-9153 llog: consolidate common error checking")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/26211
-Reviewed-by: Faccini Bruno <bruno.faccini@intel.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+C89 positional initializers require values to be placed in the
+correct order. This will cause errors if the fields of the struct
+definition are reordered or fields are added or removed. C99 named
+initializers avoid this problem, and also automatically clear any
+values that are not explicitly set.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6210
+Lustre-commit: 60c9a2d351d4 ("LU-6210 lnet: Use C99 struct initializer in framework.c")
+Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
+Reviewed-on: https://review.whamcloud.com/28436
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/llog_cat.c | 48 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 36 insertions(+), 12 deletions(-)
+ net/lnet/selftest/framework.c | 42 +++++++-----------------------------------
+ 1 file changed, 7 insertions(+), 35 deletions(-)
 
-diff --git a/fs/lustre/obdclass/llog_cat.c b/fs/lustre/obdclass/llog_cat.c
-index b61c858..4536f54 100644
---- a/fs/lustre/obdclass/llog_cat.c
-+++ b/fs/lustre/obdclass/llog_cat.c
-@@ -140,32 +140,55 @@ int llog_cat_close(const struct lu_env *env, struct llog_handle *cathandle)
+diff --git a/net/lnet/selftest/framework.c b/net/lnet/selftest/framework.c
+index 958f627..72892c1 100644
+--- a/net/lnet/selftest/framework.c
++++ b/net/lnet/selftest/framework.c
+@@ -1584,41 +1584,13 @@ struct srpc_client_rpc *
  }
- EXPORT_SYMBOL(llog_cat_close);
  
--static int llog_cat_process_cb(const struct lu_env *env,
--			       struct llog_handle *cat_llh,
--			       struct llog_rec_hdr *rec, void *data)
-+static int llog_cat_process_common(const struct lu_env *env,
-+				   struct llog_handle *cat_llh,
-+				   struct llog_rec_hdr *rec,
-+				   struct llog_handle **llhp)
- {
--	struct llog_process_data *d = data;
--	struct llog_logid_rec *lir = (struct llog_logid_rec *)rec;
--	struct llog_handle *llh;
-+	struct llog_logid_rec *lir = container_of(rec, typeof(*lir), lid_hdr);
- 	int rc;
+ static struct srpc_service sfw_services[] = {
+-	{
+-		/* sv_id */    SRPC_SERVICE_DEBUG,
+-		/* sv_name */  "debug",
+-		0
+-	},
+-	{
+-		/* sv_id */    SRPC_SERVICE_QUERY_STAT,
+-		/* sv_name */  "query stats",
+-		0
+-	},
+-	{
+-		/* sv_id */    SRPC_SERVICE_MAKE_SESSION,
+-		/* sv_name */  "make session",
+-		0
+-	},
+-	{
+-		/* sv_id */    SRPC_SERVICE_REMOVE_SESSION,
+-		/* sv_name */  "remove session",
+-		0
+-	},
+-	{
+-		/* sv_id */    SRPC_SERVICE_BATCH,
+-		/* sv_name */  "batch service",
+-		0
+-	},
+-	{
+-		/* sv_id */    SRPC_SERVICE_TEST,
+-		/* sv_name */  "test service",
+-		0
+-	},
+-	{
+-		/* sv_id */    0,
+-		/* sv_name */  NULL,
+-		0
+-	}
++	{ .sv_id = SRPC_SERVICE_DEBUG,		.sv_name = "debug", },
++	{ .sv_id = SRPC_SERVICE_QUERY_STAT,	.sv_name = "query stats", },
++	{ .sv_id = SRPC_SERVICE_MAKE_SESSION,	.sv_name = "make session", },
++	{ .sv_id = SRPC_SERVICE_REMOVE_SESSION,	.sv_name = "remove session", },
++	{ .sv_id = SRPC_SERVICE_BATCH,		.sv_name = "batch service", },
++	{ .sv_id = SRPC_SERVICE_TEST,		.sv_name = "test service", },
++	{ .sv_id = 0, }
+ };
  
--	if (rec->lrh_type != LLOG_LOGID_MAGIC) {
-+	if (rec->lrh_type != le32_to_cpu(LLOG_LOGID_MAGIC)) {
-+		rc = -EINVAL;
-+		CWARN("%s: invalid record in catalog " DFID ":%x: rc = %d\n",
-+		      cat_llh->lgh_ctxt->loc_obd->obd_name,
-+		      PFID(&cat_llh->lgh_id.lgl_oi.oi_fid),
-+		      cat_llh->lgh_id.lgl_ogen, rc);
-+
- 		CERROR("invalid record in catalog\n");
- 		return -EINVAL;
- 	}
- 	CDEBUG(D_HA,
- 	       "processing log " DFID ":%x at index %u of catalog " DFID "\n",
- 	       PFID(&lir->lid_id.lgl_oi.oi_fid), lir->lid_id.lgl_ogen,
--	       rec->lrh_index, PFID(&cat_llh->lgh_id.lgl_oi.oi_fid));
-+	       le32_to_cpu(rec->lrh_index),
-+	       PFID(&cat_llh->lgh_id.lgl_oi.oi_fid));
- 
--	rc = llog_cat_id2handle(env, cat_llh, &llh, &lir->lid_id);
-+	rc = llog_cat_id2handle(env, cat_llh, llhp, &lir->lid_id);
- 	if (rc) {
--		CERROR("%s: cannot find handle for llog " DFID ": %d\n",
--		       cat_llh->lgh_ctxt->loc_obd->obd_name,
--		       PFID(&lir->lid_id.lgl_oi.oi_fid), rc);
-+		CWARN("%s: can't find llog handle " DFID ":%x: rc = %d\n",
-+		      cat_llh->lgh_ctxt->loc_obd->obd_name,
-+		      PFID(&lir->lid_id.lgl_oi.oi_fid),
-+		      lir->lid_id.lgl_ogen, rc);
-+
- 		return rc;
- 	}
- 
-+	return rc;
-+}
-+
-+static int llog_cat_process_cb(const struct lu_env *env,
-+			       struct llog_handle *cat_llh,
-+			       struct llog_rec_hdr *rec, void *data)
-+{
-+	struct llog_process_data *d = data;
-+	struct llog_handle *llh = NULL;
-+	int rc;
-+
-+	rc = llog_cat_process_common(env, cat_llh, rec, &llh);
-+	if (rc)
-+		goto out;
-+
- 	if (rec->lrh_index < d->lpd_startcat)
- 		/* Skip processing of the logs until startcat */
- 		rc = 0;
-@@ -183,6 +206,7 @@ static int llog_cat_process_cb(const struct lu_env *env,
- 					  NULL, false);
- 	}
- 
-+out:
- 	llog_handle_put(llh);
- 
- 	return rc;
+ int
 -- 
 1.8.3.1
