@@ -1,53 +1,90 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:24 -0400
-Subject: [lustre-devel] [PATCH 125/151] lustre: llite: have ll_write_end to
- sync for DIO
+Date: Mon, 30 Sep 2019 14:56:29 -0400
+Subject: [lustre-devel] [PATCH 130/151] lustre: osc: add a bit to indicate
+ osc_page in cache tree
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-126-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-131-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Vladimir Saveliev <c17830@cray.com>
+From: Bobi Jam <bobijam@hotmail.com>
 
-direct IO write uses buffered write for pages which could not be
-released. If not adjacent pages are not releasable,
-vio->u.write.vui_queue list becomes non-contiguos which makes
-page_list_sanity_check() to fail.
+Add osc_page::ops_intree to indicate whether the osc_page is in the
+osc_object's cache tree, so that when page cannot insert in the
+cache as race happens, the cleanup code won't try to remove it from
+the cache.
 
-Have ll_write_commit to do vvp_io_write_commit() when it is called in
-course of direct IO.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10356
-Cray-bug-id: MRP-4415
-Lustre-commit: 6ea9171769db ("LU-10356 llite: have ll_write_end to sync for DIO")
-Signed-off-by: Vladimir Saveliev <c17830@cray.com>
-Reviewed-on: https://review.whamcloud.com/30659
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10244
+Lustre-commit: ed91ee6bd642 ("LU-10244 osc: add a bit to indicate osc_page in cache tree")
+Signed-off-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-on: https://review.whamcloud.com/30096
 Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/rw26.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ fs/lustre/include/lustre_osc.h |  6 +++++-
+ fs/lustre/osc/osc_page.c       | 17 ++++++++++++-----
+ 2 files changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
-index 2baab10..f5c1479 100644
---- a/fs/lustre/llite/rw26.c
-+++ b/fs/lustre/llite/rw26.c
-@@ -684,8 +684,7 @@ static int ll_write_end(struct file *file, struct address_space *mapping,
- 		unplug = true;
- 	}
+diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
+index 38ae83a8..5ba4f97 100644
+--- a/fs/lustre/include/lustre_osc.h
++++ b/fs/lustre/include/lustre_osc.h
+@@ -524,7 +524,11 @@ struct osc_page {
+ 	/*
+ 	 * Set if the page must be transferred with OBD_BRW_SRVLOCK.
+ 	 */
+-				ops_srvlock:1;
++				ops_srvlock:1,
++	/**
++	 * If the page is in osc_object::oo_tree.
++	 */
++				ops_intree:1;
+ 	/*
+ 	 * lru page list. See osc_lru_{del|use}() in osc_page.c for usage.
+ 	 */
+diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
+index 731fd27..9236e02 100644
+--- a/fs/lustre/osc/osc_page.c
++++ b/fs/lustre/osc/osc_page.c
+@@ -192,12 +192,17 @@ static void osc_page_delete(const struct lu_env *env,
+ 	osc_lru_del(osc_cli(obj), opg);
  
--	if (unplug ||
--	    file->f_flags & O_SYNC || IS_SYNC(file_inode(file)))
-+	if (unplug || io->u.ci_wr.wr_sync)
- 		result = vvp_io_write_commit(env, io);
+ 	if (slice->cpl_page->cp_type == CPT_CACHEABLE) {
+-		void *value;
++		void *value = NULL;
  
- 	if (result < 0)
+ 		spin_lock(&obj->oo_tree_lock);
+-		value = radix_tree_delete(&obj->oo_tree, osc_index(opg));
+-		if (value)
+-			--obj->oo_npages;
++		if (opg->ops_intree) {
++			value = radix_tree_delete(&obj->oo_tree,
++						  osc_index(opg));
++			if (value) {
++				--obj->oo_npages;
++				opg->ops_intree = 0;
++			}
++		}
+ 		spin_unlock(&obj->oo_tree_lock);
+ 
+ 		LASSERT(ergo(value, value == opg));
+@@ -275,8 +280,10 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
+ 				spin_lock(&osc->oo_tree_lock);
+ 				result = radix_tree_insert(&osc->oo_tree,
+ 							   index, opg);
+-				if (result == 0)
++				if (result == 0) {
+ 					++osc->oo_npages;
++					opg->ops_intree = 1;
++				}
+ 				spin_unlock(&osc->oo_tree_lock);
+ 
+ 				radix_tree_preload_end();
 -- 
 1.8.3.1
