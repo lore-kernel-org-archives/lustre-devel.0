@@ -1,60 +1,109 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:25 -0400
-Subject: [lustre-devel] [PATCH 126/151] lustre: obd: add check to obd_statfs
+Date: Mon, 30 Sep 2019 14:56:33 -0400
+Subject: [lustre-devel] [PATCH 134/151] lustre: llite: fix mount error
+ handing
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-127-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-135-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexander Boyko <c17825@cray.com>
+From: Vladimir Saveliev <c17830@cray.com>
 
-The race could happened between mount and lctl get_param.
-Because procfs files are ready before a full obd initialization.
-For example:
-3372:0:(dt_object.h:2509:dt_statfs()) ASSERTION( dev )
-3372:0:(dt_object.h:2509:dt_statfs()) LBUG
-Pid: 3372, comm: lctl
-Call Trace:
-        libcfs_call_trace+0x4e/0x60[libcfs]
-        lbug_with_loc+0x4c/0xb0[libcfs]
-        tgt_statfs_internal+0x2ea/0x350[ptlrpc]
-        ofd_statfs+0x66/0x470 [ofd]
-        lprocfs_filesfree_seq_show+0xf6/0x520 [obdclass]
-        ofd_filesfree_seq_show+0x12/0x20 [ofd]
+lustre_fill_super() allocates lsi and assumes that on failures lsi
+will be freed by server_fill_super() or ll_fill_super().
+ - server_fill_super() does not free lsi when lsi_prepare() fails.
+ - ll_fill_super() does not free lsi when OBD_ALLOC_PTR(cfg) or
+ll_init_sbi() fail.
 
-The patch adds a check of completed obd_setup to obd_statfs().
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10650
-ray-bug-id: LUS-2665
-Lustre-commit: 4f40429775c4 ("LU-10650 obd: add check to obd_statfs")
-Signed-off-by: Alexander Boyko <c17825@cray.com>
-Reviewed-on: https://review.whamcloud.com/31243
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-5991
+Cray-bug-id: MRP-2229
+Lustre-commit: acabfb9594c9 ("LU-5991 llite: fix mount error handing")
+Signed-off-by: Vladimir Saveliev <c17830@cray.com>
+Reviewed-on: https://review.whamcloud.com/12959
+Reviewed-by: Sergey Cheremencev <c17829@cray.com>
 Reviewed-by: Andriy Skulysh <c17819@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_class.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ fs/lustre/llite/llite_lib.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index dd07ec5..0bbf777 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -924,6 +924,10 @@ static inline int obd_statfs(const struct lu_env *env, struct obd_export *exp,
- 	if (!obd)
- 		return -EINVAL;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 758f856..c94bc65 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -939,7 +939,7 @@ int ll_fill_super(struct super_block *sb)
+ {
+ 	struct lustre_profile *lprof = NULL;
+ 	struct lustre_sb_info *lsi = s2lsi(sb);
+-	struct ll_sb_info *sbi;
++	struct ll_sb_info *sbi = NULL;
+ 	char *dt = NULL, *md = NULL;
+ 	char *profilenm = get_profile_name(sb);
+ 	struct config_llog_instance *cfg;
+@@ -950,21 +950,20 @@ int ll_fill_super(struct super_block *sb)
  
-+	rc = obd_check_dev_active(obd);
-+	if (rc)
-+		return rc;
+ 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p\n", sb);
+ 
++	try_module_get(THIS_MODULE);
 +
- 	if (!obd->obd_type || !obd->obd_type->typ_dt_ops->statfs) {
- 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
- 		return -EOPNOTSUPP;
+ 	cfg = kzalloc(sizeof(*cfg), GFP_NOFS);
+ 	if (!cfg) {
+-		ll_common_put_super(sb);
+-		return -ENOMEM;
++		err = -ENOMEM;
++		goto out_free;
+ 	}
+-	try_module_get(THIS_MODULE);
+ 
+ 	/* client additional sb info */
+ 	sbi = ll_init_sbi();
+ 	lsi->lsi_llsbi = sbi;
+ 	if (!sbi) {
+-		module_put(THIS_MODULE);
+-		kfree(cfg);
+-		ll_common_put_super(sb);
+-		return -ENOMEM;
++		err = -ENOMEM;
++		goto out_free;
+ 	}
+ 
+ 	err = ll_options(lsi->lsi_lmd->lmd_opts, &sbi->ll_flags);
+@@ -1048,12 +1047,12 @@ int ll_fill_super(struct super_block *sb)
+ 	kfree(dt);
+ 	if (lprof)
+ 		class_put_profile(lprof);
++	kfree(cfg);
+ 	if (err)
+ 		ll_put_super(sb);
+ 	else if (sbi->ll_flags & LL_SBI_VERBOSE)
+ 		LCONSOLE_WARN("Mounted %s\n", profilenm);
+ 
+-	kfree(cfg);
+ 	return err;
+ } /* ll_fill_super */
+ 
+@@ -1073,6 +1072,9 @@ void ll_put_super(struct super_block *sb)
+ 	int next, force = 1, rc = 0;
+ 	long ccc_count;
+ 
++	if (!sbi)
++		goto out_no_sbi;
++
+ 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p - %s\n", sb, profilenm);
+ 
+ 	cfg.cfg_instance = sb;
+@@ -1125,6 +1127,7 @@ void ll_put_super(struct super_block *sb)
+ 	ll_free_sbi(sb);
+ 	lsi->lsi_llsbi = NULL;
+ 
++out_no_sbi:
+ 	ll_common_put_super(sb);
+ 
+ 	cl_env_cache_purge(~0);
 -- 
 1.8.3.1
