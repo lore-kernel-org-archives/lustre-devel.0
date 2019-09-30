@@ -1,54 +1,80 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:54:46 -0400
-Subject: [lustre-devel] [PATCH 027/151] lustre: ptlrpc: Use C99 initializer
- in ptlrpc_register_rqbd()
+Date: Mon, 30 Sep 2019 14:55:06 -0400
+Subject: [lustre-devel] [PATCH 047/151] lustre: lvbo: pass lock as parameter
+ to lvbo_update()
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-28-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-48-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Steve Guminski <stephenx.guminski@intel.com>
+From: Mikhal Pershin <mpershin@whamcloud.com>
 
-This patch makes no functional changes. The struct initializer in
-ptlrpc_register_rqbd() is updated to C99 syntax.
+LVBO lvbo_update call was using ldlm_resource as parameter,
+the ldlm_lock parameter is added to recognize DoM resource
+in MDT LVBO functions and perform DoM specific actions.
 
-C89 positional initializers require values to be placed in the
-correct order. This will cause errors if the fields of the struct
-definition are reordered or fields are added or removed. C99 named
-initializers avoid this problem, and also automatically clear any
-values that are not explicitly set.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6210
-Lustre-commit: 3af10d510078 ("LU-6210 ptlrpc: Use C99 initializer in ptlrpc_register_rqbd()")
-Reviewed-on: https://review.whamcloud.com/28479
-Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-3285
+Lustre-commit: 978428ed0476 ("LU-3285 lvbo: pass lock as parameter to lvbo_update()")
+Signed-off-by: Mikhal Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/28016
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/niobuf.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ fs/lustre/include/lustre_dlm.h | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
-index e7aff51..f2b7902 100644
---- a/fs/lustre/ptlrpc/niobuf.c
-+++ b/fs/lustre/ptlrpc/niobuf.c
-@@ -747,7 +747,10 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- int ptlrpc_register_rqbd(struct ptlrpc_request_buffer_desc *rqbd)
+diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
+index b13e0cc..ce287b7 100644
+--- a/fs/lustre/include/lustre_dlm.h
++++ b/fs/lustre/include/lustre_dlm.h
+@@ -279,9 +279,8 @@ struct ldlm_pool {
+  */
+ struct ldlm_valblock_ops {
+ 	int (*lvbo_init)(struct ldlm_resource *res);
+-	int (*lvbo_update)(struct ldlm_resource *res,
+-			   struct ptlrpc_request *r,
+-			   int increase);
++	int (*lvbo_update)(struct ldlm_resource *res, struct ldlm_lock *lock,
++			   struct ptlrpc_request *r,  int increase);
+ 	int (*lvbo_free)(struct ldlm_resource *res);
+ 	/* Return size of lvb data appropriate RPC size can be reserved */
+ 	int (*lvbo_size)(struct ldlm_lock *lock);
+@@ -1094,17 +1093,24 @@ static inline struct ldlm_lock *ldlm_handle2lock(const struct lustre_handle *h)
+  * Update Lock Value Block Operations (LVBO) on a resource taking into account
+  * data from request @r
+  */
+-static inline int ldlm_res_lvbo_update(struct ldlm_resource *res,
+-				       struct ptlrpc_request *r, int increase)
++static inline int ldlm_lvbo_update(struct ldlm_resource *res,
++				   struct ldlm_lock *lock,
++				   struct ptlrpc_request *req, int increase)
  {
- 	struct ptlrpc_service *service = rqbd->rqbd_svcpt->scp_service;
--	static struct lnet_process_id match_id = {LNET_NID_ANY, LNET_PID_ANY};
-+	static struct lnet_process_id match_id = {
-+		.nid = LNET_NID_ANY,
-+		.pid = LNET_PID_ANY
-+	};
- 	int rc;
- 	struct lnet_md md;
- 	struct lnet_handle_me me_h;
+-	if (ldlm_res_to_ns(res)->ns_lvbo &&
+-	    ldlm_res_to_ns(res)->ns_lvbo->lvbo_update) {
+-		return ldlm_res_to_ns(res)->ns_lvbo->lvbo_update(res, r,
+-								 increase);
+-	}
++	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
++
++	if (ns->ns_lvbo && ns->ns_lvbo->lvbo_update)
++		return ns->ns_lvbo->lvbo_update(res, lock, req, increase);
++
+ 	return 0;
+ }
+ 
++static inline int ldlm_res_lvbo_update(struct ldlm_resource *res,
++				       struct ptlrpc_request *req, int increase)
++{
++	return ldlm_lvbo_update(res, NULL, req, increase);
++}
++
+ int ldlm_error2errno(enum ldlm_error error);
+ 
+ #if LUSTRE_TRACKS_LOCK_EXP_REFS
 -- 
 1.8.3.1
