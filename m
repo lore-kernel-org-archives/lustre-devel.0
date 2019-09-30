@@ -1,453 +1,686 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:55:00 -0400
-Subject: [lustre-devel] [PATCH 041/151] lustre: ptlrpc: migrate pinger to 64
- bit time
+Date: Mon, 30 Sep 2019 14:55:05 -0400
+Subject: [lustre-devel] [PATCH 046/151] lustre: mdc: add IO methods to the
+ MDC
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-42-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-47-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Change imp_next_ping, cl_*grant_* timer fields, and ti_timeout to
-time64_t. With these changes the pinger will be 64 bit time
-compliant. This prevents any possible confusion with jiffies.
+From: Mikhal Pershin <mpershin@whamcloud.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
-Lustre-commit: 44bdc137c901 ("LU-9019 ptlrpc: migrate pinger to 64 bit time")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/28035
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Add CL IO methods specific for MDC. Update and export
+related OSC functions to be used from MDC.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-3285
+Lustre-commit: 59bd024b7117 ("LU-3285 mdc: add IO methods to the MDC")
+Signed-off-by: Mikhal Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/28015
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_import.h  |  2 +-
- fs/lustre/include/lustre_net.h     |  2 +-
- fs/lustre/include/obd.h            |  6 +++---
- fs/lustre/osc/lproc_osc.c          |  2 +-
- fs/lustre/osc/osc_request.c        | 11 +++++-----
- fs/lustre/ptlrpc/client.c          |  7 +++---
- fs/lustre/ptlrpc/import.c          | 36 +++++++++++++++++++------------
- fs/lustre/ptlrpc/pinger.c          | 44 ++++++++++++++++++--------------------
- fs/lustre/ptlrpc/ptlrpc_internal.h |  2 +-
- fs/lustre/ptlrpc/ptlrpcd.c         |  2 +-
- 10 files changed, 60 insertions(+), 54 deletions(-)
+ fs/lustre/include/lustre_osc.h |  39 +++++++++--
+ fs/lustre/mdc/mdc_dev.c        | 155 ++++++++++++++++++++++++++++++++++++++---
+ fs/lustre/osc/osc_cache.c      |   4 ++
+ fs/lustre/osc/osc_dev.c        |   2 +
+ fs/lustre/osc/osc_internal.h   |  13 +++-
+ fs/lustre/osc/osc_io.c         |  76 +++++++++++---------
+ fs/lustre/osc/osc_page.c       |   1 +
+ fs/lustre/osc/osc_request.c    |  25 ++++---
+ 8 files changed, 253 insertions(+), 62 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_import.h b/fs/lustre/include/lustre_import.h
-index fc1f87c..6e22274 100644
---- a/fs/lustre/include/lustre_import.h
-+++ b/fs/lustre/include/lustre_import.h
-@@ -250,7 +250,7 @@ struct obd_import {
- 	 */
- 	struct lustre_handle		imp_remote_handle;
- 	/** When to perform next ping. time in jiffies. */
--	unsigned long			imp_next_ping;
-+	time64_t			imp_next_ping;
- 	/** When we last successfully connected. time in 64bit jiffies */
- 	u64				imp_last_success_conn;
+diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
+index 5723261..290f3c9 100644
+--- a/fs/lustre/include/lustre_osc.h
++++ b/fs/lustre/include/lustre_osc.h
+@@ -447,18 +447,19 @@ struct osc_page {
  
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index 20ce196..a0a974c 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -2287,7 +2287,7 @@ enum timeout_event {
- typedef int (*timeout_cb_t)(struct timeout_item *, void *);
- int ptlrpc_pinger_add_import(struct obd_import *imp);
- int ptlrpc_pinger_del_import(struct obd_import *imp);
--int ptlrpc_add_timeout_client(int time, enum timeout_event event,
-+int ptlrpc_add_timeout_client(time64_t time, enum timeout_event event,
- 			      timeout_cb_t cb, void *data,
- 			      struct list_head *obd_list);
- int ptlrpc_del_timeout_client(struct list_head *obd_list,
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index 3bdde31..9514260 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -117,7 +117,7 @@ struct brw_page {
+ #define OSC_FLAGS (ASYNC_URGENT | ASYNC_READY)
  
- struct timeout_item {
- 	enum timeout_event	ti_event;
--	unsigned long		ti_timeout;
-+	time64_t		ti_timeout;
- 	timeout_cb_t		ti_cb;
- 	void		       *ti_cb_data;
- 	struct list_head	ti_obd_list;
-@@ -203,9 +203,9 @@ struct client_obd {
- 	 */
- 	long			cl_reserved_grant;
- 	wait_queue_head_t	cl_cache_waiters;	/* waiting for cache/grant */
--	unsigned long		cl_next_shrink_grant;   /* jiffies */
-+	time64_t		cl_next_shrink_grant;	/* seconds */
- 	struct list_head	cl_grant_shrink_list;	/* Timeout event list */
--	int			cl_grant_shrink_interval; /* seconds */
-+	time64_t		cl_grant_shrink_interval; /* seconds */
++/* osc_page.c */
+ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
+ 		  struct cl_page *page, pgoff_t ind);
  
- 	/* A chunk is an optimal size used by osc_extent to determine
- 	 * the extent size. A chunk is max(PAGE_SIZE, OST block size)
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index 8e85863..2a57982 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -326,7 +326,7 @@ static ssize_t grant_shrink_interval_show(struct kobject *kobj,
- 	struct obd_device *obd = container_of(kobj, struct obd_device,
- 					      obd_kset.kobj);
+ void osc_index2policy(union ldlm_policy_data *policy,
+ 		      const struct cl_object *obj,
+ 		      pgoff_t start, pgoff_t end);
+-int osc_lvb_print(const struct lu_env *env, void *cookie,
+-		  lu_printer_t p, const struct ost_lvb *lvb);
+-
+ void osc_lru_add_batch(struct client_obd *cli, struct list_head *list);
+ void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
+ 		     enum cl_req_type crt, int brw_flags);
++int lru_queue_work(const struct lu_env *env, void *data);
++
++/* osc_cache.c */
+ int osc_set_async_flags(struct osc_object *obj, struct osc_page *opg,
+ 			u32 async_flags);
+ int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
+@@ -480,7 +481,6 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
+ 			      pgoff_t start, pgoff_t end, int hp, int discard);
+ int osc_cache_wait_range(const struct lu_env *env, struct osc_object *obj,
+ 			 pgoff_t start, pgoff_t end);
+-
+ int __osc_io_unplug(const struct lu_env *env, struct client_obd *cli,
+ 		    struct osc_object *osc, int async);
  
--	return sprintf(buf, "%d\n", obd->u.cli.cl_grant_shrink_interval);
-+	return sprintf(buf, "%lld\n", obd->u.cli.cl_grant_shrink_interval);
+@@ -539,6 +539,37 @@ int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ int osc_ldlm_resource_invalidate(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+ 				 struct hlist_node *hnode, void *arg);
+ 
++int osc_punch_send(struct obd_export *exp, struct obdo *oa,
++		   obd_enqueue_update_f upcall, void *cookie);
++
++/* osc_io.c */
++int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
++		  enum cl_req_type crt, struct cl_2queue *queue);
++int osc_io_commit_async(const struct lu_env *env,
++			const struct cl_io_slice *ios,
++			struct cl_page_list *qin, int from, int to,
++			cl_commit_cbt cb);
++int osc_io_iter_init(const struct lu_env *env, const struct cl_io_slice *ios);
++void osc_io_iter_fini(const struct lu_env *env,
++		      const struct cl_io_slice *ios);
++int osc_io_write_iter_init(const struct lu_env *env,
++			   const struct cl_io_slice *ios);
++void osc_io_write_iter_fini(const struct lu_env *env,
++			    const struct cl_io_slice *ios);
++int osc_io_fault_start(const struct lu_env *env, const struct cl_io_slice *ios);
++void osc_io_setattr_end(const struct lu_env *env,
++			const struct cl_io_slice *slice);
++int osc_io_read_start(const struct lu_env *env,
++		      const struct cl_io_slice *slice);
++int osc_io_write_start(const struct lu_env *env,
++		       const struct cl_io_slice *slice);
++void osc_io_end(const struct lu_env *env, const struct cl_io_slice *slice);
++
++int osc_io_fsync_start(const struct lu_env *env,
++		       const struct cl_io_slice *slice);
++void osc_io_fsync_end(const struct lu_env *env,
++		      const struct cl_io_slice *slice);
++
+ /****************************************************************************
+  *
+  * Accessors and type conversions.
+diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
+index aa86d93..77e152e 100644
+--- a/fs/lustre/mdc/mdc_dev.c
++++ b/fs/lustre/mdc/mdc_dev.c
+@@ -38,23 +38,156 @@
+ 
+ #include "mdc_internal.h"
+ 
+-int mdc_page_init(const struct lu_env *env, struct cl_object *obj,
+-		  struct cl_page *page, pgoff_t index)
+-{
+-	return -ENOTSUPP;
+-}
+-
+ int mdc_lock_init(const struct lu_env *env,
+ 		  struct cl_object *obj, struct cl_lock *lock,
+ 		  const struct cl_io *unused)
+ {
+-	return -ENOTSUPP;
++	return 0;
++}
++
++/**
++ * IO operations.
++ *
++ * An implementation of cl_io_operations specific methods for MDC layer.
++ *
++ */
++static int mdc_async_upcall(void *a, int rc)
++{
++	struct osc_async_cbargs *args = a;
++
++	args->opc_rc = rc;
++	complete(&args->opc_sync);
++	return 0;
++}
++
++static int mdc_io_setattr_start(const struct lu_env *env,
++				const struct cl_io_slice *slice)
++{
++	struct cl_io *io = slice->cis_io;
++	struct osc_io *oio = cl2osc_io(env, slice);
++	struct cl_object *obj = slice->cis_obj;
++	struct lov_oinfo *loi = cl2osc(obj)->oo_oinfo;
++	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
++	struct obdo *oa = &oio->oi_oa;
++	struct osc_async_cbargs *cbargs = &oio->oi_cbarg;
++	u64 size = io->u.ci_setattr.sa_attr.lvb_size;
++	unsigned int ia_valid = io->u.ci_setattr.sa_avalid;
++	enum op_xvalid ia_xvalid = io->u.ci_setattr.sa_xvalid;
++	int rc;
++
++	/* silently ignore non-truncate setattr for Data-on-MDT object */
++	if (cl_io_is_trunc(io)) {
++		/* truncate cache dirty pages first */
++		rc = osc_cache_truncate_start(env, cl2osc(obj), size,
++					      &oio->oi_trunc);
++		if (rc < 0)
++			return rc;
++	}
++
++	if (oio->oi_lockless == 0) {
++		cl_object_attr_lock(obj);
++		rc = cl_object_attr_get(env, obj, attr);
++		if (rc == 0) {
++			struct ost_lvb *lvb = &io->u.ci_setattr.sa_attr;
++			unsigned int cl_valid = 0;
++
++			if (ia_valid & ATTR_SIZE) {
++				attr->cat_size = attr->cat_kms = size;
++				cl_valid = (CAT_SIZE | CAT_KMS);
++			}
++			if (ia_valid & ATTR_MTIME_SET) {
++				attr->cat_mtime = lvb->lvb_mtime;
++				cl_valid |= CAT_MTIME;
++			}
++			if (ia_valid & ATTR_ATIME_SET) {
++				attr->cat_atime = lvb->lvb_atime;
++				cl_valid |= CAT_ATIME;
++			}
++			if (ia_xvalid & OP_XVALID_CTIME_SET) {
++				attr->cat_ctime = lvb->lvb_ctime;
++				cl_valid |= CAT_CTIME;
++			}
++			rc = cl_object_attr_update(env, obj, attr, cl_valid);
++		}
++		cl_object_attr_unlock(obj);
++		if (rc < 0)
++			return rc;
++	}
++
++	if (!(ia_valid & ATTR_SIZE))
++		return 0;
++
++	memset(oa, 0, sizeof(*oa));
++	oa->o_oi = loi->loi_oi;
++	oa->o_mtime = attr->cat_mtime;
++	oa->o_atime = attr->cat_atime;
++	oa->o_ctime = attr->cat_ctime;
++
++	oa->o_size = size;
++	oa->o_blocks = OBD_OBJECT_EOF;
++	oa->o_valid = OBD_MD_FLID | OBD_MD_FLGROUP | OBD_MD_FLATIME |
++		      OBD_MD_FLCTIME | OBD_MD_FLMTIME | OBD_MD_FLSIZE |
++		      OBD_MD_FLBLOCKS;
++	if (oio->oi_lockless) {
++		oa->o_flags = OBD_FL_SRVLOCK;
++		oa->o_valid |= OBD_MD_FLFLAGS;
++	}
++
++	init_completion(&cbargs->opc_sync);
++
++	rc = osc_punch_send(osc_export(cl2osc(obj)), oa,
++			    mdc_async_upcall, cbargs);
++	cbargs->opc_rpc_sent = rc == 0;
++	return rc;
  }
  
- static ssize_t grant_shrink_interval_store(struct kobject *kobj,
+-int mdc_io_init(const struct lu_env *env,
+-		struct cl_object *obj, struct cl_io *io)
++static struct cl_io_operations mdc_io_ops = {
++	.op = {
++		[CIT_READ] = {
++			.cio_iter_init	= osc_io_iter_init,
++			.cio_iter_fini	= osc_io_iter_fini,
++			.cio_start	= osc_io_read_start,
++		},
++		[CIT_WRITE] = {
++			.cio_iter_init	= osc_io_write_iter_init,
++			.cio_iter_fini	= osc_io_write_iter_fini,
++			.cio_start	= osc_io_write_start,
++			.cio_end	= osc_io_end,
++		},
++		[CIT_SETATTR] = {
++			.cio_iter_init	= osc_io_iter_init,
++			.cio_iter_fini	= osc_io_iter_fini,
++			.cio_start	= mdc_io_setattr_start,
++			.cio_end	= osc_io_setattr_end,
++		},
++		/* no support for data version so far */
++		[CIT_DATA_VERSION] = {
++			.cio_start	= NULL,
++			.cio_end	= NULL,
++		},
++		[CIT_FAULT] = {
++			.cio_iter_init	= osc_io_iter_init,
++			.cio_iter_fini	= osc_io_iter_fini,
++			.cio_start	= osc_io_fault_start,
++			.cio_end	= osc_io_end,
++		},
++		[CIT_FSYNC] = {
++			.cio_start	= osc_io_fsync_start,
++			.cio_end	= osc_io_fsync_end,
++		},
++	},
++	.cio_submit		= osc_io_submit,
++	.cio_commit_async	= osc_io_commit_async,
++};
++
++int mdc_io_init(const struct lu_env *env, struct cl_object *obj,
++		struct cl_io *io)
+ {
+-	return -ENOTSUPP;
++	struct osc_io *oio = osc_env_io(env);
++
++	CL_IO_SLICE_CLEAN(oio, oi_cl);
++	cl_io_slice_add(io, &oio->oi_cl, obj, &mdc_io_ops);
++	return 0;
+ }
+ 
+ /**
+@@ -78,7 +211,7 @@ static void mdc_req_attr_set(const struct lu_env *env, struct cl_object *obj,
+ }
+ 
+ static const struct cl_object_operations mdc_ops = {
+-	.coo_page_init		= mdc_page_init,
++	.coo_page_init		= osc_page_init,
+ 	.coo_lock_init		= mdc_lock_init,
+ 	.coo_io_init		= mdc_io_init,
+ 	.coo_attr_get		= osc_attr_get,
+diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
+index 65fdbc1..cda8791 100644
+--- a/fs/lustre/osc/osc_cache.c
++++ b/fs/lustre/osc/osc_cache.c
+@@ -2309,6 +2309,7 @@ int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(osc_prep_async_page);
+ 
+ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+ 		       struct osc_page *ops)
+@@ -2798,6 +2799,7 @@ int osc_cache_truncate_start(const struct lu_env *env, struct osc_object *obj,
+ 
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_cache_truncate_start);
+ 
+ /**
+  * Called after osc_io_setattr_end to add oio->oi_trunc back to cache.
+@@ -2883,6 +2885,7 @@ int osc_cache_wait_range(const struct lu_env *env, struct osc_object *obj,
+ 	OSC_IO_DEBUG(obj, "sync file range.\n");
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_cache_wait_range);
+ 
+ /**
+  * Called to write out a range of osc object.
+@@ -3004,6 +3007,7 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
+ 	OSC_IO_DEBUG(obj, "pageout [%lu, %lu], %d.\n", start, end, result);
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_cache_writeback_range);
+ 
+ /**
+  * Returns a list of pages by a given [start, end] of @obj.
+diff --git a/fs/lustre/osc/osc_dev.c b/fs/lustre/osc/osc_dev.c
+index 7178e6b..fb1d31c 100644
+--- a/fs/lustre/osc/osc_dev.c
++++ b/fs/lustre/osc/osc_dev.c
+@@ -126,6 +126,7 @@ struct lu_context_key osc_key = {
+ 	.lct_init		= osc_key_init,
+ 	.lct_fini		= osc_key_fini
+ };
++EXPORT_SYMBOL(osc_key);
+ 
+ static void *osc_session_init(const struct lu_context *ctx,
+ 			      struct lu_context_key *key)
+@@ -151,6 +152,7 @@ struct lu_context_key osc_session_key = {
+ 	.lct_init		= osc_session_init,
+ 	.lct_fini		= osc_session_fini
+ };
++EXPORT_SYMBOL(osc_session_key);
+ 
+ /* type constructor/destructor: osc_type_{init,fini,start,stop}(). */
+ LU_TYPE_INIT_FINI(osc, &osc_key, &osc_session_key);
+diff --git a/fs/lustre/osc/osc_internal.h b/fs/lustre/osc/osc_internal.h
+index 873556a..f9ab069 100644
+--- a/fs/lustre/osc/osc_internal.h
++++ b/fs/lustre/osc/osc_internal.h
+@@ -65,9 +65,6 @@ int osc_match_base(struct obd_export *exp, struct ldlm_res_id *res_id,
+ int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
+ 		      obd_enqueue_update_f upcall, void *cookie,
+ 		      struct ptlrpc_request_set *rqset);
+-int osc_punch_base(struct obd_export *exp, struct obdo *oa,
+-		   obd_enqueue_update_f upcall, void *cookie,
+-		   struct ptlrpc_request_set *rqset);
+ int osc_sync_base(struct osc_object *exp, struct obdo *oa,
+ 		  obd_enqueue_update_f upcall, void *cookie,
+ 		  struct ptlrpc_request_set *rqset);
+@@ -169,4 +166,14 @@ unsigned long osc_cache_shrink_count(struct shrinker *sk,
+ unsigned long osc_cache_shrink_scan(struct shrinker *sk,
+ 				    struct shrink_control *sc);
+ 
++static inline void osc_set_io_portal(struct ptlrpc_request *req)
++{
++	struct obd_import *imp = req->rq_import;
++
++	/* Distinguish OSC from MDC here to use OST or MDS portal */
++	if (OCD_HAS_FLAG(&imp->imp_connect_data, IBITS))
++		req->rq_request_portal = MDS_IO_PORTAL;
++	else
++		req->rq_request_portal = OST_IO_PORTAL;
++}
+ #endif /* OSC_INTERNAL_H */
+diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
+index f7169e9..176ebe8 100644
+--- a/fs/lustre/osc/osc_io.c
++++ b/fs/lustre/osc/osc_io.c
+@@ -104,9 +104,8 @@ static int osc_io_read_ahead(const struct lu_env *env,
+  * or, if page is already submitted, changes osc flags through
+  * osc_set_async_flags().
+  */
+-static int osc_io_submit(const struct lu_env *env,
+-			 const struct cl_io_slice *ios,
+-			 enum cl_req_type crt, struct cl_2queue *queue)
++int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
++		  enum cl_req_type crt, struct cl_2queue *queue)
+ {
+ 	struct cl_page *page;
+ 	struct cl_page *tmp;
+@@ -212,6 +211,7 @@ static int osc_io_submit(const struct lu_env *env,
+ 	CDEBUG(D_INFO, "%d/%d %d\n", qin->pl_nr, qout->pl_nr, result);
+ 	return qout->pl_nr > 0 ? 0 : result;
+ }
++EXPORT_SYMBOL(osc_io_submit);
+ 
+ /**
+  * This is called when a page is accessed within file in a way that creates
+@@ -258,10 +258,10 @@ static void osc_page_touch_at(const struct lu_env *env,
+ 	cl_object_attr_unlock(obj);
+ }
+ 
+-static int osc_io_commit_async(const struct lu_env *env,
+-			       const struct cl_io_slice *ios,
+-			       struct cl_page_list *qin, int from, int to,
+-			       cl_commit_cbt cb)
++int osc_io_commit_async(const struct lu_env *env,
++			const struct cl_io_slice *ios,
++			struct cl_page_list *qin, int from, int to,
++			cl_commit_cbt cb)
+ {
+ 	struct cl_io *io = ios->cis_io;
+ 	struct osc_io *oio = cl2osc_io(env, ios);
+@@ -331,9 +331,9 @@ static int osc_io_commit_async(const struct lu_env *env,
+ 	CDEBUG(D_INFO, "%d %d\n", qin->pl_nr, result);
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_io_commit_async);
+ 
+-static int osc_io_iter_init(const struct lu_env *env,
+-			    const struct cl_io_slice *ios)
++int osc_io_iter_init(const struct lu_env *env, const struct cl_io_slice *ios)
+ {
+ 	struct osc_object *osc = cl2osc(ios->cis_obj);
+ 	struct obd_import *imp = osc_cli(osc)->cl_import;
+@@ -351,9 +351,10 @@ static int osc_io_iter_init(const struct lu_env *env,
+ 
+ 	return rc;
+ }
++EXPORT_SYMBOL(osc_io_iter_init);
+ 
+-static int osc_io_write_iter_init(const struct lu_env *env,
+-				  const struct cl_io_slice *ios)
++int osc_io_write_iter_init(const struct lu_env *env,
++			   const struct cl_io_slice *ios)
+ {
+ 	struct cl_io *io = ios->cis_io;
+ 	struct osc_io *oio = osc_env_io(env);
+@@ -371,9 +372,10 @@ static int osc_io_write_iter_init(const struct lu_env *env,
+ 
+ 	return osc_io_iter_init(env, ios);
+ }
++EXPORT_SYMBOL(osc_io_write_iter_init);
+ 
+-static void osc_io_iter_fini(const struct lu_env *env,
+-			     const struct cl_io_slice *ios)
++void osc_io_iter_fini(const struct lu_env *env,
++		      const struct cl_io_slice *ios)
+ {
+ 	struct osc_io *oio = osc_env_io(env);
+ 
+@@ -386,9 +388,10 @@ static void osc_io_iter_fini(const struct lu_env *env,
+ 			wake_up_all(&osc->oo_io_waitq);
+ 	}
+ }
++EXPORT_SYMBOL(osc_io_iter_fini);
+ 
+-static void osc_io_write_iter_fini(const struct lu_env *env,
+-				   const struct cl_io_slice *ios)
++void osc_io_write_iter_fini(const struct lu_env *env,
++			    const struct cl_io_slice *ios)
+ {
+ 	struct osc_io *oio = osc_env_io(env);
+ 	struct osc_object *osc = cl2osc(ios->cis_obj);
+@@ -401,9 +404,9 @@ static void osc_io_write_iter_fini(const struct lu_env *env,
+ 
+ 	osc_io_iter_fini(env, ios);
+ }
++EXPORT_SYMBOL(osc_io_write_iter_fini);
+ 
+-static int osc_io_fault_start(const struct lu_env *env,
+-			      const struct cl_io_slice *ios)
++int osc_io_fault_start(const struct lu_env *env, const struct cl_io_slice *ios)
+ {
+ 	struct cl_io *io;
+ 	struct cl_fault_io *fio;
+@@ -422,6 +425,7 @@ static int osc_io_fault_start(const struct lu_env *env,
+ 				  fio->ft_index, fio->ft_nob);
+ 	return 0;
+ }
++EXPORT_SYMBOL(osc_io_fault_start);
+ 
+ static int osc_async_upcall(void *a, int rc)
+ {
+@@ -563,9 +567,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 		init_completion(&cbargs->opc_sync);
+ 
+ 		if (ia_avalid & ATTR_SIZE)
+-			result = osc_punch_base(osc_export(cl2osc(obj)),
+-						oa, osc_async_upcall,
+-						cbargs, PTLRPCD_SET);
++			result = osc_punch_send(osc_export(cl2osc(obj)),
++						oa, osc_async_upcall, cbargs);
+ 		else
+ 			result = osc_setattr_async(osc_export(cl2osc(obj)),
+ 						   oa, osc_async_upcall,
+@@ -575,8 +578,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 	return result;
+ }
+ 
+-static void osc_io_setattr_end(const struct lu_env *env,
+-			       const struct cl_io_slice *slice)
++void osc_io_setattr_end(const struct lu_env *env,
++			const struct cl_io_slice *slice)
+ {
+ 	struct cl_io *io = slice->cis_io;
+ 	struct osc_io *oio = cl2osc_io(env, slice);
+@@ -608,6 +611,7 @@ static void osc_io_setattr_end(const struct lu_env *env,
+ 		oio->oi_trunc = NULL;
+ 	}
+ }
++EXPORT_SYMBOL(osc_io_setattr_end);
+ 
+ struct osc_data_version_args {
+ 	struct osc_io *dva_oio;
+@@ -710,10 +714,10 @@ static void osc_io_data_version_end(const struct lu_env *env,
+ 	}
+ }
+ 
+-static int osc_io_read_start(const struct lu_env *env,
+-			     const struct cl_io_slice *slice)
++int osc_io_read_start(const struct lu_env *env,
++		      const struct cl_io_slice *slice)
+ {
+-	struct cl_object *obj = slice->cis_obj;
++	struct cl_object *obj  = slice->cis_obj;
+ 	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
+ 	int rc = 0;
+ 
+@@ -725,11 +729,12 @@ static int osc_io_read_start(const struct lu_env *env,
+ 	}
+ 	return rc;
+ }
++EXPORT_SYMBOL(osc_io_read_start);
+ 
+-static int osc_io_write_start(const struct lu_env *env,
+-			      const struct cl_io_slice *slice)
++int osc_io_write_start(const struct lu_env *env,
++		       const struct cl_io_slice *slice)
+ {
+-	struct cl_object *obj = slice->cis_obj;
++	struct cl_object *obj   = slice->cis_obj;
+ 	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
+ 	int rc = 0;
+ 
+@@ -742,6 +747,7 @@ static int osc_io_write_start(const struct lu_env *env,
+ 
+ 	return rc;
+ }
++EXPORT_SYMBOL(osc_io_write_start);
+ 
+ static int osc_fsync_ost(const struct lu_env *env, struct osc_object *obj,
+ 			 struct cl_fsync_io *fio)
+@@ -769,8 +775,8 @@ static int osc_fsync_ost(const struct lu_env *env, struct osc_object *obj,
+ 	return rc;
+ }
+ 
+-static int osc_io_fsync_start(const struct lu_env *env,
+-			      const struct cl_io_slice *slice)
++int osc_io_fsync_start(const struct lu_env *env,
++		       const struct cl_io_slice *slice)
+ {
+ 	struct cl_io *io = slice->cis_io;
+ 	struct cl_fsync_io *fio = &io->u.ci_fsync;
+@@ -808,9 +814,10 @@ static int osc_io_fsync_start(const struct lu_env *env,
+ 
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_io_fsync_start);
+ 
+-static void osc_io_fsync_end(const struct lu_env *env,
+-			     const struct cl_io_slice *slice)
++void osc_io_fsync_end(const struct lu_env *env,
++		      const struct cl_io_slice *slice)
+ {
+ 	struct cl_fsync_io *fio = &slice->cis_io->u.ci_fsync;
+ 	struct cl_object *obj = slice->cis_obj;
+@@ -830,6 +837,7 @@ static void osc_io_fsync_end(const struct lu_env *env,
+ 	}
+ 	slice->cis_io->ci_result = result;
+ }
++EXPORT_SYMBOL(osc_io_fsync_end);
+ 
+ static int osc_io_ladvise_start(const struct lu_env *env,
+ 				const struct cl_io_slice *slice)
+@@ -905,8 +913,7 @@ static void osc_io_ladvise_end(const struct lu_env *env,
+ 	slice->cis_io->ci_result = result;
+ }
+ 
+-static void osc_io_end(const struct lu_env *env,
+-		       const struct cl_io_slice *slice)
++void osc_io_end(const struct lu_env *env, const struct cl_io_slice *slice)
+ {
+ 	struct osc_io *oio = cl2osc_io(env, slice);
+ 
+@@ -915,6 +922,7 @@ static void osc_io_end(const struct lu_env *env,
+ 		oio->oi_active = NULL;
+ 	}
+ }
++EXPORT_SYMBOL(osc_io_end);
+ 
+ static const struct cl_io_operations osc_io_ops = {
+ 	.op = {
+diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
+index 3576b34..45b18f1 100644
+--- a/fs/lustre/osc/osc_page.c
++++ b/fs/lustre/osc/osc_page.c
+@@ -276,6 +276,7 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
+ 
+ 	return result;
+ }
++EXPORT_SYMBOL(osc_page_init);
+ 
+ /**
+  * Helper function called by osc_io_submit() for every page in an immediate
 diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index e703cf1..b84856d 100644
+index e804554..275bd12 100644
 --- a/fs/lustre/osc/osc_request.c
 +++ b/fs/lustre/osc/osc_request.c
-@@ -716,9 +716,9 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
- 
- void osc_update_next_shrink(struct client_obd *cli)
- {
--	cli->cl_next_shrink_grant =
--		jiffies + cli->cl_grant_shrink_interval * HZ;
--	CDEBUG(D_CACHE, "next time %ld to shrink grant\n",
-+	cli->cl_next_shrink_grant = ktime_get_seconds() +
-+				    cli->cl_grant_shrink_interval;
-+	CDEBUG(D_CACHE, "next time %lld to shrink grant\n",
- 	       cli->cl_next_shrink_grant);
+@@ -410,30 +410,32 @@ static int osc_create(const struct lu_env *env, struct obd_export *exp,
+ 	return rc;
  }
  
-@@ -841,14 +841,13 @@ int osc_shrink_grant_to_target(struct client_obd *cli, u64 target_bytes)
- 
- static int osc_should_shrink_grant(struct client_obd *client)
- {
--	unsigned long time = jiffies;
--	unsigned long next_shrink = client->cl_next_shrink_grant;
-+	time64_t next_shrink = client->cl_next_shrink_grant;
- 
- 	if ((client->cl_import->imp_connect_data.ocd_connect_flags &
- 	     OBD_CONNECT_GRANT_SHRINK) == 0)
- 		return 0;
- 
--	if (time_after_eq(time, next_shrink - 5)) {
-+	if (ktime_get_seconds() >= next_shrink - 5) {
- 		/* Get the current RPC size directly, instead of going via:
- 		 * cli_brw_size(obd->u.cli.cl_import->imp_obd->obd_self_export)
- 		 * Keep comment here so that it can be found by searching.
-diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
-index 4888578..fc909a8 100644
---- a/fs/lustre/ptlrpc/client.c
-+++ b/fs/lustre/ptlrpc/client.c
-@@ -2206,7 +2206,7 @@ static void ptlrpc_interrupted_set(struct ptlrpc_request_set *set)
- /**
-  * Get the smallest timeout in the set; this does NOT set a timeout.
-  */
--int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
-+time64_t ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
- {
- 	time64_t now = ktime_get_real_seconds();
- 	int timeout = 0;
-@@ -2252,7 +2252,8 @@ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
- int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+-int osc_punch_base(struct obd_export *exp, struct obdo *oa,
+-		   obd_enqueue_update_f upcall, void *cookie,
+-		   struct ptlrpc_request_set *rqset)
++int osc_punch_send(struct obd_export *exp, struct obdo *oa,
++		   obd_enqueue_update_f upcall, void *cookie)
  {
  	struct ptlrpc_request *req;
--	int rc, timeout;
-+	time64_t timeout;
-+	int rc;
- 
- 	if (set->set_producer)
- 		(void)ptlrpc_set_producer(set);
-@@ -2272,7 +2273,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
- 		 * wait until all complete, interrupted, or an in-flight
- 		 * req times out
- 		 */
--		CDEBUG(D_RPCTRACE, "set %p going to sleep for %d seconds\n",
-+		CDEBUG(D_RPCTRACE, "set %p going to sleep for %lld seconds\n",
- 		       set, timeout);
- 
- 		if (timeout == 0 && !signal_pending(current)) {
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index 67a66a5..3cb9b84 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -218,10 +218,10 @@ void ptlrpc_deactivate_import(struct obd_import *imp)
- }
- EXPORT_SYMBOL(ptlrpc_deactivate_import);
- 
--static unsigned int
-+static time64_t
- ptlrpc_inflight_deadline(struct ptlrpc_request *req, time64_t now)
- {
--	long dl;
-+	time64_t dl;
- 
- 	if (!(((req->rq_phase == RQ_PHASE_RPC) && !req->rq_waiting) ||
- 	      (req->rq_phase == RQ_PHASE_BULK) ||
-@@ -246,7 +246,7 @@ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
- {
- 	time64_t now = ktime_get_real_seconds();
- 	struct ptlrpc_request *req, *n;
--	unsigned int timeout = 0;
-+	time64_t timeout = 0;
- 
- 	spin_lock(&imp->imp_lock);
- 	list_for_each_entry_safe(req, n, &imp->imp_sending_list, rq_list)
-@@ -265,7 +265,7 @@ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
- void ptlrpc_invalidate_import(struct obd_import *imp)
- {
- 	struct ptlrpc_request *req, *n;
--	unsigned int timeout;
-+	time64_t timeout;
+ 	struct osc_setattr_args *sa;
++	struct obd_import *imp = class_exp2cliimp(exp);
+ 	struct ost_body *body;
  	int rc;
  
- 	atomic_inc(&imp->imp_inval_count);
-@@ -282,6 +282,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 	 * no guarantee that some rdma transfer is not in progress right now.
- 	 */
- 	do {
-+		long timeout_jiffies;
- 		/* Calculate max timeout for waiting on rpcs to error
- 		 * out. Use obd_timeout if calculated value is smaller
- 		 * than it.
-@@ -298,16 +299,17 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 		}
+-	req = ptlrpc_request_alloc(class_exp2cliimp(exp), &RQF_OST_PUNCH);
++	req = ptlrpc_request_alloc(imp, &RQF_OST_PUNCH);
+ 	if (!req)
+ 		return -ENOMEM;
  
- 		CDEBUG(D_RPCTRACE,
--		       "Sleeping %d sec for inflight to error out\n",
-+		       "Sleeping %llds for inflight to error out\n",
- 		       timeout);
- 
- 		/* Wait for all requests to error out and call completion
- 		 * callbacks. Cap it at obd_timeout -- these should all
- 		 * have been locally cancelled by ptlrpc_abort_inflight.
- 		 */
-+		timeout_jiffies = max_t(long, timeout * HZ, 1);
- 		rc = wait_event_idle_timeout(imp->imp_recovery_waitq,
- 					     atomic_read(&imp->imp_inflight) == 0,
--					     obd_timeout * HZ);
-+					     timeout_jiffies);
- 
- 		if (rc == 0) {
- 			const char *cli_tgt = obd2cli_tgt(imp->imp_obd);
-@@ -421,6 +423,7 @@ void ptlrpc_fail_import(struct obd_import *imp, u32 conn_cnt)
- 
- int ptlrpc_reconnect_import(struct obd_import *imp)
- {
-+	long timeout_jiffies = obd_timeout * HZ;
- 	int rc;
- 
- 	ptlrpc_pinger_force(imp);
-@@ -430,7 +433,7 @@ int ptlrpc_reconnect_import(struct obd_import *imp)
- 
- 	rc = wait_event_idle_timeout(imp->imp_recovery_waitq,
- 				     !ptlrpc_import_in_recovery(imp),
--				     obd_timeout * HZ);
-+				     timeout_jiffies);
- 	CDEBUG(D_HA, "%s: recovery finished s:%s\n", obd2cli_tgt(imp->imp_obd),
- 	       ptlrpc_import_state_name(imp->imp_state));
- 	return rc == 0 ? -ETIMEDOUT : 0;
-@@ -1506,22 +1509,27 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ 	rc = ptlrpc_request_pack(req, LUSTRE_OST_VERSION, OST_PUNCH);
+-	if (rc) {
++	if (rc < 0) {
+ 		ptlrpc_request_free(req);
+ 		return rc;
  	}
- 
- 	if (ptlrpc_import_in_recovery(imp)) {
--		unsigned long timeout;
-+		long timeout_jiffies;
-+		time64_t timeout;
- 
- 		if (AT_OFF) {
- 			if (imp->imp_server_timeout)
--				timeout = obd_timeout * HZ / 2;
-+				timeout = obd_timeout >> 1;
- 			else
--				timeout = obd_timeout * HZ;
-+				timeout = obd_timeout;
- 		} else {
--			int idx = import_at_get_index(imp,
--				imp->imp_client->cli_request_portal);
--			timeout = at_get(&imp->imp_at.iat_service_estimate[idx]) * HZ;
-+			u32 req_portal;
-+			int idx;
+-	req->rq_request_portal = OST_IO_PORTAL; /* bug 7198 */
 +
-+			req_portal = imp->imp_client->cli_request_portal;
-+			idx = import_at_get_index(imp, req_portal);
-+			timeout = at_get(&imp->imp_at.iat_service_estimate[idx]);
- 		}
++	osc_set_io_portal(req);
++
+ 	ptlrpc_at_set_req_timeout(req);
  
-+		timeout_jiffies = timeout * HZ;
- 		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
- 					    !ptlrpc_import_in_recovery(imp),
--					    max(timeout, 1UL)) == 0)
-+					    max_t(long, timeout_jiffies, 1)) == 0)
- 			l_wait_event_abortable(
- 				imp->imp_recovery_waitq,
- 				!ptlrpc_import_in_recovery(imp));
-diff --git a/fs/lustre/ptlrpc/pinger.c b/fs/lustre/ptlrpc/pinger.c
-index 6a437f4..762fd0e 100644
---- a/fs/lustre/ptlrpc/pinger.c
-+++ b/fs/lustre/ptlrpc/pinger.c
-@@ -100,15 +100,15 @@ static int ptlrpc_ping(struct obd_import *imp)
+ 	body = req_capsule_client_get(&req->rq_pill, &RMF_OST_BODY);
+-	LASSERT(body);
+-	lustre_set_wire_obdo(&req->rq_import->imp_connect_data, &body->oa,
++
++	lustre_set_wire_obdo(&imp->imp_connect_data, &body->oa,
+ 			     oa);
  
- static void ptlrpc_update_next_ping(struct obd_import *imp, int soon)
- {
--	int time = soon ? PING_INTERVAL_SHORT : PING_INTERVAL;
-+	time64_t time = soon ? PING_INTERVAL_SHORT : PING_INTERVAL;
+ 	ptlrpc_request_set_replen(req);
+@@ -444,10 +446,12 @@ int osc_punch_base(struct obd_export *exp, struct obdo *oa,
+ 	sa->sa_oa = oa;
+ 	sa->sa_upcall = upcall;
+ 	sa->sa_cookie = cookie;
+-	ptlrpc_set_add_req(rqset, req);
++
++	ptlrpcd_add_req(req);
  
- 	if (imp->imp_state == LUSTRE_IMP_DISCON) {
--		int dtime = max_t(int, CONNECTION_SWITCH_MIN,
-+		time64_t dtime = max_t(time64_t, CONNECTION_SWITCH_MIN,
- 				  AT_OFF ? 0 :
- 				  at_get(&imp->imp_at.iat_net_latency));
- 		time = min(time, dtime);
+ 	return 0;
+ }
++EXPORT_SYMBOL(osc_punch_send);
+ 
+ static int osc_sync_interpret(const struct lu_env *env,
+ 			      struct ptlrpc_request *req,
+@@ -1157,7 +1161,8 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 		ptlrpc_request_free(req);
+ 		return rc;
  	}
--	imp->imp_next_ping = jiffies + time * HZ;
-+	imp->imp_next_ping = ktime_get_seconds() + time;
- }
- 
- static inline int imp_is_deactive(struct obd_import *imp)
-@@ -117,23 +117,23 @@ static inline int imp_is_deactive(struct obd_import *imp)
- 		OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_IMP_DEACTIVE));
- }
- 
--static inline int ptlrpc_next_reconnect(struct obd_import *imp)
-+static inline time64_t ptlrpc_next_reconnect(struct obd_import *imp)
- {
- 	if (imp->imp_server_timeout)
--		return jiffies + obd_timeout / 2 * HZ;
-+		return ktime_get_seconds() + (obd_timeout >> 1);
- 	else
--		return jiffies + obd_timeout * HZ;
-+		return ktime_get_seconds() + obd_timeout;
- }
- 
--static long pinger_check_timeout(unsigned long time)
-+static time64_t pinger_check_timeout(time64_t time)
- {
- 	struct timeout_item *item;
--	unsigned long timeout = PING_INTERVAL;
-+	time64_t timeout = PING_INTERVAL;
- 
--	/* The timeout list is a increase order sorted list */
-+	/* This list is sorted in increasing timeout order */
- 	mutex_lock(&pinger_mutex);
- 	list_for_each_entry(item, &timeout_list, ti_chain) {
--		int ti_timeout = item->ti_timeout;
-+		time64_t ti_timeout = item->ti_timeout;
- 
- 		if (timeout > ti_timeout)
- 			timeout = ti_timeout;
-@@ -141,7 +141,7 @@ static long pinger_check_timeout(unsigned long time)
- 	}
- 	mutex_unlock(&pinger_mutex);
- 
--	return time + timeout * HZ - jiffies;
-+	return time + timeout - ktime_get_seconds();
- }
- 
- static bool ir_up;
-@@ -161,7 +161,7 @@ void ptlrpc_pinger_ir_down(void)
- EXPORT_SYMBOL(ptlrpc_pinger_ir_down);
- 
- static void ptlrpc_pinger_process_import(struct obd_import *imp,
--					 unsigned long this_ping)
-+					 time64_t this_ping)
- {
- 	int level;
- 	int force;
-@@ -180,8 +180,7 @@ static void ptlrpc_pinger_process_import(struct obd_import *imp,
- 
- 	imp->imp_force_verify = 0;
- 
--	if (time_after_eq(imp->imp_next_ping - 5, this_ping) &&
--	    !force) {
-+	if (imp->imp_next_ping - 5 >= this_ping && !force) {
- 		spin_unlock(&imp->imp_lock);
- 		return;
- 	}
-@@ -224,8 +223,8 @@ static void ptlrpc_pinger_process_import(struct obd_import *imp,
- 
- static void ptlrpc_pinger_main(struct work_struct *ws)
- {
--	unsigned long this_ping = jiffies;
--	long time_to_next_wake;
-+	time64_t this_ping = ktime_get_seconds();
-+	time64_t time_to_next_wake;
- 	struct timeout_item *item;
- 	struct obd_import *imp;
- 
-@@ -238,8 +237,7 @@ static void ptlrpc_pinger_main(struct work_struct *ws)
- 			ptlrpc_pinger_process_import(imp, this_ping);
- 			/* obd_timeout might have changed */
- 			if (imp->imp_pingable && imp->imp_next_ping &&
--			    time_after(imp->imp_next_ping,
--				       this_ping + PING_INTERVAL * HZ))
-+			    imp->imp_next_ping > this_ping + PING_INTERVAL)
- 				ptlrpc_update_next_ping(imp, 0);
- 		}
- 		mutex_unlock(&pinger_mutex);
-@@ -253,9 +251,9 @@ static void ptlrpc_pinger_main(struct work_struct *ws)
- 		 * we will SKIP the next ping at next_ping, and the
- 		 * ping will get sent 2 timeouts from now!  Beware.
- 		 */
--		CDEBUG(D_INFO, "next wakeup in %ld (%ld)\n",
-+		CDEBUG(D_INFO, "next wakeup in %lld (%lld)\n",
- 		       time_to_next_wake,
--		       this_ping + PING_INTERVAL * HZ);
-+		       this_ping + PING_INTERVAL);
- 	} while (time_to_next_wake <= 0);
- 
- 	queue_delayed_work(pinger_wq, &ping_work,
-@@ -357,7 +355,7 @@ int ptlrpc_pinger_del_import(struct obd_import *imp)
-  * Register a timeout callback to the pinger list, and the callback will
-  * be called when timeout happens.
-  */
--static struct timeout_item *ptlrpc_new_timeout(int time,
-+static struct timeout_item *ptlrpc_new_timeout(time64_t time,
- 					       enum timeout_event event,
- 					       timeout_cb_t cb, void *data)
- {
-@@ -382,7 +380,7 @@ static struct timeout_item *ptlrpc_new_timeout(int time,
-  * Note: the timeout list is an sorted list with increased timeout value.
-  */
- static struct timeout_item*
--ptlrpc_pinger_register_timeout(int time, enum timeout_event event,
-+ptlrpc_pinger_register_timeout(time64_t time, enum timeout_event event,
- 			       timeout_cb_t cb, void *data)
- {
- 	struct timeout_item *item, *tmp;
-@@ -410,7 +408,7 @@ static struct timeout_item *ptlrpc_new_timeout(int time,
- /* Add a client_obd to the timeout event list, when timeout(@time)
-  * happens, the callback(@cb) will be called.
-  */
--int ptlrpc_add_timeout_client(int time, enum timeout_event event,
-+int ptlrpc_add_timeout_client(time64_t time, enum timeout_event event,
- 			      timeout_cb_t cb, void *data,
- 			      struct list_head *obd_list)
- {
-diff --git a/fs/lustre/ptlrpc/ptlrpc_internal.h b/fs/lustre/ptlrpc/ptlrpc_internal.h
-index 201ccdd..40cf7b7 100644
---- a/fs/lustre/ptlrpc/ptlrpc_internal.h
-+++ b/fs/lustre/ptlrpc/ptlrpc_internal.h
-@@ -69,7 +69,7 @@ struct ptlrpc_bulk_desc *ptlrpc_new_bulk(unsigned int nfrags,
- void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
- 			    struct ptlrpc_request *req);
- void ptlrpc_expired_set(struct ptlrpc_request_set *set);
--int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set);
-+time64_t ptlrpc_set_next_timeout(struct ptlrpc_request_set *set);
- void ptlrpc_resend_req(struct ptlrpc_request *request);
- void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req);
- void ptlrpc_assign_next_xid_nolock(struct ptlrpc_request *req);
-diff --git a/fs/lustre/ptlrpc/ptlrpcd.c b/fs/lustre/ptlrpc/ptlrpcd.c
-index 92b477d..0b73d58 100644
---- a/fs/lustre/ptlrpc/ptlrpcd.c
-+++ b/fs/lustre/ptlrpc/ptlrpcd.c
-@@ -434,7 +434,7 @@ static int ptlrpcd(void *arg)
- 	 * new_req_list and ptlrpcd_check() moves them into the set.
- 	 */
- 	do {
--		int timeout;
-+		time64_t timeout;
- 
- 		timeout = ptlrpc_set_next_timeout(set);
- 
+-	req->rq_request_portal = OST_IO_PORTAL; /* bug 7198 */
++	osc_set_io_portal(req);
++
+ 	ptlrpc_at_set_req_timeout(req);
+ 	/* ask ptlrpc not to resend on EINPROGRESS since BRWs have their own
+ 	 * retry logic
 -- 
 1.8.3.1
