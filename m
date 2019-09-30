@@ -1,140 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:56:10 -0400
-Subject: [lustre-devel] [PATCH 111/151] lustre: obd: remove s2dhms time
- function
+Date: Mon, 30 Sep 2019 14:56:17 -0400
+Subject: [lustre-devel] [PATCH 118/151] lustre: llite: deny 2.10 clients to
+ open mirrored files
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-112-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-119-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lustre created the s2dhms function to report a time
-lapse in a days:hour:minute:seconds format. This is
-over kill so remove s2dhms and just report the number
-of seconds that has lapse.
+From: Jinshan Xiong <jinshan.xiong@gmail.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
-Lustre-commit: 5ed38cca120f ("LU-9019 obd: remove s2dhms time function")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/23269
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+2.10 clients would manipulate mirrored layout as PFL layout, which
+would damage mirrored files.
+
+This patch only allows mirrored files to be opened by clients who
+understand mirror layout.
+
+It also fixes the problem that it should check OBD_CONNECT_FLAGS2
+first before checking OBD_CONNECT2_XXX flags.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10286
+Lustre-commit: 21e39775a0f4 ("LU-10286 llite: deny 2.10 clients to open mirrored files")
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-on: https://review.whamcloud.com/30957
+Tested-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lprocfs_status.h  | 19 -------------------
- fs/lustre/obdclass/lprocfs_status.c | 19 ++++++++-----------
- fs/lustre/ptlrpc/lproc_ptlrpc.c     |  8 +++-----
- 3 files changed, 11 insertions(+), 35 deletions(-)
+ fs/lustre/include/lustre_export.h      | 9 ++++++++-
+ fs/lustre/llite/llite_lib.c            | 2 +-
+ include/uapi/linux/lustre/lustre_idl.h | 1 +
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
-index 10d541f..c3644f9 100644
---- a/fs/lustre/include/lprocfs_status.h
-+++ b/fs/lustre/include/lprocfs_status.h
-@@ -348,25 +348,6 @@ enum {
- struct obd_device;
- struct obd_histogram;
+diff --git a/fs/lustre/include/lustre_export.h b/fs/lustre/include/lustre_export.h
+index 544166f..de3b109 100644
+--- a/fs/lustre/include/lustre_export.h
++++ b/fs/lustre/include/lustre_export.h
+@@ -156,7 +156,9 @@ static inline u64 *exp_connect_flags2_ptr(struct obd_export *exp)
  
--/* Days / hours / mins / seconds format */
--struct dhms {
--	int d, h, m, s;
--};
--
--static inline void s2dhms(struct dhms *ts, time64_t secs64)
--{
--	unsigned int secs;
--
--	ts->d = div_u64_rem(secs64, 86400, &secs);
--	ts->h = secs / 3600;
--	secs = secs % 3600;
--	ts->m = secs / 60;
--	ts->s = secs % 60;
--}
--
--#define DHMS_FMT "%dd%dh%02dm%02ds"
--#define DHMS_VARS(x) (x)->d, (x)->h, (x)->m, (x)->s
--
- #define JOBSTATS_JOBID_VAR_MAX_LEN	20
- #define JOBSTATS_DISABLE		"disable"
- #define JOBSTATS_PROCNAME_UID		"procname_uid"
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 135926e..0e7fc70 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -943,7 +943,6 @@ int lprocfs_rd_timeouts(struct seq_file *m, void *data)
- 	struct obd_import *imp;
- 	unsigned int cur, worst;
- 	time64_t now, worstt;
--	struct dhms ts;
- 	int i, rc;
- 
- 	LASSERT(obd);
-@@ -956,16 +955,15 @@ int lprocfs_rd_timeouts(struct seq_file *m, void *data)
- 	now = ktime_get_real_seconds();
- 
- 	/* Some network health info for kicks */
--	s2dhms(&ts, now - imp->imp_last_reply_time);
--	seq_printf(m, "%-10s : %lld, " DHMS_FMT " ago\n",
--		   "last reply", (s64)imp->imp_last_reply_time, DHMS_VARS(&ts));
-+	seq_printf(m, "%-10s : %lld, %llds ago\n",
-+		   "last reply", (s64)imp->imp_last_reply_time,
-+		   (s64)(now - imp->imp_last_reply_time));
- 
- 	cur = at_get(&imp->imp_at.iat_net_latency);
- 	worst = imp->imp_at.iat_net_latency.at_worst_ever;
- 	worstt = imp->imp_at.iat_net_latency.at_worst_time;
--	s2dhms(&ts, now - worstt);
--	seq_printf(m, "%-10s : cur %3u  worst %3u (at %lld, " DHMS_FMT " ago) ",
--		   "network", cur, worst, (s64)worstt, DHMS_VARS(&ts));
-+	seq_printf(m, "%-10s : cur %3u  worst %3u (at %lld, %llds ago) ",
-+		   "network", cur, worst, (s64)worstt, (s64)(now - worstt));
- 	lprocfs_at_hist_helper(m, &imp->imp_at.iat_net_latency);
- 
- 	for (i = 0; i < IMP_AT_MAX_PORTALS; i++) {
-@@ -974,10 +972,9 @@ int lprocfs_rd_timeouts(struct seq_file *m, void *data)
- 		cur = at_get(&imp->imp_at.iat_service_estimate[i]);
- 		worst = imp->imp_at.iat_service_estimate[i].at_worst_ever;
- 		worstt = imp->imp_at.iat_service_estimate[i].at_worst_time;
--		s2dhms(&ts, now - worstt);
--		seq_printf(m, "portal %-2d  : cur %3u  worst %3u (at %lld, "
--			   DHMS_FMT " ago) ", imp->imp_at.iat_portal[i],
--			   cur, worst, (s64)worstt, DHMS_VARS(&ts));
-+		seq_printf(m, "portal %-2d  : cur %3u  worst %3u (at %lld, %llds ago) ",
-+			   imp->imp_at.iat_portal[i], cur, worst, (s64)worstt,
-+			   (s64)(now - worstt));
- 		lprocfs_at_hist_helper(m, &imp->imp_at.iat_service_estimate[i]);
- 	}
- 
-diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index 2239680..3dc99d4 100644
---- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -1009,7 +1009,6 @@ static int ptlrpc_lprocfs_timeouts_seq_show(struct seq_file *m, void *n)
+ static inline u64 exp_connect_flags2(struct obd_export *exp)
  {
- 	struct ptlrpc_service *svc = m->private;
- 	struct ptlrpc_service_part *svcpt;
--	struct dhms ts;
- 	time64_t worstt;
- 	unsigned int cur;
- 	unsigned int worst;
-@@ -1025,11 +1024,10 @@ static int ptlrpc_lprocfs_timeouts_seq_show(struct seq_file *m, void *n)
- 		cur = at_get(&svcpt->scp_at_estimate);
- 		worst = svcpt->scp_at_estimate.at_worst_ever;
- 		worstt = svcpt->scp_at_estimate.at_worst_time;
--		s2dhms(&ts, ktime_get_real_seconds() - worstt);
+-	return *exp_connect_flags2_ptr(exp);
++	if (exp_connect_flags(exp) & OBD_CONNECT_FLAGS2)
++		return *exp_connect_flags2_ptr(exp);
++	return 0;
+ }
  
--		seq_printf(m, "%10s : cur %3u  worst %3u (at %lld, "
--			   DHMS_FMT " ago) ", "service",
--			   cur, worst, (s64)worstt, DHMS_VARS(&ts));
-+		seq_printf(m, "%10s : cur %3u  worst %3u (at %lld, %llds ago) ",
-+			   "service", cur, worst, (s64)worstt,
-+			   (s64)(ktime_get_real_seconds() - worstt));
+ static inline int exp_max_brw_size(struct obd_export *exp)
+@@ -262,6 +264,11 @@ static inline int exp_connect_lockahead(struct obd_export *exp)
+ 	return !!(exp_connect_flags2(exp) & OBD_CONNECT2_LOCKAHEAD);
+ }
  
- 		lprocfs_at_hist_helper(m, &svcpt->scp_at_estimate);
- 	}
++static inline int exp_connect_flr(struct obd_export *exp)
++{
++	return !!(exp_connect_flags2(exp) & OBD_CONNECT2_FLR);
++}
++
+ struct obd_export *class_conn2export(struct lustre_handle *conn);
+ 
+ #define KKUC_CT_DATA_MAGIC	0x092013cea
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 2a7ef64..efd1093 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -208,7 +208,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 				  OBD_CONNECT_GRANT_PARAM |
+ 				  OBD_CONNECT_SHORTIO | OBD_CONNECT_FLAGS2;
+ 
+-	data->ocd_connect_flags2 = 0;
++	data->ocd_connect_flags2 = OBD_CONNECT2_FLR;
+ 
+ 	if (sbi->ll_flags & LL_SBI_LRU_RESIZE)
+ 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 6dce6f1..6294eaa 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -791,6 +791,7 @@ struct ptlrpc_body_v2 {
+ #define OBD_CONNECT2_LOCKAHEAD		0x2ULL		/* ladvise lockahead
+ 							 * v2
+ 							 */
++#define OBD_CONNECT2_FLR		0x20ULL		/* FLR support */
+ 
+ /* XXX README XXX:
+  * Please DO NOT add flag values here before first ensuring that this same
 -- 
 1.8.3.1
