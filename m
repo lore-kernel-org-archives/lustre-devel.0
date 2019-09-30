@@ -1,81 +1,83 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Sep 2019 14:55:14 -0400
-Subject: [lustre-devel] [PATCH 055/151] lustre: misc: replace LASSERT() with
- BUILD_BUG_ON()
+Date: Mon, 30 Sep 2019 14:55:37 -0400
+Subject: [lustre-devel] [PATCH 078/151] lustre: hsm: don't release with
+ wrong size
 In-Reply-To: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1569869810-23848-56-git-send-email-jsimmons@infradead.org>
+Message-ID: <1569869810-23848-79-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Alexander Boyko <c17825@cray.com>
 
-Some code consistency checks are being done at runtime with
-LASSERT() when they could be done at compile time with
-BUILD_BUG_ON(). This might miss defects introduced into the
-code if that particular code path is not exercised during testing.
+The result of ll_merge_attr operation was ignored during
+ll_hsm_release. For this case the released file could have
+the wrong size on MDS, like
+File: ?released.file?
+Size: 0  Blocks: 0  IO Block: 4194304 regular empty file
 
-Replace LASSERT() with BUILD_BUG_ON() in such cases.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10046
-Lustre-commit: 558c93dc56dc ("LU-10046 misc: replace LASSERT() with CLASSERT()")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/29256
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10271
+Lustre-commit: 09b457fffc8a ("LU-10271 hsm: don't release with wrong size")
+Signed-off-by: Alexander Boyko <c17825@cray.com>
+Reviewed-on: https://review.whamcloud.com/30240
+Reviewed-by: Henri Doreau <henri.doreau@cea.fr>
+Reviewed-by: Sergey Cheremencev <c17829@cray.com>
+Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
 Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/dir.c           | 6 +++---
- fs/lustre/ptlrpc/client.c       | 2 +-
- fs/lustre/ptlrpc/lproc_ptlrpc.c | 1 +
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/llite/file.c          | 13 +++++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index ba53c1e..8968110 100644
---- a/fs/lustre/llite/dir.c
-+++ b/fs/lustre/llite/dir.c
-@@ -1229,9 +1229,9 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 1dce1c0..6a01af4 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -384,6 +384,7 @@
+ #define OBD_FAIL_MDC_RPCS_SEM				0x804
+ #define OBD_FAIL_MDC_LIGHTWEIGHT			0x805
+ #define OBD_FAIL_MDC_CLOSE				0x806
++#define OBD_FAIL_MDC_MERGE				0x807
  
- 		BUILD_BUG_ON(sizeof(struct lov_user_md_v3) <=
- 			     sizeof(struct lov_comp_md_v1));
--		LASSERT(sizeof(lumv3) == sizeof(*lumv3p));
--		LASSERT(sizeof(lumv3.lmm_objects[0]) ==
--			sizeof(lumv3p->lmm_objects[0]));
-+		BUILD_BUG_ON(sizeof(lumv3) != sizeof(*lumv3p));
-+		BUILD_BUG_ON(sizeof(lumv3.lmm_objects[0]) !=
-+			     sizeof(lumv3p->lmm_objects[0]));
- 		/* first try with v1 which is smaller than v3 */
- 		if (copy_from_user(lumv1, lumv1p, sizeof(*lumv1)))
- 			return -EFAULT;
-diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
-index fc909a8..e0b2b91 100644
---- a/fs/lustre/ptlrpc/client.c
-+++ b/fs/lustre/ptlrpc/client.c
-@@ -2934,7 +2934,7 @@ int ptlrpc_replay_req(struct ptlrpc_request *req)
+ #define OBD_FAIL_MGS					0x900
+ #define OBD_FAIL_MGS_ALL_REQUEST_NET			0x901
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 22e3494..164948c 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -1133,7 +1133,10 @@ int ll_merge_attr(const struct lu_env *env, struct inode *inode)
+ 	ctime = inode->i_ctime.tv_sec;
  
- 	LASSERT(req->rq_import->imp_state == LUSTRE_IMP_REPLAY);
+ 	cl_object_attr_lock(obj);
+-	rc = cl_object_attr_get(env, obj, attr);
++	if (OBD_FAIL_CHECK(OBD_FAIL_MDC_MERGE))
++		rc = -EINVAL;
++	else
++		rc = cl_object_attr_get(env, obj, attr);
+ 	cl_object_attr_unlock(obj);
  
--	LASSERT(sizeof(*aa) <= sizeof(req->rq_async_args));
-+	BUILD_BUG_ON(sizeof(*aa) > sizeof(req->rq_async_args));
- 	aa = ptlrpc_req_async_args(req);
- 	memset(aa, 0, sizeof(*aa));
+ 	if (rc != 0) {
+@@ -2050,9 +2053,15 @@ int ll_hsm_release(struct inode *inode)
+ 		goto out;
+ 	}
  
-diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index bc5dc3f..937a413 100644
---- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -449,6 +449,7 @@ static void nrs_policy_get_info_locked(struct ptlrpc_nrs_policy *policy,
- {
- 	assert_spin_locked(&policy->pol_nrs->nrs_lock);
+-	ll_merge_attr(env, inode);
++	rc = ll_merge_attr(env, inode);
+ 	cl_env_put(env, &refcheck);
  
-+	BUILD_BUG_ON(sizeof(info->pi_arg) != sizeof(policy->pol_arg));
- 	memcpy(info->pi_name, policy->pol_desc->pd_name, NRS_POL_NAME_MAX);
- 
- 	info->pi_fallback = !!(policy->pol_flags & PTLRPC_NRS_FL_FALLBACK);
++	/* If error happen, we have the wrong size for a file.
++	 * Don't release it.
++	 */
++	if (rc != 0)
++		goto out;
++
+ 	/* Release the file.
+ 	 * NB: lease lock handle is released in mdc_hsm_release_pack() because
+ 	 * we still need it to pack l_remote_handle to MDT.
 -- 
 1.8.3.1
