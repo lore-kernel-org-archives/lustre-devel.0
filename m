@@ -1,49 +1,33 @@
-From: NeilBrown <neilb@suse.de>
-Date: Tue, 01 Oct 2019 17:24:33 +1000
-Subject: [lustre-devel] [PATCH 001/151] lnet: fix needed headers for
- lnet headers
-In-Reply-To: <1569869810-23848-2-git-send-email-jsimmons@infradead.org>
-References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
- <1569869810-23848-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <87d0fh6i8e.fsf@notabene.neil.brown.name>
+From: Doug Oucharek <dougso@me.com>
+Date: Tue, 1 Oct 2019 09:01:40 -0700
+Subject: [lustre-devel] client-server wire protocol
+In-Reply-To: <CAKSyJXdF6m5D0w5oFpyEFsTK_0PzJn2-cNsV3QZbH9UrYOtVTQ@mail.gmail.com>
+References: <CAKSyJXdF6m5D0w5oFpyEFsTK_0PzJn2-cNsV3QZbH9UrYOtVTQ@mail.gmail.com>
+Message-ID: <F4CB592F-6B86-4E87-94A7-DBB067C33910@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Sep 30 2019, James Simmons wrote:
+The best way to learn/understand the protocol is to look at and use the Lustre/LNet dissector for Wireshark.  It was pushed up into the Wireshark project in this commit: https://code.wireshark.org/review/gitweb?p=wireshark.git;a=commit;h=958374f352c0d1c238355a6434e0222e754f43f1 <https://code.wireshark.org/review/gitweb?p=wireshark.git;a=commit;h=958374f352c0d1c238355a6434e0222e754f43f1>.
 
-> The linux kernel now has a sanity check for the global headers,
-> activated by  CONFIG_HEADER_TEST=y and CONFIG_KERNEL_HEADER_TEST=y.
-> Some LNet headers are missing a few headers to allow them to build
-> properly.
->
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> Signed-off-by: NeilBrown <neilb@suse.com>
-
-I've added the following to this patch
-
-diff --git a/include/linux/libcfs/libcfs_debug.h b/include/linux/libcfs/libcfs_debug.h
-index 911fd35b81b5..2ae67c67faa7 100644
---- a/include/linux/libcfs/libcfs_debug.h
-+++ b/include/linux/libcfs/libcfs_debug.h
-@@ -56,6 +56,8 @@ extern unsigned int libcfs_console_backoff;
- extern unsigned int libcfs_debug_binary;
- extern char libcfs_debug_file_path_arr[PATH_MAX];
- 
-+struct task_struct;
-+
- int libcfs_debug_mask2str(char *str, int size, int mask, int is_subsys);
- int libcfs_debug_str2mask(int *mask, const char *str, int is_subsys);
- void libcfs_debug_dumpstack(struct task_struct *tsk);
+Doug
 
 
-NeilBrown
+> On Sep 28, 2019, at 1:35 PM, Bradley C. Kuszmaul <kuszmaul@gmail.com> wrote:
+> 
+> Is there a well-defined client-server wire protocol so that one could imagine building a different client or a different server that would interact with lustre?
+> 
+> I took a quick look through the lustre sources and documentation, but didn't find it.
+> 
+> -Bradley
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191001/90609b23/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191001/432ba290/attachment.html>
