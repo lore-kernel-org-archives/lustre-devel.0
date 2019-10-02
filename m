@@ -1,13 +1,11 @@
 From: NeilBrown <neilb@suse.de>
-Date: Wed, 02 Oct 2019 09:19:38 +1000
-Subject: [lustre-devel] [PATCH 069/151] lustre: ptlrpc: use lu_extent in
- layout_intent
-In-Reply-To: <alpine.LFD.2.21.1910011852440.9239@casper.infradead.org>
+Date: Wed, 02 Oct 2019 10:52:39 +1000
+Subject: [lustre-devel] [PATCH 000/151] lustre: update to 2.11 support
+In-Reply-To: <alpine.LFD.2.21.1910011904390.15141@casper.infradead.org>
 References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
- <1569869810-23848-70-git-send-email-jsimmons@infradead.org>
- <87o8z16t95.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1910011852440.9239@casper.infradead.org>
-Message-ID: <87a7ak6ol1.fsf@notabene.neil.brown.name>
+ <87imp96jb8.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1910011904390.15141@casper.infradead.org>
+Message-ID: <877e5o6ka0.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,37 +14,38 @@ To: lustre-devel@lists.lustre.org
 
 On Tue, Oct 01 2019, James Simmons wrote:
 
->> > From: Jinshan Xiong <jinshan.xiong@gmail.com>
+>> > This patchset covers 3 areas. The fix 6 patches resolves critical
+>> > bugs in the linux client. Mainly for handling of LNet with secondary
+>> > IP aliases as well as an RCU issue reported with debugging enabled.
+>> > This consoldation of IP handling makes any kernel API changes in the
+>> > future easier to handle.
 >> >
->> > This way it will be easier to check and print the extent
->> > of layout.
+>> > The last 9 patches cover patches in the lustre-testing that landed
+>> > to the OpenSFS branch.
 >> >
->> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9771
->> > Lustre-commit: c1f450270dda ("LU-9971 ptlrpc: use lu_extent in layout_intent")
->> > Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
->> > Reviewed-on: https://review.whamcloud.com/29087
->> > Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
->> > Reviewed-by: Bobi Jam <bobijam@hotmail.com>
->> > Signed-off-by: James Simmons <jsimmons@infradead.org>
->> > ---
->> >  include/uapi/linux/lustre/lustre_idl.h  | 3 +--
->> >  include/uapi/linux/lustre/lustre_user.h | 2 +-
->> >  2 files changed, 2 insertions(+), 3 deletions(-)
+>> > The rest of the patches cover all the patches missing from the
+>> > Lustre 2.11 release. I have done extentsive testing of these
+>> > patches (sanity, sanity-pfl, sanity-dom, sanity-pfl). Only
+>> > regression I saw was sanity-flr 200 which needs to be investiaged.
+>> > So we are in very good shape.
 >> 
->> 
->> hi James,
->>  most of this patch is missing - it seems to have been merged into the
->>  next patch by mistake.
->>  I'm walking through patches checking that code still compiles after
->>  each patch, and this one doesn't.
->> 
->> NeilBrown
+>> Thanks a lot for these James!
+>> Though I only received up to 133/151 - are 18 missing, or was there a
+>> miscount??
 >
-> Ugh. My tree is on a NFS partition so some times when I apply a patch 
-> while on one node the entire change doesn't show up on another node.
-> Do you need me to resend the patch?
+> Their should be 151 patches. I have had this problem of patches not making
+> it to my mailbox. That is why I have:
+>
+> https://patchwork.kernel.org/project/lustre-devel/list
+>
+> All the patches are there.
 
-No thanks - I've fixed it up in my tree.
+So they are.  There is even a nice "series" line so I can grab them
+call.
+I wonder why they didn't get delivered to me ...
+
+I've applied them all to my tree with no further issues. I'll push
+something out later today.
 
 Thanks,
 NeilBrown
@@ -56,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191002/78e3fd46/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191002/5fe40eac/attachment.sig>
