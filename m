@@ -1,58 +1,46 @@
-From: NeilBrown <neilb@suse.de>
-Date: Wed, 02 Oct 2019 10:52:39 +1000
-Subject: [lustre-devel] [PATCH 000/151] lustre: update to 2.11 support
-In-Reply-To: <alpine.LFD.2.21.1910011904390.15141@casper.infradead.org>
-References: <1569869810-23848-1-git-send-email-jsimmons@infradead.org>
- <87imp96jb8.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1910011904390.15141@casper.infradead.org>
-Message-ID: <877e5o6ka0.fsf@notabene.neil.brown.name>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Wed, 2 Oct 2019 17:45:28 +0000
+Subject: [lustre-devel] client-server wire protocol
+In-Reply-To: <CAKSyJXdF6m5D0w5oFpyEFsTK_0PzJn2-cNsV3QZbH9UrYOtVTQ@mail.gmail.com>
+References: <CAKSyJXdF6m5D0w5oFpyEFsTK_0PzJn2-cNsV3QZbH9UrYOtVTQ@mail.gmail.com>
+Message-ID: <4E10628E-75DE-4BAA-84EF-47E871BABAC1@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Oct 01 2019, James Simmons wrote:
+On Sep 28, 2019, at 14:35, Bradley C. Kuszmaul <kuszmaul at gmail.com<mailto:kuszmaul@gmail.com>> wrote:
 
->> > This patchset covers 3 areas. The fix 6 patches resolves critical
->> > bugs in the linux client. Mainly for handling of LNet with secondary
->> > IP aliases as well as an RCU issue reported with debugging enabled.
->> > This consoldation of IP handling makes any kernel API changes in the
->> > future easier to handle.
->> >
->> > The last 9 patches cover patches in the lustre-testing that landed
->> > to the OpenSFS branch.
->> >
->> > The rest of the patches cover all the patches missing from the
->> > Lustre 2.11 release. I have done extentsive testing of these
->> > patches (sanity, sanity-pfl, sanity-dom, sanity-pfl). Only
->> > regression I saw was sanity-flr 200 which needs to be investiaged.
->> > So we are in very good shape.
->> 
->> Thanks a lot for these James!
->> Though I only received up to 133/151 - are 18 missing, or was there a
->> miscount??
->
-> Their should be 151 patches. I have had this problem of patches not making
-> it to my mailbox. That is why I have:
->
-> https://patchwork.kernel.org/project/lustre-devel/list
->
-> All the patches are there.
+Is there a well-defined client-server wire protocol so that one could imagine building a different client or a different server that would interact with lustre?
 
-So they are.  There is even a nice "series" line so I can grab them
-call.
-I wonder why they didn't get delivered to me ...
+I took a quick look through the lustre sources and documentation, but didn't find it.
 
-I've applied them all to my tree with no further issues. I'll push
-something out later today.
+There is a partially-completed wire protocol document in Git: https://git.whamcloud.com/?p=doc/protocol.git
 
-Thanks,
-NeilBrown
+However, I seriously doubt that it would be sufficient to implement a different client/server than the existing one,
+since it is unfortunately both incomplete and already somewhat out of date.
+
+Since Lustre is open-source software, there is little motivation to spend the huge amount of time & effort to
+reimplement the client or server.  Also, the Lustre protocol changes over time in order to add new functionality,
+so a full reimplementation would become obsolete over time without continuous effort equal to all of the other
+Lustre developers combined.
+
+It would be better to add/fix/port existing code as needed rather than implementing everything from scratch.
+If I might ask, what is your interest in this area?  We're always looking to grow the number of developers and
+contributors in the Lustre community.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Principal Lustre Architect
+Whamcloud
+
+
+
+
+
+
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191002/5fe40eac/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191002/2ccdcfbc/attachment.html>
