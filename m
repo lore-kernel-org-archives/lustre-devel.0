@@ -1,14 +1,25 @@
-From: Christopher Voltz <christopher.voltz@hpe.com>
-Date: Mon, 7 Oct 2019 12:56:26 -0500
-Subject: [lustre-devel] CentOS 8.0 released without HA packages
-Message-ID: <d366a618-5b56-b9ba-0a46-753a5c59af9a@hpe.com>
+From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
+Date: Wed, 16 Oct 2019 12:21:32 +0200
+Subject: [lustre-devel] [testing] Maloo not scheduling tests
+Message-ID: <c7942901-13ea-6126-5a65-be2271c37f22@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-FYI, CentOS 8.0 released without any of the HA packages. I reported it
-in CentOS bug 0016553 (https://bugs.centos.org/view.php?id=16553).
+Hello,
 
-Christopher
+It seems like Maloo is not scheduling tests for this patch 
+<https://review.whamcloud.com/#/c/36292/> since I added some test 
+parameters yesterday:
+
+    Test-Parameters: fortestonly testlist=sanity clientarch=ppc64
+
+Are there problems on Maloo, or am I doing something wrong?
+
+Quentin
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191016/1ebf5752/attachment.html>
