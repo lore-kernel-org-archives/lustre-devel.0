@@ -1,53 +1,32 @@
 From: Peter Jones <pjones@whamcloud.com>
-Date: Fri, 8 Nov 2019 23:21:59 +0000
-Subject: [lustre-devel] New tag and branch split
-Message-ID: <D41466BC-F528-47BF-A101-413969363B03@ddn.com>
+Date: Thu, 5 Dec 2019 15:30:13 +0000
+Subject: [lustre-devel] Lustre 2.13.0 released
+Message-ID: <11EBD557-E6ED-4E4B-90F2-88086EAFE1DC@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Alex
+We are pleased to announce that the Lustre 2.13.0 Release has been declared GA and is available for download<https://downloads.whamcloud.com/public/lustre/lustre-2.13.0/> <https://downloads.hpdd.intel.com/public/lustre/lustre-2.11.0/> . You can also grab the source from git<https://git.whamcloud.com/?p=fs/lustre-release.git;a=commit;h=a298f8c1376485512f83472a22dc755f47947e75>
 
-The release numbering convention is that for build numbers x.y.z that the numbers 50 to 99 are reserved for development builds for the release y+1. So, it is orthogonal to the 2.12.x LTS releases, which are based on the b2_12 branch, not the master branch
+This major release includes new features:
 
-Peter
+Persistent Client Cache allows Lustre to utilize client-local storage such as NVMe or NVRAM as part of the filesystem namespace.  Clients can cache the data of newly created or existing files in a locally-mounted cache filesystem (e.g. ext4) for exclusive access at local filesystem speeds, and data migrates transparently into the global filesystem when accessed by other clients  (LU-10092<https://jira.whamcloud.com/browse/LU-10092>)
 
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Alexander I Kulyavtsev <aik@fnal.gov>
-Date: Friday, November 8, 2019 at 2:36 PM
-To: Oleg Drokin <green@whamcloud.com>, Lustre Development List <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] New tag and branch split
+Multi-Rail Routing enhances multi-rail support for LNet routers, allowing auto discovery of routes and improved resiliency in configurations with multiple interfaces per node (LU-11297<https://jira.whamcloud.com/browse/LU-11297>)
 
-What does  2.12.90 tag mean on  branch 2.12 ?
+Overstriping allows files to have multiple stripes of a single file on each OST.  This allows configurations with relatively few clients/threads or very large OSTs to better utilize the full storage performance (LU-9846<https://jira.whamcloud.com/browse/LU-9846>)
 
-Last release on LTS branch 2.12 ?
-Or am I reading in it too much ?
+Self-Extending Layouts improves the flexibility of Progressive File Layouts (PFL) to better handle filesystems with imbalanced OST capacity, such as smaller flash OST pools combined with larger disk OST pools. Files using Self-Extending Layouts can write to the flash pool as much as possible, but will automatically change over to the disk pool if there is not enough space
+(LU-10070<https://jira.whamcloud.com/browse/LU-10070>)
 
-Alex.
+Fuller details can be found in the 2.13 wiki page <http://wiki.lustre.org/Release_2.13.0> (including the change log <http://wiki.lustre.org/Lustre_2.13.0_Changelog> and test matrix<http://wiki.lustre.org/Release_2.13.0#Test_Matrix>)
 
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Oleg Drokin <odrokin@ddn.com>
-Sent: Friday, November 8, 2019 11:51 AM
-To: Lustre Development List <lustre-devel@lists.lustre.org>
-Subject: [lustre-devel] New tag and branch split
+Please log any issues found in the issue tracking system<https://jira.whamcloud.com/>
 
-Hello!
+Thanks to all those who have contributed to the creation of this release.
 
-  I just split off b2_13 branch from master for final touches of 2.13 release and so we can continue landing other patches (of which there?s now quite a backlog)
-  b2_13 in in codefreeze and will be tagged RC soon.
-
-  Here?s the changelog:
-
-... cut ...
-
-Oleg Drokin (4):
-... cut ...
-      New tag 2.12.90
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191108/4f5f89dc/attachment.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20191205/4774d0b7/attachment.html>
