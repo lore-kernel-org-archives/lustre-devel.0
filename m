@@ -1,16 +1,21 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 7 Jan 2020 01:53:59 +0000
+Date: Tue, 7 Jan 2020 02:24:22 +0000
 Subject: [lustre-devel] Lustre upstreaming status.
-In-Reply-To: <alpine.LFD.2.21.2001062316450.26511@casper.infradead.org>
+In-Reply-To: <8E3FD560-7730-49D7-B5F5-0EC2BD08E149@whamcloud.com>
 References: <alpine.LFD.2.21.1802112308150.3291@casper.infradead.org>
  <87sglgg9ub.fsf@notabene.neil.brown.name>
  <alpine.LFD.2.21.2001062316450.26511@casper.infradead.org>
-Message-ID: <8E3FD560-7730-49D7-B5F5-0EC2BD08E149@whamcloud.com>
+ <8E3FD560-7730-49D7-B5F5-0EC2BD08E149@whamcloud.com>
+Message-ID: <7CDEC7E6-F64B-4014-8CAB-EA77EB9AA0EA@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Replying to my own email to get email addresses correct.
+
+On Jan 6, 2020, at 18:53, Andreas Dilger <adilger at whamcloud.com<mailto:adilger@whamcloud.com>> wrote:
 
 On Jan 6, 2020, at 17:02, James Simmons <jsimmons at infradead.org<mailto:jsimmons@infradead.org>> wrote:
 
@@ -69,6 +74,22 @@ Whamcloud
 
 
 
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+Cheers, Andreas
+--
+Andreas Dilger
+Principal Lustre Architect
+Whamcloud
+
+
+
+
+
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200107/b5a019db/attachment.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200107/c40587f9/attachment-0001.html>
