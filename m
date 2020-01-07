@@ -1,95 +1,81 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 7 Jan 2020 02:24:22 +0000
+From: NeilBrown <neilb@suse.de>
+Date: Tue, 07 Jan 2020 15:05:47 +1100
 Subject: [lustre-devel] Lustre upstreaming status.
-In-Reply-To: <8E3FD560-7730-49D7-B5F5-0EC2BD08E149@whamcloud.com>
+In-Reply-To: <alpine.LFD.2.21.2001062316450.26511@casper.infradead.org>
 References: <alpine.LFD.2.21.1802112308150.3291@casper.infradead.org>
  <87sglgg9ub.fsf@notabene.neil.brown.name>
  <alpine.LFD.2.21.2001062316450.26511@casper.infradead.org>
- <8E3FD560-7730-49D7-B5F5-0EC2BD08E149@whamcloud.com>
-Message-ID: <7CDEC7E6-F64B-4014-8CAB-EA77EB9AA0EA@whamcloud.com>
+Message-ID: <87zhezdi78.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Replying to my own email to get email addresses correct.
+On Tue, Jan 07 2020, James Simmons wrote:
+>
+> I have been going over the patches from your backport tree to find
+> missing patches and test for regressions. I think all regressions I
+> saw was stomped out for everything for 2.12. I'm doing full regression
+> right now. The only bug I see now is very unique to the linux client.
+>
+> 2020-01-06T16:24:58.006823-05:00 ninja81.ccs.ornl.gov kernel: RIP: 
+> 0010:ll_dcompare+0x62/0xf0 [lustre]
+> 2020-01-06T16:24:58.006880-05:00 ninja81.ccs.ornl.gov kernel: RAX: 
+> 0000000000000000 RBX: 0000000000000000 RCX: 0000000000000002
+> 2020-01-06T16:24:58.006934-05:00 ninja81.ccs.ornl.gov kernel: RDX: 
+> 0000000000000001 RSI: 0000000000000001 RDI: 00000000ffffffff
+> 2020-01-06T16:24:58.006992-05:00 ninja81.ccs.ornl.gov kernel: Code: 85 c0 
+> 89 c3 75 2d f6 05 c8 c7 c8 ff 20 74 09 f6 05 c2 c7 c8 ff
+>  80 75 2b 41 f7 04 24 00 00 01 10 75 c2 49 8b 84 24 f8 00 00 00 <0f> b6 58 
+> 0c 83 e3 01 eb b1 48 83 c4 08 bb 01 00 00 00 89 d8 5b 5
+> d
 
-On Jan 6, 2020, at 18:53, Andreas Dilger <adilger at whamcloud.com<mailto:adilger@whamcloud.com>> wrote:
+The crashing code here is
 
-On Jan 6, 2020, at 17:02, James Simmons <jsimmons at infradead.org<mailto:jsimmons@infradead.org>> wrote:
+  22:	49 8b 84 24 f8 00 00 	mov    0xf8(%r12),%rax
+  29:	00 
+  2a:*	0f b6 58 0c          	movzbl 0xc(%rax),%ebx		<-- trapping instruction
+  2e:	83 e3 01             	and    $0x1,%ebx
+  31:	eb b1                	jmp    0xffffffffffffffe4
 
+The only place that could happen in ll_dcompare is the
 
-Hi all,
-At the LUG in Houston, I said that I hoped to submit something upstream
-by the end of 2019.  Clearly that isn't going to happen now.
+        if (d_lustre_invalid(dentry))
+                return 1;
+call@the end.
+ll_d2d(dentry) must be NULL.
 
-The main reason that caused me to not even try is IPv6 support.
-It became apparent to me that LNet would not be accepted until it has
-working IPv6 support, and that doesn't exist yet.
-I hope to put some development time into IPv6, and to have something
-that works and is worth reviewing by the end of January 2020.
+in OpenSFS lustre, d_lustre_invalid() protects against that being NULL.
+Linux/lustre lost that protection in
 
-That would be awesome. I believe the original plan was for IPv6 support
-for 2.14 but USDP didn't make it in for 2.13 so everything got delayed.
+Commit 7126bc2e8d60 ("lustre: switch to use of ->d_init()")
 
-The other issue is that development has progressed slowly because
-there is no spare review bandwidth.  James has contributed a lot, and
-others have helped, but reviewing patches for two code streams (OpenSFS
-and Linux-upstream) turns out to be too much to ask for.
-So I've decided to take a different approach.  From now on I'm not
-going to wait for reviews for patches going into my linux-lustre tree.
-Part of my justification for this is that historically, review hasn't
-really provided much promise of correctness.  Patches go missing.
-Random lines from patches go missing.  Errors creep in in other ways.
+because it really shouldn't need it.
 
-I have been going over the patches from your backport tree to find
-missing patches and test for regressions. I think all regressions I
-saw was stomped out for everything for 2.12. I'm doing full regression
-right now. The only bug I see now is very unique to the linux client.
+Have you reported this to me before? It seems awfully familiar.
 
-[snip]
+>
+> This might be resolved with
+>
+> https://review.whamcloud.com/#/c/24175
 
-I also have started working through the 2.13 release. I'm up to 2.12.54
-but no heavy testing as of yet of those patches. Once I'm done testing
-2.12 in depth I can push quickly through 2.13 and even sync up to
-OpenSFS branch. I think the back porting work can be wrapped up by the
-end of the month.
+That would certainly resolve this particular symptom.
+I don't know if it is correct though ... maybe.
 
-I thought the goal was to stop at 2.12.x (following the b2_12 branch to get
-important fixes) and try to get that included upstream?  That gives a good
-point-in-time to track, and ensures that the upstream code is aligned with
-a relatively stable version of the code.  It also has the major benefit that
-2.12 is an LTS branch and we will need to keep compatibility with that for
-a long time, which isn't always true of intermediate releases.
+>
+> I believe having it ready for LUG 2020 is a reasonable goal.
 
-Cheers, Andreas
---
-Andreas Dilger
-Principal Lustre Architect
-Whamcloud
-
-
+Sounds like a nice goal.
 
 
-
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
-Cheers, Andreas
---
-Andreas Dilger
-Principal Lustre Architect
-Whamcloud
-
-
-
-
-
+Thanks,
+NeilBrown
 
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200107/c40587f9/attachment-0001.html>
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200107/5f656022/attachment.sig>
