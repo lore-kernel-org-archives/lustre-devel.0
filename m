@@ -1,59 +1,64 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 29 Jan 2020 00:49:26 +0000 (GMT)
-Subject: [lustre-devel] New slack chat room for linux client work
-In-Reply-To: <B20E3FCC-4F4B-4AF9-86FD-57481DBB4A7A@cray.com>
-References: <alpine.LFD.2.21.1807061531540.15728@casper.infradead.org>
- <88A13941-47CB-4D08-8CA8-4FD041487322@cray.com>
- <alpine.LFD.2.21.1807070013470.6125@casper.infradead.org>
- <B20E3FCC-4F4B-4AF9-86FD-57481DBB4A7A@cray.com>
-Message-ID: <alpine.LFD.2.21.2001290048230.18746@casper.infradead.org>
+From: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
+Date: Wed, 29 Jan 2020 15:18:26 +0100
+Subject: [lustre-devel] Gerrit option - build only one backend
+In-Reply-To: <102CE8C0-6E14-44C1-9189-FF8A0C50EE56@whamcloud.com>
+References: <1580240254.12827.0@informatik.uni-hamburg.de>
+ <102CE8C0-6E14-44C1-9189-FF8A0C50EE56@whamcloud.com>
+Message-ID: <e8468652-a564-ba4f-cf30-80f6dd21dfc5@informatik.uni-hamburg.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+I see, but are there any "build-parameters" I can set? I haven't seen 
+anything like that in another commits.
 
-> Hi James,
-> 
-> Could you please allow access to the cray.com and hpe.com domains for this channel?
+I want to prevent the osd-ldiskfs to be built since my stuff involves 
+experimental interface changes for the backend and this build will fail 
+at the moment.
 
-I tried cray.com in the past but it conflicted with an internal slack 
-channel cray uses. The hpe domain might be okay. Cory would that be fine?
+None of the tests will run if any build fails, am I right? I wanted to 
+have first some reviews before I change everything.
 
-> Cheers,
-> Nikitas
-> 
-> ?On 7/6/18, 4:18 PM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
-> 
->     
->     > James, Slack tells me:
->     > "Don't have an @whamcloud.com email address? 
->     > Contact your Workspace Administrator for an invitation."
->     
->     Yeah slack doesn't seem to be a open to anyone platform. You have to ask
->     the admin (me in this case) if you can join. I can let people in the same
->     domain like whamcloud.com or cray.com to join.
->     
->     > 
->     > -Cory
->     > 
->     > -- 
->     > 
->     > On 7/6/18, 9:34 AM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
->     > 
->     >     
->     >     Some people have asked for a chat room since it can be difficult
->     >     to filter between the mixture of patches and technical discusssions
->     >     going on here. If people are interested to join the site is below
->     >     
->     >     https://lustreupstreamclient.slack.com/messages/CAV4QF0ER/
->     >     _______________________________________________
->     >     lustre-devel mailing list
->     >     lustre-devel at lists.lustre.org
->     >     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->     >     
->     > 
->     > 
-> 
-> 
+So either I (currently unnecessarily) adjust the ldiskfs path just for 
+the build to pass or.. is there any or?
+
+Thanks,
+
+Anna
+
+Am 28.01.2020 um 21:36 schrieb Andreas Dilger:
+> The fstype option affects the testing, because this is "Test-Parameters:", not "Build-Parameters:". :-)
+>
+> The zfs vs. ldiskfs option mostly only affects the osd-ldiskfs and oss-zfs, and the matching mount.lustre helpers. All of the rest of the code should be independent of the backing filesystem.
+>
+> Cheers, Andreas
+>
+>> On Jan 28, 2020, at 12:37, Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de> wrote:
+>>
+>> ?
+>> Dear all,
+>>
+>> I am wondering why the Gerrit option "fstype=zfs" in my commit does not influence the build process - both targets, ldiskfs and zfs are built:
+>>
+>> checking whether to build ldiskfs... yes
+>> checking whether to enable zfs... yes
+>>
+>> The option seems to affect only the following tests. Is this behavior intended?
+>> Is there any option to build and test only one backend?
+>>
+>> Regards
+>> Anna
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+-- 
+Anna Fuchs
+Universit?t Hamburg
+https://wr.informatik.uni-hamburg.de
+
+anna.fuchs at informatik.uni-hamburg.de
+https://wr.informatik.uni-hamburg.de/people/anna_fuchs
