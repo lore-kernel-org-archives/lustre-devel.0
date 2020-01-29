@@ -1,37 +1,59 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 28 Jan 2020 20:36:24 +0000
-Subject: [lustre-devel] Gerrit option - build only one backend
-In-Reply-To: <1580240254.12827.0@informatik.uni-hamburg.de>
-References: <1580240254.12827.0@informatik.uni-hamburg.de>
-Message-ID: <102CE8C0-6E14-44C1-9189-FF8A0C50EE56@whamcloud.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 29 Jan 2020 00:49:26 +0000 (GMT)
+Subject: [lustre-devel] New slack chat room for linux client work
+In-Reply-To: <B20E3FCC-4F4B-4AF9-86FD-57481DBB4A7A@cray.com>
+References: <alpine.LFD.2.21.1807061531540.15728@casper.infradead.org>
+ <88A13941-47CB-4D08-8CA8-4FD041487322@cray.com>
+ <alpine.LFD.2.21.1807070013470.6125@casper.infradead.org>
+ <B20E3FCC-4F4B-4AF9-86FD-57481DBB4A7A@cray.com>
+Message-ID: <alpine.LFD.2.21.2001290048230.18746@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The fstype option affects the testing, because this is "Test-Parameters:", not "Build-Parameters:". :-)
 
-The zfs vs. ldiskfs option mostly only affects the osd-ldiskfs and oss-zfs, and the matching mount.lustre helpers. All of the rest of the code should be independent of the backing filesystem. 
+> Hi James,
+> 
+> Could you please allow access to the cray.com and hpe.com domains for this channel?
 
-Cheers, Andreas
+I tried cray.com in the past but it conflicted with an internal slack 
+channel cray uses. The hpe domain might be okay. Cory would that be fine?
 
-> On Jan 28, 2020, at 12:37, Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de> wrote:
+> Cheers,
+> Nikitas
 > 
-> ?
-> Dear all,
+> ?On 7/6/18, 4:18 PM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
 > 
-> I am wondering why the Gerrit option "fstype=zfs" in my commit does not influence the build process - both targets, ldiskfs and zfs are built:
+>     
+>     > James, Slack tells me:
+>     > "Don't have an @whamcloud.com email address? 
+>     > Contact your Workspace Administrator for an invitation."
+>     
+>     Yeah slack doesn't seem to be a open to anyone platform. You have to ask
+>     the admin (me in this case) if you can join. I can let people in the same
+>     domain like whamcloud.com or cray.com to join.
+>     
+>     > 
+>     > -Cory
+>     > 
+>     > -- 
+>     > 
+>     > On 7/6/18, 9:34 AM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+>     > 
+>     >     
+>     >     Some people have asked for a chat room since it can be difficult
+>     >     to filter between the mixture of patches and technical discusssions
+>     >     going on here. If people are interested to join the site is below
+>     >     
+>     >     https://lustreupstreamclient.slack.com/messages/CAV4QF0ER/
+>     >     _______________________________________________
+>     >     lustre-devel mailing list
+>     >     lustre-devel at lists.lustre.org
+>     >     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>     >     
+>     > 
+>     > 
 > 
-> checking whether to build ldiskfs... yes
-> checking whether to enable zfs... yes
 > 
-> The option seems to affect only the following tests. Is this behavior intended?
-> Is there any option to build and test only one backend?
-> 
-> Regards
-> Anna
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
