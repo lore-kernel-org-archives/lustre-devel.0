@@ -1,37 +1,101 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Fri, 31 Jan 2020 12:53:21 +0000
-Subject: [lustre-devel] LU-12759 not in 2.12
-In-Reply-To: <c8caac87-3406-6692-ec4a-4c2e234d4829@pdc.kth.se>
-References: <0377f0de-25e8-db29-e59a-ef885bcd1e7d@pdc.kth.se>
- <94C86C98-64D5-445C-98E8-F695C4AD163D@ddn.com>
- <c8caac87-3406-6692-ec4a-4c2e234d4829@pdc.kth.se>
-Message-ID: <4965B65D-E55A-4285-921D-BCEDC57099B0@ddn.com>
+From: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
+Date: Fri, 31 Jan 2020 18:29:35 +0100
+Subject: [lustre-devel] Gerrit option - build only one backend
+In-Reply-To: <E2EFBD04-9291-42CC-83C6-8B250066144E@whamcloud.com>
+References: <1580240254.12827.0@informatik.uni-hamburg.de>
+ <102CE8C0-6E14-44C1-9189-FF8A0C50EE56@whamcloud.com>
+ <e8468652-a564-ba4f-cf30-80f6dd21dfc5@informatik.uni-hamburg.de>
+ <E2EFBD04-9291-42CC-83C6-8B250066144E@whamcloud.com>
+Message-ID: <1580491775.5117.0@informatik.uni-hamburg.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ok, well, this issue is included in the 2.12.4 RC1 build that is presently undergoing release testing.
+Ok, I will see which way is better, thanks a lot.
 
-?On 2020-01-07, 9:48 AM, "Mattias Claesson" <slas+lustre@pdc.kth.se> wrote:
+Regards Anna
 
-    Hi Peter,
-    
-    Sorry for not answering earlier.
-    
-    > The short answer is because nobody has flagged it for inclusion. Do
-    > you consider that there would still be value to include it now that a
-    > fix for LU-12120 has landed?
-    Ok. I'm not too familiar with what should go into which version stream,
-    but since 2.12 is the current LTS version, and I would consider this
-    (set parameters are "forgotten") a separate bug in itself, it seems
-    natural to me to include it there also. The fewer patches we need to
-    remember to apply when using the LTS version the better, I would say.
-    And I assume there are other cases also when one would want to turn off
-    'grant_shrink', even when not trying to mitigate LU-12120, since the
-    feature was already (mostly) implemented :)
-    
-    Mattias
-    PDC-staff
-    
+On Wed, Jan 29, 2020 at 6:51 PM, Andreas Dilger <adilger@whamcloud.com> 
+wrote:
+> You could potentially include a change in your patch series to always 
+> disable ldiskfs building, probably in config/lustre-build-ldiskfs.m4.
+> 
+> It would be best if that was a separate patch with a description like 
+> "osd-ldiskfs: permanently disable building" and tagged "forbuildonly" 
+> so that it cannot be landed.
+> 
+> Cheers, Andreas
+> 
+>>  On Jan 29, 2020, at 07:18, Anna Fuchs 
+>> <anna.fuchs@informatik.uni-hamburg.de 
+>> <mailto:anna.fuchs@informatik.uni-hamburg.de>> wrote:
+>> 
+>>  ?I see, but are there any "build-parameters" I can set? I haven't 
+>> seen anything like that in another commits.
+>> 
+>>  I want to prevent the osd-ldiskfs to be built since my stuff 
+>> involves experimental interface changes for the backend and this 
+>> build will fail at the moment.
+>> 
+>>  None of the tests will run if any build fails, am I right? I wanted 
+>> to have first some reviews before I change everything.
+>> 
+>>  So either I (currently unnecessarily) adjust the ldiskfs path just 
+>> for the build to pass or.. is there any or?
+>> 
+>>  Thanks,
+>> 
+>>  Anna
+>> 
+>>>  Am 28.01.2020 um 21:36 schrieb Andreas Dilger:
+>>>  The fstype option affects the testing, because this is 
+>>> "Test-Parameters:", not "Build-Parameters:". :-)
+>>> 
+>>>  The zfs vs. ldiskfs option mostly only affects the osd-ldiskfs and 
+>>> oss-zfs, and the matching mount.lustre helpers. All of the rest of 
+>>> the code should be independent of the backing filesystem.
+>>> 
+>>>  Cheers, Andreas
+>>> 
+>>>>>  On Jan 28, 2020, at 12:37, Anna Fuchs 
+>>>>> <anna.fuchs@informatik.uni-hamburg.de 
+>>>>> <mailto:anna.fuchs@informatik.uni-hamburg.de>> wrote:
+>>>> 
+>>>>  ?
+>>>>  Dear all,
+>>>> 
+>>>>  I am wondering why the Gerrit option "fstype=zfs" in my commit 
+>>>> does not influence the build process - both targets, ldiskfs and 
+>>>> zfs are built:
+>>>> 
+>>>>  checking whether to build ldiskfs... yes
+>>>>  checking whether to enable zfs... yes
+>>>> 
+>>>>  The option seems to affect only the following tests. Is this 
+>>>> behavior intended?
+>>>>  Is there any option to build and test only one backend?
+>>>> 
+>>>>  Regards
+>>>>  Anna
+>>>>  _______________________________________________
+>>>>  lustre-devel mailing list
+>>>>  lustre-devel at lists.lustre.org 
+>>>> <mailto:lustre-devel@lists.lustre.org>
+>>>>  <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>
+>> 
+>>  --
+>>  Anna Fuchs
+>>  Universit?t Hamburg
+>>  https://wr.informatik.uni-hamburg.de 
+>> <https://wr.informatik.uni-hamburg.de/>
+>> 
+>>  anna.fuchs at informatik.uni-hamburg.de 
+>> <mailto:anna.fuchs@informatik.uni-hamburg.de>
+>>  <https://wr.informatik.uni-hamburg.de/people/anna_fuchs>
+>> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200131/8d161dab/attachment.html>
