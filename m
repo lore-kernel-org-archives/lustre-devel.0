@@ -1,187 +1,75 @@
-From: Oleg Drokin <green@whamcloud.com>
-Date: Wed, 12 Feb 2020 06:22:23 +0000
-Subject: [lustre-devel] New tag 2.13.52
-Message-ID: <FFAF5468-1DB5-48DB-8CDC-5EF0ECEA7FA8@whamcloud.com>
+From: Degremont, Aurelien <degremoa@amazon.com>
+Date: Fri, 14 Feb 2020 17:13:48 +0000
+Subject: [lustre-devel] Setting GFP_FS flag for Lustre threads doing DMU
+ calls?
+Message-ID: <15EB8039-20D2-447C-A9C8-8DCB455B862B@amazon.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Hello
 
-I just tagged 2.13.52 in Lustre development branch. Here?s the changelog:
+I would like to bring a technical discussion undergoing for a ZFS patch which relates to Lustre.
 
-Alex Zhuravlev (5):
-      LU-13098 ptlrpc: supress connection restored message
-      LU-13130 tests: sanity-scrub to use full device size with ZFS
-      LU-12133 osd-zfs: set blocksize to 8K for llog objects
-      LU-12988 ldiskfs: skip non-loaded groups at cr=0/1
-      LU-12988 ldiskfs: mballoc to prefetch groups
+Debugging a deadlock on an OSS we noticed a Lustre thread deadlocked itself due to memory reclaim, an arc_read() can trigger kernel memory allocation that in turn leads to a memory reclaim callback and a deadlock within a single zfs process. (see below for the full stack)
+ZFS code should call spl_fstrans_mark() everywhere it could be doing memory allocation that could trigger ZFS cache reclaim. Doing so ended up adding GFP_FS flag for memory allocations in ZFS code.
 
-Alexander Boyko (2):
-      LU-13093 osd: fix osd_attr_set race
-      LU-12593 osd: up i_append_sem during errors
+After discussing this with Brian on https://github.com/zfsonlinux/zfs/pull/9987, there is a discussion wondering where is the good spot to add this. For proper layering, it seems they should rather be done in Lustre threads calling DMU calls, likewise this is done in ZPL for ZFS.
 
-Alexander Zarochentsev (1):
-      LU-13128 osc: glimpse and lock cancel race
+Brian said: "This will resolve the deadlock but it also somewhat violates the existing layering. Normally we call spl_fstrans_check() when setting up a new kthread if it's going to call the DMU interfaces, or for system calls it's done in our registered VFS callbacks. Feel free to update the PR, but before moving forward with this solution let's check with @adilger about potentially calling this on the Lustre side when they setup the threads which access the DMU. There may be other cases this doesn't cover."
 
-Alexey Lyashkov (3):
-      LU-12214 selinux: Remove concatenating of selinux context
-      LU-12991 lnet: lnet response entries leak
-      LU-13036 lnet: avoid extra memory consumption
+What do you think of it?
 
-Amir Shehata (1):
-      LU-13049 lnet: peer lookup handle shutdown
+PID: 108591  TASK: ffff888ee68ccb80  CPU: 12  COMMAND: "ldlm_bl_16"
+ #0 [ffffc9002b98adc8] __schedule at ffffffff81610f2e
+ #1 [ffffc9002b98ae68] schedule at ffffffff81611558
+ #2 [ffffc9002b98ae70] schedule_preempt_disabled at ffffffff8161184a
+ #3 [ffffc9002b98ae78] __mutex_lock at ffffffff816131e8
+ #4 [ffffc9002b98af18] arc_buf_destroy at ffffffffa0bf37d7 [zfs]
+ #5 [ffffc9002b98af48] dbuf_destroy at ffffffffa0bfa6fe [zfs]
+ #6 [ffffc9002b98af88] dbuf_evict_one at ffffffffa0bfaa96 [zfs]
+ #7 [ffffc9002b98afa0] dbuf_rele_and_unlock at ffffffffa0bfa561 [zfs]
+ #8 [ffffc9002b98b050] dbuf_rele_and_unlock at ffffffffa0bfa32b [zfs]
+ #9 [ffffc9002b98b100] osd_object_delete at ffffffffa0b64ecc [osd_zfs]
+#10 [ffffc9002b98b118] lu_object_free at ffffffffa06d6a74 [obdclass]
+#11 [ffffc9002b98b178] lu_site_purge_objects at ffffffffa06d7fc1 [obdclass]
+#12 [ffffc9002b98b220] lu_cache_shrink_scan at ffffffffa06d81b8 [obdclass]
+#13 [ffffc9002b98b278] shrink_slab at ffffffff811ca9d8
+#14 [ffffc9002b98b338] shrink_node at ffffffff811cfd94
+#15 [ffffc9002b98b3b8] do_try_to_free_pages at ffffffff811cfe63
+#16 [ffffc9002b98b408] try_to_free_pages at ffffffff811d01c4
+#17 [ffffc9002b98b488] __alloc_pages_slowpath at ffffffff811be7f2
+#18 [ffffc9002b98b580] __alloc_pages_nodemask at ffffffff811bf3ed
+#19 [ffffc9002b98b5e0] new_slab at ffffffff81226304
+#20 [ffffc9002b98b638] ___slab_alloc at ffffffff812272ab
+#21 [ffffc9002b98b6f8] __slab_alloc at ffffffff8122740c
+#22 [ffffc9002b98b708] kmem_cache_alloc at ffffffff81227578
+#23 [ffffc9002b98b740] spl_kmem_cache_alloc at ffffffffa048a1fd [spl]
+#24 [ffffc9002b98b780] arc_buf_alloc_impl at ffffffffa0befba2 [zfs]
+#25 [ffffc9002b98b7b0] arc_read at ffffffffa0bf0924 [zfs]
+#26 [ffffc9002b98b858] dbuf_read at ffffffffa0bf9083 [zfs]
+#27 [ffffc9002b98b900] dmu_buf_hold_by_dnode at ffffffffa0c04869 [zfs]
+#28 [ffffc9002b98b930] zap_get_leaf_byblk at ffffffffa0c71e86 [zfs]
+#29 [ffffc9002b98b988] zap_deref_leaf at ffffffffa0c720b6 [zfs]
+#30 [ffffc9002b98b9c0] fzap_lookup at ffffffffa0c730ca [zfs]
+#31 [ffffc9002b98ba38] zap_lookup_impl at ffffffffa0c77418 [zfs]
+#32 [ffffc9002b98ba78] zap_lookup_norm at ffffffffa0c77c89 [zfs]
+#33 [ffffc9002b98bae0] zap_lookup at ffffffffa0c77ce2 [zfs]
+#34 [ffffc9002b98bb08] osd_fid_lookup at ffffffffa0b6f4ef [osd_zfs]
+#35 [ffffc9002b98bb50] osd_object_init at ffffffffa0b68abf [osd_zfs]
+#36 [ffffc9002b98bbb0] lu_object_alloc at ffffffffa06d9778 [obdclass]
+#37 [ffffc9002b98bc08] lu_object_find_at at ffffffffa06d9b5a [obdclass]
+#38 [ffffc9002b98bc68] ofd_object_find at ffffffffa0f860a0 [ofd]
+#39 [ffffc9002b98bc88] ofd_lvbo_update at ffffffffa0f94cba [ofd]
+#40 [ffffc9002b98bd40] ldlm_cancel_lock_for_export at ffffffffa0923ba1 [ptlrpc]
+#41 [ffffc9002b98bd78] ldlm_cancel_locks_for_export_cb at ffffffffa0923e85 [ptlrpc]
+#42 [ffffc9002b98bd98] cfs_hash_for_each_relax at ffffffffa05a85a5 [libcfs]
+#43 [ffffc9002b98be18] cfs_hash_for_each_empty at ffffffffa05ab948 [libcfs]
+#44 [ffffc9002b98be58] ldlm_export_cancel_locks at ffffffffa092410f [ptlrpc]
+#45 [ffffc9002b98be80] ldlm_bl_thread_main at ffffffffa094d147 [ptlrpc]
+#46 [ffffc9002b98bf10] kthread at ffffffff810a921a
 
-Andreas Dilger (11):
-      LU-12865 tests: fix sanity 160f to be more robust
-      LU-8066 lfsck: use underscores in lfsck status files
-      LU-12470 tests: increase pdirops timeout
-      LU-12521 llapi: add separate fsname and instance API
-      Revert "LU-13120 build: Fix ZFS dependancies for osd-zfs-mount"
-      LU-11644 ptlrpc: show target name in req_history
-      LU-12518 llite: proper names/types for offset/pages
-      LU-12871 mdd: enable Changelog garbage collection
-      LU-13164 uapi: remove unused LUSTRE_DIRECTIO_FL
-      LU-13063 tests: remove checks for old RHEL versions
-      LU-13145 lnet: use conservative health timeouts
 
-Andriy Skulysh (3):
-      LU-7791 ldlm: signal vs CP callback race
-      LU-13101 llite: eviction during ll_open_cleanup()
-      LU-13165 mdt: MSG_RESENT can be improperly cleared.
-
-Arshad Hussain (1):
-      LU-12923 libcfs: Remove CLASSERT() for libcfs_private.h
-
-Chris Horn (7):
-      LU-12756 lnet: Avoid extra lnet_remotenet lookup
-      LU-12756 lnet: Remove unused vars in lnet_find_route_locked
-      LU-12756 lnet: Refactor lnet_compare_routes
-      LU-12919 lnet: Fix source specified route selection
-      LU-13147 tests: Cleanup sanity-lnet on test failure
-      Revert "LU-12222 lnet: Check if we're sending to ourselves"
-      LU-12889 lnet: Do not assume peers are MR capable
-
-Emoly Liu (1):
-      LU-12852 pfl: restrict the stripe count correctly
-
-James Nunez (7):
-      LU-12928 tests: start running recovery-small 136
-      LU-13053 tests: fix conf-sanity call to  umount_ldiskfs
-      LU-13063 tests: stop running sanity test 411
-      LU-1538 tests: standardize test script init ? failover
-      LU-13194 tests: check server version sanityn 104
-      LU-10447 tests: deprecate use of $SETSTRIPE/$GETSTRIPE
-      LU-11607 tests: replace version/fstype calls in sanity/n
-
-James Simmons (5):
-      LU-13119 osd-ldiskfs: set f_cred for app armour
-      LU-12822 uapi: properly pack data structures
-      LU-12977 ldiskfs: properly take inode_lock() for truncates
-      LU-9859 libcfs: move files out of libcfs/linux
-      LU-12598 osd-ldiskfs: always return errors for osd_ios_lf_fill
-
-Jian Yu (1):
-      LU-12791 kernel: kernel update RHEL 8.0 [4.18.0-80.11.2.el8_0]
-
-Jinshan Xiong (2):
-      LU-4198 clio: turn on lockless for some kind of IO
-      LU-4198 clio: AIO support for direct IO
-
-Lai Siyao (3):
-      LU-13121 llite: fix deadlock in ll_update_lsm_md()
-      LU-13163 mdc: new kernel function xa_is_value()
-      LU-13191 osp: handle -EROFS in osp_sync_interpret()
-
-Mikhail Pershin (4):
-      LU-13115 mdt: handle mdt_pack_sectx_in_reply() errors
-      LU-10664 tests: fix MPI tests in dom-performance.sh
-      LU-13136 dom: check read-on-open buffer presents in reply
-      LU-10198 llog: keep llog handle alive until last reference
-
-Mr NeilBrown (25):
-      LU-9679 llite: fix possible race with module unload.
-      LU-13004 ptlrpc: Allow BULK_BUF_KIOV to accept a kvec
-      LU-13005 lnet: discard LNetEQGet and LNetEQWait
-      LU-10467 ptlrpc: refactor waiting in ptlrpc_set_wait()
-      LU-12678 socklnd: initialize the_ksocklnd at compile-time.
-      LU-12678 lnet: make "struct lnet_lnd" always "const".
-      LU-12678 lnet: remove locking protection ln_testprotocompat
-      LU-10467 obdclass: convert waiting in cl_sync_io_wait().
-      LU-9679 modules: use list_move were appropriate.
-      LU-13004 target: convert tgt_send_buffer to use KIOV
-      LU-12678 lnet: remove dead code: lnet_fini_locks()
-      LU-12678 lnet: fix small race in unloading klnd modules.
-      LU-12678 lnet: me: discard struct lnet_handle_me
-      LU-12678 socklnd: convert peers hash table to hashtable.h
-      LU-10467 lustre: convert most users of LWI_TIMEOUT_INTERVAL()
-      LU-10467 lustre: convert users of back_to_sleep()
-      LU-10467 ptlrpc: convert waiters on set->set_waitq
-      LU-10467 ldlm: convert waiting in ldlm_flock_completion_ast()
-      LU-10467 ldlm: convert waiting in ldlm_completion_ast()
-      LU-10467 ptlrpc: convert use of l_wait_event_exclusive_head()
-      LU-9679 general: add missing spaces to folded strings.
-      LU-9679 lnet: discard lnet_print_text_bufs()
-      LU-9679 lnet: use LIST_HEAD() for local lists.
-      LU-9679 lustre: use LIST_HEAD() for local lists.
-      LU-11300 lnet: remove lnd_query interface.
-
-NeilBrown (6):
-      LU-8130 lu_object: factor out extra per-bucket data
-      LU-12460 llite: replace lli_trunc_sem
-      LU-12542 handle: remove locking from class_handle2object()
-      LU-12542 handle: use hlist for hash lists.
-      LU-12542 handle: discard h_lock.
-      LU-8304 libcfs: convert debug_ctlwq to a completion.
-
-Olaf Faaland (1):
-      LU-11114 llite: Update mdc and lite stats on open|creat
-
-Oleg Drokin (1):
-      New tag 2.13.52
-
-Patrick Farrell (2):
-      LU-12518 llite: Accept EBUSY for page unaligned read
-      LU-11939 tgt: Do not assert during grant cleanup
-
-Quentin Bouget (1):
-      LU-12806 llapi: use name_to_handle_at in llapi_fd2fid
-
-Sebastien Buisson (2):
-      LU-13152 llapi: llapi_layout_get_by_xattr groks DoM
-      LU-13142 lod: cleanup layout checking
-
-Serguei Smirnov (1):
-      LU-11385 odbclass: Handle gracefully if nsproxy is NULL
-
-Shaun Tancheff (8):
-      LU-13039 quota: Ensure local buffer is null terminated
-      LU-13141 ldiskfs: block alloc performance patch
-      LU-12904 ldiskfs: Add ldiskfs support for linux 5.4
-      LU-12968 mgs: Prevent reading past end of buffer
-      LU-13120 build: Fix ZFS dependancies for osd-zfs-mount
-      LU-12861 libcfs: Cleanup use of bare printk
-      LU-12634 gss: uid_keyring and session_keyring moved
-      LU-13183 ldiskfs: Drop remove truncate warning patch
-
-Swapnil Pimpale (2):
-      LU-3606 fsx: Add fallocate operation to fsx
-      LU-3606 lustre: Reserve OST_FALLOCATE(fallocate) opcode
-
-Tatsushi Takamura (1):
-      LU-12287 lnet: handling device failure by IB event handler
-
-Vitaly Fertman (1):
-      LU-11276 ldlm: fix lock convert races
-
-Vladimir Saveliev (1):
-      LU-13099 lmv: disable statahead for remote objects
-
-Wang Shilong (5):
-      LU-13092 lbuild: include lbuild-{fc,rhel,sles} to SIGNATURE
-      LU-13117 libcfs: fix to match right key in cfs_get_environ()
-      LU-13154 test: skip sanity-quota 66 if MDS version < 2.12.4
-      LU-13134 obdclass: use slab allocation for cl_dio_aio
-      LU-13180 lustre: reserve bit for RDMA-only memory RPC
+Aur?lien
