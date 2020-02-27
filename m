@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:37 -0500
-Subject: [lustre-devel] [PATCH 529/622] lustre: lov: use wait_event() in
- lov_subobject_kill()
+Date: Thu, 27 Feb 2020 16:17:09 -0500
+Subject: [lustre-devel] [PATCH 561/622] lustre: handle: discard OBD_FREE_RCU
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-530-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-562-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,80 +12,164 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-lov_subobject_kill() has an open-coded version
-of wait_event(). Change it to use the macro.
+OBD_FREE_RCU and the hop_free call-back together form an overly
+complex mechanism equivalent to kfree_rcu() or call_rcu(...).
+Discard them and use the simpler approach.
 
-There is no need to take a spinlock just to check if a variable
-have changed value. If there was, the first test would be protected too.
+This removes the only use for the field h_size, so discard
+that too.
 
-"lti_waiter" now has no users and can be removed from lov_thread_info.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10467
-Lustre-commit: c0894d1d32670 ("LU-10467 lov: use wait_event() in lov_subobject_kill()")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12542
+Lustre-commit: 48830f888b6 ("LU-12542 handle: discard OBD_FREE_RCU")
 Signed-off-by: NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/36343
+Reviewed-on: https://review.whamcloud.com/35797
 Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_cl_internal.h |  1 -
- fs/lustre/lov/lov_object.c      | 24 +-----------------------
- 2 files changed, 1 insertion(+), 24 deletions(-)
+ fs/lustre/include/lustre_handles.h  |  3 ---
+ fs/lustre/include/obd_support.h     | 10 ----------
+ fs/lustre/ldlm/ldlm_lock.c          | 16 ++++++++--------
+ fs/lustre/obdclass/genops.c         |  3 +--
+ fs/lustre/obdclass/lustre_handles.c | 15 ---------------
+ 5 files changed, 9 insertions(+), 38 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_cl_internal.h b/fs/lustre/lov/lov_cl_internal.h
-index 8791e69..e21439d 100644
---- a/fs/lustre/lov/lov_cl_internal.h
-+++ b/fs/lustre/lov/lov_cl_internal.h
-@@ -474,7 +474,6 @@ struct lov_thread_info {
- 	struct ost_lvb		lti_lvb;
- 	struct cl_2queue	lti_cl2q;
- 	struct cl_page_list     lti_plist;
--	wait_queue_entry_t	lti_waiter;
+diff --git a/fs/lustre/include/lustre_handles.h b/fs/lustre/include/lustre_handles.h
+index 7c93d72..8f733fd 100644
+--- a/fs/lustre/include/lustre_handles.h
++++ b/fs/lustre/include/lustre_handles.h
+@@ -46,7 +46,6 @@
+ #include <linux/types.h>
+ 
+ struct portals_handle_ops {
+-	void (*hop_free)(void *object, int size);
+ 	/* hop_type is used for some debugging messages */
+ 	char *hop_type;
+ };
+@@ -72,7 +71,6 @@ struct portals_handle {
+ 	/* newly added fields to handle the RCU issue. -jxiong */
+ 	struct rcu_head			h_rcu;
+ 	spinlock_t			h_lock;
+-	unsigned int			h_size:31;
+ 	unsigned int			h_in:1;
  };
  
+@@ -83,7 +81,6 @@ void class_handle_hash(struct portals_handle *,
+ 		       const struct portals_handle_ops *ops);
+ void class_handle_unhash(struct portals_handle *);
+ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
+-void class_handle_free_cb(struct rcu_head *rcu);
+ int class_handle_init(void);
+ void class_handle_cleanup(void);
+ 
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index acfd098..5969b6b 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -533,16 +533,6 @@
+ #define POISON_PAGE(page, val) do { } while (0)
+ #endif
+ 
+-#define OBD_FREE_RCU(ptr, size, handle)			\
+-do {							\
+-	struct portals_handle *__h = (handle);		\
+-							\
+-	__h->h_cookie = (unsigned long)(ptr);		\
+-	__h->h_size = (size);				\
+-	call_rcu(&__h->h_rcu, class_handle_free_cb);	\
+-	POISON_PTR(ptr);				\
+-} while (0)
+-
+ #define KEY_IS(str)					\
+ 	(keylen >= (sizeof(str) - 1) &&			\
+ 	memcmp(key, str, (sizeof(str) - 1)) == 0)
+diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
+index 2471e30..61bf028 100644
+--- a/fs/lustre/ldlm/ldlm_lock.c
++++ b/fs/lustre/ldlm/ldlm_lock.c
+@@ -153,6 +153,13 @@ struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock)
+ }
+ EXPORT_SYMBOL(ldlm_lock_get);
+ 
++static void lock_handle_free(struct rcu_head *rcu)
++{
++	struct ldlm_lock *lock = container_of(rcu, struct ldlm_lock,
++					      l_handle.h_rcu);
++	kmem_cache_free(ldlm_lock_slab, lock);
++}
++
  /**
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index f2c7bc2..2a35993 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -287,7 +287,6 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
- 	struct cl_object *sub;
- 	struct lu_site *site;
- 	wait_queue_head_t *wq;
--	wait_queue_entry_t *waiter;
+  * Release lock reference.
+  *
+@@ -186,7 +193,7 @@ void ldlm_lock_put(struct ldlm_lock *lock)
+ 		kvfree(lock->l_lvb_data);
  
- 	LASSERT(r0->lo_sub[idx] == los);
- 
-@@ -303,28 +302,7 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
- 	/* ... wait until it is actually destroyed---sub-object clears its
- 	 * ->lo_sub[] slot in lovsub_object_free()
- 	 */
--	if (r0->lo_sub[idx] == los) {
--		waiter = &lov_env_info(env)->lti_waiter;
--		init_waitqueue_entry(waiter, current);
--		add_wait_queue(wq, waiter);
--		set_current_state(TASK_UNINTERRUPTIBLE);
--		while (1) {
--			/* this wait-queue is signaled at the end of
--			 * lu_object_free().
--			 */
--			set_current_state(TASK_UNINTERRUPTIBLE);
--			spin_lock(&r0->lo_sub_lock);
--			if (r0->lo_sub[idx] == los) {
--				spin_unlock(&r0->lo_sub_lock);
--				schedule();
--			} else {
--				spin_unlock(&r0->lo_sub_lock);
--				set_current_state(TASK_RUNNING);
--				break;
--			}
--		}
--		remove_wait_queue(wq, waiter);
--	}
-+	wait_event(*wq, r0->lo_sub[idx] != los);
- 	LASSERT(!r0->lo_sub[idx]);
+ 		lu_ref_fini(&lock->l_reference);
+-		OBD_FREE_RCU(lock, sizeof(*lock), &lock->l_handle);
++		call_rcu(&lock->l_handle.h_rcu, lock_handle_free);
+ 	}
+ }
+ EXPORT_SYMBOL(ldlm_lock_put);
+@@ -358,14 +365,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
+ 	}
  }
  
+-static void lock_handle_free(void *lock, int size)
+-{
+-	LASSERT(size == sizeof(struct ldlm_lock));
+-	kmem_cache_free(ldlm_lock_slab, lock);
+-}
+-
+ static struct portals_handle_ops lock_handle_ops = {
+-	.hop_free   = lock_handle_free,
+ 	.hop_type   = "ldlm",
+ };
+ 
+diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
+index a31e9ce..15bea0d 100644
+--- a/fs/lustre/obdclass/genops.c
++++ b/fs/lustre/obdclass/genops.c
+@@ -729,11 +729,10 @@ static void class_export_destroy(struct obd_export *exp)
+ 	if (exp != obd->obd_self_export)
+ 		class_decref(obd, "export", exp);
+ 
+-	OBD_FREE_RCU(exp, sizeof(*exp), &exp->exp_handle);
++	kfree_rcu(exp, exp_handle.h_rcu);
+ }
+ 
+ static struct portals_handle_ops export_handle_ops = {
+-	.hop_free	= NULL,
+ 	.hop_type	= "export",
+ };
+ 
+diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
+index 95a34db..99c68fe 100644
+--- a/fs/lustre/obdclass/lustre_handles.c
++++ b/fs/lustre/obdclass/lustre_handles.c
+@@ -167,21 +167,6 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
+ }
+ EXPORT_SYMBOL(class_handle2object);
+ 
+-void class_handle_free_cb(struct rcu_head *rcu)
+-{
+-	struct portals_handle *h;
+-	void *ptr;
+-
+-	h = container_of(rcu, struct portals_handle, h_rcu);
+-	ptr = (void *)(unsigned long)h->h_cookie;
+-
+-	if (h->h_ops->hop_free)
+-		h->h_ops->hop_free(ptr, h->h_size);
+-	else
+-		kfree(ptr);
+-}
+-EXPORT_SYMBOL(class_handle_free_cb);
+-
+ int class_handle_init(void)
+ {
+ 	struct handle_bucket *bucket;
 -- 
 1.8.3.1
