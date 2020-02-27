@@ -1,131 +1,194 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:44 -0500
-Subject: [lustre-devel] [PATCH 476/622] lustre: llite: Improve readahead RPC
- issuance
+Date: Thu, 27 Feb 2020 16:17:57 -0500
+Subject: [lustre-devel] [PATCH 609/622] lnet: libcfs: Cleanup use of bare
+ printk
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-477-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-610-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: Shaun Tancheff <stancheff@cray.com>
 
-lov_io_submit receives a range of pages, then adds pages in
-to a batch until it hits a page which is not in the stripe
-associated with this lov object.  This means that if a
-readahead page range hits the same stripe more than once,
-we will issue multiple I/Os, even if the pages would fit in
-one RPC.
+Some users of printk(<LEVEL> "fmt" can be converted to
+pr_level("fmt" equivalents
 
-This is unnecessary - Just submit all these pages at once.
-
-mpirun -n 2 $IOR -s 2000 -t 47K -b 47K -k -r -E -o $FILE
-
-Without patch:
-osc.lustre-OST0001-osc-ffff8fe82c952000.rpc_stats=
-
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                     118  56  56   |          0   0   0
-2:                       0   0  56   |          0   0   0
-4:                       0   0  56   |          0   0   0
-8:                       0   0  56   |          0   0   0
-16:                      5   2  58   |          0   0   0
-32:                      0   0  58   |          0   0   0
-64:                      0   0  58   |          0   0   0
-128:                    21  10  68   |          0   0   0
-256:                    25  11  80   |          0   0   0
-512:                    10   4  85   |          0   0   0
-1024:                   31  14 100   |          0   0   0
-
-osc.lustre-OST0002-osc-ffff8fe82c952000.rpc_stats=
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                       5   6   6   |          0   0   0
-2:                       0   0   6   |          0   0   0
-4:                       0   0   6   |          0   0   0
-8:                       0   0   6   |          0   0   0
-16:                      0   0   6   |          0   0   0
-32:                      0   0   6   |          0   0   0
-64:                      0   0   6   |          0   0   0
-128:                    19  23  29   |          0   0   0
-256:                    19  23  52   |          0   0   0
-512:                     5   6  58   |          0   0   0
-1024:                   34  41 100   |          0   0   0
-
-With patch:
-osc.lustre-OST0001-osc-ffff8fe7a7227800.rpc_stats=
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                      12  17  17   |          0   0   0
-2:                       0   0  17   |          0   0   0
-4:                       0   0  17   |          0   0   0
-8:                       0   0  17   |          0   0   0
-16:                      5   7  24   |          0   0   0
-32:                      0   0  24   |          0   0   0
-64:                      5   7  31   |          0   0   0
-128:                     6   8  40   |          0   0   0
-256:                     1   1  42   |          0   0   0
-512:                     2   2  44   |          0   0   0
-1024:                   38  55 100   |          0   0   0
-
-osc.lustre-OST0002-osc-ffff8fe7a7227800.rpc_stats=
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                       0   0   0   |          0   0   0
-2:                       0   0   0   |          0   0   0
-4:                       0   0   0   |          0   0   0
-8:                       0   0   0   |          0   0   0
-16:                      0   0   0   |          0   0   0
-32:                      0   0   0   |          0   0   0
-64:                      4   7   7   |          0   0   0
-128:                     7  13  21   |          0   0   0
-256:                     0   0  21   |          0   0   0
-512:                     3   5  26   |          0   0   0
-1024:                   38  73 100   |          0   0   0
-
-Note the much larger # of smaller RPC issued without the patch.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12533
-Lustre-commit: 05b9da4fd124 ("LU-12533 llite: Improve readahead RPC issuance")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35458
-Reviewed-by: Li Xi <lixi@ddn.com>
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12861
+Lustre-commit: b4c8a5180dec ("LU-12861 libcfs: Cleanup use of bare printk")
+Signed-off-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-on: https://review.whamcloud.com/37046
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_io.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ net/lnet/libcfs/debug.c     |  2 +-
+ net/lnet/libcfs/module.c    |  4 ++--
+ net/lnet/libcfs/tracefile.c | 43 +++++++++++++++++++++++++------------------
+ 3 files changed, 28 insertions(+), 21 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
-index 6e86efa..fbed3de 100644
---- a/fs/lustre/lov/lov_io.c
-+++ b/fs/lustre/lov/lov_io.c
-@@ -1081,6 +1081,7 @@ static int lov_io_submit(const struct lu_env *env,
- 	struct lov_io_sub *sub;
- 	struct cl_page_list *plist = &lov_env_info(env)->lti_plist;
- 	struct cl_page *page;
-+	struct cl_page *tmp;
- 	int index;
- 	int rc = 0;
+diff --git a/net/lnet/libcfs/debug.c b/net/lnet/libcfs/debug.c
+index c6b92df..d7747e7 100644
+--- a/net/lnet/libcfs/debug.c
++++ b/net/lnet/libcfs/debug.c
+@@ -418,7 +418,7 @@ void libcfs_debug_dumplog(void)
+ 			     "libcfs_debug_dumper");
+ 	set_current_state(TASK_INTERRUPTIBLE);
+ 	if (IS_ERR(dumper))
+-		pr_err("LustreError: cannot start log dump thread: %ld\n",
++		pr_err("LustreError: cannot start log dump thread: rc = %ld\n",
+ 		       PTR_ERR(dumper));
+ 	else
+ 		schedule();
+diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
+index 20d4302..a53efcc 100644
+--- a/net/lnet/libcfs/module.c
++++ b/net/lnet/libcfs/module.c
+@@ -720,7 +720,7 @@ int libcfs_setup(void)
  
-@@ -1105,10 +1106,10 @@ static int lov_io_submit(const struct lu_env *env,
- 		cl_page_list_move(&cl2q->c2_qin, qin, page);
+ 	rc = libcfs_debug_init(5 * 1024 * 1024);
+ 	if (rc < 0) {
+-		pr_err("LustreError: libcfs_debug_init: %d\n", rc);
++		pr_err("LustreError: libcfs_debug_init: rc = %d\n", rc);
+ 		goto err;
+ 	}
  
- 		index = lov_page_index(page);
--		while (qin->pl_nr > 0) {
--			page = cl_page_list_first(qin);
-+		cl_page_list_for_each_safe(page, tmp, qin) {
-+			/* this page is not on this stripe */
- 			if (index != lov_page_index(page))
--				break;
-+				continue;
+@@ -794,7 +794,7 @@ static void libcfs_exit(void)
+ 	/* the below message is checked in test-framework.sh check_mem_leak() */
+ 	rc = libcfs_debug_cleanup();
+ 	if (rc)
+-		pr_err("LustreError: libcfs_debug_cleanup: %d\n", rc);
++		pr_err("LustreError: libcfs_debug_cleanup: rc = %d\n", rc);
+ }
  
- 			cl_page_list_move(&cl2q->c2_qin, qin, page);
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+diff --git a/net/lnet/libcfs/tracefile.c b/net/lnet/libcfs/tracefile.c
+index bda3523..1eb5397 100644
+--- a/net/lnet/libcfs/tracefile.c
++++ b/net/lnet/libcfs/tracefile.c
+@@ -332,7 +332,8 @@ static struct cfs_trace_page *cfs_trace_get_tage(struct cfs_trace_cpu_data *tcd,
+ 	 * from here: this will lead to infinite recursion.
+ 	 */
+ 	if (len > PAGE_SIZE) {
+-		pr_err("cowardly refusing to write %lu bytes in a page\n", len);
++		pr_err("LustreError: cowardly refusing to write %lu bytes in a page\n",
++		       len);
+ 		return NULL;
+ 	}
+ 
+@@ -477,7 +478,8 @@ int libcfs_debug_msg(struct libcfs_debug_msg_data *msgdata,
+ 
+ 		max_nob = PAGE_SIZE - tage->used - known_size;
+ 		if (max_nob <= 0) {
+-			pr_emerg("negative max_nob: %d\n", max_nob);
++			pr_emerg("LustreError: negative max_nob: %d\n",
++				 max_nob);
+ 			mask |= D_ERROR;
+ 			cfs_trace_put_tcd(tcd);
+ 			tcd = NULL;
+@@ -499,10 +501,15 @@ int libcfs_debug_msg(struct libcfs_debug_msg_data *msgdata,
+ 			break;
+ 	}
+ 
+-	if (*(string_buf + needed - 1) != '\n')
+-		pr_info("format@%s:%d:%s doesn't end in newline\n", file,
+-			msgdata->msg_line, msgdata->msg_fn);
+-
++	if (*(string_buf + needed - 1) != '\n') {
++		pr_info("Lustre: format at %s:%d:%s doesn't end in newline\n",
++			file, msgdata->msg_line, msgdata->msg_fn);
++	} else if (mask & D_TTY) {
++		/* TTY needs '\r\n' to move carriage to leftmost position */
++		if (needed < 2 || *(string_buf + needed - 2) != '\r')
++			pr_info("Lustre: format@%s:%d:%s doesn't end in '\\r\\n'\n",
++				file, msgdata->msg_line, msgdata->msg_fn);
++	}
+ 	header.ph_len = known_size + needed;
+ 	debug_buf = (char *)page_address(tage->page) + tage->used;
+ 
+@@ -816,7 +823,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ 	if (IS_ERR(filp)) {
+ 		rc = PTR_ERR(filp);
+ 		filp = NULL;
+-		pr_err("LustreError: can't open %s for dump: rc %d\n",
++		pr_err("LustreError: can't open %s for dump: rc = %d\n",
+ 		       filename, rc);
+ 		goto out;
+ 	}
+@@ -839,8 +846,8 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ 		kunmap(tage->page);
+ 
+ 		if (rc != (int)tage->used) {
+-			pr_warn("wanted to write %u but wrote %d\n", tage->used,
+-				rc);
++			pr_warn("Lustre: wanted to write %u but wrote %d\n",
++				tage->used, rc);
+ 			put_pages_back(&pc);
+ 			__LASSERT(list_empty(&pc.pc_pages));
+ 			break;
+@@ -851,7 +858,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ 
+ 	rc = vfs_fsync(filp, 1);
+ 	if (rc)
+-		pr_err("sync returns %d\n", rc);
++		pr_err("LustreError: sync returns: rc = %d\n", rc);
+ close:
+ 	filp_close(filp, NULL);
+ out:
+@@ -985,7 +992,7 @@ int cfs_trace_daemon_command(char *str)
+ 	} else {
+ 		strcpy(cfs_tracefile, str);
+ 
+-		pr_info("debug daemon will attempt to start writing to %s (%lukB max)\n",
++		pr_info("Lustre: debug daemon will attempt to start writing to %s (%lukB max)\n",
+ 			cfs_tracefile,
+ 			(long)(cfs_tracefile_size >> 10));
+ 
+@@ -1100,8 +1107,8 @@ static int tracefiled(void *arg)
+ 			if (IS_ERR(filp)) {
+ 				rc = PTR_ERR(filp);
+ 				filp = NULL;
+-				pr_warn("couldn't open %s: %d\n", cfs_tracefile,
+-					rc);
++				pr_warn("Lustre: couldn't open %s: rc = %d\n",
++					cfs_tracefile, rc);
+ 			}
  		}
+ 		up_read(&cfs_tracefile_sem);
+@@ -1126,7 +1133,7 @@ static int tracefiled(void *arg)
+ 			kunmap(tage->page);
+ 
+ 			if (rc != (int)tage->used) {
+-				pr_warn("wanted to write %u but wrote %d\n",
++				pr_warn("Lustre: wanted to write %u but wrote %d\n",
+ 					tage->used, rc);
+ 				put_pages_back(&pc);
+ 				__LASSERT(list_empty(&pc.pc_pages));
+@@ -1139,8 +1146,8 @@ static int tracefiled(void *arg)
+ 		if (!list_empty(&pc.pc_pages)) {
+ 			int i;
+ 
+-			pr_alert("trace pages aren't empty\n");
+-			pr_err("total cpus(%d): ", num_possible_cpus());
++			pr_alert("Lustre: trace pages aren't empty\n");
++			pr_err("Lustre: total cpus(%d): ", num_possible_cpus());
+ 			for (i = 0; i < num_possible_cpus(); i++)
+ 				if (cpu_online(i))
+ 					pr_cont("%d(on) ", i);
+@@ -1151,9 +1158,9 @@ static int tracefiled(void *arg)
+ 			i = 0;
+ 			list_for_each_entry_safe(tage, tmp, &pc.pc_pages,
+ 						 linkage)
+-				pr_err("page %d belongs to cpu %d\n",
++				pr_err("Lustre: page %d belongs to cpu %d\n",
+ 				       ++i, tage->cpu);
+-			pr_err("There are %d pages unwritten\n", i);
++			pr_err("Lustre: There are %d pages unwritten\n", i);
+ 		}
+ 		__LASSERT(list_empty(&pc.pc_pages));
+ end_loop:
 -- 
 1.8.3.1
