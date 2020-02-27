@@ -1,84 +1,61 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:00 -0500
-Subject: [lustre-devel] [PATCH 192/622] lustre: ldlm: Adjust search_*
- functions
+Date: Thu, 27 Feb 2020 16:11:03 -0500
+Subject: [lustre-devel] [PATCH 195/622] lustre: ptlrpc: always unregister
+ bulk
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-193-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-196-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: Hongchao Zhang <hongchao@whamcloud.com>
 
-The search_itree and search_queue functions should both
-return either a pointer to a found lock or NULL.
+In ptlrpc_check_set, the bulk should be unregistered before
+ptl_send_rpc in any case.
 
-Currently, search_itree just returns the contents of
-data->lmd_lock, whether or not a lock was found.
-
-search_queue will do the same under certain cirumstances.
-
-Zero lmd_lock in both search_* functions, and also stop
-searching in search_itree once a lock is found.
-
-cray-bug-id: LUS-6783
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11719
-Lustre-commit: a231148843bd ("LU-11719 ldlm: Adjust search_* functions")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33754
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11647
+Lustre-commit: 21c53b18a1bc ("LU-11647 ptlrpc: always unregister bulk")
+Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/22378
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_lock.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ fs/lustre/ptlrpc/client.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index b9771ef..06690a6 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -1159,6 +1159,8 @@ static struct ldlm_lock *search_itree(struct ldlm_resource *res,
- {
- 	int idx;
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index ff212a3..f57ec1883 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -1902,9 +1902,6 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 					spin_lock(&req->rq_lock);
+ 					req->rq_resend = 1;
+ 					spin_unlock(&req->rq_lock);
+-					if (req->rq_bulk &&
+-					    !ptlrpc_unregister_bulk(req, 1))
+-						continue;
+ 				}
+ 				/*
+ 				 * rq_wait_ctx is only touched by ptlrpcd,
+@@ -1931,6 +1928,13 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 					spin_unlock(&req->rq_lock);
+ 				}
  
-+	data->lmd_lock = NULL;
++				/* In any case, the previous bulk should be
++				 * cleaned up to prepare for the new sending
++				 */
++				if (req->rq_bulk &&
++				    !ptlrpc_unregister_bulk(req, 1))
++					continue;
 +
- 	for (idx = 0; idx < LCK_MODE_NUM; idx++) {
- 		struct ldlm_interval_tree *tree = &res->lr_itree[idx];
- 
-@@ -1172,11 +1174,14 @@ static struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 				   data->lmd_policy->l_extent.start,
- 				   data->lmd_policy->l_extent.end,
- 				   lock_matches, data);
-+		if (data->lmd_lock)
-+			return data->lmd_lock;
- 	}
--	return data->lmd_lock;
-+
-+	return NULL;
- }
- 
--/**
-+/*
-  * Search for a lock with given properties in a queue.
-  *
-  * @queue	search for a lock in this queue
-@@ -1189,9 +1194,12 @@ static struct ldlm_lock *search_queue(struct list_head *queue,
- {
- 	struct ldlm_lock *lock;
- 
-+	data->lmd_lock = NULL;
-+
- 	list_for_each_entry(lock, queue, l_res_link)
- 		if (lock_matches(lock, data))
- 			return data->lmd_lock;
-+
- 	return NULL;
- }
- 
+ 				rc = ptl_send_rpc(req, 0);
+ 				if (rc == -ENOMEM) {
+ 					spin_lock(&imp->imp_lock);
 -- 
 1.8.3.1
