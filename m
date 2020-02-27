@@ -1,440 +1,493 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:49 -0500
-Subject: [lustre-devel] [PATCH 241/622] lustre: security: return security
- context for metadata ops
+Date: Thu, 27 Feb 2020 16:12:00 -0500
+Subject: [lustre-devel] [PATCH 252/622] lustre: ldlm: Fix style issues for
+ ldlm_request.c
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-242-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-253-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bruno Faccini <bruno.faccini@intel.com>
+From: Arshad Hussain <arshad.super@gmail.com>
 
-Security layer needs to fetch security context of files/dirs
-upon metadata ops like lookup, getattr, open, truncate, and
-layout, for its own purpose and control checks.
-Retrieving the security context consists in a getxattr operation
-at the file system level. The fact that the requested metadata
-operation and the getxattr are not atomic can create a window
-for a dead-lock situation where, based on some access patterns,
-all MDT service threads can become stuck waiting for lookup lock
-to be released and thus unable to serve getxattr for security context.
-Another problem is that sending an additional getxattr request for
-every metadata op hurts performance.
+This patch fixes issues reported by checkpatch
+for file fs/lustre/ldlm/ldlm_request.c
 
-This patch introduces a way to get atomicity by having
-the MDT return security context upon granted lock reply,
-sparing the client an additional getxattr request.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9193
-Lustre-commit: fca35f74f9ec ("LU-9193 security: return security context for metadata ops")
-Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/26831
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: 3a56c0e5f42f ("LU-6142 ldlm: Fix style issues for ldlm_request.c")
+Signed-off-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-on: https://review.whamcloud.com/34547
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd.h                |  3 +-
- fs/lustre/llite/llite_internal.h       |  3 ++
- fs/lustre/llite/namei.c                | 60 +++++++++++++++++++++++++++++++--
- fs/lustre/llite/xattr_security.c       | 19 +++++++++++
- fs/lustre/lmv/lmv_intent.c             | 21 ++++++++++--
- fs/lustre/mdc/mdc_locks.c              | 61 +++++++++++++++++++++++++++++++++-
- fs/lustre/mdc/mdc_request.c            |  2 ++
- fs/lustre/ptlrpc/layout.c              |  9 +++--
- include/uapi/linux/lustre/lustre_idl.h |  1 +
- 9 files changed, 169 insertions(+), 10 deletions(-)
+ fs/lustre/ldlm/ldlm_request.c | 144 +++++++++++++++++++++++++++---------------
+ 1 file changed, 94 insertions(+), 50 deletions(-)
 
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index ff94092..758efc1 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -778,8 +778,9 @@ struct md_op_data {
- 	u64			op_data_version;
- 	struct lustre_handle	op_lease_handle;
- 
--	/* File security context, for creates. */
-+	/* File security context, for creates/metadata ops */
- 	const char	       *op_file_secctx_name;
-+	u32			op_file_secctx_name_size;
- 	void		       *op_file_secctx;
- 	u32			op_file_secctx_size;
- 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index d41531b..3c81c3b 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -279,6 +279,9 @@ int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
- int ll_inode_init_security(struct dentry *dentry, struct inode *inode,
- 			   struct inode *dir);
- 
-+int ll_listsecurity(struct inode *inode, char *secctx_name,
-+		    size_t secctx_name_size);
-+
- /*
-  * Locking to guarantee consistency of non-atomic updates to long long i_size,
-  * consistency between file size and KMS.
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index e410ff0..ee3ce70 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -592,7 +592,8 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
- 
- static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 			       struct lookup_intent *it,
--			       struct inode *parent, struct dentry **de)
-+			       struct inode *parent, struct dentry **de,
-+			       void *secctx, u32 secctxlen)
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index fb564f4..45d70d4 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -147,7 +147,8 @@ static void ldlm_expired_completion_wait(struct ldlm_lock *lock, u32 conn_cnt)
+  *
+  * Return:	timeout in seconds to wait for the server reply
+  */
+-/* We use the same basis for both server side and client side functions
++/*
++ * We use the same basis for both server side and client side functions
+  * from a single node.
+  */
+ static time64_t ldlm_cp_timeout(struct ldlm_lock *lock)
+@@ -289,13 +290,14 @@ static void failed_lock_cleanup(struct ldlm_namespace *ns,
  {
- 	struct inode *inode = NULL;
- 	u64 bits = 0;
-@@ -605,6 +606,10 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 	CDEBUG(D_DENTRY, "it %p it_disposition %x\n", it,
- 	       it->it_disposition);
- 	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
-+		struct req_capsule *pill = &request->rq_pill;
-+		struct mdt_body *body = req_capsule_server_get(pill,
-+							       &RMF_MDT_BODY);
-+
- 		rc = ll_prep_inode(&inode, request, (*de)->d_sb, it);
- 		if (rc)
- 			return rc;
-@@ -623,6 +628,32 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 		 * ll_glimpse_size or some equivalent themselves anyway.
- 		 * Also see bug 7198.
+ 	int need_cancel = 0;
+ 
+-	/* Set a flag to prevent us from sending a CANCEL (bug 407) */
++	/* Set a flag to prevent us from sending a CANCEL (b=407) */
+ 	lock_res_and_lock(lock);
+ 	/* Check that lock is not granted or failed, we might race. */
+ 	if (!ldlm_is_granted(lock) && !ldlm_is_failed(lock)) {
+-		/* Make sure that this lock will not be found by raced
++		/*
++		 * Make sure that this lock will not be found by raced
+ 		 * bl_ast and -EINVAL reply is sent to server anyways.
+-		 * bug 17645
++		 * b=17645
  		 */
-+
-+		/* If security context was returned by MDT, put it in
-+		 * inode now to save an extra getxattr from security hooks,
-+		 * and avoid deadlock.
-+		 */
-+		if (body->mbo_valid & OBD_MD_SECCTX) {
-+			secctx = req_capsule_server_get(pill, &RMF_FILE_SECCTX);
-+			secctxlen = req_capsule_get_size(pill,
-+							 &RMF_FILE_SECCTX,
-+							 RCL_SERVER);
-+
-+			if (secctxlen)
-+				CDEBUG(D_SEC,
-+				       "server returned security context for " DFID "\n",
-+				       PFID(ll_inode2fid(inode)));
-+		}
-+
-+		if (secctx && secctxlen != 0) {
-+			inode_lock(inode);
-+			rc = security_inode_notifysecctx(inode, secctx,
-+							 secctxlen);
-+			inode_unlock(inode);
-+			if (rc)
-+				CWARN("cannot set security context for " DFID ": rc = %d\n",
-+				      PFID(ll_inode2fid(inode)), rc);
-+		}
- 	}
+ 		lock->l_flags |= LDLM_FL_LOCAL_ONLY | LDLM_FL_FAILED |
+ 				 LDLM_FL_ATOMIC_CB | LDLM_FL_CBPENDING;
+@@ -309,10 +311,12 @@ static void failed_lock_cleanup(struct ldlm_namespace *ns,
+ 	else
+ 		LDLM_DEBUG(lock, "lock was granted or failed in race");
  
- 	alias = ll_splice_alias(inode, *de);
-@@ -680,6 +711,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 	struct dentry *save = dentry, *retval;
- 	struct ptlrpc_request *req = NULL;
- 	struct md_op_data *op_data = NULL;
-+	char secctx_name[XATTR_NAME_MAX + 1];
- 	struct inode *inode;
- 	u32 opc;
- 	int rc;
-@@ -742,6 +774,28 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 			*secctx = op_data->op_file_secctx;
- 		if (secctxlen)
- 			*secctxlen = op_data->op_file_secctx_size;
-+	} else {
-+		if (secctx)
-+			*secctx = NULL;
-+		if (secctxlen)
-+			*secctxlen = 0;
-+	}
-+
-+	/* ask for security context upon intent */
-+	if (it->it_op & (IT_LOOKUP | IT_GETATTR | IT_OPEN)) {
-+		/* get name of security xattr to request to server */
-+		rc = ll_listsecurity(parent, secctx_name,
-+				     sizeof(secctx_name));
-+		if (rc < 0) {
-+			CDEBUG(D_SEC,
-+			       "cannot get security xattr name for " DFID ": rc = %d\n",
-+			       PFID(ll_inode2fid(parent)), rc);
-+		} else if (rc > 0) {
-+			op_data->op_file_secctx_name = secctx_name;
-+			op_data->op_file_secctx_name_size = rc;
-+			CDEBUG(D_SEC, "'%.*s' is security xattr for " DFID "\n",
-+			       rc, secctx_name, PFID(ll_inode2fid(parent)));
-+		}
- 	}
- 
- 	rc = md_intent_lock(ll_i2mdexp(parent), op_data, it, &req,
-@@ -783,7 +837,9 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 
- 	/* dir layout may change */
- 	ll_unlock_md_op_lsm(op_data);
--	rc = ll_lookup_it_finish(req, it, parent, &dentry);
-+	rc = ll_lookup_it_finish(req, it, parent, &dentry,
-+				 secctx ? *secctx : NULL,
-+				 secctxlen ? *secctxlen : 0);
- 	if (rc != 0) {
- 		ll_intent_release(it);
- 		retval = ERR_PTR(rc);
-diff --git a/fs/lustre/llite/xattr_security.c b/fs/lustre/llite/xattr_security.c
-index e5a52d9..e4fb64a 100644
---- a/fs/lustre/llite/xattr_security.c
-+++ b/fs/lustre/llite/xattr_security.c
-@@ -132,3 +132,22 @@ int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
- 		return 0;
- 	return err;
- }
-+
-+/**
-+ * Get security context xattr name used by policy.
-+ *
-+ * \retval >= 0     length of xattr name
-+ * \retval < 0      failure to get security context xattr name
-+ */
-+int
-+ll_listsecurity(struct inode *inode, char *secctx_name, size_t secctx_name_size)
-+{
-+	int rc;
-+
-+	rc = security_inode_listsecurity(inode, secctx_name, secctx_name_size);
-+	if (rc >= secctx_name_size)
-+		rc = -ERANGE;
-+	else if (rc >= 0)
-+		secctx_name[rc] = '\0';
-+	return rc;
-+}
-diff --git a/fs/lustre/lmv/lmv_intent.c b/fs/lustre/lmv/lmv_intent.c
-index 6933f7d..45f1ac5 100644
---- a/fs/lustre/lmv/lmv_intent.c
-+++ b/fs/lustre/lmv/lmv_intent.c
-@@ -52,7 +52,8 @@ static int lmv_intent_remote(struct obd_export *exp, struct lookup_intent *it,
- 			     const struct lu_fid *parent_fid,
- 			     struct ptlrpc_request **reqp,
- 			     ldlm_blocking_callback cb_blocking,
--			     u64 extra_lock_flags)
-+			     u64 extra_lock_flags,
-+			     const char *secctx_name, u32 secctx_name_size)
- {
- 	struct obd_device *obd = exp->exp_obd;
- 	struct lmv_obd *lmv = &obd->u.lmv;
-@@ -109,6 +110,16 @@ static int lmv_intent_remote(struct obd_export *exp, struct lookup_intent *it,
- 	CDEBUG(D_INODE, "REMOTE_INTENT with fid=" DFID " -> mds #%u\n",
- 	       PFID(&body->mbo_fid1), tgt->ltd_idx);
- 
-+	/* ask for security context upon intent */
-+	if (it->it_op & (IT_LOOKUP | IT_GETATTR | IT_OPEN) &&
-+	    secctx_name_size != 0 && secctx_name) {
-+		op_data->op_file_secctx_name = secctx_name;
-+		op_data->op_file_secctx_name_size = secctx_name_size;
-+		CDEBUG(D_SEC,
-+		       "'%.*s' is security xattr to fetch for " DFID "\n",
-+		       secctx_name_size, secctx_name, PFID(&body->mbo_fid1));
-+	}
-+
- 	rc = md_intent_lock(tgt->ltd_exp, op_data, it, &req, cb_blocking,
- 			    extra_lock_flags);
- 	if (rc)
-@@ -385,7 +396,9 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
- 	/* Not cross-ref case, just get out of here. */
- 	if (unlikely((body->mbo_valid & OBD_MD_MDS))) {
- 		rc = lmv_intent_remote(exp, it, &op_data->op_fid1, reqp,
--				       cb_blocking, extra_lock_flags);
-+				       cb_blocking, extra_lock_flags,
-+				       op_data->op_file_secctx_name,
-+				       op_data->op_file_secctx_name_size);
- 		if (rc != 0)
- 			return rc;
- 
-@@ -471,7 +484,9 @@ static int lmv_intent_lookup(struct obd_export *exp,
- 	/* Not cross-ref case, just get out of here. */
- 	if (unlikely((body->mbo_valid & OBD_MD_MDS))) {
- 		rc = lmv_intent_remote(exp, it, NULL, reqp, cb_blocking,
--				       extra_lock_flags);
-+				       extra_lock_flags,
-+				       op_data->op_file_secctx_name,
-+				       op_data->op_file_secctx_name_size);
- 		if (rc != 0)
- 			return rc;
- 		body = req_capsule_server_get(&(*reqp)->rq_pill, &RMF_MDT_BODY);
-diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
-index 55de559..6f4baa6 100644
---- a/fs/lustre/mdc/mdc_locks.c
-+++ b/fs/lustre/mdc/mdc_locks.c
-@@ -310,7 +310,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
- 
- 	req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX_NAME,
- 			     RCL_CLIENT, op_data->op_file_secctx_name ?
--			     strlen(op_data->op_file_secctx_name) + 1 : 0);
-+			     op_data->op_file_secctx_name_size : 0);
- 
- 	req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX, RCL_CLIENT,
- 			     op_data->op_file_secctx_size);
-@@ -337,6 +337,30 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
- 			     obddev->u.cli.cl_max_mds_easize);
- 	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
- 
-+	if (!(it->it_op & IT_CREAT) && it->it_op & IT_OPEN &&
-+	    req_capsule_has_field(&req->rq_pill, &RMF_FILE_SECCTX_NAME,
-+				  RCL_CLIENT) &&
-+	    op_data->op_file_secctx_name_size > 0 &&
-+	    op_data->op_file_secctx_name) {
-+		char *secctx_name;
-+
-+		secctx_name = req_capsule_client_get(&req->rq_pill,
-+						     &RMF_FILE_SECCTX_NAME);
-+		memcpy(secctx_name, op_data->op_file_secctx_name,
-+		       op_data->op_file_secctx_name_size);
-+		req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX,
-+				     RCL_SERVER,
-+				     obddev->u.cli.cl_max_mds_easize);
-+
-+		CDEBUG(D_SEC, "packed '%.*s' as security xattr name\n",
-+		       op_data->op_file_secctx_name_size,
-+		       op_data->op_file_secctx_name);
-+
-+	} else {
-+		req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX,
-+				     RCL_SERVER, 0);
-+	}
-+
- 	/**
- 	 * Inline buffer for possible data from Data-on-MDT files.
+-	/* XXX - HACK because we shouldn't call ldlm_lock_destroy()
++	/*
++	 * XXX - HACK because we shouldn't call ldlm_lock_destroy()
+ 	 *       from llite/file.c/ll_file_flock().
  	 */
-@@ -407,6 +431,8 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
- 	/* pack the intent */
- 	lit = req_capsule_client_get(&req->rq_pill, &RMF_LDLM_INTENT);
- 	lit->opc = IT_GETXATTR;
-+	CDEBUG(D_INFO, "%s: get xattrs for " DFID "\n",
-+	       exp->exp_obd->obd_name, PFID(&op_data->op_fid1));
+-	/* This code makes for the fact that we do not have blocking handler on
++	/*
++	 * This code makes for the fact that we do not have blocking handler on
+ 	 * a client for flock locks. As such this is the place where we must
+ 	 * completely kill failed locks. (interrupted and those that
+ 	 * were waiting to be granted when server evicted us.
+@@ -416,7 +420,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 	CDEBUG(D_INFO, "local: %p, remote cookie: %#llx, flags: 0x%llx\n",
+ 	       lock, reply->lock_handle.cookie, *flags);
  
- 	/* If the supplied buffer is too small then the server will
- 	 * return -ERANGE and llite will fallback to using non cached
-@@ -454,12 +480,25 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
- 	struct ldlm_intent *lit;
- 	int rc;
- 	u32 easize;
-+	bool have_secctx = false;
+-	/* If enqueue returned a blocked lock but the completion handler has
++	/*
++	 * If enqueue returned a blocked lock but the completion handler has
+ 	 * already run, then it fixed up the resource and we don't need to do it
+ 	 * again.
+ 	 */
+@@ -466,11 +471,13 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 		LDLM_DEBUG(lock, "enqueue reply includes blocking AST");
+ 	}
  
- 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
- 				   &RQF_LDLM_INTENT_GETATTR);
- 	if (!req)
- 		return ERR_PTR(-ENOMEM);
+-	/* If the lock has already been granted by a completion AST, don't
++	/*
++	 * If the lock has already been granted by a completion AST, don't
+ 	 * clobber the LVB with an older one.
+ 	 */
+ 	if (lvb_len > 0) {
+-		/* We must lock or a racing completion might update lvb without
++		/*
++		 * We must lock or a racing completion might update lvb without
+ 		 * letting us know and we'll clobber the correct value.
+ 		 * Cannot unlock after the check either, as that still leaves
+ 		 * a tiny window for completion to get in
+@@ -499,7 +506,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 	}
  
-+	/* send name of security xattr to get upon intent */
-+	if (it->it_op & (IT_LOOKUP | IT_GETATTR) &&
-+	    req_capsule_has_field(&req->rq_pill, &RMF_FILE_SECCTX_NAME,
-+				  RCL_CLIENT) &&
-+	    op_data->op_file_secctx_name_size > 0 &&
-+	    op_data->op_file_secctx_name) {
-+		have_secctx = true;
-+		req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX_NAME,
-+				     RCL_CLIENT,
-+				     op_data->op_file_secctx_name_size);
-+	}
-+
- 	req_capsule_set_size(&req->rq_pill, &RMF_NAME, RCL_CLIENT,
- 			     op_data->op_namelen + 1);
+ 	if (lvb_len > 0 && lvb) {
+-		/* Copy the LVB here, and not earlier, because the completion
++		/*
++		 * Copy the LVB here, and not earlier, because the completion
+ 		 * AST (if any) can override what we got in the reply
+ 		 */
+ 		memcpy(lvb, lock->l_lvb_data, lvb_len);
+@@ -586,7 +594,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
+ 		to_free = !ns_connect_lru_resize(ns) &&
+ 			  opc == LDLM_ENQUEUE ? 1 : 0;
  
-@@ -483,6 +522,26 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+-		/* Cancel LRU locks here _only_ if the server supports
++		/*
++		 * Cancel LRU locks here _only_ if the server supports
+ 		 * EARLY_CANCEL. Otherwise we have to send extra CANCEL
+ 		 * RPC, which will make us slower.
+ 		 */
+@@ -611,7 +620,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
+ 		if (canceloff) {
+ 			dlm = req_capsule_client_get(pill, &RMF_DLM_REQ);
+ 			LASSERT(dlm);
+-			/* Skip first lock handler in ldlm_request_pack(),
++			/*
++			 * Skip first lock handler in ldlm_request_pack(),
+ 			 * this method will increment @lock_count according
+ 			 * to the lock handle amount actually written to
+ 			 * the buffer.
+@@ -685,7 +695,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
  
- 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER, easize);
- 	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
-+
-+	if (have_secctx) {
-+		char *secctx_name;
-+
-+		secctx_name = req_capsule_client_get(&req->rq_pill,
-+						     &RMF_FILE_SECCTX_NAME);
-+		memcpy(secctx_name, op_data->op_file_secctx_name,
-+		       op_data->op_file_secctx_name_size);
-+
-+		req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX,
-+				     RCL_SERVER, easize);
-+
-+		CDEBUG(D_SEC, "packed '%.*s' as security xattr name\n",
-+		       op_data->op_file_secctx_name_size,
-+		       op_data->op_file_secctx_name);
-+	} else {
-+		req_capsule_set_size(&req->rq_pill, &RMF_FILE_SECCTX,
-+				     RCL_SERVER, 0);
-+	}
-+
- 	ptlrpc_request_set_replen(req);
- 	return req;
+ 	ns = exp->exp_obd->obd_namespace;
+ 
+-	/* If we're replaying this lock, just check some invariants.
++	/*
++	 * If we're replaying this lock, just check some invariants.
+ 	 * If we're creating a new lock, get everything all setup nicely.
+ 	 */
+ 	if (is_replay) {
+@@ -752,7 +763,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 	if (*flags & LDLM_FL_NDELAY) {
+ 		DEBUG_REQ(D_DLMTRACE, req, "enque lock with no delay\n");
+ 		req->rq_no_resend = req->rq_no_delay = 1;
+-		/* probably set a shorter timeout value and handle ETIMEDOUT
++		/*
++		 * probably set a shorter timeout value and handle ETIMEDOUT
+ 		 * in osc_lock_upcall() correctly
+ 		 */
+ 		/* lustre_msg_set_timeout(req, req->rq_timeout / 2); */
+@@ -799,7 +811,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 				    einfo->ei_mode, flags, lvb, lvb_len,
+ 				    lockh, rc);
+ 
+-	/* If ldlm_cli_enqueue_fini did not find the lock, we need to free
++	/*
++	 * If ldlm_cli_enqueue_fini did not find the lock, we need to free
+ 	 * one reference that we took
+ 	 */
+ 	if (err == -ENOLCK)
+@@ -860,7 +873,8 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 	}
+ 
+ 	lock_res_and_lock(lock);
+-	/* Lock convert is sent for any new bits to drop, the converting flag
++	/*
++	 * Lock convert is sent for any new bits to drop, the converting flag
+ 	 * is dropped when ibits on server are the same as on client. Meanwhile
+ 	 * that can be so that more later convert will be replied first with
+ 	 * and clear converting flag, so in case of such race just exit here.
+@@ -872,7 +886,8 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 			   reply->lock_desc.l_policy_data.l_inodebits.bits);
+ 	} else if (reply->lock_desc.l_policy_data.l_inodebits.bits !=
+ 		   lock->l_policy_data.l_inodebits.bits) {
+-		/* Compare server returned lock ibits and local lock ibits
++		/*
++		 * Compare server returned lock ibits and local lock ibits
+ 		 * if they are the same we consider conversion is done,
+ 		 * otherwise we have more converts inflight and keep
+ 		 * converting flag.
+@@ -882,14 +897,16 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 	} else {
+ 		ldlm_clear_converting(lock);
+ 
+-		/* Concurrent BL AST may arrive and cause another convert
++		/*
++		 * Concurrent BL AST may arrive and cause another convert
+ 		 * or cancel so just do nothing here if bl_ast is set,
+ 		 * finish with convert otherwise.
+ 		 */
+ 		if (!ldlm_is_bl_ast(lock)) {
+ 			struct ldlm_namespace *ns = ldlm_lock_to_ns(lock);
+ 
+-			/* Drop cancel_bits since there are no more converts
++			/*
++			 * Drop cancel_bits since there are no more converts
+ 			 * and put lock into LRU if it is still not used and
+ 			 * is not there yet.
+ 			 */
+@@ -918,7 +935,8 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 		}
+ 		unlock_res_and_lock(lock);
+ 
+-		/* fallback to normal lock cancel. If rc means there is no
++		/*
++		 * fallback to normal lock cancel. If rc means there is no
+ 		 * valid lock on server, do only local cancel
+ 		 */
+ 		if (rc == ELDLM_NO_LOCK_DATA)
+@@ -959,7 +977,8 @@ int ldlm_cli_convert(struct ldlm_lock *lock, u32 *flags)
+ 		return -EINVAL;
+ 	}
+ 
+-	/* this is better to check earlier and it is done so already,
++	/*
++	 * this is better to check earlier and it is done so already,
+ 	 * but this check is kept too as final one to issue an error
+ 	 * if any new code will miss such check.
+ 	 */
+@@ -1075,7 +1094,8 @@ static void ldlm_cancel_pack(struct ptlrpc_request *req,
+ 	max += LDLM_LOCKREQ_HANDLES;
+ 	LASSERT(max >= dlm->lock_count + count);
+ 
+-	/* XXX: it would be better to pack lock handles grouped by resource.
++	/*
++	 * XXX: it would be better to pack lock handles grouped by resource.
+ 	 * so that the server cancel would call filter_lvbo_update() less
+ 	 * frequently.
+ 	 */
+@@ -1202,7 +1222,8 @@ int ldlm_cli_update_pool(struct ptlrpc_request *req)
+ 		return 0;
+ 	}
+ 
+-	/* In some cases RPC may contain SLV and limit zeroed out. This
++	/*
++	 * In some cases RPC may contain SLV and limit zeroed out. This
+ 	 * is the case when server does not support LRU resize feature.
+ 	 * This is also possible in some recovery cases when server-side
+ 	 * reqs have no reference to the OBD export and thus access to
+@@ -1221,7 +1242,8 @@ int ldlm_cli_update_pool(struct ptlrpc_request *req)
+ 	new_slv = lustre_msg_get_slv(req->rq_repmsg);
+ 	obd = req->rq_import->imp_obd;
+ 
+-	/* Set new SLV and limit in OBD fields to make them accessible
++	/*
++	 * Set new SLV and limit in OBD fields to make them accessible
+ 	 * to the pool thread. We do not access obd_namespace and pool
+ 	 * directly here as there is no reliable way to make sure that
+ 	 * they are still alive at cleanup time. Evil races are possible
+@@ -1281,7 +1303,8 @@ int ldlm_cli_cancel(const struct lustre_handle *lockh,
+ 		return 0;
+ 	}
+ 
+-	/* Lock is being converted, cancel it immediately.
++	/*
++	 * Lock is being converted, cancel it immediately.
+ 	 * When convert will end, it releases lock and it will be gone.
+ 	 */
+ 	if (ldlm_is_converting(lock)) {
+@@ -1302,7 +1325,8 @@ int ldlm_cli_cancel(const struct lustre_handle *lockh,
+ 		LDLM_LOCK_RELEASE(lock);
+ 		return 0;
+ 	}
+-	/* Even if the lock is marked as LDLM_FL_BL_AST, this is a LDLM_CANCEL
++	/*
++	 * Even if the lock is marked as LDLM_FL_BL_AST, this is a LDLM_CANCEL
+ 	 * RPC which goes to canceld portal, so we can cancel other LRU locks
+ 	 * here and send them all as one LDLM_CANCEL RPC.
+ 	 */
+@@ -1350,7 +1374,8 @@ int ldlm_cli_cancel_list_local(struct list_head *cancels, int count,
+ 		} else {
+ 			rc = ldlm_cli_cancel_local(lock);
+ 		}
+-		/* Until we have compound requests and can send LDLM_CANCEL
++		/*
++		 * Until we have compound requests and can send LDLM_CANCEL
+ 		 * requests batched with generic RPCs, we need to send cancels
+ 		 * with the LDLM_FL_BL_AST flag in a separate RPC from
+ 		 * the one being generated now.
+@@ -1387,7 +1412,8 @@ int ldlm_cli_cancel_list_local(struct list_head *cancels, int count,
+ {
+ 	enum ldlm_policy_res result = LDLM_POLICY_CANCEL_LOCK;
+ 
+-	/* don't check added & count since we want to process all locks
++	/*
++	 * don't check added & count since we want to process all locks
+ 	 * from unused list.
+ 	 * It's fine to not take lock to access lock->l_resource since
+ 	 * the lock has already been granted so it won't change.
+@@ -1424,7 +1450,8 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+ 	u64 slv, lvf, lv;
+ 	s64 la;
+ 
+-	/* Stop LRU processing when we reach past @count or have checked all
++	/*
++	 * Stop LRU processing when we reach past @count or have checked all
+ 	 * locks in LRU.
+ 	 */
+ 	if (count && added >= count)
+@@ -1447,7 +1474,8 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+ 	/* Inform pool about current CLV to see it via debugfs. */
+ 	ldlm_pool_set_clv(pl, lv);
+ 
+-	/* Stop when SLV is not yet come from server or lv is smaller than
++	/*
++	 * Stop when SLV is not yet come from server or lv is smaller than
+ 	 * it is.
+ 	 */
+ 	if (slv == 0 || lv < slv)
+@@ -1469,7 +1497,8 @@ static enum ldlm_policy_res ldlm_cancel_passed_policy(struct ldlm_namespace *ns,
+ 						      int unused, int added,
+ 						      int count)
+ {
+-	/* Stop LRU processing when we reach past @count or have checked all
++	/*
++	 * Stop LRU processing when we reach past @count or have checked all
+ 	 * locks in LRU.
+ 	 */
+ 	return (added >= count) ?
+@@ -1538,7 +1567,8 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
+ ldlm_cancel_default_policy(struct ldlm_namespace *ns, struct ldlm_lock *lock,
+ 			   int unused, int added, int count)
+ {
+-	/* Stop LRU processing when we reach past count or have checked all
++	/*
++	 * Stop LRU processing when we reach past count or have checked all
+ 	 * locks in LRU.
+ 	 */
+ 	return (added >= count) ?
+@@ -1652,7 +1682,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 			    !ldlm_is_converting(lock))
+ 				break;
+ 
+-			/* Somebody is already doing CANCEL. No need for this
++			/*
++			 * Somebody is already doing CANCEL. No need for this
+ 			 * lock in LRU, do not traverse it again.
+ 			 */
+ 			ldlm_lock_remove_from_lru_nolock(lock);
+@@ -1668,7 +1699,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		spin_unlock(&ns->ns_lock);
+ 		lu_ref_add(&lock->l_reference, __func__, current);
+ 
+-		/* Pass the lock through the policy filter and see if it
++		/*
++		 * Pass the lock through the policy filter and see if it
+ 		 * should stay in LRU.
+ 		 *
+ 		 * Even for shrinker policy we stop scanning if
+@@ -1707,7 +1739,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		/* Check flags again under the lock. */
+ 		if (ldlm_is_canceling(lock) || ldlm_is_converting(lock) ||
+ 		    (ldlm_lock_remove_from_lru_check(lock, last_use) == 0)) {
+-			/* Another thread is removing lock from LRU, or
++			/*
++			 * Another thread is removing lock from LRU, or
+ 			 * somebody is already doing CANCEL, or there
+ 			 * is a blocking request which will send cancel
+ 			 * by itself, or the lock is no longer unused or
+@@ -1722,7 +1755,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		}
+ 		LASSERT(!lock->l_readers && !lock->l_writers);
+ 
+-		/* If we have chosen to cancel this lock voluntarily, we
++		/*
++		 * If we have chosen to cancel this lock voluntarily, we
+ 		 * better send cancel notification to server, so that it
+ 		 * frees appropriate state. This might lead to a race
+ 		 * where while we are doing cancel here, server is also
+@@ -1730,7 +1764,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		 */
+ 		ldlm_clear_cancel_on_block(lock);
+ 
+-		/* Setting the CBPENDING flag is a little misleading,
++		/*
++		 * Setting the CBPENDING flag is a little misleading,
+ 		 * but prevents an important race; namely, once
+ 		 * CBPENDING is set, the lock can accumulate no more
+ 		 * readers/writers. Since readers and writers are
+@@ -1744,11 +1779,12 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		     ldlm_has_dom(lock)) && lock->l_granted_mode == LCK_PR)
+ 			ldlm_set_discard_data(lock);
+ 
+-		/* We can't re-add to l_lru as it confuses the
++		/*
++		 * We can't re-add to l_lru as it confuses the
+ 		 * refcounting in ldlm_lock_remove_from_lru() if an AST
+ 		 * arrives after we drop lr_lock below. We use l_bl_ast
+ 		 * and can't use l_pending_chain as it is used both on
+-		 * server and client nevertheless bug 5666 says it is
++		 * server and client nevertheless b=5666 says it is
+ 		 * used only on server
+ 		 */
+ 		LASSERT(list_empty(&lock->l_bl_ast));
+@@ -1787,7 +1823,8 @@ int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
+ 	LIST_HEAD(cancels);
+ 	int count, rc;
+ 
+-	/* Just prepare the list of locks, do not actually cancel them yet.
++	/*
++	 * Just prepare the list of locks, do not actually cancel them yet.
+ 	 * Locks are cancelled later in a separate thread.
+ 	 */
+ 	count = ldlm_prepare_lru_list(ns, &cancels, nr, 0, flags);
+@@ -1824,7 +1861,8 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
+ 		if (lock->l_readers || lock->l_writers)
+ 			continue;
+ 
+-		/* If somebody is already doing CANCEL, or blocking AST came,
++		/*
++		 * If somebody is already doing CANCEL, or blocking AST came,
+ 		 * skip this lock.
+ 		 */
+ 		if (ldlm_is_bl_ast(lock) || ldlm_is_canceling(lock) ||
+@@ -1834,7 +1872,8 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
+ 		if (lockmode_compat(lock->l_granted_mode, mode))
+ 			continue;
+ 
+-		/* If policy is given and this is IBITS lock, add to list only
++		/*
++		 * If policy is given and this is IBITS lock, add to list only
+ 		 * those locks that match by policy.
+ 		 * Skip locks with DoM bit always to don't flush data.
+ 		 */
+@@ -1878,7 +1917,8 @@ int ldlm_cli_cancel_list(struct list_head *cancels, int count,
+ 	if (list_empty(cancels) || count == 0)
+ 		return 0;
+ 
+-	/* XXX: requests (both batched and not) could be sent in parallel.
++	/*
++	 * XXX: requests (both batched and not) could be sent in parallel.
+ 	 * Usually it is enough to have just 1 RPC, but it is possible that
+ 	 * there are too many locks to be cancelled in LRU or on a resource.
+ 	 * It would also speed up the case when the server does not support
+@@ -2071,7 +2111,8 @@ static void ldlm_namespace_foreach(struct ldlm_namespace *ns,
+ 				 ldlm_res_iter_helper, &helper, 0);
  }
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index c08a6ee..88e790f0 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -439,6 +439,8 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
- 		obd_md_valid == OBD_MD_FLXATTRLS);
  
-+	CDEBUG(D_INFO, "%s: get xattr '%s' for " DFID "\n",
-+	       exp->exp_obd->obd_name, name, PFID(fid));
- 	rc = mdc_xattr_common(exp, &RQF_MDS_GETXATTR, fid, MDS_GETXATTR,
- 			      obd_md_valid, name, NULL, 0, buf_size, 0, -1,
- 			      req);
-diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
-index 2e74ae1b..1dd18b9 100644
---- a/fs/lustre/ptlrpc/layout.c
-+++ b/fs/lustre/ptlrpc/layout.c
-@@ -417,6 +417,7 @@
- 	&RMF_CAPA1,
- 	&RMF_CAPA2,
- 	&RMF_NIOBUF_INLINE,
-+	&RMF_FILE_SECCTX
- };
+-/* non-blocking function to manipulate a lock whose cb_data is being put away.
++/*
++ * non-blocking function to manipulate a lock whose cb_data is being put away.
+  * return  0:  find no resource
+  *       > 0:  must be LDLM_ITER_STOP/LDLM_ITER_CONTINUE.
+  *       < 0:  errors
+@@ -2108,8 +2149,9 @@ static int ldlm_chain_lock_for_replay(struct ldlm_lock *lock, void *closure)
+ 		 "lock %p next %p prev %p\n",
+ 		 lock, &lock->l_pending_chain.next,
+ 		 &lock->l_pending_chain.prev);
+-	/* bug 9573: don't replay locks left after eviction, or
+-	 * bug 17614: locks being actively cancelled. Get a reference
++	/*
++	 * b=9573: don't replay locks left after eviction, or
++	 * b=17614: locks being actively cancelled. Get a reference
+ 	 * on a lock so that it does not disappear under us (e.g. due to cancel)
+ 	 */
+ 	if (!(lock->l_flags & (LDLM_FL_FAILED | LDLM_FL_BL_DONE))) {
+@@ -2169,7 +2211,7 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
+ 	struct ldlm_request *body;
+ 	int flags;
  
- static const struct req_msg_field *ldlm_intent_getattr_client[] = {
-@@ -425,7 +426,8 @@
- 	&RMF_LDLM_INTENT,
- 	&RMF_MDT_BODY,     /* coincides with mds_getattr_name_client[] */
- 	&RMF_CAPA1,
--	&RMF_NAME
-+	&RMF_NAME,
-+	&RMF_FILE_SECCTX_NAME
- };
+-	/* Bug 11974: Do not replay a lock which is actively being canceled */
++	/* B=11974: Do not replay a lock which is actively being canceled */
+ 	if (ldlm_is_bl_done(lock)) {
+ 		LDLM_DEBUG(lock, "Not replaying canceled lock:");
+ 		return 0;
+@@ -2226,10 +2268,11 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
+ 	req_capsule_set_size(&req->rq_pill, &RMF_DLM_LVB, RCL_SERVER,
+ 			     lock->l_lvb_len);
+ 	ptlrpc_request_set_replen(req);
+-	/* notify the server we've replayed all requests.
++	/*
++	 * notify the server we've replayed all requests.
+ 	 * also, we mark the request to be put on a dedicated
+ 	 * queue to be processed after all request replayes.
+-	 * bug 6063
++	 * b=6063
+ 	 */
+ 	lustre_msg_set_flags(req->rq_reqmsg, MSG_REQ_REPLAY_DONE);
  
- static const struct req_msg_field *ldlm_intent_getattr_server[] = {
-@@ -434,7 +436,8 @@
- 	&RMF_MDT_BODY,
- 	&RMF_MDT_MD,
- 	&RMF_ACL,
--	&RMF_CAPA1
-+	&RMF_CAPA1,
-+	&RMF_FILE_SECCTX
- };
+@@ -2263,7 +2306,8 @@ static void ldlm_cancel_unused_locks_for_replay(struct ldlm_namespace *ns)
+ 	       "Dropping as many unused locks as possible before replay for namespace %s (%d)\n",
+ 	       ldlm_ns_name(ns), ns->ns_nr_unused);
  
- static const struct req_msg_field *ldlm_intent_create_client[] = {
-@@ -935,7 +938,7 @@ struct req_msg_field RMF_FILE_SECCTX_NAME =
- EXPORT_SYMBOL(RMF_FILE_SECCTX_NAME);
- 
- struct req_msg_field RMF_FILE_SECCTX =
--	DEFINE_MSGF("file_secctx", 0, -1, NULL, NULL);
-+	DEFINE_MSGF("file_secctx", RMF_F_NO_SIZE_CHECK, -1, NULL, NULL);
- EXPORT_SYMBOL(RMF_FILE_SECCTX);
- 
- struct req_msg_field RMF_LLOGD_BODY =
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 76068ee..1a1b6c6 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1198,6 +1198,7 @@ static inline __u32 lov_mds_md_size(__u16 stripes, __u32 lmm_magic)
- #define OBD_MD_DEFAULT_MEA	(0x0040000000000000ULL) /* default MEA */
- #define OBD_MD_FLOSTLAYOUT	(0x0080000000000000ULL)	/* contain ost_layout */
- #define OBD_MD_FLPROJID		(0x0100000000000000ULL) /* project ID */
-+#define OBD_MD_SECCTX        (0x0200000000000000ULL) /* embed security xattr */
- 
- #define OBD_MD_FLALLQUOTA (OBD_MD_FLUSRQUOTA | \
- 			   OBD_MD_FLGRPQUOTA | \
+-	/* We don't need to care whether or not LRU resize is enabled
++	/*
++	 * We don't need to care whether or not LRU resize is enabled
+ 	 * because the LDLM_LRU_FLAG_NO_WAIT policy doesn't use the
+ 	 * count parameter
+ 	 */
 -- 
 1.8.3.1
