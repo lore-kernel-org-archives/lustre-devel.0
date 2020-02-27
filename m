@@ -1,135 +1,211 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:51 -0500
-Subject: [lustre-devel] [PATCH 303/622] lustre: llite: Revalidate dentries
- in ll_intent_file_open
+Date: Thu, 27 Feb 2020 16:13:35 -0500
+Subject: [lustre-devel] [PATCH 347/622] lnet: handle health for incoming
+ messages
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-304-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-348-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Oleg Drokin <green@whamcloud.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-We might get a lookup lock in response to our open request and we
-definitely want to ensure that our dentry is valid, so it could
-actually be matched by dcache code in future operations.
+In case of routers (as well as for the general case) it's important to
+update the health of the ni/lpni for incoming messages. For an lpni
+specifically when we receive a message is when we know that the lpni
+is up.
 
-Benchmark results:
+A percentage router health is required in order to send a message to a
+gateway. That defaults to 100, meaning that a router interface has to
+be absolutely healthy in order to send to it. This matches the current
+behavior. So if a router interface goes down an its health goes down
+significantly, but then it comes back up again; either we receive a
+message from it or we discover it and get a reply, then in order to
+start using that router interface again we have to boost its health
+all the way up to maximum.
 
-This patch can significantly improve open-create + stat on the same
-client.
+This behavior is special cased for routers.
 
-This patch in combination with two others:
-
-https://review.whamcloud.com/#/c/33584
-https://review.whamcloud.com/#/c/33585
-
-Improves the 'stat' side of open-create + stat by >10x.
-
-Without patches (master branch commit 26a7abe):
-
-mpirun -np 24 --allow-run-as-root /work/tools/bin/mdtest -n 50000 -d /cache1/out/ -F -C -T -v -w 32k
-
-   Operation                      Max            Min           Mean        Std Dev
-   ---------                      ---            ---           ----        -------
-   File creation     :       3838.205       3838.204       3838.204          0.000
-   File stat         :      33459.289      33459.249      33459.271          0.011
-   File read         :          0.000          0.000          0.000          0.000
-   File removal      :          0.000          0.000          0.000          0.000
-   Tree creation     :       3146.841       3146.841       3146.841          0.000
-   Tree removal      :          0.000          0.000          0.000          0.000
-
-With the three patches:
-
-mpirun -np 24 --allow-run-as-root /work/tools/bin/mdtest -n 50000 -d /cache1/out/ -F -C -T -v -w 32k
-SUMMARY rate: (of 1 iterations)
-   Operation                      Max            Min           Mean        Std Dev
-   ---------                      ---            ---           ----        -------
-   File creation     :       3822.440       3822.439       3822.440          0.000
-   File stat         :     350620.140     350615.980     350617.193          1.051
-   File read         :          0.000          0.000          0.000          0.000
-   File removal      :          0.000          0.000          0.000          0.000
-   Tree creation     :       2076.727       2076.727       2076.727          0.000
-   Tree removal      :          0.000          0.000          0.000          0.000
-
-Note 33K stats/second vs 350K stats/second.
-
-ls -l time of the mdtest directory is also reduced from 23.5 seconds to
-5.8 seconds.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10948
-Lustre-commit: 14ca3157b21d ("LU-10948 llite: Revalidate dentries in ll_intent_file_open")
-Signed-off-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32157
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11477
+Lustre-commit: 18c850cb91a6 ("LU-11477 lnet: handle health for incoming messages")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33301
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c | 34 ++++++++++++++++++++--------------
- 1 file changed, 20 insertions(+), 14 deletions(-)
+ net/lnet/lnet/lib-msg.c | 90 +++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 65 insertions(+), 25 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index e9d0ff9..191b0f9 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -419,25 +419,12 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
- 	struct page *vmpage;
- 	struct niobuf_remote *rnb;
- 	char *data;
--	struct lustre_handle lockh;
--	struct ldlm_lock *lock;
- 	unsigned long index, start;
- 	struct niobuf_local lnb;
--	bool dom_lock = false;
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index 23c3bf4..2cbaff8a 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -598,19 +598,23 @@
+ {
+ 	enum lnet_msg_hstatus hstatus = msg->msg_health_status;
+ 	bool lo = false;
++	struct lnet_ni *ni;
++	struct lnet_peer_ni *lpni;
  
- 	if (!obj)
- 		return;
+ 	/* if we're shutting down no point in handling health. */
+ 	if (the_lnet.ln_mt_state != LNET_MT_STATE_RUNNING)
+ 		return -1;
  
--	if (it->it_lock_mode != 0) {
--		lockh.cookie = it->it_lock_handle;
--		lock = ldlm_handle2lock(&lockh);
--		if (lock)
--			dom_lock = ldlm_has_dom(lock);
--		LDLM_LOCK_PUT(lock);
--	}
--	if (!dom_lock)
--		return;
--
- 	if (!req_capsule_has_field(&req->rq_pill, &RMF_NIOBUF_INLINE,
- 				   RCL_SERVER))
- 		return;
-@@ -576,8 +563,27 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
- 	rc = ll_prep_inode(&inode, req, NULL, itp);
+-	LASSERT(msg->msg_txni);
++	LASSERT(msg->msg_tx_committed || msg->msg_rx_committed);
  
- 	if (!rc && itp->it_lock_mode) {
--		ll_dom_finish_open(d_inode(de), req, itp);
-+		struct lustre_handle handle = {.cookie = itp->it_lock_handle};
-+		struct ldlm_lock *lock;
-+		bool has_dom_bit = false;
-+
-+		/* If we got a lock back and it has a LOOKUP bit set,
-+		 * make sure the dentry is marked as valid so we can find it.
-+		 * We don't need to care about actual hashing since other bits
-+		 * of kernel will deal with that later.
-+		 */
-+		lock = ldlm_handle2lock(&handle);
-+		if (lock) {
-+			has_dom_bit = ldlm_has_dom(lock);
-+			if (lock->l_policy_data.l_inodebits.bits &
-+			    MDS_INODELOCK_LOOKUP)
-+				d_lustre_revalidate(de);
-+
-+			LDLM_LOCK_PUT(lock);
-+		}
- 		ll_set_lock_data(sbi->ll_md_exp, inode, itp, NULL);
-+		if (has_dom_bit)
-+			ll_dom_finish_open(inode, req, itp);
+ 	/* if we're sending to the LOLND then the msg_txpeer will not be
+ 	 * set. So no need to sanity check it.
+ 	 */
+-	if (LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) != LOLND)
++	if (msg->msg_tx_committed &&
++	    LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) != LOLND)
+ 		LASSERT(msg->msg_txpeer);
+-	else
++	else if (msg->msg_tx_committed &&
++		 LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) == LOLND)
+ 		lo = true;
+ 
+ 	if (hstatus != LNET_MSG_STATUS_OK &&
+@@ -626,20 +630,52 @@
+ 		lnet_net_unlock(0);
  	}
  
- out:
++	/* always prefer txni/txpeer if they message is committed for both
++	 * directions.
++	 */
++	if (msg->msg_tx_committed) {
++		ni = msg->msg_txni;
++		lpni = msg->msg_txpeer;
++	} else {
++		ni = msg->msg_rxni;
++		lpni = msg->msg_rxpeer;
++	}
++
++	if (!lo)
++		LASSERT(ni && lpni);
++	else
++		LASSERT(ni);
++
+ 	CDEBUG(D_NET, "health check: %s->%s: %s: %s\n",
+-	       libcfs_nid2str(msg->msg_txni->ni_nid),
+-	       (lo) ? "self" : libcfs_nid2str(msg->msg_txpeer->lpni_nid),
++	       libcfs_nid2str(ni->ni_nid),
++	       (lo) ? "self" : libcfs_nid2str(lpni->lpni_nid),
+ 	       lnet_msgtyp2str(msg->msg_type),
+ 	       lnet_health_error2str(hstatus));
+ 
+ 	switch (hstatus) {
+ 	case LNET_MSG_STATUS_OK:
+-		lnet_inc_healthv(&msg->msg_txni->ni_healthv);
++		/* increment the local ni health weather we successfully
++		 * received or sent a message on it.
++		 */
++		lnet_inc_healthv(&ni->ni_healthv);
+ 		/* It's possible msg_txpeer is NULL in the LOLND
+-		 * case.
++		 * case. Only increment the peer's health if we're
++		 * receiving a message from it. It's the only sure way to
++		 * know that a remote interface is up.
++		 * If this interface is part of a router, then take that
++		 * as indication that the router is fully healthy.
+ 		 */
+-		if (msg->msg_txpeer)
+-			lnet_inc_healthv(&msg->msg_txpeer->lpni_healthv);
++		if (lpni && msg->msg_rx_committed) {
++			/* If we're receiving a message from the router or
++			 * I'm a router, then set that lpni's health to
++			 * maximum so we can commence communication
++			 */
++			if (lnet_isrouter(lpni) || the_lnet.ln_routing)
++				lnet_set_healthv(&lpni->lpni_healthv,
++						 LNET_MAX_HEALTH_VALUE);
++			else
++				lnet_inc_healthv(&lpni->lpni_healthv);
++		}
+ 
+ 		/* we can finalize this message */
+ 		return -1;
+@@ -648,34 +684,41 @@
+ 	case LNET_MSG_STATUS_LOCAL_ABORTED:
+ 	case LNET_MSG_STATUS_LOCAL_NO_ROUTE:
+ 	case LNET_MSG_STATUS_LOCAL_TIMEOUT:
+-		lnet_handle_local_failure(msg->msg_txni);
+-		/* add to the re-send queue */
+-		goto resend;
++		lnet_handle_local_failure(ni);
++		if (msg->msg_tx_committed)
++			/* add to the re-send queue */
++			goto resend;
++		break;
+ 
+ 	/* These errors will not trigger a resend so simply
+ 	 * finalize the message
+ 	 */
+ 	case LNET_MSG_STATUS_LOCAL_ERROR:
+-		lnet_handle_local_failure(msg->msg_txni);
++		lnet_handle_local_failure(ni);
+ 		return -1;
+ 
+ 	/* TODO: since the remote dropped the message we can
+ 	 * attempt a resend safely.
+ 	 */
+ 	case LNET_MSG_STATUS_REMOTE_DROPPED:
+-		lnet_handle_remote_failure(msg->msg_txpeer);
+-		goto resend;
++		lnet_handle_remote_failure(lpni);
++		if (msg->msg_tx_committed)
++			goto resend;
++		break;
+ 
+ 	case LNET_MSG_STATUS_REMOTE_ERROR:
+ 	case LNET_MSG_STATUS_REMOTE_TIMEOUT:
+ 	case LNET_MSG_STATUS_NETWORK_TIMEOUT:
+-		lnet_handle_remote_failure(msg->msg_txpeer);
++		lnet_handle_remote_failure(lpni);
+ 		return -1;
+ 	default:
+ 		LBUG();
+ 	}
+ 
+ resend:
++	/* we can only resend tx_committed messages */
++	LASSERT(msg->msg_tx_committed);
++
+ 	/* don't resend recovery messages */
+ 	if (msg->msg_recovery) {
+ 		CDEBUG(D_NET, "msg %s->%s is a recovery ping. retry# %d\n",
+@@ -783,7 +826,7 @@
+ static bool
+ lnet_is_health_check(struct lnet_msg *msg)
+ {
+-	bool hc;
++	bool hc = true;
+ 	int status = msg->msg_ev.status;
+ 
+ 	if ((!msg->msg_tx_committed && !msg->msg_rx_committed) ||
+@@ -800,15 +843,12 @@
+ 		return false;
+ 	}
+ 
+-	/* perform a health check for any message committed for transmit */
+-	hc = msg->msg_tx_committed;
+-
+ 	/* Check for status inconsistencies */
+-	if (hc &&
+-	    ((!status && msg->msg_health_status != LNET_MSG_STATUS_OK) ||
+-	     (status && msg->msg_health_status == LNET_MSG_STATUS_OK))) {
+-		CERROR("Msg is in inconsistent state, don't perform health checking (%d, %d)\n",
+-		       status, msg->msg_health_status);
++	if ((!status && msg->msg_health_status != LNET_MSG_STATUS_OK) ||
++	    (status && msg->msg_health_status == LNET_MSG_STATUS_OK)) {
++		CDEBUG(D_NET,
++		       "Msg %p is in inconsistent state, don't perform health checking (%d, %d)\n",
++		       msg, status, msg->msg_health_status);
+ 		hc = false;
+ 	}
+ 
 -- 
 1.8.3.1
