@@ -1,60 +1,75 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:32 -0500
-Subject: [lustre-devel] [PATCH 044/622] lustre: build: armv7 client build
- fixes
+Date: Thu, 27 Feb 2020 16:08:34 -0500
+Subject: [lustre-devel] [PATCH 046/622] lustre: ptlrpc: Add WBC connect flag
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-45-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-47-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andrew Perepechko <c17827@cray.com>
+From: Oleg Drokin <green@whamcloud.com>
 
-This commit is supposed to fix armv7 Lustre client
-build, mostly 64-bit division related changes.
+It denotes ability of the node to understand additional
+types of intent requests, exclusive metadata locks issued
+to clients and server operations performed under such
+locks while still held by clients.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10964
-Lustre-commit: 0300a6efd226 ("LU-10964 build: armv7 client build fixes")
-Signed-off-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-on: https://review.whamcloud.com/32194
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10938
+Lustre-commit: f024aabf8bbf ("LU-10938 ptlrpc: Add WBC connect flag")
+Signed-off-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32241
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Mikhal Pershin <mpershin@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_request.c | 3 ++-
- fs/lustre/ptlrpc/import.c     | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ fs/lustre/obdclass/lprocfs_status.c    | 1 +
+ fs/lustre/ptlrpc/wiretest.c            | 2 ++
+ include/uapi/linux/lustre/lustre_idl.h | 5 +++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
-index dd4d958..3991a8f 100644
---- a/fs/lustre/ldlm/ldlm_request.c
-+++ b/fs/lustre/ldlm/ldlm_request.c
-@@ -1408,7 +1408,8 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 66d2679..e2575b4 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -117,6 +117,7 @@
+ 	"unknown",	/* 0x08 */
+ 	"unknown",	/* 0x10 */
+ 	"flr",		/* 0x20 */
++	"wbc",		/* 0x40 */
+ 	NULL
+ };
  
- 	slv = ldlm_pool_get_slv(pl);
- 	lvf = ldlm_pool_get_lvf(pl);
--	la = ktime_to_ns(ktime_sub(cur, lock->l_last_used)) / NSEC_PER_SEC;
-+	la = div_u64(ktime_to_ns(ktime_sub(cur, lock->l_last_used)),
-+		     NSEC_PER_SEC);
- 	lv = lvf * la * unused;
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index b14d301c..c566dea 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1115,6 +1115,8 @@ void lustre_assert_wire_constants(void)
+ 		 OBD_CONNECT2_DIR_MIGRATE);
+ 	LASSERTF(OBD_CONNECT2_FLR == 0x20ULL, "found 0x%.16llxULL\n",
+ 		 OBD_CONNECT2_FLR);
++	LASSERTF(OBD_CONNECT2_WBC_INTENTS == 0x40ULL, "found 0x%.16llxULL\n",
++		 OBD_CONNECT2_WBC_INTENTS);
+ 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
+ 		 (unsigned int)OBD_CKSUM_CRC32);
+ 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 2403b89..f437614 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -794,6 +794,11 @@ struct ptlrpc_body_v2 {
+ #define OBD_CONNECT2_DIR_MIGRATE	0x4ULL		/* migrate striped dir
+ 							 */
+ #define OBD_CONNECT2_FLR		0x20ULL		/* FLR support */
++#define OBD_CONNECT2_WBC_INTENTS	0x40ULL /* create/unlink/... intents
++						 * for wbc, also operations
++						 * under client-held parent
++						 * locks
++						 */
  
- 	/* Inform pool about current CLV to see it via debugfs. */
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index f69b907..5d6546d 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -289,7 +289,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 		 */
- 		if (!OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK)) {
- 			timeout = ptlrpc_inflight_timeout(imp);
--			timeout += timeout / 3;
-+			timeout += div_u64(timeout, 3);
- 
- 			if (timeout == 0)
- 				timeout = obd_timeout;
+ /* XXX README XXX:
+  * Please DO NOT add flag values here before first ensuring that this same
 -- 
 1.8.3.1
