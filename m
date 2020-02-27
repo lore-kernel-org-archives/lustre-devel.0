@@ -1,160 +1,121 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:22 -0500
-Subject: [lustre-devel] [PATCH 574/622] lustre: ldlm: simplify
- ldlm_ns_hash_defs[]
+Date: Thu, 27 Feb 2020 16:17:31 -0500
+Subject: [lustre-devel] [PATCH 583/622] lustre: uapi: turn struct
+ lustre_nfs_fid to userland fhandle
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-575-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-584-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+From: Quentin Bouget <quentin.bouget@cea.fr>
 
-As the ldlm_ns_types are dense, we can use the type as
-the index to the array, rather than searching through
-the array for a match.
-We can also discard nsd_hops as all hash tables now
-use the same hops.
-This makes the table smaller and the code simpler.
+Rename struct lustre_nfs_fid to struct lustre_file_handle and move
+it to UAPI header lustre_user.h so we can use it with the fhandle
+API such as name_to_handle_at().
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8130
-Lustre-commit: 416142145c9d ("LU-8130 ldlm: simplify ldlm_ns_hash_defs[]")
-Signed-off-by: NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/36220
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12806
+Lustre-commit: 7ff384eee194 ("LU-12806 llapi: use name_to_handle_at in llapi_fd2fid")
+Signed-off-by: Quentin Bouget <quentin.bouget@cea.fr>
+Reviewed-on: https://review.whamcloud.com/36292
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_resource.c | 62 ++++++++++++++----------------------------
- 1 file changed, 20 insertions(+), 42 deletions(-)
+ fs/lustre/llite/llite_nfs.c             | 23 +++++++++--------------
+ include/uapi/linux/lustre/lustre_user.h |  6 ++++++
+ 2 files changed, 15 insertions(+), 14 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
-index d009d5d..9b24be7 100644
---- a/fs/lustre/ldlm/ldlm_resource.c
-+++ b/fs/lustre/ldlm/ldlm_resource.c
-@@ -522,55 +522,35 @@ static void ldlm_res_hop_put(struct cfs_hash *hs, struct hlist_node *hnode)
- 	.hs_put		= ldlm_res_hop_put
- };
+diff --git a/fs/lustre/llite/llite_nfs.c b/fs/lustre/llite/llite_nfs.c
+index 2ac5ad9..a57ab51 100644
+--- a/fs/lustre/llite/llite_nfs.c
++++ b/fs/lustre/llite/llite_nfs.c
+@@ -110,11 +110,6 @@ struct inode *search_inode_for_lustre(struct super_block *sb,
+ 	return inode;
+ }
  
--struct ldlm_ns_hash_def {
--	enum ldlm_ns_type	nsd_type;
-+static struct {
- 	/** hash bucket bits */
- 	unsigned int		nsd_bkt_bits;
- 	/** hash bits */
- 	unsigned int		nsd_all_bits;
--	/** hash operations */
--	struct cfs_hash_ops	*nsd_hops;
+-struct lustre_nfs_fid {
+-	struct lu_fid lnf_child;
+-	struct lu_fid lnf_parent;
 -};
 -
--static struct ldlm_ns_hash_def ldlm_ns_hash_defs[] = {
--	{
--		.nsd_type       = LDLM_NS_TYPE_MDC,
-+} ldlm_ns_hash_defs[] = {
-+	[LDLM_NS_TYPE_MDC] = {
- 		.nsd_bkt_bits   = 11,
- 		.nsd_all_bits   = 16,
--		.nsd_hops       = &ldlm_ns_hash_ops,
- 	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_MDT,
-+	[LDLM_NS_TYPE_MDT] = {
- 		.nsd_bkt_bits   = 14,
- 		.nsd_all_bits   = 21,
--		.nsd_hops       = &ldlm_ns_hash_ops,
- 	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_OSC,
-+	[LDLM_NS_TYPE_OSC] = {
- 		.nsd_bkt_bits   = 8,
- 		.nsd_all_bits   = 12,
--		.nsd_hops       = &ldlm_ns_hash_ops,
- 	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_OST,
-+	[LDLM_NS_TYPE_OST] = {
- 		.nsd_bkt_bits   = 11,
- 		.nsd_all_bits   = 17,
--		.nsd_hops       = &ldlm_ns_hash_ops,
- 	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_MGC,
-+	[LDLM_NS_TYPE_MGC] = {
- 		.nsd_bkt_bits   = 3,
- 		.nsd_all_bits   = 4,
--		.nsd_hops       = &ldlm_ns_hash_ops,
- 	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_MGT,
-+	[LDLM_NS_TYPE_MGT] = {
- 		.nsd_bkt_bits   = 3,
- 		.nsd_all_bits   = 4,
--		.nsd_hops       = &ldlm_ns_hash_ops,
--	},
--	{
--		.nsd_type       = LDLM_NS_TYPE_UNKNOWN,
- 	},
- };
- 
-@@ -594,7 +574,6 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 					  enum ldlm_ns_type ns_type)
+ static struct dentry *
+ ll_iget_for_nfs(struct super_block *sb,
+ 		struct lu_fid *fid, struct lu_fid *parent)
+@@ -177,8 +172,8 @@ struct lustre_nfs_fid {
+ static int ll_encode_fh(struct inode *inode, u32 *fh, int *plen,
+ 			struct inode *parent)
  {
- 	struct ldlm_namespace *ns = NULL;
--	struct ldlm_ns_hash_def *nsd;
- 	int idx;
- 	int rc;
+-	int fileid_len = sizeof(struct lustre_nfs_fid) / 4;
+-	struct lustre_nfs_fid *nfs_fid = (void *)fh;
++	int fileid_len = sizeof(struct lustre_file_handle) / 4;
++	struct lustre_file_handle *lfh = (void *)fh;
  
-@@ -606,15 +585,10 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 		return NULL;
+ 	CDEBUG(D_INFO, "%s: encoding for (" DFID ") maxlen=%d minlen=%d\n",
+ 	       ll_i2sbi(inode)->ll_fsname,
+@@ -189,11 +184,11 @@ static int ll_encode_fh(struct inode *inode, u32 *fh, int *plen,
+ 		return FILEID_INVALID;
  	}
  
--	for (idx = 0; ; idx++) {
--		nsd = &ldlm_ns_hash_defs[idx];
--		if (nsd->nsd_type == LDLM_NS_TYPE_UNKNOWN) {
--			CERROR("Unknown type %d for ns %s\n", ns_type, name);
--			goto out_ref;
--		}
--
--		if (nsd->nsd_type == ns_type)
--			break;
-+	if (ns_type >= ARRAY_SIZE(ldlm_ns_hash_defs) ||
-+	    ldlm_ns_hash_defs[ns_type].nsd_bkt_bits == 0) {
-+		CERROR("Unknown type %d for ns %s\n", ns_type, name);
-+		goto out_ref;
- 	}
+-	nfs_fid->lnf_child = *ll_inode2fid(inode);
++	lfh->lfh_child = *ll_inode2fid(inode);
+ 	if (parent)
+-		nfs_fid->lnf_parent = *ll_inode2fid(parent);
++		lfh->lfh_parent = *ll_inode2fid(parent);
+ 	else
+-		fid_zero(&nfs_fid->lnf_parent);
++		fid_zero(&lfh->lfh_parent);
+ 	*plen = fileid_len;
  
- 	ns = kzalloc(sizeof(*ns), GFP_NOFS);
-@@ -622,11 +596,13 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 		goto out_ref;
+ 	return FILEID_LUSTRE;
+@@ -264,23 +259,23 @@ static int ll_get_name(struct dentry *dentry, char *name,
+ static struct dentry *ll_fh_to_dentry(struct super_block *sb, struct fid *fid,
+ 				      int fh_len, int fh_type)
+ {
+-	struct lustre_nfs_fid *nfs_fid = (struct lustre_nfs_fid *)fid;
++	struct lustre_file_handle *lfh = (struct lustre_file_handle *)fid;
  
- 	ns->ns_rs_hash = cfs_hash_create(name,
--					 nsd->nsd_all_bits, nsd->nsd_all_bits,
--					 nsd->nsd_bkt_bits, 0,
-+					 ldlm_ns_hash_defs[ns_type].nsd_all_bits,
-+					 ldlm_ns_hash_defs[ns_type].nsd_all_bits,
-+					 ldlm_ns_hash_defs[ns_type].nsd_bkt_bits,
-+					 0,
- 					 CFS_HASH_MIN_THETA,
- 					 CFS_HASH_MAX_THETA,
--					 nsd->nsd_hops,
-+					 &ldlm_ns_hash_ops,
- 					 CFS_HASH_DEPTH |
- 					 CFS_HASH_BIGNAME |
- 					 CFS_HASH_SPIN_BKTLOCK |
-@@ -634,7 +610,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 	if (!ns->ns_rs_hash)
- 		goto out_ns;
+ 	if (fh_type != FILEID_LUSTRE)
+ 		return ERR_PTR(-EPROTO);
  
--	ns->ns_bucket_bits = nsd->nsd_all_bits - nsd->nsd_bkt_bits;
-+	ns->ns_bucket_bits = ldlm_ns_hash_defs[ns_type].nsd_all_bits -
-+			     ldlm_ns_hash_defs[ns_type].nsd_bkt_bits;
+-	return ll_iget_for_nfs(sb, &nfs_fid->lnf_child, &nfs_fid->lnf_parent);
++	return ll_iget_for_nfs(sb, &lfh->lfh_child, &lfh->lfh_parent);
+ }
+ 
+ static struct dentry *ll_fh_to_parent(struct super_block *sb, struct fid *fid,
+ 				      int fh_len, int fh_type)
+ {
+-	struct lustre_nfs_fid *nfs_fid = (struct lustre_nfs_fid *)fid;
++	struct lustre_file_handle *lfh = (struct lustre_file_handle *)fid;
+ 
+ 	if (fh_type != FILEID_LUSTRE)
+ 		return ERR_PTR(-EPROTO);
+ 
+-	return ll_iget_for_nfs(sb, &nfs_fid->lnf_parent, NULL);
++	return ll_iget_for_nfs(sb, &lfh->lfh_parent, NULL);
+ }
+ 
+ int ll_dir_get_parent_fid(struct inode *dir, struct lu_fid *parent_fid)
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 12b1f78..1c36114 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -164,6 +164,12 @@ static inline bool fid_is_zero(const struct lu_fid *fid)
+ 	return !fid->f_seq && !fid->f_oid;
+ }
+ 
++/* The data name_to_handle_at() places in a struct file_handle (at f_handle) */
++struct lustre_file_handle {
++	struct lu_fid lfh_child;
++	struct lu_fid lfh_parent;
++};
 +
- 	ns->ns_rs_buckets = kvmalloc(BIT(ns->ns_bucket_bits) *
- 				     sizeof(ns->ns_rs_buckets[0]),
- 				     GFP_KERNEL);
+ struct ost_layout {
+ 	__u32	ol_stripe_size;
+ 	__u32	ol_stripe_count;
 -- 
 1.8.3.1
