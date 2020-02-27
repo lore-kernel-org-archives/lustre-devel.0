@@ -1,74 +1,91 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:14 -0500
-Subject: [lustre-devel] [PATCH 266/622] lustre: quota: make overquota flag
- for old req
+Date: Thu, 27 Feb 2020 16:12:20 -0500
+Subject: [lustre-devel] [PATCH 272/622] lustre: llite: fill copied dentry
+ name's ending char properly
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-267-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-273-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Hongchao Zhang <hongchao@whamcloud.com>
+From: Wang Shilong <wshilong@ddn.com>
 
-For the old request with over quota flag, the over quota flag
-should still be marked at OSC, because the old request could be
-processed afther the new request at OST, then it won't break the
-quota enforement at OST.
+Dentry name expect an extra '\0'. and dentry_len won't calcualte
+extra '\0' for it, but we should allocate memory and fill it
+when copying dentry name by ourselves.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11678
-Lustre-commit: c59cf862c3c0 ("LU-11678 quota: make overquota flag for old req")
-Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34645
+Otherwise, lu_name_is_valid_2() will try to access @name[len]
+and check whether it is '\0'. this is invalid memory access.
+We will possibly hit a crash if the first access that bit is '\0'.
+and the bit overwritten by someone else, and finally we failed
+sanity check in mdc_name_pack().
+
+LustreError: 157839:0:(mdc_lib.c:137:mdc_pack_name()) LBUG
+
+Fixes: 2eae6a4 ("lustre: llite: make sure name pack atomic")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12169
+Lustre-commit: bc9cc327983c ("LU-12169 llite: fill copied dentry name's ending char properly")
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-on: https://review.whamcloud.com/34611
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Shilong Wang <wshilong@ddn.com>
 Reviewed-by: Gu Zheng <gzheng@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/osc/osc_quota.c              | 11 +++++++++--
- include/uapi/linux/lustre/lustre_idl.h |  3 +++
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/llite/file.c          | 10 ++++++----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/osc/osc_quota.c b/fs/lustre/osc/osc_quota.c
-index 316e087..8ff803c 100644
---- a/fs/lustre/osc/osc_quota.c
-+++ b/fs/lustre/osc/osc_quota.c
-@@ -119,10 +119,17 @@ int osc_quota_setdq(struct client_obd *cli, u64 xid, const unsigned int qid[],
- 		return 0;
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 9ebdcb6..4e956da 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -456,6 +456,7 @@
+ #define OBD_FAIL_LLITE_CREATE_NODE_PAUSE		0x140c
+ #define OBD_FAIL_LLITE_IMUTEX_SEC			0x140e
+ #define OBD_FAIL_LLITE_IMUTEX_NOSEC			0x140f
++#define OBD_FAIL_LLITE_OPEN_BY_NAME			0x1410
  
- 	mutex_lock(&cli->cl_quota_mutex);
--	if (cli->cl_quota_last_xid > xid)
-+	/* still mark the quots is running out for the old request, because it
-+	 * could be processed after the new request at OST, the side effect is
-+	 * the following request will be processed synchronously, but it will
-+	 * not break the quota enforcement.
-+	 */
-+	if (cli->cl_quota_last_xid > xid && !(flags & OBD_FL_NO_QUOTA_ALL))
- 		goto out_unlock;
- 
--	cli->cl_quota_last_xid = xid;
-+	if (cli->cl_quota_last_xid < xid)
-+		cli->cl_quota_last_xid = xid;
+ #define OBD_FAIL_FID_INDIR				0x1501
+ #define OBD_FAIL_FID_INLMA				0x1502
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 0f15ea8..61d53c4 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -513,12 +513,14 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 	 * if server supports open-by-fid, or file name is invalid, don't pack
+ 	 * name in open request
+ 	 */
+-	if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID)) {
++	if (OBD_FAIL_CHECK(OBD_FAIL_LLITE_OPEN_BY_NAME) ||
++	    !(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID)) {
+ retry:
+ 		len = de->d_name.len;
+-		name = kmalloc(len, GFP_NOFS);
++		name = kmalloc(len + 1, GFP_NOFS);
+ 		if (!name)
+ 			return -ENOMEM;
 +
- 	for (type = 0; type < MAXQUOTAS; type++) {
- 		struct osc_quota_info *oqi;
+ 		/* race here */
+ 		spin_lock(&de->d_lock);
+ 		if (len != de->d_name.len) {
+@@ -527,12 +529,12 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 			goto retry;
+ 		}
+ 		memcpy(name, de->d_name.name, len);
++		name[len] = '\0';
+ 		spin_unlock(&de->d_lock);
  
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 1b4b018..3a2a093 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -998,6 +998,9 @@ enum obdo_flags {
- 				   OBD_FL_CKSUM_T10IP4K |
- 				   OBD_FL_CKSUM_T10CRC512 |
- 				   OBD_FL_CKSUM_T10CRC4K),
-+
-+	OBD_FL_NO_QUOTA_ALL = OBD_FL_NO_USRQUOTA | OBD_FL_NO_GRPQUOTA |
-+			      OBD_FL_NO_PRJQUOTA,
- };
+ 		if (!lu_name_is_valid_2(name, len)) {
+ 			kfree(name);
+-			name = NULL;
+-			len = 0;
++			return -ESTALE;
+ 		}
+ 	}
  
- /*
 -- 
 1.8.3.1
