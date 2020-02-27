@@ -1,78 +1,65 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:41 -0500
-Subject: [lustre-devel] [PATCH 233/622] lustre: osc: propagate grant shrink
- interval immediately
+Date: Thu, 27 Feb 2020 16:11:45 -0500
+Subject: [lustre-devel] [PATCH 237/622] lustre: ptlrpc: Change static
+ defines to use macro for sec_gc.c
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-234-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-238-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alex Zhuravlev <bzzz@whamcloud.com>
+From: Arshad Hussain <arshad.super@gmail.com>
 
-currently the new interval (updated with lctl) will be used
-only when the next shrink happens. with default interval it
-will take at least 20 minutes. instead we should refresh it
-immediately.
+This patch replaces all mutex, locks, and wait qeueues
+which are defined statically in file fs/lustre/ptlrpc/sec_gc.c
+with kernel provided macro.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11408
-Lustre-commit: 0b09a19bdf2d ("LU-11408 osc: propagate grant shrink interval immediately")
-Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33204
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9010
+Lustre-commit: 50c01e02506f ("LU-9010 ptlrpc: Change static defines to use macro for sec_gc.c")
+Signed-off-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-on: https://review.whamcloud.com/33937
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/osc/lproc_osc.c    | 2 ++
- fs/lustre/osc/osc_internal.h | 1 +
- fs/lustre/osc/osc_request.c  | 6 ++++++
- 3 files changed, 9 insertions(+)
+ fs/lustre/ptlrpc/sec_gc.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index ea67d20..5faf518 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -349,6 +349,8 @@ static ssize_t grant_shrink_interval_store(struct kobject *kobj,
- 		return -ERANGE;
+diff --git a/fs/lustre/ptlrpc/sec_gc.c b/fs/lustre/ptlrpc/sec_gc.c
+index d5edcec..3baed8c 100644
+--- a/fs/lustre/ptlrpc/sec_gc.c
++++ b/fs/lustre/ptlrpc/sec_gc.c
+@@ -48,12 +48,12 @@
  
- 	obd->u.cli.cl_grant_shrink_interval = val;
-+	osc_update_next_shrink(&obd->u.cli);
-+	osc_schedule_grant_work();
+ #define SEC_GC_INTERVAL (30 * 60)
  
- 	return count;
+-static struct mutex sec_gc_mutex;
++static DEFINE_MUTEX(sec_gc_mutex);
+ static LIST_HEAD(sec_gc_list);
+-static spinlock_t sec_gc_list_lock;
++static DEFINE_SPINLOCK(sec_gc_list_lock);
+ 
+ static LIST_HEAD(sec_gc_ctx_list);
+-static spinlock_t sec_gc_ctx_list_lock;
++static DEFINE_SPINLOCK(sec_gc_ctx_list_lock);
+ 
+ static atomic_t sec_gc_wait_del = ATOMIC_INIT(0);
+ 
+@@ -176,10 +176,6 @@ static void sec_gc_main(struct work_struct *ws)
+ 
+ int sptlrpc_gc_init(void)
+ {
+-	mutex_init(&sec_gc_mutex);
+-	spin_lock_init(&sec_gc_list_lock);
+-	spin_lock_init(&sec_gc_ctx_list_lock);
+-
+ 	schedule_delayed_work(&sec_gc_work, 0);
+ 	return 0;
  }
-diff --git a/fs/lustre/osc/osc_internal.h b/fs/lustre/osc/osc_internal.h
-index 2cb737b..0f0f4d4 100644
---- a/fs/lustre/osc/osc_internal.h
-+++ b/fs/lustre/osc/osc_internal.h
-@@ -43,6 +43,7 @@
- extern struct ptlrpc_request_pool *osc_rq_pool;
- 
- int osc_shrink_grant_to_target(struct client_obd *cli, u64 target_bytes);
-+void osc_schedule_grant_work(void);
- void osc_update_next_shrink(struct client_obd *cli);
- int lru_queue_work(const struct lu_env *env, void *data);
- int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 7190da9..7b120da 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -905,6 +905,12 @@ static void osc_grant_work_handler(struct work_struct *data)
- 		schedule_work(&work.work);
- }
- 
-+void osc_schedule_grant_work(void)
-+{
-+	cancel_delayed_work_sync(&work);
-+	schedule_work(&work.work);
-+}
-+
- /**
-  * Start grant thread for returing grant to server for idle clients.
-  */
 -- 
 1.8.3.1
