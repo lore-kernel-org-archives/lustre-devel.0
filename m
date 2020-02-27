@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:31 -0500
-Subject: [lustre-devel] [PATCH 463/622] lustre: ptlrpc: remove
- scp_nthrs_stopping field.
+Date: Thu, 27 Feb 2020 16:15:34 -0500
+Subject: [lustre-devel] [PATCH 466/622] lustre: llite: remove ll_umounting
+ field
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-464-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-467-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,34 +13,47 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.com>
 
-This field is unused, so remove it.
-If "shrinking threads" is ever needed, any extra fields
-required can be added then.
+This field is set but never accessed, so remove it.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 7233248e565f ("LU-6142 ptlrpc: remove scp_nthrs_stopping field.")
+Lustre-commit: 15b83c9b7b28 ("LU-6142 llite: remove ll_umounting field")
 Signed-off-by: Mr NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/35882
+Reviewed-on: https://review.whamcloud.com/35885
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h | 2 --
- 1 file changed, 2 deletions(-)
+ fs/lustre/llite/llite_internal.h | 3 +--
+ fs/lustre/llite/llite_lib.c      | 1 -
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index 68db603..aaf5cb8 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -1557,8 +1557,6 @@ struct ptlrpc_service_part {
- 	int				scp_thr_nextid;
- 	/** # of starting threads */
- 	int				scp_nthrs_starting;
--	/** # of stopping threads, reserved for shrinking threads */
--	int				scp_nthrs_stopping;
- 	/** # running threads */
- 	int				scp_nthrs_running;
- 	/** service threads list */
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index 77854a5..6186720 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -505,8 +505,7 @@ struct ll_sb_info {
+ 	struct lu_fid	     ll_root_fid; /* root object fid */
+ 
+ 	int		       ll_flags;
+-	unsigned int		  ll_umounting:1,
+-				  ll_xattr_cache_enabled:1,
++	unsigned int		  ll_xattr_cache_enabled:1,
+ 				ll_xattr_cache_set:1, /* already set to 0/1 */
+ 				  ll_client_common_fill_super_succeeded:1,
+ 				  ll_checksum_set:1;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 7d83ee3..ad7c2e2 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -785,7 +785,6 @@ void ll_kill_super(struct super_block *sb)
+ 	 */
+ 	if (sbi) {
+ 		sb->s_dev = sbi->ll_sdev_orig;
+-		sbi->ll_umounting = 1;
+ 
+ 		/* wait running statahead threads to quit */
+ 		while (atomic_read(&sbi->ll_sa_running) > 0)
 -- 
 1.8.3.1
