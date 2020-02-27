@@ -1,194 +1,220 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:57 -0500
-Subject: [lustre-devel] [PATCH 609/622] lnet: libcfs: Cleanup use of bare
- printk
+Date: Thu, 27 Feb 2020 16:18:03 -0500
+Subject: [lustre-devel] [PATCH 615/622] lnet: handling device failure by IB
+ event handler
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-610-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-616-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Shaun Tancheff <stancheff@cray.com>
+From: Tatsushi Takamura <takamr.tatsushi@jp.fujitsu.com>
 
-Some users of printk(<LEVEL> "fmt" can be converted to
-pr_level("fmt" equivalents
+The following IB events cannot be handled by QP event handler
+- IB_EVENT_DEVICE_FATAL
+- IB_EVENT_PORT_ERR
+- IB_EVENT_PORT_ACTIVE
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12861
-Lustre-commit: b4c8a5180dec ("LU-12861 libcfs: Cleanup use of bare printk")
-Signed-off-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-on: https://review.whamcloud.com/37046
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+IB event handler handles device errors such as hardware errors
+and link down.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12287
+Lustre-commit: c6e4c21c4f8b ("LU-12287 lnet: handling device failure by IB event handler")
+Signed-off-by: Tatsushi Takamura <takamr.tatsushi@jp.fujitsu.com>
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35037
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/libcfs/debug.c     |  2 +-
- net/lnet/libcfs/module.c    |  4 ++--
- net/lnet/libcfs/tracefile.c | 43 +++++++++++++++++++++++++------------------
- 3 files changed, 28 insertions(+), 21 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 100 +++++++++++++++++++++++++++++++++++++++
+ net/lnet/klnds/o2iblnd/o2iblnd.h |   8 ++++
+ 2 files changed, 108 insertions(+)
 
-diff --git a/net/lnet/libcfs/debug.c b/net/lnet/libcfs/debug.c
-index c6b92df..d7747e7 100644
---- a/net/lnet/libcfs/debug.c
-+++ b/net/lnet/libcfs/debug.c
-@@ -418,7 +418,7 @@ void libcfs_debug_dumplog(void)
- 			     "libcfs_debug_dumper");
- 	set_current_state(TASK_INTERRUPTIBLE);
- 	if (IS_ERR(dumper))
--		pr_err("LustreError: cannot start log dump thread: %ld\n",
-+		pr_err("LustreError: cannot start log dump thread: rc = %ld\n",
- 		       PTR_ERR(dumper));
- 	else
- 		schedule();
-diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
-index 20d4302..a53efcc 100644
---- a/net/lnet/libcfs/module.c
-+++ b/net/lnet/libcfs/module.c
-@@ -720,7 +720,7 @@ int libcfs_setup(void)
- 
- 	rc = libcfs_debug_init(5 * 1024 * 1024);
- 	if (rc < 0) {
--		pr_err("LustreError: libcfs_debug_init: %d\n", rc);
-+		pr_err("LustreError: libcfs_debug_init: rc = %d\n", rc);
- 		goto err;
- 	}
- 
-@@ -794,7 +794,7 @@ static void libcfs_exit(void)
- 	/* the below message is checked in test-framework.sh check_mem_leak() */
- 	rc = libcfs_debug_cleanup();
- 	if (rc)
--		pr_err("LustreError: libcfs_debug_cleanup: %d\n", rc);
-+		pr_err("LustreError: libcfs_debug_cleanup: rc = %d\n", rc);
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index f6db2c7..7bf2883 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2306,9 +2306,93 @@ static int kiblnd_net_init_pools(struct kib_net *net, struct lnet_ni *ni,
+ 	return rc;
  }
  
- MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
-diff --git a/net/lnet/libcfs/tracefile.c b/net/lnet/libcfs/tracefile.c
-index bda3523..1eb5397 100644
---- a/net/lnet/libcfs/tracefile.c
-+++ b/net/lnet/libcfs/tracefile.c
-@@ -332,7 +332,8 @@ static struct cfs_trace_page *cfs_trace_get_tage(struct cfs_trace_cpu_data *tcd,
- 	 * from here: this will lead to infinite recursion.
- 	 */
- 	if (len > PAGE_SIZE) {
--		pr_err("cowardly refusing to write %lu bytes in a page\n", len);
-+		pr_err("LustreError: cowardly refusing to write %lu bytes in a page\n",
-+		       len);
- 		return NULL;
- 	}
- 
-@@ -477,7 +478,8 @@ int libcfs_debug_msg(struct libcfs_debug_msg_data *msgdata,
- 
- 		max_nob = PAGE_SIZE - tage->used - known_size;
- 		if (max_nob <= 0) {
--			pr_emerg("negative max_nob: %d\n", max_nob);
-+			pr_emerg("LustreError: negative max_nob: %d\n",
-+				 max_nob);
- 			mask |= D_ERROR;
- 			cfs_trace_put_tcd(tcd);
- 			tcd = NULL;
-@@ -499,10 +501,15 @@ int libcfs_debug_msg(struct libcfs_debug_msg_data *msgdata,
- 			break;
- 	}
- 
--	if (*(string_buf + needed - 1) != '\n')
--		pr_info("format@%s:%d:%s doesn't end in newline\n", file,
--			msgdata->msg_line, msgdata->msg_fn);
--
-+	if (*(string_buf + needed - 1) != '\n') {
-+		pr_info("Lustre: format at %s:%d:%s doesn't end in newline\n",
-+			file, msgdata->msg_line, msgdata->msg_fn);
-+	} else if (mask & D_TTY) {
-+		/* TTY needs '\r\n' to move carriage to leftmost position */
-+		if (needed < 2 || *(string_buf + needed - 2) != '\r')
-+			pr_info("Lustre: format@%s:%d:%s doesn't end in '\\r\\n'\n",
-+				file, msgdata->msg_line, msgdata->msg_fn);
++static int kiblnd_port_get_attr(struct kib_hca_dev *hdev)
++{
++	struct ib_port_attr *port_attr;
++	int rc;
++	unsigned long flags;
++	rwlock_t *g_lock = &kiblnd_data.kib_global_lock;
++
++	port_attr = kzalloc(sizeof(*port_attr), GFP_NOFS);
++	if (!port_attr) {
++		CDEBUG(D_NETERROR, "Out of memory\n");
++		return -ENOMEM;
 +	}
- 	header.ph_len = known_size + needed;
- 	debug_buf = (char *)page_address(tage->page) + tage->used;
++
++	rc = ib_query_port(hdev->ibh_ibdev, hdev->ibh_port, port_attr);
++
++	write_lock_irqsave(g_lock, flags);
++
++	if (rc == 0)
++		hdev->ibh_state = port_attr->state == IB_PORT_ACTIVE
++				 ? IBLND_DEV_PORT_ACTIVE
++				 : IBLND_DEV_PORT_DOWN;
++
++	write_unlock_irqrestore(g_lock, flags);
++	kfree(port_attr);
++
++	if (rc != 0) {
++		CDEBUG(D_NETERROR, "Failed to query IB port: %d\n", rc);
++		return rc;
++	}
++	return 0;
++}
++
++static inline void
++kiblnd_set_ni_fatal_on(struct kib_hca_dev *hdev, int val)
++{
++	struct kib_net  *net;
++
++	/* for health check */
++	list_for_each_entry(net, &hdev->ibh_dev->ibd_nets, ibn_list) {
++		if (val)
++			CDEBUG(D_NETERROR, "Fatal device error for NI %s\n",
++			       libcfs_nid2str(net->ibn_ni->ni_nid));
++		atomic_set(&net->ibn_ni->ni_fatal_error_on, val);
++	}
++}
++
++void
++kiblnd_event_handler(struct ib_event_handler *handler, struct ib_event *event)
++{
++	rwlock_t *g_lock = &kiblnd_data.kib_global_lock;
++	struct kib_hca_dev  *hdev;
++	unsigned long flags;
++
++	hdev = container_of(handler, struct kib_hca_dev, ibh_event_handler);
++
++	write_lock_irqsave(g_lock, flags);
++
++	switch (event->event) {
++	case IB_EVENT_DEVICE_FATAL:
++		CDEBUG(D_NET, "IB device fatal\n");
++		hdev->ibh_state = IBLND_DEV_FATAL;
++		kiblnd_set_ni_fatal_on(hdev, 1);
++		break;
++	case IB_EVENT_PORT_ACTIVE:
++		CDEBUG(D_NET, "IB port active\n");
++		if (event->element.port_num == hdev->ibh_port) {
++			hdev->ibh_state = IBLND_DEV_PORT_ACTIVE;
++			kiblnd_set_ni_fatal_on(hdev, 0);
++		}
++		break;
++	case IB_EVENT_PORT_ERR:
++		CDEBUG(D_NET, "IB port err\n");
++		if (event->element.port_num == hdev->ibh_port) {
++			hdev->ibh_state = IBLND_DEV_PORT_DOWN;
++			kiblnd_set_ni_fatal_on(hdev, 1);
++		}
++		break;
++	default:
++		break;
++	}
++	write_unlock_irqrestore(g_lock, flags);
++}
++
+ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
+ {
+ 	struct ib_device_attr *dev_attr = &hdev->ibh_ibdev->attrs;
++	int rc2 = 0;
  
-@@ -816,7 +823,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 	if (IS_ERR(filp)) {
- 		rc = PTR_ERR(filp);
- 		filp = NULL;
--		pr_err("LustreError: can't open %s for dump: rc %d\n",
-+		pr_err("LustreError: can't open %s for dump: rc = %d\n",
- 		       filename, rc);
+ 	/*
+ 	 * It's safe to assume a HCA can handle a page size
+@@ -2338,12 +2422,19 @@ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
+ 	hdev->ibh_mr_size = dev_attr->max_mr_size;
+ 	hdev->ibh_max_qp_wr = dev_attr->max_qp_wr;
+ 
++	rc2 = kiblnd_port_get_attr(hdev);
++	if (rc2 != 0)
++		return rc2;
++
+ 	CERROR("Invalid mr size: %#llx\n", hdev->ibh_mr_size);
+ 	return -EINVAL;
+ }
+ 
+ void kiblnd_hdev_destroy(struct kib_hca_dev *hdev)
+ {
++	if (hdev->ibh_event_handler.device)
++		ib_unregister_event_handler(&hdev->ibh_event_handler);
++
+ 	if (hdev->ibh_pd)
+ 		ib_dealloc_pd(hdev->ibh_pd);
+ 
+@@ -2491,6 +2582,7 @@ int kiblnd_dev_failover(struct kib_dev *dev, struct net *ns)
+ 	hdev->ibh_dev = dev;
+ 	hdev->ibh_cmid = cmid;
+ 	hdev->ibh_ibdev = cmid->device;
++	hdev->ibh_port  = cmid->port_num;
+ 
+ 	pd = ib_alloc_pd(cmid->device, 0);
+ 	if (IS_ERR(pd)) {
+@@ -2513,6 +2605,10 @@ int kiblnd_dev_failover(struct kib_dev *dev, struct net *ns)
  		goto out;
  	}
-@@ -839,8 +846,8 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 		kunmap(tage->page);
  
- 		if (rc != (int)tage->used) {
--			pr_warn("wanted to write %u but wrote %d\n", tage->used,
--				rc);
-+			pr_warn("Lustre: wanted to write %u but wrote %d\n",
-+				tage->used, rc);
- 			put_pages_back(&pc);
- 			__LASSERT(list_empty(&pc.pc_pages));
- 			break;
-@@ -851,7 +858,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
++	INIT_IB_EVENT_HANDLER(&hdev->ibh_event_handler,
++			      hdev->ibh_ibdev, kiblnd_event_handler);
++	ib_register_event_handler(&hdev->ibh_event_handler);
++
+ 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
  
- 	rc = vfs_fsync(filp, 1);
- 	if (rc)
--		pr_err("sync returns %d\n", rc);
-+		pr_err("LustreError: sync returns: rc = %d\n", rc);
- close:
- 	filp_close(filp, NULL);
- out:
-@@ -985,7 +992,7 @@ int cfs_trace_daemon_command(char *str)
- 	} else {
- 		strcpy(cfs_tracefile, str);
+ 	swap(dev->ibd_hdev, hdev); /* take over the refcount */
+@@ -2907,6 +3003,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 		goto net_failed;
+ 	}
  
--		pr_info("debug daemon will attempt to start writing to %s (%lukB max)\n",
-+		pr_info("Lustre: debug daemon will attempt to start writing to %s (%lukB max)\n",
- 			cfs_tracefile,
- 			(long)(cfs_tracefile_size >> 10));
++	net->ibn_ni = ni;
+ 	net->ibn_incarnation = ktime_get_real_ns() / NSEC_PER_USEC;
  
-@@ -1100,8 +1107,8 @@ static int tracefiled(void *arg)
- 			if (IS_ERR(filp)) {
- 				rc = PTR_ERR(filp);
- 				filp = NULL;
--				pr_warn("couldn't open %s: %d\n", cfs_tracefile,
--					rc);
-+				pr_warn("Lustre: couldn't open %s: rc = %d\n",
-+					cfs_tracefile, rc);
- 			}
- 		}
- 		up_read(&cfs_tracefile_sem);
-@@ -1126,7 +1133,7 @@ static int tracefiled(void *arg)
- 			kunmap(tage->page);
+ 	rc = kiblnd_tunables_setup(ni);
+@@ -3000,6 +3097,9 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+ 	ibdev->ibd_nnets++;
+ 	list_add_tail(&net->ibn_list, &ibdev->ibd_nets);
++	/* for health check */
++	if (ibdev->ibd_hdev->ibh_state == IBLND_DEV_PORT_DOWN)
++		kiblnd_set_ni_fatal_on(ibdev->ibd_hdev, 1);
+ 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
  
- 			if (rc != (int)tage->used) {
--				pr_warn("wanted to write %u but wrote %d\n",
-+				pr_warn("Lustre: wanted to write %u but wrote %d\n",
- 					tage->used, rc);
- 				put_pages_back(&pc);
- 				__LASSERT(list_empty(&pc.pc_pages));
-@@ -1139,8 +1146,8 @@ static int tracefiled(void *arg)
- 		if (!list_empty(&pc.pc_pages)) {
- 			int i;
+ 	net->ibn_init = IBLND_INIT_ALL;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
+index 2169fdd..8aa79d5 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -180,6 +180,13 @@ struct kib_hca_dev {
+ 	u64			ibh_mr_size;	/* size of MR */
+ 	int			ibh_max_qp_wr;	/* maximum work requests size */
+ 	struct ib_pd		*ibh_pd;	/* PD */
++	u8			ibh_port;	/* port number */
++	struct ib_event_handler
++				ibh_event_handler; /* IB event handler */
++	int			ibh_state;	/* device status */
++#define IBLND_DEV_PORT_DOWN	0
++#define IBLND_DEV_PORT_ACTIVE	1
++#define IBLND_DEV_FATAL		2
+ 	struct kib_dev		*ibh_dev;	/* owner */
+ 	atomic_t		ibh_ref;	/* refcount */
+ };
+@@ -309,6 +316,7 @@ struct kib_net {
+ 	struct kib_fmr_poolset	**ibn_fmr_ps;	/* fmr pool-set */
  
--			pr_alert("trace pages aren't empty\n");
--			pr_err("total cpus(%d): ", num_possible_cpus());
-+			pr_alert("Lustre: trace pages aren't empty\n");
-+			pr_err("Lustre: total cpus(%d): ", num_possible_cpus());
- 			for (i = 0; i < num_possible_cpus(); i++)
- 				if (cpu_online(i))
- 					pr_cont("%d(on) ", i);
-@@ -1151,9 +1158,9 @@ static int tracefiled(void *arg)
- 			i = 0;
- 			list_for_each_entry_safe(tage, tmp, &pc.pc_pages,
- 						 linkage)
--				pr_err("page %d belongs to cpu %d\n",
-+				pr_err("Lustre: page %d belongs to cpu %d\n",
- 				       ++i, tage->cpu);
--			pr_err("There are %d pages unwritten\n", i);
-+			pr_err("Lustre: There are %d pages unwritten\n", i);
- 		}
- 		__LASSERT(list_empty(&pc.pc_pages));
- end_loop:
+ 	struct kib_dev		*ibn_dev;	/* underlying IB device */
++	struct lnet_ni		*ibn_ni;	/* LNet interface */
+ };
+ 
+ #define KIB_THREAD_SHIFT		16
 -- 
 1.8.3.1
