@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:33 -0500
-Subject: [lustre-devel] [PATCH 345/622] lnet: allow deleting router
- primary_nid
+Date: Thu, 27 Feb 2020 16:13:34 -0500
+Subject: [lustre-devel] [PATCH 346/622] lnet: transfer routers
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-346-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-347-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,129 +12,98 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <ashehata@whamcloud.com>
 
-Discovery doesn't allow deleting a primary_nid of a peer. This
-is necessary because upper layers only know to reach the peer by
-using the primary_nid. For routers this is not the case. So
-if a router changes its interfaces and comes back up again, the
-peer_ni should be adjusted.
+When a primary NID of a peer is about to be deleted because
+it's being transferred to another peer, if that peer is a gateway
+then transfer all gateway properties to the new peer.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-11475
-Lustre-commit: 086962e37737 ("LU-11475 lnet: allow deleting router primary_nid")
+Lustre-commit: cab57464e17b ("LU-11475 lnet: transfer routers")
 Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33300
+Reviewed-on: https://review.whamcloud.com/34539
 Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
 Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h |  3 +++
- net/lnet/lnet/peer.c           | 29 ++++++++++++++++++++++-------
- 2 files changed, 25 insertions(+), 7 deletions(-)
+ include/linux/lnet/lib-lnet.h |  2 ++
+ net/lnet/lnet/peer.c          | 12 ++++++++++++
+ net/lnet/lnet/router.c        | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 9662c9e..97d35e0 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -716,6 +716,9 @@ struct lnet_peer {
- #define LNET_PEER_FORCE_PING	BIT(13)	/* Forced Ping */
- #define LNET_PEER_FORCE_PUSH	BIT(14)	/* Forced Push */
- 
-+/* force delete even if router */
-+#define LNET_PEER_RTR_NI_FORCE_DEL BIT(15)
-+
- /* gw undergoing alive discovery */
- #define LNET_PEER_RTR_DISCOVERY	BIT(16)
- 
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index 1d06263..5a83e3a 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -534,6 +534,8 @@ int lnet_get_peer_list(u32 *countp, u32 *sizep,
+ int lnet_rtrpools_enable(void);
+ void lnet_rtrpools_disable(void);
+ void lnet_rtrpools_free(int keep_pools);
++void lnet_rtr_transfer_to_peer(struct lnet_peer *src,
++			       struct lnet_peer *target);
+ struct lnet_remotenet *lnet_find_rnet_locked(u32 net);
+ int lnet_dyn_add_net(struct lnet_ioctl_config_data *conf);
+ int lnet_dyn_del_net(u32 net);
 diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index b804d78..a81fee2 100644
+index a81fee2..5d13986 100644
 --- a/net/lnet/lnet/peer.c
 +++ b/net/lnet/lnet/peer.c
-@@ -323,12 +323,12 @@
+@@ -1355,6 +1355,18 @@ struct lnet_peer_net *
+ 		}
+ 		/* If this is the primary NID, destroy the peer. */
+ 		if (lnet_peer_ni_is_primary(lpni)) {
++			struct lnet_peer *rtr_lp =
++			  lpni->lpni_peer_net->lpn_peer;
++			int rtr_refcount = rtr_lp->lp_rtr_refcount;
++
++			/* if we're trying to delete a router it means
++			 * we're moving this peer NI to a new peer so must
++			 * transfer router properties to the new peer
++			 */
++			if (rtr_refcount > 0) {
++				flags |= LNET_PEER_RTR_NI_FORCE_DEL;
++				lnet_rtr_transfer_to_peer(rtr_lp, lp);
++			}
+ 			lnet_peer_del(lpni->lpni_peer_net->lpn_peer);
+ 			lpni = lnet_peer_ni_alloc(nid);
+ 			if (!lpni) {
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index 4a061f3..aa8ec8c 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -136,6 +136,35 @@ static int rtr_sensitivity_set(const char *val,
+ 	return 0;
+ }
  
- /* called with lnet_net_lock LNET_LOCK_EX held */
- static int
--lnet_peer_ni_del_locked(struct lnet_peer_ni *lpni)
-+lnet_peer_ni_del_locked(struct lnet_peer_ni *lpni, bool force)
- {
- 	struct lnet_peer_table *ptable = NULL;
- 
- 	/* don't remove a peer_ni if it's also a gateway */
--	if (lnet_isrouter(lpni)) {
-+	if (lnet_isrouter(lpni) && !force) {
- 		CERROR("Peer NI %s is a gateway. Can not delete it\n",
- 		       libcfs_nid2str(lpni->lpni_nid));
- 		return -EBUSY;
-@@ -384,7 +384,7 @@ void lnet_peer_uninit(void)
- 	/* remove all peer_nis from the remote peer and the hash list */
- 	list_for_each_entry_safe(lpni, tmp, &the_lnet.ln_remote_peer_ni_list,
- 				 lpni_on_remote_peer_ni_list)
--		lnet_peer_ni_del_locked(lpni);
-+		lnet_peer_ni_del_locked(lpni, false);
- 
- 	lnet_peer_tables_destroy();
- 
-@@ -439,7 +439,7 @@ void lnet_peer_uninit(void)
- 	lpni = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
- 	while (lpni) {
- 		lpni2 = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
--		rc = lnet_peer_ni_del_locked(lpni);
-+		rc = lnet_peer_ni_del_locked(lpni, false);
- 		if (rc != 0)
- 			rc2 = rc;
- 		lpni = lpni2;
-@@ -473,6 +473,7 @@ void lnet_peer_uninit(void)
- 	struct lnet_peer_ni *lpni;
- 	lnet_nid_t primary_nid = lp->lp_primary_nid;
- 	int rc = 0;
-+	bool force = (flags & LNET_PEER_RTR_NI_FORCE_DEL) ? true : false;
- 
- 	if (!(flags & LNET_PEER_CONFIGURED)) {
- 		if (lp->lp_state & LNET_PEER_CONFIGURED) {
-@@ -495,14 +496,21 @@ void lnet_peer_uninit(void)
- 	 * This function only allows deletion of the primary NID if it
- 	 * is the only NID.
- 	 */
--	if (nid == lp->lp_primary_nid && lp->lp_nnis != 1) {
-+	if (nid == lp->lp_primary_nid && lp->lp_nnis != 1 && !force) {
- 		rc = -EBUSY;
- 		goto out;
- 	}
- 
- 	lnet_net_lock(LNET_LOCK_EX);
- 
--	rc = lnet_peer_ni_del_locked(lpni);
-+	if (nid == lp->lp_primary_nid && lp->lp_nnis != 1 && force) {
-+		struct lnet_peer_ni *lpni2;
-+		/* assign the next peer_ni to be the primary */
-+		lpni2 = lnet_get_next_peer_ni_locked(lp, NULL, lpni);
-+		LASSERT(lpni2);
-+		lp->lp_primary_nid = lpni->lpni_nid;
++void
++lnet_rtr_transfer_to_peer(struct lnet_peer *src, struct lnet_peer *target)
++{
++	struct lnet_route *route;
++
++	lnet_net_lock(LNET_LOCK_EX);
++	target->lp_rtr_refcount += src->lp_rtr_refcount;
++	/* move the list of queued messages to the new peer */
++	list_splice_init(&src->lp_rtrq, &target->lp_rtrq);
++	/* move all the routes that reference the peer */
++	list_splice_init(&src->lp_routes, &target->lp_routes);
++	/* update all the routes to point to the new peer */
++	list_for_each_entry(route, &target->lp_routes, lr_gwlist)
++		route->lr_gateway = target;
++	/* remove the old peer from the ln_routers list */
++	list_del_init(&src->lp_rtr_list);
++	/* add the new peer to the ln_routers list */
++	if (list_empty(&target->lp_rtr_list)) {
++		lnet_peer_addref_locked(target);
++		list_add_tail(&target->lp_rtr_list, &the_lnet.ln_routers);
 +	}
-+	rc = lnet_peer_ni_del_locked(lpni, force);
- 
- 	lnet_net_unlock(LNET_LOCK_EX);
- 
-@@ -530,7 +538,7 @@ void lnet_peer_uninit(void)
- 
- 			peer = lpni->lpni_peer_net->lpn_peer;
- 			if (peer->lp_primary_nid != lpni->lpni_nid) {
--				lnet_peer_ni_del_locked(lpni);
-+				lnet_peer_ni_del_locked(lpni, false);
- 				continue;
- 			}
- 			/*
-@@ -2545,6 +2553,13 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
- 	}
- 
- 	for (i = 0; i < ndelnis; i++) {
-+		/* for routers it's okay to delete the primary_nid because
-+		 * the upper layers don't really rely on it. So if we're
-+		 * being told that the router changed its primary_nid
-+		 * then it's okay to delete it.
-+		 */
-+		if (lp->lp_rtr_refcount > 0)
-+			flags |= LNET_PEER_RTR_NI_FORCE_DEL;
- 		rc = lnet_peer_del_nid(lp, delnis[i], flags);
- 		if (rc) {
- 			CERROR("Error deleting NID %s from peer %s: %d\n",
++	/* reset the ref count on the old peer and decrement its ref count */
++	src->lp_rtr_refcount = 0;
++	lnet_peer_decref_locked(src);
++	/* update the router version */
++	the_lnet.ln_routers_version++;
++	lnet_net_unlock(LNET_LOCK_EX);
++}
++
+ int
+ lnet_peers_start_down(void)
+ {
 -- 
 1.8.3.1
