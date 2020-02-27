@@ -1,92 +1,95 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:57 -0500
-Subject: [lustre-devel] [PATCH 189/622] lustre: lov: quiet lov_dump_lmm_
- console messages
+Date: Thu, 27 Feb 2020 16:11:02 -0500
+Subject: [lustre-devel] [PATCH 194/622] lustre: ptlrpc: connect vs import
+ invalidate race
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-190-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-195-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-Limit messages in lov_dump_lmm_objects() and lov_dump_lmm_common()
-printing to the console repeatedly when D_ERROR is used.  Change
-CDEBUG() to CDEBUG_LIMIT() so that rate-limiting is applied.
+Connect can't be sent while import invalidate is
+in progress, thus it leaves the import in not
+initialized state.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11579
-Lustre-commit: d9ef75eb8226 ("LU-11579 lov: quiet lov_dump_lmm_ console messages")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33513
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Don't allow reconnect in evicted state.
+
+Cray-bug-id: LUS-6322
+WC-bug-id: https://jira.whamcloud.com/browse/LU-7558
+Lustre-commit: b1827ff1da82 ("LU-7558 ptlrpc: connect vs import invalidate race")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Alexander Boyko <c17825@cray.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-on: https://review.whamcloud.com/33718
 Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_pack.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ fs/lustre/include/obd_support.h | 1 +
+ fs/lustre/ptlrpc/import.c       | 6 ++++++
+ fs/lustre/ptlrpc/recover.c      | 2 ++
+ 3 files changed, 9 insertions(+)
 
-diff --git a/fs/lustre/lov/lov_pack.c b/fs/lustre/lov/lov_pack.c
-index 5f8b281..c6dec2d 100644
---- a/fs/lustre/lov/lov_pack.c
-+++ b/fs/lustre/lov/lov_pack.c
-@@ -55,13 +55,13 @@ void lov_dump_lmm_common(int level, void *lmmp)
- 	struct ost_id oi;
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index c2db38f..5ff270a 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -353,6 +353,7 @@
+ #define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK			0x51b
+ #define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK		0x51c
+ #define OBD_FAIL_PTLRPC_BULK_ATTACH      0x521
++#define OBD_FAIL_PTLRPC_CONNECT_RACE			0x531
  
- 	lmm_oi_le_to_cpu(&oi, &lmm->lmm_oi);
--	CDEBUG(level, "objid " DOSTID ", magic 0x%08x, pattern %#x\n",
--	       POSTID(&oi), le32_to_cpu(lmm->lmm_magic),
--	       le32_to_cpu(lmm->lmm_pattern));
--	CDEBUG(level, "stripe_size %u, stripe_count %u, layout_gen %u\n",
--	       le32_to_cpu(lmm->lmm_stripe_size),
--	       le16_to_cpu(lmm->lmm_stripe_count),
--	       le16_to_cpu(lmm->lmm_layout_gen));
-+	CDEBUG_LIMIT(level, "objid " DOSTID ", magic 0x%08x, pattern %#x\n",
-+		     POSTID(&oi), le32_to_cpu(lmm->lmm_magic),
-+		     le32_to_cpu(lmm->lmm_pattern));
-+	CDEBUG_LIMIT(level, "stripe_size %u, stripe_count %u, layout_gen %u\n",
-+		     le32_to_cpu(lmm->lmm_stripe_size),
-+		     le16_to_cpu(lmm->lmm_stripe_count),
-+		     le16_to_cpu(lmm->lmm_layout_gen));
- }
+ #define OBD_FAIL_OBD_PING_NET				0x600
+ /*	OBD_FAIL_OBD_LOG_CANCEL_NET	0x601 obsolete since 1.5 */
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index 867aff6..df6c459 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -38,6 +38,7 @@
+ #define DEBUG_SUBSYSTEM S_RPC
  
- static void lov_dump_lmm_objects(int level, struct lov_ost_data *lod,
-@@ -70,8 +70,9 @@ static void lov_dump_lmm_objects(int level, struct lov_ost_data *lod,
- 	int i;
+ #include <linux/kthread.h>
++#include <linux/delay.h>
+ #include <linux/fs_struct.h>
+ #include <obd_support.h>
+ #include <lustre_ha.h>
+@@ -273,6 +274,10 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 	if (!imp->imp_invalid || imp->imp_obd->obd_no_recov)
+ 		ptlrpc_deactivate_import(imp);
  
- 	if (stripe_count > LOV_V1_INSANE_STRIPE_COUNT) {
--		CDEBUG(level, "bad stripe_count %u > max_stripe_count %u\n",
--		       stripe_count, LOV_V1_INSANE_STRIPE_COUNT);
-+		CDEBUG_LIMIT(level,
-+			     "bad stripe_count %u > max_stripe_count %u\n",
-+			     stripe_count, LOV_V1_INSANE_STRIPE_COUNT);
- 		return;
- 	}
++	if (OBD_FAIL_PRECHECK(OBD_FAIL_PTLRPC_CONNECT_RACE)) {
++		OBD_RACE(OBD_FAIL_PTLRPC_CONNECT_RACE);
++		msleep(10 * MSEC_PER_SEC);
++	}
+ 	CFS_FAIL_TIMEOUT(OBD_FAIL_MGS_CONNECT_NET, 3 * cfs_fail_val / 2);
+ 	LASSERT(imp->imp_invalid);
  
-@@ -79,8 +80,8 @@ static void lov_dump_lmm_objects(int level, struct lov_ost_data *lod,
- 		struct ost_id oi;
+@@ -615,6 +620,7 @@ int ptlrpc_connect_import(struct obd_import *imp)
+ 		CERROR("already connected\n");
+ 		return 0;
+ 	} else if (imp->imp_state == LUSTRE_IMP_CONNECTING ||
++		   imp->imp_state == LUSTRE_IMP_EVICTED ||
+ 		   imp->imp_connected) {
+ 		spin_unlock(&imp->imp_lock);
+ 		CERROR("already connecting\n");
+diff --git a/fs/lustre/ptlrpc/recover.c b/fs/lustre/ptlrpc/recover.c
+index 7c09c4e..ceab288 100644
+--- a/fs/lustre/ptlrpc/recover.c
++++ b/fs/lustre/ptlrpc/recover.c
+@@ -339,6 +339,8 @@ int ptlrpc_recover_import(struct obd_import *imp, char *new_uuid, int async)
+ 	if (rc)
+ 		goto out;
  
- 		ostid_le_to_cpu(&lod->l_ost_oi, &oi);
--		CDEBUG(level, "stripe %u idx %u subobj " DOSTID "\n", i,
--		       le32_to_cpu(lod->l_ost_idx), POSTID(&oi));
-+		CDEBUG_LIMIT(level, "stripe %u idx %u subobj " DOSTID "\n", i,
-+			     le32_to_cpu(lod->l_ost_idx), POSTID(&oi));
- 	}
- }
- 
-@@ -94,7 +95,8 @@ void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm)
- void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
- {
- 	lov_dump_lmm_common(level, lmm);
--	CDEBUG(level, "pool_name " LOV_POOLNAMEF "\n", lmm->lmm_pool_name);
-+	CDEBUG_LIMIT(level, "pool_name " LOV_POOLNAMEF "\n",
-+		     lmm->lmm_pool_name);
- 	lov_dump_lmm_objects(level, lmm->lmm_objects,
- 			     le16_to_cpu(lmm->lmm_stripe_count));
- }
++	OBD_RACE(OBD_FAIL_PTLRPC_CONNECT_RACE);
++
+ 	rc = ptlrpc_connect_import(imp);
+ 	if (rc)
+ 		goto out;
 -- 
 1.8.3.1
