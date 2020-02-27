@@ -1,783 +1,409 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:50 -0500
-Subject: [lustre-devel] [PATCH 362/622] lustre: pcc: auto attach during open
- for valid cache
+Date: Thu, 27 Feb 2020 16:14:00 -0500
+Subject: [lustre-devel] [PATCH 372/622] lustre: obdclass: allow per-session
+ jobids.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-363-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-373-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Qian Yingjin <qian@ddn.com>
+From: Mr NeilBrown <neilb@suse.com>
 
-In current PCC implementation, all PCC state information is
-stored in the in-memory data structure named pcc_inode (a member
-of data structure ll_inode_info). Once the file inode is reclaimed
-due to the memory pressure or memory shrinking, the corresponding
-in-memory pcc_inode will be released too, and the PCC-cached file
-will be detached automatically. And the revocation of layout lock
-will also trigger the detach of the PCC-cached file. These all lead
-that the still valid PCC-cached file can not be used.
+Lustre includes a jobid in all RPC message sent to the server.  This
+is used to collected per-job statistics, where a "job" can involve
+multiple processes on multiple nodes in a cluster.
 
-To solve this problem, we introduce an auto-attaching mechanism
-during open. During PCC attach, the L.Gen will be stored as
-extented attribute of the local copy file on PCC device. When the
-in-memory inode is reclaimed or the layout lock is revoked, and
-the file is opend again, it can check whether the stored L.Gen on
-the PCC copy is same as the Lustre file current L.Gen on MDT. If
-they are consistent, it means the cached copy on PCC device is still
-valid, we can continue to use it after auto-attach.
+Nodes in a cluster can be running processes for multiple jobs, so it
+is best if different processes can have different jobids, and that
+processes on different nodes can have the same job id.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10092
-Lustre-commit: e29ecb659e51 ("LU-10092 pcc: auto attach during open for valid cache")
-Signed-off-by: Qian Yingjin <qian@ddn.com>
-Reviewed-on: https://review.whamcloud.com/33787
-Reviewed-by: Li Xi <lixi@ddn.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+The current mechanism for supporting this is to use an environment
+variable which the kernel extracts from the relevant process's address
+space. Some kernel developers see this to be an unacceptable design
+choice, and the code is not likely to be accepted upstream.
+
+This patch provides an alternate method, leveraging the concept of a
+"session id", as set with setsid().  Each login session already gets a
+unique sid which is preserved for all processes in that session unless
+explicitly changed (with setsid(1)).
+When a process in a session writes to
+        /sys/fs/lustre/jobid_this_session
+the string becomes the name for that session.
+If jobid_var is set to "session", then the per-session jobid is used
+for the jobid for all requests from processes in that session.
+
+When a session ends, the jobid information will be purged within 5
+minutes.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12330
+Lustre-commit: a32ce8f50eca ("LU-12330 obdclass: allow per-session jobids.")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/34995
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h           |   2 +
- fs/lustre/llite/pcc.c                   | 400 ++++++++++++++++++++++++++------
- fs/lustre/llite/pcc.h                   |  18 +-
- fs/lustre/lov/lov_object.c              |   1 +
- include/uapi/linux/lustre/lustre_user.h |   2 +
- 5 files changed, 348 insertions(+), 75 deletions(-)
+ fs/lustre/include/lprocfs_status.h |   1 +
+ fs/lustre/include/obd_class.h      |   4 +
+ fs/lustre/obdclass/jobid.c         | 199 +++++++++++++++++++++++++++++++++++--
+ fs/lustre/obdclass/obd_sysfs.c     |  48 +++++++++
+ 4 files changed, 246 insertions(+), 6 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index 3337bbf..d1c1413 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -293,6 +293,8 @@ struct cl_layout {
- 	u32			cl_layout_gen;
- 	/** whether layout is a composite one */
- 	bool			cl_is_composite;
-+	/** Whether layout is a HSM released one */
-+	bool			cl_is_released;
- };
+diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
+index 9f62d4e..6269bd3 100644
+--- a/fs/lustre/include/lprocfs_status.h
++++ b/fs/lustre/include/lprocfs_status.h
+@@ -360,6 +360,7 @@ enum {
+ #define JOBSTATS_DISABLE		"disable"
+ #define JOBSTATS_PROCNAME_UID		"procname_uid"
+ #define JOBSTATS_NODELOCAL		"nodelocal"
++#define JOBSTATS_SESSION		"session"
  
- /**
-diff --git a/fs/lustre/llite/pcc.c b/fs/lustre/llite/pcc.c
-index 469ff6c..fc4a2a3 100644
---- a/fs/lustre/llite/pcc.c
-+++ b/fs/lustre/llite/pcc.c
-@@ -124,7 +124,7 @@ int pcc_super_init(struct pcc_super *super)
+ /* obd_config.c */
+ void lustre_register_client_process_config(int (*cpc)(struct lustre_cfg *lcfg));
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index 58c743c..76e8201 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -57,6 +57,10 @@
+ struct obd_device *class_exp2obd(struct obd_export *exp);
+ int class_handle_ioctl(unsigned int cmd, unsigned long arg);
+ int lustre_get_jobid(char *jobid, size_t len);
++void jobid_cache_fini(void);
++int jobid_cache_init(void);
++char *jobid_current(void);
++int jobid_set_current(char *jobid);
  
- 	/* Never override disk quota limits or use reserved space */
- 	cap_lower(cred->cap_effective, CAP_SYS_RESOURCE);
--	spin_lock_init(&super->pccs_lock);
-+	init_rwsem(&super->pccs_rw_sem);
- 	INIT_LIST_HEAD(&super->pccs_datasets);
+ struct lu_device_type;
  
- 	return 0;
-@@ -472,6 +472,24 @@ static int pcc_id_parse(struct pcc_cmd *cmd, const char *id)
- 		if (id <= 0)
- 			return -EINVAL;
- 		cmd->u.pccc_add.pccc_roid = id;
-+	} else if (strcmp(key, "open_attach") == 0) {
-+		rc = kstrtoul(val, 10, &id);
-+		if (rc)
-+			return rc;
-+		if (id > 0)
-+			cmd->u.pccc_add.pccc_flags |= PCC_DATASET_OPEN_ATTACH;
-+	} else if (strcmp(key, "rwpcc") == 0) {
-+		rc = kstrtoul(val, 10, &id);
-+		if (rc)
-+			return rc;
-+		if (id > 0)
-+			cmd->u.pccc_add.pccc_flags |= PCC_DATASET_RWPCC;
-+	} else if (strcmp(key, "ropcc") == 0) {
-+		rc = kstrtoul(val, 10, &id);
-+		if (rc)
-+			return rc;
-+		if (id > 0)
-+			cmd->u.pccc_add.pccc_flags |= PCC_DATASET_ROPCC;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -494,6 +512,24 @@ static int pcc_id_parse(struct pcc_cmd *cmd, const char *id)
- 			return rc;
- 	}
+diff --git a/fs/lustre/obdclass/jobid.c b/fs/lustre/obdclass/jobid.c
+index 8bad859..98b3f39 100644
+--- a/fs/lustre/obdclass/jobid.c
++++ b/fs/lustre/obdclass/jobid.c
+@@ -46,6 +46,151 @@
+ char obd_jobid_var[JOBSTATS_JOBID_VAR_MAX_LEN + 1] = JOBSTATS_DISABLE;
+ char obd_jobid_name[LUSTRE_JOBID_SIZE] = "%e.%u";
  
-+	switch (cmd->pccc_cmd) {
-+	case PCC_ADD_DATASET:
-+		if (cmd->u.pccc_add.pccc_flags & PCC_DATASET_RWPCC &&
-+		    cmd->u.pccc_add.pccc_flags & PCC_DATASET_ROPCC)
-+			return -EINVAL;
-+		/*
-+		 * By default, a PCC backend can provide caching service for
-+		 * both RW-PCC and RO-PCC.
-+		 */
-+		if ((cmd->u.pccc_add.pccc_flags & PCC_DATASET_PCC_ALL) == 0)
-+			cmd->u.pccc_add.pccc_flags |= PCC_DATASET_PCC_ALL;
-+		break;
-+	case PCC_DEL_DATASET:
-+	case PCC_CLEAR_ALL:
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
- 	return 0;
- }
- 
-@@ -641,15 +677,18 @@ struct pcc_dataset*
- 	struct pcc_dataset *dataset;
- 	struct pcc_dataset *selected = NULL;
- 
--	spin_lock(&super->pccs_lock);
-+	down_read(&super->pccs_rw_sem);
- 	list_for_each_entry(dataset, &super->pccs_datasets, pccd_linkage) {
-+		if (!(dataset->pccd_flags & PCC_DATASET_RWPCC))
-+			continue;
++/*
++ * Jobid can be set for a session (see setsid(2)) by writing to
++ * a sysfs file from any process in that session.
++ * The jobids are stored in a hash table indexed by the relevant
++ * struct pid.  We periodically look for entries where the pid has
++ * no PIDTYPE_SID tasks any more, and prune them.  This happens within
++ * 5 seconds of a jobid being added, and every 5 minutes when jobids exist,
++ * but none are added.
++ */
++#define JOBID_EXPEDITED_CLEAN	(5)
++#define JOBID_BACKGROUND_CLEAN	(5 * 60)
 +
- 		if (pcc_cond_match(&dataset->pccd_rule, matcher)) {
- 			atomic_inc(&dataset->pccd_refcount);
- 			selected = dataset;
- 			break;
- 		}
- 	}
--	spin_unlock(&super->pccs_lock);
-+	up_read(&super->pccs_rw_sem);
- 	if (selected)
- 		CDEBUG(D_CACHE, "PCC create, matched %s - %d:%d:%d:%s\n",
- 		       dataset->pccd_rule.pmr_conds_str,
-@@ -687,6 +726,7 @@ struct pcc_dataset*
- 	strncpy(dataset->pccd_pathname, pathname, PATH_MAX);
- 	dataset->pccd_rwid = cmd->u.pccc_add.pccc_rwid;
- 	dataset->pccd_roid = cmd->u.pccc_add.pccc_roid;
-+	dataset->pccd_flags = cmd->u.pccc_add.pccc_flags;
- 	atomic_set(&dataset->pccd_refcount, 1);
- 
- 	rc = pcc_dataset_rule_init(&dataset->pccd_rule, cmd);
-@@ -695,7 +735,7 @@ struct pcc_dataset*
- 		return rc;
- 	}
- 
--	spin_lock(&super->pccs_lock);
-+	down_write(&super->pccs_rw_sem);
- 	list_for_each_entry(tmp, &super->pccs_datasets, pccd_linkage) {
- 		if (strcmp(tmp->pccd_pathname, pathname) == 0 ||
- 		    (dataset->pccd_rwid != 0 &&
-@@ -708,7 +748,7 @@ struct pcc_dataset*
- 	}
- 	if (!found)
- 		list_add(&dataset->pccd_linkage, &super->pccs_datasets);
--	spin_unlock(&super->pccs_lock);
-+	up_write(&super->pccs_rw_sem);
- 
- 	if (found) {
- 		pcc_dataset_put(dataset);
-@@ -731,15 +771,16 @@ struct pcc_dataset *
- 	 * archive ID (read-write ID) or read-only ID is unique in the list,
- 	 * we just return last added one as first priority.
- 	 */
--	spin_lock(&super->pccs_lock);
-+	down_read(&super->pccs_rw_sem);
- 	list_for_each_entry(dataset, &super->pccs_datasets, pccd_linkage) {
--		if (type == LU_PCC_READWRITE && dataset->pccd_rwid != id)
-+		if (type == LU_PCC_READWRITE && (dataset->pccd_rwid != id ||
-+		    !(dataset->pccd_flags & PCC_DATASET_RWPCC)))
- 			continue;
- 		atomic_inc(&dataset->pccd_refcount);
- 		selected = dataset;
- 		break;
- 	}
--	spin_unlock(&super->pccs_lock);
-+	up_read(&super->pccs_rw_sem);
- 	if (selected)
- 		CDEBUG(D_CACHE, "matched id %u, PCC mode %d\n", id, type);
- 
-@@ -763,17 +804,17 @@ struct pcc_dataset *
- 	struct pcc_dataset *dataset;
- 	int rc = -ENOENT;
- 
--	spin_lock(&super->pccs_lock);
-+	down_write(&super->pccs_rw_sem);
- 	list_for_each_safe(l, tmp, &super->pccs_datasets) {
- 		dataset = list_entry(l, struct pcc_dataset, pccd_linkage);
- 		if (strcmp(dataset->pccd_pathname, pathname) == 0) {
--			list_del(&dataset->pccd_linkage);
-+			list_del_init(&dataset->pccd_linkage);
- 			pcc_dataset_put(dataset);
- 			rc = 0;
- 			break;
- 		}
- 	}
--	spin_unlock(&super->pccs_lock);
-+	up_write(&super->pccs_rw_sem);
- 	return rc;
- }
- 
-@@ -782,6 +823,7 @@ struct pcc_dataset *
- {
- 	seq_printf(m, "%s:\n", dataset->pccd_pathname);
- 	seq_printf(m, "  rwid: %u\n", dataset->pccd_rwid);
-+	seq_printf(m, "  flags: %x\n", dataset->pccd_flags);
- 	seq_printf(m, "  autocache: %s\n", dataset->pccd_rule.pmr_conds_str);
- }
- 
-@@ -790,11 +832,11 @@ struct pcc_dataset *
- {
- 	struct pcc_dataset *dataset;
- 
--	spin_lock(&super->pccs_lock);
-+	down_read(&super->pccs_rw_sem);
- 	list_for_each_entry(dataset, &super->pccs_datasets, pccd_linkage) {
- 		pcc_dataset_dump(dataset, m);
- 	}
--	spin_unlock(&super->pccs_lock);
-+	up_read(&super->pccs_rw_sem);
- 	return 0;
- }
- 
-@@ -802,11 +844,13 @@ static void pcc_remove_datasets(struct pcc_super *super)
- {
- 	struct pcc_dataset *dataset, *tmp;
- 
-+	down_write(&super->pccs_rw_sem);
- 	list_for_each_entry_safe(dataset, tmp,
- 				 &super->pccs_datasets, pccd_linkage) {
- 		list_del(&dataset->pccd_linkage);
- 		pcc_dataset_put(dataset);
- 	}
-+	up_write(&super->pccs_rw_sem);
- }
- 
- void pcc_super_fini(struct pcc_super *super)
-@@ -1027,19 +1071,241 @@ void pcc_file_init(struct pcc_file *pccf)
- 	pccf->pccf_type = LU_PCC_NONE;
- }
- 
-+static inline bool pcc_open_attach_enabled(struct pcc_dataset *dataset)
++struct session_jobid {
++	struct pid		*sj_session;
++	struct rhash_head	sj_linkage;
++	struct rcu_head		sj_rcu;
++	char			sj_jobid[1];
++};
++
++static const struct rhashtable_params jobid_params = {
++	.key_len	= sizeof(struct pid *),
++	.key_offset	= offsetof(struct session_jobid, sj_session),
++	.head_offset	= offsetof(struct session_jobid, sj_linkage),
++};
++
++static struct rhashtable session_jobids;
++
++/*
++ * jobid_current must be called with rcu_read_lock held.
++ * if it returns non-NULL, the string can only be used
++ * until rcu_read_unlock is called.
++ */
++char *jobid_current(void)
 +{
-+	return dataset->pccd_flags & PCC_DATASET_OPEN_ATTACH;
++	struct pid *sid = task_session(current);
++	struct session_jobid *sj;
++
++	sj = rhashtable_lookup_fast(&session_jobids, &sid, jobid_params);
++	if (sj)
++		return sj->sj_jobid;
++	return NULL;
 +}
 +
-+static const char pcc_xattr_layout[] = XATTR_USER_PREFIX "PCC.layout";
-+
-+static int pcc_layout_xattr_set(struct pcc_inode *pcci, u32 gen)
++static void jobid_prune_expedite(void);
++/*
++ * jobid_set_current will try to add a new entry
++ * to the table.  If one exists with the same key, the
++ * jobid will be replaced
++ */
++int jobid_set_current(char *jobid)
 +{
-+	struct dentry *pcc_dentry = pcci->pcci_path.dentry;
-+	struct ll_inode_info *lli = pcci->pcci_lli;
-+	int rc;
++	struct pid *sid;
++	struct session_jobid *sj, *origsj;
++	int ret;
++	int len = strlen(jobid);
 +
-+	if (!(lli->lli_pcc_state & PCC_STATE_FL_OPEN_ATTACH))
-+		return 0;
-+
-+	rc = __vfs_setxattr(pcc_dentry, pcc_dentry->d_inode, pcc_xattr_layout,
-+			    &gen, sizeof(gen), 0);
-+	return rc;
-+}
-+
-+static int pcc_get_layout_info(struct inode *inode, struct cl_layout *clt)
-+{
-+	struct lu_env *env;
-+	struct ll_inode_info *lli = ll_i2info(inode);
-+	u16 refcheck;
-+	int rc;
-+
-+	if (!lli->lli_clob)
-+		return -EINVAL;
-+
-+	env = cl_env_get(&refcheck);
-+	if (IS_ERR(env))
-+		return PTR_ERR(env);
-+
-+	rc = cl_object_layout_get(env, lli->lli_clob, clt);
-+	if (rc)
-+		CDEBUG(D_INODE, "Cannot get layout for "DFID"\n",
-+		       PFID(ll_inode2fid(inode)));
-+
-+	cl_env_put(env, &refcheck);
-+	return rc;
-+}
-+
-+static int pcc_fid2dataset_fullpath(char *buf, int sz, struct lu_fid *fid,
-+				    struct pcc_dataset *dataset)
-+{
-+	return snprintf(buf, sz, "%s/%04x/%04x/%04x/%04x/%04x/%04x/"
-+			DFID_NOBRACE,
-+			dataset->pccd_pathname,
-+			(fid)->f_oid       & 0xFFFF,
-+			(fid)->f_oid >> 16 & 0xFFFF,
-+			(unsigned int)((fid)->f_seq       & 0xFFFF),
-+			(unsigned int)((fid)->f_seq >> 16 & 0xFFFF),
-+			(unsigned int)((fid)->f_seq >> 32 & 0xFFFF),
-+			(unsigned int)((fid)->f_seq >> 48 & 0xFFFF),
-+			PFID(fid));
-+}
-+
-+/* Must be called with pcci->pcci_lock held */
-+static void pcc_inode_attach_init(struct pcc_dataset *dataset,
-+				  struct pcc_inode *pcci,
-+				  struct dentry *dentry,
-+				  enum lu_pcc_type type)
-+{
-+	pcci->pcci_path.mnt = mntget(dataset->pccd_path.mnt);
-+	pcci->pcci_path.dentry = dentry;
-+	LASSERT(atomic_read(&pcci->pcci_refcount) == 0);
-+	atomic_set(&pcci->pcci_refcount, 1);
-+	pcci->pcci_type = type;
-+	pcci->pcci_attr_valid = false;
-+
-+	if (pcc_open_attach_enabled(dataset)) {
-+		struct ll_inode_info *lli = pcci->pcci_lli;
-+
-+		lli->lli_pcc_state |= PCC_STATE_FL_OPEN_ATTACH;
-+	}
-+}
-+
-+static inline void pcc_layout_gen_set(struct pcc_inode *pcci,
-+				      u32 gen)
-+{
-+	pcci->pcci_layout_gen = gen;
-+}
-+
- static inline bool pcc_inode_has_layout(struct pcc_inode *pcci)
- {
- 	return pcci->pcci_layout_gen != CL_LAYOUT_GEN_NONE;
- }
- 
-+static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
-+				  enum lu_pcc_type type,
-+				  struct pcc_dataset *dataset,
-+				  bool *cached)
-+{
-+	struct ll_inode_info *lli = ll_i2info(inode);
-+	struct pcc_inode *pcci = lli->lli_pcc_inode;
-+	const struct cred *old_cred;
-+	struct dentry *pcc_dentry;
-+	struct path path;
-+	char *pathname;
-+	u32 pcc_gen;
-+	int rc;
-+
-+	if (type == LU_PCC_READWRITE &&
-+	    !(dataset->pccd_flags & PCC_DATASET_RWPCC))
-+		return 0;
-+
-+	pathname = kzalloc(PATH_MAX, GFP_KERNEL);
-+	if (!pathname)
++	sj = kmalloc(sizeof(*sj) + len, GFP_KERNEL);
++	if (!sj)
 +		return -ENOMEM;
++	rcu_read_lock();
++	sid = task_session(current);
++	sj->sj_session = get_pid(sid);
++	strncpy(sj->sj_jobid, jobid, len+1);
++	origsj = rhashtable_lookup_get_insert_fast(&session_jobids,
++						   &sj->sj_linkage,
++						   jobid_params);
++	if (!origsj) {
++		/* successful insert */
++		rcu_read_unlock();
++		jobid_prune_expedite();
++		return 0;
++	}
 +
-+	pcc_fid2dataset_fullpath(pathname, PATH_MAX, &lli->lli_fid, dataset);
++	if (IS_ERR(origsj)) {
++		put_pid(sj->sj_session);
++		kfree(sj);
++		rcu_read_unlock();
++		return PTR_ERR(origsj);
++	}
++	ret = rhashtable_replace_fast(&session_jobids,
++				      &origsj->sj_linkage,
++				      &sj->sj_linkage,
++				      jobid_params);
++	if (ret) {
++		put_pid(sj->sj_session);
++		kfree(sj);
++		rcu_read_unlock();
++		return ret;
++	}
++	put_pid(origsj->sj_session);
++	rcu_read_unlock();
++	kfree_rcu(origsj, sj_rcu);
++	jobid_prune_expedite();
 +
-+	old_cred = override_creds(pcc_super_cred(inode->i_sb));
-+	rc = kern_path(pathname, LOOKUP_FOLLOW, &path);
++	return 0;
++}
++
++static void jobid_free(void *vsj, void *arg)
++{
++	struct session_jobid *sj = vsj;
++
++	put_pid(sj->sj_session);
++	kfree(sj);
++}
++
++static void jobid_prune(struct work_struct *work);
++static DECLARE_DELAYED_WORK(jobid_prune_work, jobid_prune);
++static int jobid_prune_expedited;
++static void jobid_prune(struct work_struct *work)
++{
++	int remaining = 0;
++	struct rhashtable_iter iter;
++	struct session_jobid *sj;
++
++	jobid_prune_expedited = 0;
++	rhashtable_walk_enter(&session_jobids, &iter);
++	rhashtable_walk_start(&iter);
++	while ((sj = rhashtable_walk_next(&iter)) != NULL) {
++		if (!hlist_empty(&sj->sj_session->tasks[PIDTYPE_SID])) {
++			remaining++;
++			continue;
++		}
++		if (rhashtable_remove_fast(&session_jobids,
++					   &sj->sj_linkage,
++					   jobid_params) == 0) {
++			put_pid(sj->sj_session);
++			kfree_rcu(sj, sj_rcu);
++		}
++	}
++	rhashtable_walk_stop(&iter);
++	rhashtable_walk_exit(&iter);
++	if (remaining)
++		schedule_delayed_work(&jobid_prune_work,
++				      JOBID_BACKGROUND_CLEAN * HZ);
++}
++
++static void jobid_prune_expedite(void)
++{
++	if (!jobid_prune_expedited) {
++		jobid_prune_expedited = 1;
++		mod_delayed_work(system_wq, &jobid_prune_work,
++				 JOBID_EXPEDITED_CLEAN * HZ);
++	}
++}
++
+ /* Get jobid of current process from stored variable or calculate
+  * it from pid and user_id.
+  *
+@@ -134,14 +279,40 @@ static int jobid_interpret_string(const char *jobfmt, char *jobid,
+ 	return joblen < 0 ? -EOVERFLOW : 0;
+ }
+ 
++/**
++ * Generate the job identifier string for this process for tracking purposes.
++ *
++ * Fill in @jobid string based on the value of obd_jobid_var:
++ * JOBSTATS_DISABLE:	  none
++ * JOBSTATS_NODELOCAL:	  content of obd_jobid_name (jobid_interpret_string())
++ * JOBSTATS_PROCNAME_UID: process name/UID
++ * JOBSTATS_SESSION	  per-session value set by
++ *			  /sys/fs/lustre/jobid_this_session
++ *
++ * Return -ve error number, 0 on success.
++ */
+ int lustre_get_jobid(char *jobid, size_t joblen)
+ {
+ 	char tmp_jobid[LUSTRE_JOBID_SIZE] = "";
+ 
++	if (unlikely(joblen < 2)) {
++		if (joblen == 1)
++			jobid[0] = '\0';
++		return -EINVAL;
++	}
++
+ 	/* Jobstats isn't enabled */
+ 	if (strcmp(obd_jobid_var, JOBSTATS_DISABLE) == 0)
+ 		goto out_cache_jobid;
+ 
++	/* Whole node dedicated to single job */
++	if (strcmp(obd_jobid_var, JOBSTATS_NODELOCAL) == 0) {
++		int rc2 = jobid_interpret_string(obd_jobid_name,
++						 tmp_jobid, joblen);
++		if (!rc2)
++			goto out_cache_jobid;
++	}
++
+ 	/* Use process name + fsuid as jobid */
+ 	if (strcmp(obd_jobid_var, JOBSTATS_PROCNAME_UID) == 0) {
+ 		snprintf(tmp_jobid, LUSTRE_JOBID_SIZE, "%s.%u",
+@@ -150,13 +321,17 @@ int lustre_get_jobid(char *jobid, size_t joblen)
+ 		goto out_cache_jobid;
+ 	}
+ 
+-	/* Whole node dedicated to single job */
+-	if (strcmp(obd_jobid_var, JOBSTATS_NODELOCAL) == 0) {
+-		int rc2 = jobid_interpret_string(obd_jobid_name,
+-						 tmp_jobid, joblen);
+-		if (!rc2)
+-			goto out_cache_jobid;
++	if (strcmp(obd_jobid_var, JOBSTATS_SESSION) == 0) {
++		char *jid;
++
++		rcu_read_lock();
++		jid = jobid_current();
++		if (jid)
++			strlcpy(jobid, jid, sizeof(jobid));
++		rcu_read_unlock();
++		goto out_cache_jobid;
+ 	}
++
+ 	return -ENOENT;
+ 
+ out_cache_jobid:
+@@ -167,3 +342,15 @@ int lustre_get_jobid(char *jobid, size_t joblen)
+ 	return 0;
+ }
+ EXPORT_SYMBOL(lustre_get_jobid);
++
++int jobid_cache_init(void)
++{
++	return rhashtable_init(&session_jobids, &jobid_params);
++}
++
++void jobid_cache_fini(void)
++{
++	cancel_delayed_work_sync(&jobid_prune_work);
++
++	rhashtable_free_and_destroy(&session_jobids, jobid_free, NULL);
++}
+diff --git a/fs/lustre/obdclass/obd_sysfs.c b/fs/lustre/obdclass/obd_sysfs.c
+index ca15936..8803d05 100644
+--- a/fs/lustre/obdclass/obd_sysfs.c
++++ b/fs/lustre/obdclass/obd_sysfs.c
+@@ -259,6 +259,44 @@ static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
+ 	return count;
+ }
+ 
++static ssize_t jobid_this_session_show(struct kobject *kobj,
++				       struct attribute *attr,
++				       char *buf)
++{
++	char *jid;
++	int ret = -ENOENT;
++
++	rcu_read_lock();
++	jid = jobid_current();
++	if (jid)
++		ret = snprintf(buf, PAGE_SIZE, "%s\n", jid);
++	rcu_read_unlock();
++	return ret;
++}
++
++static ssize_t jobid_this_session_store(struct kobject *kobj,
++					struct attribute *attr,
++					const char *buffer,
++					size_t count)
++{
++	char *jobid;
++	int len;
++	int ret;
++
++	if (!count || count > LUSTRE_JOBID_SIZE)
++		return -EINVAL;
++
++	jobid = kstrndup(buffer, count, GFP_KERNEL);
++	if (!jobid)
++		return -ENOMEM;
++	len = strcspn(jobid, "\n ");
++	jobid[len] = '\0';
++	ret = jobid_set_current(jobid);
++	kfree(jobid);
++
++	return ret ?: count;
++}
++
+ /* Root for /sys/kernel/debug/lustre */
+ struct dentry *debugfs_lustre_root;
+ EXPORT_SYMBOL_GPL(debugfs_lustre_root);
+@@ -268,6 +306,7 @@ static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
+ LUSTRE_RO_ATTR(health_check);
+ LUSTRE_RW_ATTR(jobid_var);
+ LUSTRE_RW_ATTR(jobid_name);
++LUSTRE_RW_ATTR(jobid_this_session);
+ 
+ static struct attribute *lustre_attrs[] = {
+ 	&lustre_attr_version.attr,
+@@ -275,6 +314,7 @@ static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
+ 	&lustre_attr_health_check.attr,
+ 	&lustre_attr_jobid_name.attr,
+ 	&lustre_attr_jobid_var.attr,
++	&lustre_attr_jobid_this_session.attr,
+ 	&lustre_sattr_timeout.u.attr,
+ 	&lustre_attr_max_dirty_mb.attr,
+ 	&lustre_sattr_debug_peer_on_timeout.u.attr,
+@@ -441,6 +481,12 @@ int class_procfs_init(void)
+ 		goto out;
+ 	}
+ 
++	rc = jobid_cache_init();
 +	if (rc) {
-+		/* ignore this error */
-+		rc = 0;
++		kset_unregister(lustre_kset);
 +		goto out;
 +	}
 +
-+	pcc_dentry = path.dentry;
-+	rc = __vfs_getxattr(pcc_dentry, pcc_dentry->d_inode, pcc_xattr_layout,
-+			    &pcc_gen, sizeof(pcc_gen));
-+	if (rc < 0) {
-+		/* ignore this error */
-+		rc = 0;
-+		goto out_put_path;
-+	}
+ 	debugfs_lustre_root = debugfs_create_dir("lustre", NULL);
+ 
+ 	debugfs_create_file("devices", 0444, debugfs_lustre_root, NULL,
+@@ -458,6 +504,8 @@ int class_procfs_clean(void)
+ 
+ 	debugfs_lustre_root = NULL;
+ 
++	jobid_cache_fini();
 +
-+	rc = 0;
-+	/* The file is still valid cached in PCC, attach it immediately. */
-+	if (pcc_gen == gen) {
-+		CDEBUG(D_CACHE, DFID" L.Gen (%d) consistent, auto attached.\n",
-+		       PFID(&lli->lli_fid), gen);
-+		if (!pcci) {
-+			pcci = kmem_cache_zalloc(pcc_inode_slab, GFP_NOFS);
-+			if (!pcci) {
-+				rc = -ENOMEM;
-+				goto out_put_path;
-+			}
-+
-+			pcc_inode_init(pcci, lli);
-+			dget(pcc_dentry);
-+			pcc_inode_attach_init(dataset, pcci, pcc_dentry, type);
-+		} else {
-+			/*
-+			 * This happened when a file was once attached into
-+			 * PCC, and some processes keep this file opened
-+			 * (pcci->refcount > 1) and corresponding PCC file
-+			 * without any I/O activity, and then this file was
-+			 * detached by the manual detach command or the
-+			 * revocation of the layout lock (i.e. cached LRU lock
-+			 * shrinking).
-+			 */
-+			pcc_inode_get(pcci);
-+			pcci->pcci_type = type;
-+		}
-+		pcc_layout_gen_set(pcci, gen);
-+		*cached = true;
-+	}
-+out_put_path:
-+	path_put(&path);
-+out:
-+	revert_creds(old_cred);
-+	kfree(pathname);
-+	return rc;
-+}
-+
-+static int pcc_try_datasets_attach(struct inode *inode, u32 gen,
-+				   enum lu_pcc_type type, bool *cached)
-+{
-+	struct pcc_dataset *dataset, *tmp;
-+	struct pcc_super *super = &ll_i2sbi(inode)->ll_pcc_super;
-+	int rc = 0;
-+
-+	down_read(&super->pccs_rw_sem);
-+	list_for_each_entry_safe(dataset, tmp,
-+				 &super->pccs_datasets, pccd_linkage) {
-+		if (!pcc_open_attach_enabled(dataset))
-+			continue;
-+		rc = pcc_try_dataset_attach(inode, gen, type, dataset, cached);
-+		if (rc < 0 || (!rc && *cached))
-+			break;
-+	}
-+	up_read(&super->pccs_rw_sem);
-+
-+	return rc;
-+}
-+
-+static int pcc_try_open_attach(struct inode *inode, bool *cached)
-+{
-+	struct pcc_super *super = &ll_i2sbi(inode)->ll_pcc_super;
-+	struct cl_layout clt = {
-+		.cl_layout_gen = 0,
-+		.cl_is_released = false,
-+	};
-+	int rc;
-+
-+	/*
-+	 * Quick check whether there is PCC device.
-+	 */
-+	if (list_empty(&super->pccs_datasets))
-+		return 0;
-+
-+	/*
-+	 * The file layout lock was cancelled. And this open does not
-+	 * obtain valid layout lock from MDT (i.e. the file is being
-+	 * HSM restoring).
-+	 */
-+	if (ll_layout_version_get(ll_i2info(inode)) == CL_LAYOUT_GEN_NONE)
-+		return 0;
-+
-+	rc = pcc_get_layout_info(inode, &clt);
-+	if (rc)
-+		return rc;
-+
-+	if (clt.cl_is_released)
-+		rc = pcc_try_datasets_attach(inode, clt.cl_layout_gen,
-+					     LU_PCC_READWRITE, cached);
-+
-+	return rc;
-+}
-+
- int pcc_file_open(struct inode *inode, struct file *file)
- {
- 	struct pcc_inode *pcci;
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
- 	struct pcc_file *pccf = &fd->fd_pcc_file;
- 	struct file *pcc_file;
- 	struct path *path;
- 	struct qstr *dname;
-+	bool cached = false;
- 	int rc = 0;
+ 	sysfs_remove_group(&lustre_kset->kobj, &lustre_attr_group);
  
- 	if (!S_ISREG(inode->i_mode))
-@@ -1047,13 +1313,19 @@ int pcc_file_open(struct inode *inode, struct file *file)
- 
- 	pcc_inode_lock(inode);
- 	pcci = ll_i2pcci(inode);
--	if (!pcci)
--		goto out_unlock;
- 
--	if (atomic_read(&pcci->pcci_refcount) == 0 ||
--	    !pcc_inode_has_layout(pcci))
-+	if (lli->lli_pcc_state & PCC_STATE_FL_ATTACHING)
- 		goto out_unlock;
- 
-+	if (!pcci || !pcc_inode_has_layout(pcci)) {
-+		rc = pcc_try_open_attach(inode, &cached);
-+		if (rc < 0 || !cached)
-+			goto out_unlock;
-+
-+		if (!pcci)
-+			pcci = ll_i2pcci(inode);
-+	}
-+
- 	pcc_inode_get(pcci);
- 	WARN_ON(pccf->pccf_file);
- 
-@@ -1106,12 +1378,6 @@ void pcc_file_release(struct inode *inode, struct file *file)
- 	pcc_inode_unlock(inode);
- }
- 
--static inline void pcc_layout_gen_set(struct pcc_inode *pcci,
--				      u32 gen)
--{
--	pcci->pcci_layout_gen = gen;
--}
--
- static void pcc_io_init(struct inode *inode, bool *cached)
- {
- 	struct pcc_inode *pcci;
-@@ -1439,11 +1705,20 @@ int pcc_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
- 	const struct vm_operations_struct *pcc_vm_ops = vma->vm_private_data;
- 	int rc;
- 
--	if (!pcc_file || !pcc_vm_ops || !pcc_vm_ops->page_mkwrite) {
-+	if (!pcc_file || !pcc_vm_ops) {
- 		*cached = false;
- 		return 0;
- 	}
- 
-+	if (!pcc_vm_ops->page_mkwrite &&
-+	    page->mapping == pcc_file->f_mapping) {
-+		CDEBUG(D_MMAP,
-+		       "%s: PCC backend fs not support ->page_mkwrite()\n",
-+		       ll_i2sbi(inode)->ll_fsname);
-+		pcc_ioctl_detach(inode);
-+		up_read(&mm->mmap_sem);
-+		return VM_FAULT_RETRY | VM_FAULT_NOPAGE;
-+	}
- 	/* Pause to allow for a race with concurrent detach */
- 	OBD_FAIL_TIMEOUT(OBD_FAIL_LLITE_PCC_MKWRITE_PAUSE, cfs_fail_val);
- 
-@@ -1465,7 +1740,7 @@ int pcc_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
- 		 * VM_FAULT_NOPAGE | VM_FAULT_RETRY to the caller
- 		 * __do_page_fault and retry the memory fault handling.
- 		 */
--		if (page->mapping == file_inode(pcc_file)->i_mapping) {
-+		if (page->mapping == pcc_file->f_mapping) {
- 			*cached = true;
- 			up_read(&mm->mmap_sem);
- 			return VM_FAULT_RETRY | VM_FAULT_NOPAGE;
-@@ -1554,16 +1829,15 @@ void pcc_layout_invalidate(struct inode *inode)
- 	pcc_inode_unlock(inode);
- }
- 
--static int pcc_inode_remove(struct pcc_inode *pcci)
-+static int pcc_inode_remove(struct inode *inode, struct dentry *pcc_dentry)
- {
--	struct dentry *dentry;
- 	int rc;
- 
--	dentry = pcci->pcci_path.dentry;
--	rc = vfs_unlink(dentry->d_parent->d_inode, dentry, NULL);
-+	rc = vfs_unlink(pcc_dentry->d_parent->d_inode, pcc_dentry, NULL);
- 	if (rc)
--		CWARN("failed to unlink PCC file %.*s, rc = %d\n",
--		      dentry->d_name.len, dentry->d_name.name, rc);
-+		CWARN("%s: failed to unlink PCC file %.*s, rc = %d\n",
-+		      ll_i2sbi(inode)->ll_fsname, pcc_dentry->d_name.len,
-+		      pcc_dentry->d_name.name, rc);
- 
- 	return rc;
- }
-@@ -1651,20 +1925,6 @@ static int pcc_inode_remove(struct pcc_inode *pcci)
- 	return dentry;
- }
- 
--/* Must be called with pcci->pcci_lock held */
--static void pcc_inode_attach_init(struct pcc_dataset *dataset,
--				  struct pcc_inode *pcci,
--				  struct dentry *dentry,
--				  enum lu_pcc_type type)
--{
--	pcci->pcci_path.mnt = mntget(dataset->pccd_path.mnt);
--	pcci->pcci_path.dentry = dentry;
--	LASSERT(atomic_read(&pcci->pcci_refcount) == 0);
--	atomic_set(&pcci->pcci_refcount, 1);
--	pcci->pcci_type = type;
--	pcci->pcci_attr_valid = false;
--}
--
- static int __pcc_inode_create(struct pcc_dataset *dataset,
- 			      struct lu_fid *fid,
- 			      struct dentry **dentry)
-@@ -1744,38 +2004,37 @@ int pcc_inode_create_fini(struct pcc_dataset *dataset, struct inode *inode,
- 	pcci = kmem_cache_zalloc(pcc_inode_slab, GFP_NOFS);
- 	if (!pcci) {
- 		rc = -ENOMEM;
--		goto out_unlock;
-+		goto out_put;
- 	}
- 
- 	rc = pcc_inode_store_ugpid(pcc_dentry, old_cred->suid,
- 				   old_cred->sgid);
- 	if (rc)
--		goto out_unlock;
-+		goto out_put;
- 
- 	pcc_inode_init(pcci, ll_i2info(inode));
- 	pcc_inode_attach_init(dataset, pcci, pcc_dentry, LU_PCC_READWRITE);
--	/* Set the layout generation of newly created file with 0 */
--	pcc_layout_gen_set(pcci, 0);
- 
--out_unlock:
-+	rc = pcc_layout_xattr_set(pcci, 0);
- 	if (rc) {
--		int rc2;
-+		(void) pcc_inode_remove(inode, pcci->pcci_path.dentry);
-+		pcc_inode_put(pcci);
-+		goto out_unlock;
-+	}
- 
--		rc2 = vfs_unlink(pcc_dentry->d_parent->d_inode,
--				 pcc_dentry, NULL);
--		if (rc2)
--			CWARN("%s: failed to unlink PCC file %.*s, rc = %d\n",
--			      ll_i2sbi(inode)->ll_fsname,
--			      pcc_dentry->d_name.len, pcc_dentry->d_name.name,
--			      rc2);
-+	/* Set the layout generation of newly created file with 0 */
-+	pcc_layout_gen_set(pcci, 0);
- 
-+out_put:
-+	if (rc) {
-+		(void) pcc_inode_remove(inode, pcc_dentry);
- 		dput(pcc_dentry);
--	}
- 
-+		kmem_cache_free(pcc_inode_slab, pcci);
-+	}
-+out_unlock:
- 	pcc_inode_unlock(inode);
- 	revert_creds(old_cred);
--	if (rc)
--		kmem_cache_free(pcc_inode_slab, pcci);
- 
- 	return rc;
- }
-@@ -1919,16 +2178,9 @@ int pcc_readwrite_attach(struct file *file, struct inode *inode,
- 	fput(pcc_filp);
- out_dentry:
- 	if (rc) {
--		int rc2;
--
- 		old_cred = override_creds(pcc_super_cred(inode->i_sb));
--		rc2 = vfs_unlink(dentry->d_parent->d_inode, dentry, NULL);
-+		(void) pcc_inode_remove(inode, dentry);
- 		revert_creds(old_cred);
--		if (rc2)
--			CWARN("%s: failed to unlink PCC file %.*s, rc = %d\n",
--			      ll_i2sbi(inode)->ll_fsname, dentry->d_name.len,
--			      dentry->d_name.name, rc2);
--
- 		dput(dentry);
- 	}
- out_dataset_put:
-@@ -1945,6 +2197,7 @@ int pcc_readwrite_attach_fini(struct file *file, struct inode *inode,
- 	struct pcc_inode *pcci;
- 	u32 gen2;
- 
-+	old_cred = override_creds(pcc_super_cred(inode->i_sb));
- 	pcc_inode_lock(inode);
- 	pcci = ll_i2pcci(inode);
- 	lli->lli_pcc_state &= ~PCC_STATE_FL_ATTACHING;
-@@ -1962,6 +2215,10 @@ int pcc_readwrite_attach_fini(struct file *file, struct inode *inode,
- 	}
- 
- 	LASSERT(attached);
-+	rc = pcc_layout_xattr_set(pcci, gen);
-+	if (rc)
-+		goto out_put;
-+
- 	rc = ll_layout_refresh(inode, &gen2);
- 	if (!rc) {
- 		if (gen2 == gen) {
-@@ -1977,13 +2234,12 @@ int pcc_readwrite_attach_fini(struct file *file, struct inode *inode,
- 
- out_put:
- 	if (rc) {
--		old_cred = override_creds(pcc_super_cred(inode->i_sb));
--		pcc_inode_remove(pcci);
--		revert_creds(old_cred);
-+		(void) pcc_inode_remove(inode, pcci->pcci_path.dentry);
- 		pcc_inode_put(pcci);
- 	}
- out_unlock:
- 	pcc_inode_unlock(inode);
-+	revert_creds(old_cred);
- 	return rc;
- }
- 
-diff --git a/fs/lustre/llite/pcc.h b/fs/lustre/llite/pcc.h
-index f2b57f9..4947911 100644
---- a/fs/lustre/llite/pcc.h
-+++ b/fs/lustre/llite/pcc.h
-@@ -91,12 +91,23 @@ struct pcc_matcher {
- 	struct qstr	*pm_name;
- };
- 
-+enum pcc_dataset_flags {
-+	PCC_DATASET_NONE	= 0x0,
-+	/* Try auto attach at open, disabled by default */
-+	PCC_DATASET_OPEN_ATTACH	= 0x1,
-+	/* PCC backend is only used for RW-PCC */
-+	PCC_DATASET_RWPCC	= 0x2,
-+	/* PCC backend is only used for RO-PCC */
-+	PCC_DATASET_ROPCC	= 0x4,
-+	/* PCC backend provides caching services for both RW-PCC and RO-PCC */
-+	PCC_DATASET_PCC_ALL	= PCC_DATASET_RWPCC | PCC_DATASET_ROPCC,
-+};
-+
- struct pcc_dataset {
- 	u32			pccd_rwid;	 /* Archive ID */
- 	u32			pccd_roid;	 /* Readonly ID */
- 	struct pcc_match_rule	pccd_rule;	 /* Match rule */
--	u32			pccd_rwonly:1, /* Only use as RW-PCC */
--				pccd_roonly:1; /* Only use as RO-PCC */
-+	enum pcc_dataset_flags	pccd_flags;	 /* flags of PCC backend */
- 	char			pccd_pathname[PATH_MAX]; /* full path */
- 	struct path		pccd_path;	 /* Root path */
- 	struct list_head	pccd_linkage;  /* Linked to pccs_datasets */
-@@ -105,7 +116,7 @@ struct pcc_dataset {
- 
- struct pcc_super {
- 	/* Protect pccs_datasets */
--	spinlock_t		 pccs_lock;
-+	struct rw_semaphore	 pccs_rw_sem;
- 	/* List of datasets */
- 	struct list_head	 pccs_datasets;
- 	/* creds of process who forced instantiation of super block */
-@@ -158,6 +169,7 @@ struct pcc_cmd {
- 			u32			 pccc_roid;
- 			struct list_head	 pccc_conds;
- 			char			*pccc_conds_str;
-+			enum pcc_dataset_flags	 pccc_flags;
- 		} pccc_add;
- 		struct pcc_cmd_del {
- 			u32			 pccc_pad;
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index 27e0ca5..792d946 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -2049,6 +2049,7 @@ static int lov_object_layout_get(const struct lu_env *env,
- 	cl->cl_size = lov_comp_md_size(lsm);
- 	cl->cl_layout_gen = lsm->lsm_layout_gen;
- 	cl->cl_dom_comp_size = 0;
-+	cl->cl_is_released = lsm->lsm_is_released;
- 	if (lsm_is_composite(lsm->lsm_magic)) {
- 		struct lov_stripe_md_entry *lsme = lsm->lsm_entries[0];
- 
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index b024a44..2f9687e 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -2104,6 +2104,8 @@ enum lu_pcc_state_flags {
- 	PCC_STATE_FL_ATTR_VALID		= 0x01,
- 	/* The file is being attached into PCC */
- 	PCC_STATE_FL_ATTACHING		= 0x02,
-+	/* Allow to auto attach at open */
-+	PCC_STATE_FL_OPEN_ATTACH	= 0x04,
- };
- 
- struct lu_pcc_state {
+ 	kset_unregister(lustre_kset);
 -- 
 1.8.3.1
