@@ -1,67 +1,94 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:44 -0500
-Subject: [lustre-devel] [PATCH 596/622] lustre: ptlrpc: show target name in
- req_history
+Date: Thu, 27 Feb 2020 16:17:45 -0500
+Subject: [lustre-devel] [PATCH 597/622] lustre: dom: check read-on-open
+ buffer presents in reply
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-597-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-598-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-Currently the req_history tracing shows the "self" NID as the second
-field.  However, this is not very useful since there may be a number
-of different targets on the same server, and since the logs are all
-collected directly on the server we already know the local NID.
+The ll_dom_finish_open() uses req_capsule_has_field() wronly,
+it check only format but not buffer presence in reply, that
+causes unneeded console errors about missing buffer later in
+req_capsule_server_get()
 
-Instead of printing the "self" NID, store the target name as the
-second field, if that is available, so that we can determine which
-target the RPC was intended for.  This makes it easier to debug
-problems with bad clients and isolate traffic for a specific target.
+Patch replaces that with req_capsule_field_present() to check
+if server pack that field in reply or not and properly skip
+responses from an old server.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11644
-Lustre-commit: 83b6c6608e94 ("LU-11644 ptlrpc: show target name in req_history")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/37193
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Nathaniel Clark <nclark@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13136
+Lustre-commit: 58bea527100b ("LU-13136 dom: check read-on-open buffer presents in reply")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/37249
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Stephane Thiell <sthiell@stanford.edu>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/lproc_ptlrpc.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ fs/lustre/include/lustre_req_layout.h | 3 +++
+ fs/lustre/llite/file.c                | 4 ++--
+ fs/lustre/ptlrpc/layout.c             | 7 ++++---
+ 3 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index d52a08a..f34aec3 100644
---- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -956,7 +956,6 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+diff --git a/fs/lustre/include/lustre_req_layout.h b/fs/lustre/include/lustre_req_layout.h
+index feb5e77..ea6baef 100644
+--- a/fs/lustre/include/lustre_req_layout.h
++++ b/fs/lustre/include/lustre_req_layout.h
+@@ -112,6 +112,9 @@ u32 req_capsule_fmt_size(u32 magic, const struct req_format *fmt,
+ int req_capsule_has_field(const struct req_capsule *pill,
+ 			  const struct req_msg_field *field,
+ 			  enum req_location loc);
++int req_capsule_field_present(const struct req_capsule *pill,
++			      const struct req_msg_field *field,
++			      enum req_location loc);
+ void req_capsule_shrink(struct req_capsule *pill,
+ 			const struct req_msg_field *field,
+ 			u32 newlen, enum req_location loc);
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index a3c36a7..c7233bf 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -459,8 +459,8 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 	if (!obj)
+ 		return;
  
- 		req = srhi->srhi_req;
+-	if (!req_capsule_has_field(&req->rq_pill, &RMF_NIOBUF_INLINE,
+-				   RCL_SERVER))
++	if (!req_capsule_field_present(&req->rq_pill, &RMF_NIOBUF_INLINE,
++				       RCL_SERVER))
+ 		return;
  
--		libcfs_nid2str_r(req->rq_self, nidstr, sizeof(nidstr));
- 		arrival.tv_sec = req->rq_arrival_time.tv_sec;
- 		arrival.tv_nsec = req->rq_arrival_time.tv_nsec;
- 		sent.tv_sec = req->rq_sent;
-@@ -970,8 +969,13 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
- 		 * parser. Currently I only print stuff here I know is OK
- 		 * to look at coz it was set up in request_in_callback()!!!
- 		 */
--		seq_printf(s, "%lld:%s:%s:x%llu:%d:%s:%lld.%06lld:%lld.%06llds(%+lld.0s) ",
--			   req->rq_history_seq, nidstr,
-+		seq_printf(s,
-+			   "%lld:%s:%s:x%llu:%d:%s:%lld.%06lld:%lld.%06llds(%+lld.0s) ",
-+			   req->rq_history_seq,
-+			   req->rq_export && req->rq_export->exp_obd ?
-+				req->rq_export->exp_obd->obd_name :
-+				libcfs_nid2str_r(req->rq_self, nidstr,
-+						 sizeof(nidstr)),
- 			   libcfs_id2str(req->rq_peer), req->rq_xid,
- 			   req->rq_reqlen, ptlrpc_rqphase2str(req),
- 			   (s64)req->rq_arrival_time.tv_sec,
+ 	rnb = req_capsule_server_get(&req->rq_pill, &RMF_NIOBUF_INLINE);
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index 06db86d..4213fb2 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -2268,9 +2268,9 @@ int req_capsule_has_field(const struct req_capsule *pill,
+  * Returns a non-zero value if the given @field is present in the given
+  * @pill's PTLRPC request or reply (@loc), else it returns 0.
+  */
+-static int req_capsule_field_present(const struct req_capsule *pill,
+-				     const struct req_msg_field *field,
+-				     enum req_location loc)
++int req_capsule_field_present(const struct req_capsule *pill,
++			      const struct req_msg_field *field,
++			      enum req_location loc)
+ {
+ 	u32 offset;
+ 
+@@ -2280,6 +2280,7 @@ static int req_capsule_field_present(const struct req_capsule *pill,
+ 	offset = __req_capsule_offset(pill, field, loc);
+ 	return lustre_msg_bufcount(__req_msg(pill, loc)) > offset;
+ }
++EXPORT_SYMBOL(req_capsule_field_present);
+ 
+ /**
+  * This function shrinks the size of the _buffer_ of the @pill's PTLRPC
 -- 
 1.8.3.1
