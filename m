@@ -1,105 +1,131 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:41 -0500
-Subject: [lustre-devel] [PATCH 473/622] lnet: o2iblnd: remove some unused
- fields.
+Date: Thu, 27 Feb 2020 16:15:44 -0500
+Subject: [lustre-devel] [PATCH 476/622] lustre: llite: Improve readahead RPC
+ issuance
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-474-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-477-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Fields kib_min_reconnect_interval kib_max_reconnect_interval kib_ntx
-are never used or set.
+lov_io_submit receives a range of pages, then adds pages in
+to a batch until it hits a page which is not in the stripe
+associated with this lov object.  This means that if a
+readahead page range hits the same stripe more than once,
+we will issue multiple I/Os, even if the pages would fit in
+one RPC.
 
-ibh_mr_shift is set but never used;
-rx_status is used (in a debug message) but never set.
+This is unnecessary - Just submit all these pages at once.
 
-Remove them all.
+mpirun -n 2 $IOR -s 2000 -t 47K -b 47K -k -r -E -o $FILE
 
-We could possibly remove ibh_mr_size too. It is only used
-for an error message.
+Without patch:
+osc.lustre-OST0001-osc-ffff8fe82c952000.rpc_stats=
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 68c04b8fdd5d ("LU-6142 o2iblnd: remove some unused fields.")
-Signed-off-by: Mr NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/35891
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
+                        read                    write
+pages per rpc         rpcs   % cum % |       rpcs   % cum %
+1:                     118  56  56   |          0   0   0
+2:                       0   0  56   |          0   0   0
+4:                       0   0  56   |          0   0   0
+8:                       0   0  56   |          0   0   0
+16:                      5   2  58   |          0   0   0
+32:                      0   0  58   |          0   0   0
+64:                      0   0  58   |          0   0   0
+128:                    21  10  68   |          0   0   0
+256:                    25  11  80   |          0   0   0
+512:                    10   4  85   |          0   0   0
+1024:                   31  14 100   |          0   0   0
+
+osc.lustre-OST0002-osc-ffff8fe82c952000.rpc_stats=
+                        read                    write
+pages per rpc         rpcs   % cum % |       rpcs   % cum %
+1:                       5   6   6   |          0   0   0
+2:                       0   0   6   |          0   0   0
+4:                       0   0   6   |          0   0   0
+8:                       0   0   6   |          0   0   0
+16:                      0   0   6   |          0   0   0
+32:                      0   0   6   |          0   0   0
+64:                      0   0   6   |          0   0   0
+128:                    19  23  29   |          0   0   0
+256:                    19  23  52   |          0   0   0
+512:                     5   6  58   |          0   0   0
+1024:                   34  41 100   |          0   0   0
+
+With patch:
+osc.lustre-OST0001-osc-ffff8fe7a7227800.rpc_stats=
+                        read                    write
+pages per rpc         rpcs   % cum % |       rpcs   % cum %
+1:                      12  17  17   |          0   0   0
+2:                       0   0  17   |          0   0   0
+4:                       0   0  17   |          0   0   0
+8:                       0   0  17   |          0   0   0
+16:                      5   7  24   |          0   0   0
+32:                      0   0  24   |          0   0   0
+64:                      5   7  31   |          0   0   0
+128:                     6   8  40   |          0   0   0
+256:                     1   1  42   |          0   0   0
+512:                     2   2  44   |          0   0   0
+1024:                   38  55 100   |          0   0   0
+
+osc.lustre-OST0002-osc-ffff8fe7a7227800.rpc_stats=
+                        read                    write
+pages per rpc         rpcs   % cum % |       rpcs   % cum %
+1:                       0   0   0   |          0   0   0
+2:                       0   0   0   |          0   0   0
+4:                       0   0   0   |          0   0   0
+8:                       0   0   0   |          0   0   0
+16:                      0   0   0   |          0   0   0
+32:                      0   0   0   |          0   0   0
+64:                      4   7   7   |          0   0   0
+128:                     7  13  21   |          0   0   0
+256:                     0   0  21   |          0   0   0
+512:                     3   5  26   |          0   0   0
+1024:                   38  73 100   |          0   0   0
+
+Note the much larger # of smaller RPC issued without the patch.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12533
+Lustre-commit: 05b9da4fd124 ("LU-12533 llite: Improve readahead RPC issuance")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35458
+Reviewed-by: Li Xi <lixi@ddn.com>
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c | 7 +------
- net/lnet/klnds/o2iblnd/o2iblnd.h | 5 -----
- 2 files changed, 1 insertion(+), 11 deletions(-)
+ fs/lustre/lov/lov_io.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index f3176e1..278823f 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2303,7 +2303,6 @@ static int kiblnd_net_init_pools(struct kib_net *net, struct lnet_ni *ni,
- static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
- {
- 	struct ib_device_attr *dev_attr = &hdev->ibh_ibdev->attrs;
--	int rc = 0;
+diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
+index 6e86efa..fbed3de 100644
+--- a/fs/lustre/lov/lov_io.c
++++ b/fs/lustre/lov/lov_io.c
+@@ -1081,6 +1081,7 @@ static int lov_io_submit(const struct lu_env *env,
+ 	struct lov_io_sub *sub;
+ 	struct cl_page_list *plist = &lov_env_info(env)->lti_plist;
+ 	struct cl_page *page;
++	struct cl_page *tmp;
+ 	int index;
+ 	int rc = 0;
  
- 	/*
- 	 * It's safe to assume a HCA can handle a page size
-@@ -2326,15 +2325,11 @@ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
- 			hdev->ibh_dev->ibd_dev_caps |= IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT;
- 	} else {
- 		CERROR("IB device does not support FMRs nor FastRegs, can't register memory: %d\n",
--		       rc);
-+		       -ENXIO);
- 		return -ENXIO;
- 	}
+@@ -1105,10 +1106,10 @@ static int lov_io_submit(const struct lu_env *env,
+ 		cl_page_list_move(&cl2q->c2_qin, qin, page);
  
- 	hdev->ibh_mr_size = dev_attr->max_mr_size;
--	if (hdev->ibh_mr_size == ~0ULL) {
--		hdev->ibh_mr_shift = 64;
--		return 0;
--	}
+ 		index = lov_page_index(page);
+-		while (qin->pl_nr > 0) {
+-			page = cl_page_list_first(qin);
++		cl_page_list_for_each_safe(page, tmp, qin) {
++			/* this page is not on this stripe */
+ 			if (index != lov_page_index(page))
+-				break;
++				continue;
  
- 	CERROR("Invalid mr size: %#llx\n", hdev->ibh_mr_size);
- 	return -EINVAL;
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 1285ab1..2f2337a 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -76,12 +76,9 @@
- struct kib_tunables {
- 	int *kib_dev_failover;		/* HCA failover */
- 	unsigned int *kib_service;	/* IB service number */
--	int *kib_min_reconnect_interval; /* first failed connection retry... */
--	int *kib_max_reconnect_interval; /* exponentially increasing to this */
- 	int *kib_cksum;			/* checksum struct kib_msg? */
- 	int *kib_timeout;		/* comms timeout (seconds) */
- 	int *kib_keepalive;		/* keepalive timeout (seconds) */
--	int *kib_ntx;			/* # tx descs */
- 	char **kib_default_ipif;	/* default IPoIB interface */
- 	int *kib_retry_count;
- 	int *kib_rnr_retry_count;
-@@ -178,7 +175,6 @@ struct kib_hca_dev {
- 	int			ibh_page_shift;	/* page shift of current HCA */
- 	int			ibh_page_size;	/* page size of current HCA */
- 	u64			ibh_page_mask;	/* page mask of current HCA */
--	int			ibh_mr_shift;	/* bits shift of max MR size */
- 	u64			ibh_mr_size;	/* size of MR */
- 	struct ib_pd		*ibh_pd;	/* PD */
- 	struct kib_dev		*ibh_dev;	/* owner */
-@@ -492,7 +488,6 @@ struct kib_rx {					/* receive message */
- 	struct list_head	rx_list;	/* queue for attention */
- 	struct kib_conn        *rx_conn;	/* owning conn */
- 	int			rx_nob;		/* # bytes received (-1 while posted) */
--	enum ib_wc_status	rx_status;	/* completion status */
- 	struct kib_msg	       *rx_msg;		/* message buffer (host vaddr) */
- 	u64			rx_msgaddr;	/* message buffer (I/O addr) */
- 	DEFINE_DMA_UNMAP_ADDR(rx_msgunmap);	/* for dma_unmap_single() */
+ 			cl_page_list_move(&cl2q->c2_qin, qin, page);
+ 		}
 -- 
 1.8.3.1
