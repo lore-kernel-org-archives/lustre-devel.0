@@ -1,71 +1,167 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:06 -0500
-Subject: [lustre-devel] [PATCH 258/622] lustre: pcc: Reserve a new
- connection flag for PCC
+Date: Thu, 27 Feb 2020 16:12:15 -0500
+Subject: [lustre-devel] [PATCH 267/622] lustre: osd: Set max ea size to
+ XATTR_SIZE_MAX
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-259-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-268-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Qian Yingjin <qian@ddn.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Reserve OBD_CONNECT2_PCC connection flag that will be set
-(in ocd_connect_flags2) if a Lustre server or a client supports
-Persistent Client Cache (PCC).
+Lustre currently limits EA size to either ~1 MiB (ldiskfs)
+or 32K (ZFS).  VFS has its own limit, XATTR_SIZE_MAX,
+which we must respect to interoperate correctly with
+userspace tools like tar, getattr, and the getxattr()
+syscall.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10092
-Lustre-commit: 93aa68404669 ("LU-10092 pcc: Reserve a new connection flag for PCC")
-Signed-off-by: Qian Yingjin <qian@ddn.com>
-Reviewed-on: https://review.whamcloud.com/34356
+Set this as the new max EA size for both ldiskfs and ZFS.
+
+(The current 32K on ZFS is too small for
+LOV_MAX_STRIPE_COUNT [2000] files, so needs to be raised
+regardless.)
+
+In order to use this correctly, we have to use the real ea
+size on the client.  The previous code for maximum ea size
+on the client (KEY_MAX_EASIZE, llite.max_easize) used a
+calculated value based on number of targets.
+
+With one exception, the mdc code already uses the default
+ea size rather than the max.  Default ea size adjusts
+automatically to the largest size sent by the server.
+
+The exception is the open code, which uses the max so it
+never has to resend a layout request.  This patch changes
+it to use default, which means that the first time a very
+widely striped file is opened, the open will be resent.
+
+Add limit checks on client & server so the xattr size limit
+is honored.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11868
+Lustre-commit: 3ec712bd183a ("LU-11868 osd: Set max ea size to XATTR_SIZE_MAX")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34058
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lprocfs_status.c    | 1 +
- fs/lustre/ptlrpc/wiretest.c            | 2 ++
- include/uapi/linux/lustre/lustre_idl.h | 1 +
- 3 files changed, 4 insertions(+)
+ fs/lustre/include/obd.h     |  7 +++++++
+ fs/lustre/llite/llite_lib.c |  4 ++++
+ fs/lustre/lov/lov_obd.c     |  5 +----
+ fs/lustre/mdc/mdc_locks.c   | 12 ++++++------
+ 4 files changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index cdf25ed..254a600 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -123,6 +123,7 @@
- 	"unknown",		/* 0x200 */
- 	"selinux_policy",	/* 0x400 */
- 	"lsom",			/* 0x800 */
-+	"pcc",			/* 0x1000 */
- 	NULL
- };
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 2195f85..687b54b 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -154,6 +154,13 @@ enum obd_cl_sem_lock_class {
+  */
+ #define OBD_MAX_DEFAULT_EA_SIZE		4096
  
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 7cb6d74..22447e2 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1148,6 +1148,8 @@ void lustre_assert_wire_constants(void)
- 		 OBD_CONNECT2_SELINUX_POLICY);
- 	LASSERTF(OBD_CONNECT2_LSOM == 0x800ULL, "found 0x%.16llxULL\n",
- 		 OBD_CONNECT2_LSOM);
-+	LASSERTF(OBD_CONNECT2_PCC == 0x1000ULL, "found 0x%.16llxULL\n",
-+		 OBD_CONNECT2_PCC);
- 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
- 		 (unsigned int)OBD_CKSUM_CRC32);
- 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 6b9a623..46c3369 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -807,6 +807,7 @@ struct ptlrpc_body_v2 {
- #define OBD_CONNECT2_ARCHIVE_ID_ARRAY  0x100ULL	/* store HSM archive_id in array */
- #define OBD_CONNECT2_SELINUX_POLICY    0x400ULL	/* has client SELinux policy */
- #define OBD_CONNECT2_LSOM	       0x800ULL	/* LSOM support */
-+#define OBD_CONNECT2_PCC	       0x1000ULL /* Persistent Client Cache */
++/*
++ * Lustre can handle larger xattrs internally, but we must respect the Linux
++ * VFS limitation or tools like tar cannot interact with Lustre volumes
++ * correctly.
++ */
++#define OBD_MAX_EA_SIZE		XATTR_SIZE_MAX
++
+ struct mdc_rpc_lock;
+ struct obd_import;
+ struct client_obd {
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 347bdd6..aadde3f 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -663,12 +663,16 @@ int ll_get_max_mdsize(struct ll_sb_info *sbi, int *lmmsize)
+ 		return rc;
+ 	}
  
- /* XXX README XXX:
-  * Please DO NOT add flag values here before first ensuring that this same
++	CDEBUG(D_INFO, "max LOV ea size: %d\n", *lmmsize);
++
+ 	size = sizeof(int);
+ 	rc = obd_get_info(NULL, sbi->ll_md_exp, sizeof(KEY_MAX_EASIZE),
+ 			  KEY_MAX_EASIZE, &size, lmmsize);
+ 	if (rc)
+ 		CERROR("Get max mdsize error rc %d\n", rc);
+ 
++	CDEBUG(D_INFO, "max LMV ea size: %d\n", *lmmsize);
++
+ 	return rc;
+ }
+ 
+diff --git a/fs/lustre/lov/lov_obd.c b/fs/lustre/lov/lov_obd.c
+index 240cc6f9..3a90e7e 100644
+--- a/fs/lustre/lov/lov_obd.c
++++ b/fs/lustre/lov/lov_obd.c
+@@ -1162,10 +1162,7 @@ static int lov_get_info(const struct lu_env *env, struct obd_export *exp,
+ 	lov_tgts_getref(obddev);
+ 
+ 	if (KEY_IS(KEY_MAX_EASIZE)) {
+-		u32 max_stripe_count = min_t(u32, ld->ld_active_tgt_count,
+-					     LOV_MAX_STRIPE_COUNT);
+-
+-		*((u32 *)val) = lov_mds_md_size(max_stripe_count, LOV_MAGIC_V3);
++		*((u32 *)val) = exp->exp_connect_data.ocd_max_easize;
+ 	} else if (KEY_IS(KEY_DEFAULT_EASIZE)) {
+ 		u32 def_stripe_count = min_t(u32, ld->ld_default_stripe_count,
+ 					     LOV_MAX_STRIPE_COUNT);
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index 019eb35..f6273ef 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -256,12 +256,15 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+ 	struct ldlm_intent *lit;
+ 	const void *lmm = op_data->op_data;
+ 	u32 lmmsize = op_data->op_data_size;
++	u32 mdt_md_capsule_size;
+ 	LIST_HEAD(cancels);
+ 	int count = 0;
+ 	enum ldlm_mode mode;
+ 	int rc;
+ 	int repsize, repsize_estimate;
+ 
++	mdt_md_capsule_size = obddev->u.cli.cl_default_mds_easize;
++
+ 	it->it_create_mode = (it->it_create_mode & ~S_IFMT) | S_IFREG;
+ 
+ 	/* XXX: openlock is not cancelled for cross-refs. */
+@@ -348,7 +351,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+ 		      lmmsize);
+ 
+ 	req_capsule_set_size(&req->rq_pill, &RMF_MDT_MD, RCL_SERVER,
+-			     obddev->u.cli.cl_max_mds_easize);
++			     mdt_md_capsule_size);
+ 	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, acl_bufsize);
+ 
+ 	if (!(it->it_op & IT_CREAT) && it->it_op & IT_OPEN &&
+@@ -387,7 +390,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+ 				      lustre_msg_early_size());
+ 	/* Estimate free space for DoM files in repbuf */
+ 	repsize_estimate = repsize - (req->rq_replen -
+-			   obddev->u.cli.cl_max_mds_easize +
++			   mdt_md_capsule_size +
+ 			   sizeof(struct lov_comp_md_v1) +
+ 			   sizeof(struct lov_comp_md_entry_v1) +
+ 			   lov_mds_md_size(0, LOV_MAGIC_V3));
+@@ -539,10 +542,7 @@ static int mdc_save_lovea(struct ptlrpc_request *req,
+ 	lit = req_capsule_client_get(&req->rq_pill, &RMF_LDLM_INTENT);
+ 	lit->opc = (u64)it->it_op;
+ 
+-	if (obddev->u.cli.cl_default_mds_easize > 0)
+-		easize = obddev->u.cli.cl_default_mds_easize;
+-	else
+-		easize = obddev->u.cli.cl_max_mds_easize;
++	easize = obddev->u.cli.cl_default_mds_easize;
+ 
+ 	/* pack the intended request */
+ 	mdc_getattr_pack(req, valid, it->it_flags, op_data, easize);
 -- 
 1.8.3.1
