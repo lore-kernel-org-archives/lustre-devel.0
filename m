@@ -1,78 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:59 -0500
-Subject: [lustre-devel] [PATCH 551/622] lustre: llite: don't cache
- MDS_OPEN_LOCK for volatile files
+Date: Thu, 27 Feb 2020 16:17:05 -0500
+Subject: [lustre-devel] [PATCH 557/622] lustre: lmv: fix to return correct
+ MDT count
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-552-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-558-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The kernels knfsd constantly opens and closes files for each
-access which can result in a continuous stream of open+close RPCs
-being send to the MDS. To avoid this Lustre created a special
-flag, ll_nfs_dentry, which enables caching of the MDS_OPEN_LOCK
-on the client. The fhandles API also uses the same exportfs layer
-as NFS which indirectly ends up caching the MDS_OPEN_LOCK as well.
-This is okay for normal files except for Lustre's special volatile
-files that are used for HSM restore. It is expected on the last
-close of a Lustre volatile file that it is no longer accessable.
-To ensure this behavior is kept don't cache MDS_OPEN_LOCK for
-volatile files.
+From: Wang Shilong <wshilong@ddn.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8585
-Lustre-commit: 6a3a842add0e ("LU-8585 llite: don't cache MDS_OPEN_LOCK for volatile files")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/36641
+@ltd_tgts_size could be larger than actual MDT count,
+as we preallocate ltd_tgts and resize it if necessary.
+
+Fix it to use @ld_tgt_count instead.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12951
+Lustre-commit: 3aa8826aabc7 ("LU-12951 lmv: fix to return correct MDT count")
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-on: https://review.whamcloud.com/36713
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ fs/lustre/lmv/lmv_obd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index d196da8..a3c36a7 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -798,6 +798,7 @@ int ll_file_open(struct inode *inode, struct file *file)
- 	} else {
- 		LASSERT(*och_usecount == 0);
- 		if (!it->it_disposition) {
-+			struct dentry *dentry = file_dentry(file);
- 			struct ll_dentry_data *ldd;
- 
- 			/* We cannot just request lock handle now, new ELC code
-@@ -822,10 +823,13 @@ int ll_file_open(struct inode *inode, struct file *file)
- 			 * lookup path only, since ll_iget_for_nfs always calls
- 			 * ll_d_init().
- 			 */
--			ldd = ll_d2d(file->f_path.dentry);
-+			ldd = ll_d2d(dentry);
- 			if (ldd && ldd->lld_nfs_dentry) {
- 				ldd->lld_nfs_dentry = 0;
--				it->it_flags |= MDS_OPEN_LOCK;
-+				if (!filename_is_volatile(dentry->d_name.name,
-+							  dentry->d_name.len,
-+							  NULL))
-+					it->it_flags |= MDS_OPEN_LOCK;
- 			}
- 
- 			/*
-@@ -833,8 +837,7 @@ int ll_file_open(struct inode *inode, struct file *file)
- 			 * to get file with different fid.
- 			 */
- 			it->it_flags |= MDS_OPEN_BY_FID;
--			rc = ll_intent_file_open(file->f_path.dentry,
--						 NULL, 0, it);
-+			rc = ll_intent_file_open(dentry, NULL, 0, it);
- 			if (rc)
- 				goto out_openerr;
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index e92be25..ee52bba 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -2870,7 +2870,7 @@ static int lmv_get_info(const struct lu_env *env, struct obd_export *exp,
+ 			exp->exp_connect_data = *(struct obd_connect_data *)val;
+ 		return rc;
+ 	} else if (KEY_IS(KEY_TGT_COUNT)) {
+-		*((int *)val) = lmv->lmv_mdt_descs.ltd_tgts_size;
++		*((int *)val) = lmv->lmv_mdt_descs.ltd_lmv_desc.ld_tgt_count;
+ 		return 0;
+ 	}
  
 -- 
 1.8.3.1
