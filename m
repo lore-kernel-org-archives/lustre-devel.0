@@ -1,67 +1,127 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:08 -0500
-Subject: [lustre-devel] [PATCH 020/622] lnet: libcfs: remove unnecessary
- set_fs(KERNEL_DS)
+Date: Thu, 27 Feb 2020 16:08:06 -0500
+Subject: [lustre-devel] [PATCH 018/622] lustre: ptlrpc: Add QoS for uid and
+ gid in NRS-TBF
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-21-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-19-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mike Marciniszyn <mike.marciniszyn@intel.com>
+From: Teddy Chan <teddy@ddn.com>
 
-When we converted to using kernel_write(), we left some
-set_fs() calls that are not unnecessary.
-Remove them.
+This patch add a new QoS feature in TBF policy which could
+limits the rate based on uid or gid. The policy is able to
+limit the rate both on MDT and OSS site.
 
-Original OpenSFS version of this patch, as mentioned below,
-did the full conversion to kernel_write.
+The command for this feature is like:
+Start the tbf uid QoS on OST:
+    lctl set_param ost.OSS.*.nrs_policies="tbf uid"
+Limit the rate of ptlrpc requests of the uid 500
+    lctl set_param ost.OSS.*.nrs_tbf_rule=
+ "start tbf_name uid={500} rate=100"
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10560
-lustre-commit: b9a32054600a ("LU-10560 libcfs: Use kernel_write when appropriate")
-Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
-Reviewed-on: https://review.whamcloud.com/31154
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Start the tbf gid QoS on OST:
+    lctl set_param ost.OSS.*.nrs_policies="tbf gid"
+Limit the rate of ptlrpc requests of the gid 500
+    lctl set_param ost.OSS.*.nrs_tbf_rule=
+ "start tbf_name gid={500} rate=100"
+
+or use generic tbf rule to mix them on OST:
+    lctl set_param ost.OSS.*.nrs_policies="tbf"
+Limit the rate of ptlrpc requests of the uid 500 gid 500
+    lctl set_param ost.OSS.*.nrs_tbf_rule=
+ "start tbf_name uid={500}&gid={500} rate=100"
+
+Also, you can use the following rule to control all reqs
+to mds:
+Start the tbf uid QoS on MDS:
+    lctl set_param mds.MDS.*.nrs_policies="tbf uid"
+Limit the rate of ptlrpc requests of the uid 500
+    lctl set_param mds.MDS.*.nrs_tbf_rule=
+ "start tbf_name uid={500} rate=100"
+
+For the linux client we need to send the uid and gid
+information to the NRS-TBF handling on the servers.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9658
+Lustre-commit: e0cdde123c14 ("LU-9658 ptlrpc: Add QoS for uid and gid in NRS-TBF")
+Signed-off-by: Teddy Chan <teddy@ddn.com>
+Signed-off-by: Li Xi <lixi@ddn.com>
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/27608
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
-igned-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/libcfs/tracefile.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ fs/lustre/llite/vvp_object.c |  5 ++---
+ fs/lustre/obdclass/obdo.c    |  5 +++++
+ fs/lustre/osc/osc_request.c  | 10 ++++++++++
+ 3 files changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/net/lnet/libcfs/tracefile.c b/net/lnet/libcfs/tracefile.c
-index 3b29116..6e4cc31 100644
---- a/net/lnet/libcfs/tracefile.c
-+++ b/net/lnet/libcfs/tracefile.c
-@@ -807,7 +807,6 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 	struct cfs_trace_page *tage;
- 	struct cfs_trace_page *tmp;
- 	char *buf;
--	mm_segment_t __oldfs;
- 	int rc;
+diff --git a/fs/lustre/llite/vvp_object.c b/fs/lustre/llite/vvp_object.c
+index 24cde0d..eeb8823 100644
+--- a/fs/lustre/llite/vvp_object.c
++++ b/fs/lustre/llite/vvp_object.c
+@@ -196,7 +196,7 @@ static int vvp_object_glimpse(const struct lu_env *env,
+ static void vvp_req_attr_set(const struct lu_env *env, struct cl_object *obj,
+ 			     struct cl_req_attr *attr)
+ {
+-	u64 valid_flags = OBD_MD_FLTYPE;
++	u64 valid_flags = OBD_MD_FLTYPE | OBD_MD_FLUID | OBD_MD_FLGID;
+ 	struct inode *inode;
+ 	struct obdo *oa;
  
- 	down_write(&cfs_tracefile_sem);
-@@ -828,8 +827,6 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 		rc = 0;
- 		goto close;
- 	}
--	__oldfs = get_fs();
--	set_fs(KERNEL_DS);
+@@ -204,8 +204,7 @@ static void vvp_req_attr_set(const struct lu_env *env, struct cl_object *obj,
+ 	inode = vvp_object_inode(obj);
  
- 	/* ok, for now, just write the pages.  in the future we'll be building
- 	 * iobufs with the pages and calling generic_direct_IO
-@@ -851,7 +848,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 		list_del(&tage->linkage);
- 		cfs_tage_free(tage);
+ 	if (attr->cra_type == CRT_WRITE) {
+-		valid_flags |= OBD_MD_FLMTIME | OBD_MD_FLCTIME |
+-			       OBD_MD_FLUID | OBD_MD_FLGID;
++		valid_flags |= OBD_MD_FLMTIME | OBD_MD_FLCTIME;
+ 		obdo_set_o_projid(oa, ll_i2info(inode)->lli_projid);
  	}
--	set_fs(__oldfs);
+ 	obdo_from_inode(oa, inode, valid_flags & attr->cra_flags);
+diff --git a/fs/lustre/obdclass/obdo.c b/fs/lustre/obdclass/obdo.c
+index 1926896..e5475f1 100644
+--- a/fs/lustre/obdclass/obdo.c
++++ b/fs/lustre/obdclass/obdo.c
+@@ -144,6 +144,11 @@ void lustre_set_wire_obdo(const struct obd_connect_data *ocd,
+ 	if (!ocd)
+ 		return;
+ 
++	if (!(wobdo->o_valid & OBD_MD_FLUID))
++		wobdo->o_uid = from_kuid(&init_user_ns, current_uid());
++	if (!(wobdo->o_valid & OBD_MD_FLGID))
++		wobdo->o_gid = from_kgid(&init_user_ns, current_gid());
 +
- 	rc = vfs_fsync(filp, 1);
- 	if (rc)
- 		pr_err("sync returns %d\n", rc);
+ 	if (unlikely(!(ocd->ocd_connect_flags & OBD_CONNECT_FID)) &&
+ 	    fid_seq_is_echo(ostid_seq(&lobdo->o_oi))) {
+ 		/*
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 300dee5..99c9620 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -1184,6 +1184,16 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 
+ 	lustre_set_wire_obdo(&req->rq_import->imp_connect_data, &body->oa, oa);
+ 
++	/* For READ and WRITE, we can't fill o_uid and o_gid using from_kuid()
++	 * and from_kgid(), because they are asynchronous. Fortunately, variable
++	 * oa contains valid o_uid and o_gid in these two operations.
++	 * Besides, filling o_uid and o_gid is enough for nrs-tbf, see LU-9658.
++	 * OBD_MD_FLUID and OBD_MD_FLUID is not set in order to avoid breaking
++	 * other process logic
++	 */
++	body->oa.o_uid = oa->o_uid;
++	body->oa.o_gid = oa->o_gid;
++
+ 	obdo_to_ioobj(oa, ioobj);
+ 	ioobj->ioo_bufcnt = niocount;
+ 	/* The high bits of ioo_max_brw tells server _maximum_ number of bulks
 -- 
 1.8.3.1
