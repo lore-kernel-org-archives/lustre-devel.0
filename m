@@ -1,191 +1,179 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:30 -0500
-Subject: [lustre-devel] [PATCH 222/622] lustre: obd: use ldo_process_config
- for mdc and osc layer
+Date: Thu, 27 Feb 2020 16:11:31 -0500
+Subject: [lustre-devel] [PATCH 223/622] lnet: check for asymmetrical route
+ messages
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-223-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-224-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Both the mdc and osc layer use the lu_device infrastructure but
-we don't use ldo_process_config() which is preferred over the
-currently used obd_process_config() handling. Migrate to the
-lu_device ldo_process_config() for both mdc and osc layer.
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9855
-Lustre-commit: d12959c69fd4 ("LU-9855 obd: use ldo_process_config for mdc and osc layer")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/34106
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Asymmetrical routes can be an issue when debugging network,
+and allowing them also opens the door to attacks where hostile
+clients inject data to the servers.
+
+In order to prevent asymmetrical routes, add a new lnet kernel
+module option named 'lnet_drop_asym_route'. When set to non-zero,
+lnet_parse() will check if the message received from a remote peer
+is coming through a router that would normally be used by this node
+to reach the remote peer. If it is not the case, then it means we
+are dealing with an asymmetrical route message, and the message will
+be dropped.
+
+The check for asymmetrical route can also be switched on/off with
+the command 'lnetctl set drop_asym_route 0|1'. And this parameter is
+exported/imported in Yaml.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11894
+Lustre-commit: 4932febc1213 ("LU-11894 lnet: check for asymmetrical route messages")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/34119
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_dev.c      | 11 +++++++----
- fs/lustre/mdc/mdc_internal.h |  1 -
- fs/lustre/mdc/mdc_request.c  | 11 -----------
- fs/lustre/osc/osc_dev.c      | 11 +++++++----
- fs/lustre/osc/osc_request.c  | 14 --------------
- 5 files changed, 14 insertions(+), 34 deletions(-)
+ include/linux/lnet/lib-lnet.h |  1 +
+ net/lnet/lnet/api-ni.c        | 44 ++++++++++++++++++++++++++++++++++++++++
+ net/lnet/lnet/lib-move.c      | 47 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
 
-diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
-index 306b917..f23f6cf 100644
---- a/fs/lustre/mdc/mdc_dev.c
-+++ b/fs/lustre/mdc/mdc_dev.c
-@@ -35,6 +35,7 @@
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index d09fb4c..a6e64f6 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -507,6 +507,7 @@ struct lnet_ni *
+ extern unsigned int lnet_health_sensitivity;
+ extern unsigned int lnet_recovery_interval;
+ extern unsigned int lnet_peer_discovery_disabled;
++extern unsigned int lnet_drop_asym_route;
+ extern int portal_rotor;
  
- #include <obd_class.h>
- #include <lustre_osc.h>
-+#include <uapi/linux/lustre/lustre_param.h>
+ int lnet_lib_init(void);
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 3ee10da..e5f5c6c 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -126,6 +126,20 @@ static int recovery_interval_set(const char *val,
+ MODULE_PARM_DESC(lnet_peer_discovery_disabled,
+ 		 "Set to 1 to disable peer discovery on this node.");
  
- #include "mdc_internal.h"
- 
-@@ -1422,15 +1423,17 @@ struct lu_object *mdc_object_alloc(const struct lu_env *env,
- 	return obj;
++unsigned int lnet_drop_asym_route;
++static int drop_asym_route_set(const char *val, const struct kernel_param *kp);
++
++static struct kernel_param_ops param_ops_drop_asym_route = {
++	.set = drop_asym_route_set,
++	.get = param_get_int,
++};
++
++#define param_check_drop_asym_route(name, p)	\
++	__param_check(name, p, int)
++module_param(lnet_drop_asym_route, drop_asym_route, 0644);
++MODULE_PARM_DESC(lnet_drop_asym_route,
++		 "Set to 1 to drop asymmetrical route messages.");
++
+ unsigned int lnet_transaction_timeout = 50;
+ static int transaction_to_set(const char *val, const struct kernel_param *kp);
+ static struct kernel_param_ops param_ops_transaction_timeout = {
+@@ -292,6 +306,36 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
  }
  
--static int mdc_cl_process_config(const struct lu_env *env,
--				 struct lu_device *d, struct lustre_cfg *cfg)
-+static int mdc_process_config(const struct lu_env *env, struct lu_device *d,
-+			      struct lustre_cfg *cfg)
+ static int
++drop_asym_route_set(const char *val, const struct kernel_param *kp)
++{
++	int rc;
++	unsigned int *drop_asym_route = (unsigned int *)kp->arg;
++	unsigned long value;
++
++	rc = kstrtoul(val, 0, &value);
++	if (rc) {
++		CERROR("Invalid module parameter value for 'lnet_drop_asym_route'\n");
++		return rc;
++	}
++
++	/* The purpose of locking the api_mutex here is to ensure that
++	 * the correct value ends up stored properly.
++	 */
++	mutex_lock(&the_lnet.ln_api_mutex);
++
++	if (value == *drop_asym_route) {
++		mutex_unlock(&the_lnet.ln_api_mutex);
++		return 0;
++	}
++
++	*drop_asym_route = value;
++
++	mutex_unlock(&the_lnet.ln_api_mutex);
++
++	return 0;
++}
++
++static int
+ transaction_to_set(const char *val, const struct kernel_param *kp)
  {
--	return mdc_process_config(d->ld_obd, 0, cfg);
-+	size_t count  = class_modify_config(cfg, PARAM_MDC,
-+					    &d->ld_obd->obd_kset.kobj);
-+	return count > 0 ? 0 : count;
- }
+ 	unsigned int *transaction_to = (unsigned int *)kp->arg;
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 185c31a..809d2b6 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -3959,6 +3959,53 @@ void lnet_monitor_thr_stop(void)
+ 		goto drop;
+ 	}
  
- const struct lu_device_operations mdc_lu_ops = {
- 	.ldo_object_alloc	= mdc_object_alloc,
--	.ldo_process_config	= mdc_cl_process_config,
-+	.ldo_process_config	= mdc_process_config,
- 	.ldo_recovery_complete	= NULL,
- };
- 
-diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
-index 7a6ec81..a5fe164 100644
---- a/fs/lustre/mdc/mdc_internal.h
-+++ b/fs/lustre/mdc/mdc_internal.h
-@@ -93,7 +93,6 @@ int mdc_resource_get_unused(struct obd_export *exp, const struct lu_fid *fid,
- int mdc_fid_alloc(const struct lu_env *env, struct obd_export *exp,
- 		  struct lu_fid *fid, struct md_op_data *op_data);
- int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg);
--int mdc_process_config(struct obd_device *obd, u32 len, void *buf);
- 
- struct obd_client_handle;
- 
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index 4711288..c08a6ee 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -51,7 +51,6 @@
- #include <lustre_kernelcomm.h>
- #include <lustre_lmv.h>
- #include <lustre_log.h>
--#include <uapi/linux/lustre/lustre_param.h>
- #include <lustre_swab.h>
- #include <obd_class.h>
- #include <lustre_osc.h>
-@@ -2743,15 +2742,6 @@ static int mdc_cleanup(struct obd_device *obd)
- 	return osc_cleanup_common(obd);
- }
- 
--int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
--{
--	struct lustre_cfg *lcfg = buf;
--	size_t count  = class_modify_config(lcfg, PARAM_MDC,
--					    &obd->obd_kset.kobj);
--
--	return count > 0 ? 0 : count;
--}
--
- static const struct obd_ops mdc_obd_ops = {
- 	.owner			= THIS_MODULE,
- 	.setup			= mdc_setup,
-@@ -2770,7 +2760,6 @@ int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
- 	.fid_alloc		= mdc_fid_alloc,
- 	.import_event		= mdc_import_event,
- 	.get_info		= mdc_get_info,
--	.process_config		= mdc_process_config,
- 	.get_uuid		= mdc_get_uuid,
- 	.quotactl		= mdc_quotactl,
- };
-diff --git a/fs/lustre/osc/osc_dev.c b/fs/lustre/osc/osc_dev.c
-index b8bf75a..6469973 100644
---- a/fs/lustre/osc/osc_dev.c
-+++ b/fs/lustre/osc/osc_dev.c
-@@ -40,6 +40,7 @@
- /* class_name2obd() */
- #include <obd_class.h>
- #include <lustre_osc.h>
-+#include <uapi/linux/lustre/lustre_param.h>
- 
- #include "osc_internal.h"
- 
-@@ -161,15 +162,17 @@ struct lu_context_key osc_session_key = {
- /* type constructor/destructor: osc_type_{init,fini,start,stop}(). */
- LU_TYPE_INIT_FINI(osc, &osc_key, &osc_session_key);
- 
--static int osc_cl_process_config(const struct lu_env *env,
--				 struct lu_device *d, struct lustre_cfg *cfg)
-+static int osc_process_config(const struct lu_env *env, struct lu_device *d,
-+			      struct lustre_cfg *cfg)
- {
--	return osc_process_config_base(d->ld_obd, cfg);
-+	ssize_t count  = class_modify_config(cfg, PARAM_OSC,
-+					     &d->ld_obd->obd_kset.kobj);
-+	return count > 0 ? 0 : count;
- }
- 
- static const struct lu_device_operations osc_lu_ops = {
- 	.ldo_object_alloc	= osc_object_alloc,
--	.ldo_process_config	= osc_cl_process_config,
-+	.ldo_process_config	= osc_process_config,
- 	.ldo_recovery_complete	= NULL
- };
- 
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 6ce22c3..c55d5a9 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -47,7 +47,6 @@
- #include <lprocfs_status.h>
- #include <uapi/linux/lustre/lustre_ioctl.h>
- #include <lustre_obdo.h>
--#include <uapi/linux/lustre/lustre_param.h>
- #include <lustre_fid.h>
- #include <obd_class.h>
- #include <obd.h>
-@@ -3348,18 +3347,6 @@ int osc_cleanup_common(struct obd_device *obd)
- }
- EXPORT_SYMBOL(osc_cleanup_common);
- 
--int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg)
--{
--	ssize_t count  = class_modify_config(lcfg, PARAM_OSC,
--					     &obd->obd_kset.kobj);
--	return count > 0 ? 0 : count;
--}
--
--static int osc_process_config(struct obd_device *obd, u32 len, void *buf)
--{
--	return osc_process_config_base(obd, buf);
--}
--
- static const struct obd_ops osc_obd_ops = {
- 	.owner		= THIS_MODULE,
- 	.setup		= osc_setup,
-@@ -3379,7 +3366,6 @@ static int osc_process_config(struct obd_device *obd, u32 len, void *buf)
- 	.iocontrol	= osc_iocontrol,
- 	.set_info_async	= osc_set_info_async,
- 	.import_event	= osc_import_event,
--	.process_config	= osc_process_config,
- 	.quotactl	= osc_quotactl,
- };
- 
++	if (lnet_drop_asym_route && for_me &&
++	    LNET_NIDNET(src_nid) != LNET_NIDNET(from_nid)) {
++		struct lnet_net *net;
++		struct lnet_remotenet *rnet;
++		bool found = true;
++
++		/* we are dealing with a routed message,
++		 * so see if route to reach src_nid goes through from_nid
++		 */
++		lnet_net_lock(cpt);
++		net = lnet_get_net_locked(LNET_NIDNET(ni->ni_nid));
++		if (!net) {
++			lnet_net_unlock(cpt);
++			CERROR("net %s not found\n",
++			       libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
++			return -EPROTO;
++		}
++
++		rnet = lnet_find_rnet_locked(LNET_NIDNET(src_nid));
++		if (rnet) {
++			struct lnet_peer_ni *gw = NULL;
++			struct lnet_route *route;
++
++			list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
++				found = false;
++				gw = route->lr_gateway;
++				if (gw->lpni_net != net)
++					continue;
++				if (gw->lpni_nid == from_nid) {
++					found = true;
++					break;
++				}
++			}
++		}
++		lnet_net_unlock(cpt);
++		if (!found) {
++			/* we would not use from_nid to route a message to
++			 * src_nid
++			 * => asymmetric routing detected but forbidden
++			 */
++			CERROR("%s, src %s: Dropping asymmetrical route %s\n",
++			       libcfs_nid2str(from_nid),
++			       libcfs_nid2str(src_nid), lnet_msgtyp2str(type));
++			goto drop;
++		}
++	}
++
+ 	msg = kzalloc(sizeof(*msg), GFP_NOFS);
+ 	if (!msg) {
+ 		CERROR("%s, src %s: Dropping %s (out of memory)\n",
 -- 
 1.8.3.1
