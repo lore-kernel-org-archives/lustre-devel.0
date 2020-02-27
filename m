@@ -1,84 +1,62 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:20 -0500
-Subject: [lustre-devel] [PATCH 392/622] lustre: lu_object: Add missed
- qos_rr_init
+Date: Thu, 27 Feb 2020 16:14:24 -0500
+Subject: [lustre-devel] [PATCH 396/622] lnet: libcfs: Reduce memory frag due
+ to HA debug msg
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-393-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-397-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: Ann Koehler <amk@cray.com>
 
-The new lmv space hash code uses the lu_qos_rr struct, but
-forgot to init it fully.  Specifically, the spin lock isn't
-inited, causing failures.
+The dynamic allocation and freeing of Lustre trace pages has been
+shown to cause memory fragmentation that sometimes prevents
+applications from getting the contiguous memory they need to run. In
+one such occurrence over 99% of the messages were the matched open
+trace messages issued by mdc_close():
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12538
-Lustre-commit: 5e6a30cc2f34 ("LU-12538 lod: Add missed qos_rr_init")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35490
+DEBUG_REQ(D_HA, mod->mod_open_req, "matched open; tag %d", tag);
+
+D_HA is included in the default set of debug flags. This has proven
+to be quite useful in debugging connection issues particularly at
+mount time. So removing all HA message from the default tracing is
+not a good option.
+
+However, the matched open debug message has not proven itself to be
+as generally useful. So moving the message under a different debug
+flag, one that must be explicitly enabled, reduces the amount of
+default tracing and thereby helps reduce fragmentation without
+causing much loss of functionality. Using D_RPCTRACE to match the
+corresponding open debug message in mdc_set_open_replay_data.
+
+Cray-bug-id: LUS-7560
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12524
+Lustre-commit: 076a5961f20b ("LU-12524 libcfs: Reduce memory frag due to HA debug msg")
+Signed-off-by: Ann Koehler <amk@cray.com>
+Reviewed-on: https://review.whamcloud.com/35449
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lu_object.h | 1 +
- fs/lustre/lmv/lmv_obd.c       | 3 ++-
- fs/lustre/obdclass/lu_qos.c   | 7 +++++++
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ fs/lustre/mdc/mdc_request.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
-index 6b1064a..d2e84a3 100644
---- a/fs/lustre/include/lu_object.h
-+++ b/fs/lustre/include/lu_object.h
-@@ -1388,6 +1388,7 @@ struct lu_qos {
- 				 lq_reset:1;     /* zero current penalties */
- };
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index a26efa1..7bc6196 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -937,7 +937,7 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
  
-+void lu_qos_rr_init(struct lu_qos_rr *lqr);
- int lqos_add_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
- int lqos_del_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
- u64 lu_prandom_u64_max(u64 ep_ro);
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index ae799db..e9f9c36 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -1295,13 +1295,14 @@ static int lmv_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	INIT_LIST_HEAD(&lmv->lmv_qos.lq_svr_list);
- 	init_rwsem(&lmv->lmv_qos.lq_rw_sem);
- 	lmv->lmv_qos.lq_dirty = 1;
--	lmv->lmv_qos.lq_rr.lqr_dirty = 1;
- 	lmv->lmv_qos.lq_reset = 1;
- 	/* Default priority is toward free space balance */
- 	lmv->lmv_qos.lq_prio_free = 232;
- 	/* Default threshold for rr (roughly 17%) */
- 	lmv->lmv_qos.lq_threshold_rr = 43;
+ 		mod->mod_close_req = req;
  
-+	lu_qos_rr_init(&lmv->lmv_qos.lq_rr);
-+
- 	/*
- 	 * initialize rr_index to lower 32bit of netid, so that client
- 	 * can distribute subdirs evenly from the beginning.
-diff --git a/fs/lustre/obdclass/lu_qos.c b/fs/lustre/obdclass/lu_qos.c
-index 9fdcbc2..d4803e8 100644
---- a/fs/lustre/obdclass/lu_qos.c
-+++ b/fs/lustre/obdclass/lu_qos.c
-@@ -42,6 +42,13 @@
- #include <lustre_fid.h>
- #include <lu_object.h>
- 
-+void lu_qos_rr_init(struct lu_qos_rr *lqr)
-+{
-+	spin_lock_init(&lqr->lqr_alloc);
-+	lqr->lqr_dirty = 1;
-+}
-+EXPORT_SYMBOL(lu_qos_rr_init);
-+
- /**
-  * Add a new target to Quality of Service (QoS) target table.
-  *
+-		DEBUG_REQ(D_HA, mod->mod_open_req, "matched open");
++		DEBUG_REQ(D_RPCTRACE, mod->mod_open_req, "matched open");
+ 		/* We no longer want to preserve this open for replay even
+ 		 * though the open was committed. b=3632, b=3633
+ 		 */
 -- 
 1.8.3.1
