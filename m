@@ -1,46 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:26 -0500
-Subject: [lustre-devel] [PATCH 398/622] lustre: uapi: add unused enum
- obd_statfs_state
+Date: Thu, 27 Feb 2020 16:14:41 -0500
+Subject: [lustre-devel] [PATCH 413/622] lustre: llite: do not cache write
+ open lock for exec file
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-399-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-414-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Jinshan Xiong <jinshan.xiong@uber.com>
 
-The 3rd and 4th bit field of enum obd_statfs_state are for values
-that have been obsoleted since Lustre 1.6. Lets make this clear
-for end user applications.
+This is to avoid the problem that the MDT needs an extra lock
+revocation to make the file be able to execute.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12501
-Lustre-commit: e4d92a8a08ac ("LU-12501 utils: fix 'lfs df' printing loop")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35456
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4398
+Lustre-commit: 6dd9d57bc006 ("LU-4398 llite: do not cache write open lock for exec file")
+Signed-off-by: Jinshan Xiong <jinshan.xiong@uber.com>
+Signed-off-by: Gu Zheng <gzheng@ddn.com>
+Reviewed-on: https://review.whamcloud.com/32265
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_user.h | 2 ++
- 1 file changed, 2 insertions(+)
+ fs/lustre/llite/file.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 86f3111..9c849ce 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -102,6 +102,8 @@ enum obd_statfs_state {
- 	OS_STATE_DEGRADED	= 0x00000001, /**< RAID degraded/rebuilding */
- 	OS_STATE_READONLY	= 0x00000002, /**< filesystem is read-only */
- 	OS_STATE_NOPRECREATE	= 0x00000004, /**< no object precreation */
-+	OS_STATE_UNUSED1	= 0x00000008, /**< obsolete 1.6, was EROFS=30 */
-+	OS_STATE_UNUSED2	= 0x00000010, /**< obsolete 1.6, was EROFS=30 */
- 	OS_STATE_ENOSPC		= 0x00000020, /**< not enough free space */
- 	OS_STATE_ENOINO		= 0x00000040, /**< not enough inodes */
- 	OS_STATE_SUM		= 0x00000100, /**< aggregated for all tagrets */
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 6f418e0..35e31ad 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -360,7 +360,9 @@ static int ll_md_close(struct inode *inode, struct file *file)
+ 	}
+ 	mutex_unlock(&lli->lli_och_mutex);
+ 
+-	if (!md_lock_match(ll_i2mdexp(inode), flags, ll_inode2fid(inode),
++	/* LU-4398: do not cache write open lock if the file has exec bit */
++	if ((lockmode == LCK_CW && inode->i_mode & 0111) ||
++	    !md_lock_match(ll_i2mdexp(inode), flags, ll_inode2fid(inode),
+ 			   LDLM_IBITS, &policy, lockmode, &lockh))
+ 		rc = ll_md_real_close(inode, fd->fd_omode);
+ 
 -- 
 1.8.3.1
