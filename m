@@ -1,232 +1,234 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:29 -0500
-Subject: [lustre-devel] [PATCH 041/622] lustre: lmv: dir page is released
- while in use
+Date: Thu, 27 Feb 2020 16:08:43 -0500
+Subject: [lustre-devel] [PATCH 055/622] lustre: ldlm: handle lock converts
+ in cancel handler
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-42-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-56-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-When popping stripe dirent, if it reaches page end,
-stripe_dirent_next() releases current page and then reads next one,
-but current dirent is still in use, as will cause wrong values used,
-and trigger assertion.
+- Use cancel portals and high-priority handling for lock
+  converts. Update ldlm_cancel_handler to understand
+  LDLM_CONVERT RPC for that.
+- Use ns_dirty_age_limit for lock convert - don't convert too old
+  locks.
+- Check for empty converts and skip such
 
-This patch changes to not read next page upon reaching end, but
-leave it to next dirent read.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9857
-Lustre-commit: b51e8d6b53a3 ("LU-9857 lmv: dir page is released while in use")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32180
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10175
+Lustre-commit: 541902a3f934 ("LU-10175 ldlm: handle lock converts in cancel handler")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32314
 Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lmv/lmv_obd.c | 123 +++++++++++++++++++++++-------------------------
- 1 file changed, 60 insertions(+), 63 deletions(-)
+ fs/lustre/include/lustre_export.h |  6 ++++++
+ fs/lustre/ldlm/ldlm_inodebits.c   | 19 ++++++++++++++-----
+ fs/lustre/ldlm/ldlm_request.c     | 39 +++++++++++++++++++++++++++++++--------
+ fs/lustre/llite/llite_lib.c       |  2 +-
+ fs/lustre/llite/namei.c           |  7 ++++++-
+ 5 files changed, 58 insertions(+), 15 deletions(-)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index d0f626f..c7bf8c7 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -2016,7 +2016,7 @@ struct lmv_dir_ctxt {
- 	struct stripe_dirent	 ldc_stripes[0];
- };
- 
--static inline void put_stripe_dirent(struct stripe_dirent *stripe)
-+static inline void stripe_dirent_unload(struct stripe_dirent *stripe)
- {
- 	if (stripe->sd_page) {
- 		kunmap(stripe->sd_page);
-@@ -2031,62 +2031,77 @@ static inline void put_lmv_dir_ctxt(struct lmv_dir_ctxt *ctxt)
- 	int i;
- 
- 	for (i = 0; i < ctxt->ldc_count; i++)
--		put_stripe_dirent(&ctxt->ldc_stripes[i]);
-+		stripe_dirent_unload(&ctxt->ldc_stripes[i]);
+diff --git a/fs/lustre/include/lustre_export.h b/fs/lustre/include/lustre_export.h
+index de3b109..57cf68b 100644
+--- a/fs/lustre/include/lustre_export.h
++++ b/fs/lustre/include/lustre_export.h
+@@ -269,9 +269,15 @@ static inline int exp_connect_flr(struct obd_export *exp)
+ 	return !!(exp_connect_flags2(exp) & OBD_CONNECT2_FLR);
  }
  
--static struct lu_dirent *stripe_dirent_next(struct lmv_dir_ctxt *ctxt,
-+/* if @ent is dummy, or . .., get next */
-+static struct lu_dirent *stripe_dirent_get(struct lmv_dir_ctxt *ctxt,
-+					   struct lu_dirent *ent,
-+					   int stripe_index)
++static inline int exp_connect_lock_convert(struct obd_export *exp)
 +{
-+	for (; ent; ent = lu_dirent_next(ent)) {
-+		/* Skip dummy entry */
-+		if (le16_to_cpu(ent->lde_namelen) == 0)
-+			continue;
-+
-+		/* skip . and .. for other stripes */
-+		if (stripe_index &&
-+		    (strncmp(ent->lde_name, ".",
-+			     le16_to_cpu(ent->lde_namelen)) == 0 ||
-+		     strncmp(ent->lde_name, "..",
-+			     le16_to_cpu(ent->lde_namelen)) == 0))
-+			continue;
-+
-+		if (le64_to_cpu(ent->lde_hash) >= ctxt->ldc_hash)
-+			break;
-+	}
-+
-+	return ent;
++	return !!(exp_connect_flags2(exp) & OBD_CONNECT2_LOCK_CONVERT);
 +}
 +
-+static struct lu_dirent *stripe_dirent_load(struct lmv_dir_ctxt *ctxt,
- 					    struct stripe_dirent *stripe,
- 					    int stripe_index)
- {
-+	struct md_op_data *op_data = ctxt->ldc_op_data;
-+	struct lmv_oinfo *oinfo;
-+	struct lu_fid fid = op_data->op_fid1;
-+	struct inode *inode = op_data->op_data;
-+	struct lmv_tgt_desc *tgt;
- 	struct lu_dirent *ent = stripe->sd_ent;
- 	u64 hash = ctxt->ldc_hash;
--	u64 end;
- 	int rc = 0;
+ struct obd_export *class_conn2export(struct lustre_handle *conn);
  
- 	LASSERT(stripe == &ctxt->ldc_stripes[stripe_index]);
--
--	if (stripe->sd_eof)
--		return NULL;
--
--	if (ent) {
--		ent = lu_dirent_next(ent);
--		if (!ent) {
--check_eof:
--			end = le64_to_cpu(stripe->sd_dp->ldp_hash_end);
--
--			LASSERTF(hash <= end, "hash %llx end %llx\n",
--				 hash, end);
-+	LASSERT(!ent);
+ #define KKUC_CT_DATA_MAGIC	0x092013cea
 +
-+	do {
-+		if (stripe->sd_page) {
-+			u64 end = le64_to_cpu(stripe->sd_dp->ldp_hash_end);
+ struct kkuc_ct_data {
+ 	u32			kcd_magic;
+ 	u32			kcd_archive;
+diff --git a/fs/lustre/ldlm/ldlm_inodebits.c b/fs/lustre/ldlm/ldlm_inodebits.c
+index ddbf8d4..9cf3c5f 100644
+--- a/fs/lustre/ldlm/ldlm_inodebits.c
++++ b/fs/lustre/ldlm/ldlm_inodebits.c
+@@ -81,7 +81,7 @@ int ldlm_inodebits_drop(struct ldlm_lock *lock, u64 to_drop)
+ 
+ 	/* Just return if there are no conflicting bits */
+ 	if ((lock->l_policy_data.l_inodebits.bits & to_drop) == 0) {
+-		LDLM_WARN(lock, "try to drop unset bits %#llx/%#llx\n",
++		LDLM_WARN(lock, "try to drop unset bits %#llx/%#llx",
+ 			  lock->l_policy_data.l_inodebits.bits, to_drop);
+ 		/* nothing to do */
+ 		return 0;
+@@ -111,7 +111,7 @@ int ldlm_cli_dropbits(struct ldlm_lock *lock, u64 drop_bits)
+ 
+ 	ldlm_lock2handle(lock, &lockh);
+ 	lock_res_and_lock(lock);
+-	/* check if all bits are cancelled */
++	/* check if all bits are blocked */
+ 	if (!(lock->l_policy_data.l_inodebits.bits & ~drop_bits)) {
+ 		unlock_res_and_lock(lock);
+ 		/* return error to continue with cancel */
+@@ -119,6 +119,13 @@ int ldlm_cli_dropbits(struct ldlm_lock *lock, u64 drop_bits)
+ 		goto exit;
+ 	}
+ 
++	/* check if no common bits, consider this as successful convert */
++	if (!(lock->l_policy_data.l_inodebits.bits & drop_bits)) {
++		unlock_res_and_lock(lock);
++		rc = 0;
++		goto exit;
++	}
 +
-+			/* @hash should be the last dirent hash */
-+			LASSERTF(hash <= end,
-+				 "ctxt@%p stripe@%p hash %llx end %llx\n",
-+				 ctxt, stripe, hash, end);
-+			/* unload last page */
-+			stripe_dirent_unload(stripe);
-+			/* eof */
- 			if (end == MDS_DIR_END_OFF) {
- 				stripe->sd_ent = NULL;
- 				stripe->sd_eof = true;
--				return NULL;
-+				break;
- 			}
--
--			put_stripe_dirent(stripe);
- 			hash = end;
- 		}
--	}
--
--	if (!ent) {
--		struct md_op_data *op_data = ctxt->ldc_op_data;
--		struct lmv_oinfo *oinfo;
--		struct lu_fid fid = op_data->op_fid1;
--		struct inode *inode = op_data->op_data;
--		struct lmv_tgt_desc *tgt;
--
--		LASSERT(!stripe->sd_page);
- 
- 		oinfo = &op_data->op_mea1->lsm_md_oinfo[stripe_index];
- 		tgt = lmv_get_target(ctxt->ldc_lmv, oinfo->lmo_mds, NULL);
- 		if (IS_ERR(tgt)) {
- 			rc = PTR_ERR(tgt);
--			goto out;
-+			break;
- 		}
- 
--		/*
--		 * op_data will be shared by each stripe, so we need
--		 * reset these value for each stripe
--		 */
-+		/* op_data is shared by stripes, reset after use */
- 		op_data->op_fid1 = oinfo->lmo_fid;
- 		op_data->op_fid2 = oinfo->lmo_fid;
- 		op_data->op_data = oinfo->lmo_root;
-@@ -2099,42 +2114,24 @@ static struct lu_dirent *stripe_dirent_next(struct lmv_dir_ctxt *ctxt,
- 		op_data->op_data = inode;
- 
- 		if (rc)
--			goto out;
--
--		stripe->sd_dp = page_address(stripe->sd_page);
--		ent = lu_dirent_start(stripe->sd_dp);
--	}
--
--	for (; ent; ent = lu_dirent_next(ent)) {
--		/* Skip dummy entry */
--		if (!le16_to_cpu(ent->lde_namelen))
--			continue;
--
--		/* skip . and .. for other stripes */
--		if (stripe_index &&
--		    (strncmp(ent->lde_name, ".",
--			     le16_to_cpu(ent->lde_namelen)) == 0 ||
--		     strncmp(ent->lde_name, "..",
--			     le16_to_cpu(ent->lde_namelen)) == 0))
--			continue;
--
--		if (le64_to_cpu(ent->lde_hash) >= hash)
- 			break;
--	}
- 
--	if (!ent)
--		goto check_eof;
-+		stripe->sd_dp = page_address(stripe->sd_page);
-+		ent = stripe_dirent_get(ctxt, lu_dirent_start(stripe->sd_dp),
-+					stripe_index);
-+		/* in case a page filled with ., .. and dummy, read next */
-+	} while (!ent);
- 
--out:
- 	stripe->sd_ent = ent;
--	/* treat error as eof, so dir can be partially accessed */
+ 	/* check if there is race with cancel */
+ 	if (ldlm_is_canceling(lock) || ldlm_is_cancel(lock)) {
+ 		unlock_res_and_lock(lock);
+@@ -167,9 +174,11 @@ int ldlm_cli_dropbits(struct ldlm_lock *lock, u64 drop_bits)
+ 	rc = ldlm_cli_convert(lock, &flags);
  	if (rc) {
--		put_stripe_dirent(stripe);
-+		LASSERT(!ent);
-+		/* treat error as eof, so dir can be partially accessed */
- 		stripe->sd_eof = true;
- 		LCONSOLE_WARN("dir " DFID " stripe %d readdir failed: %d, directory is partially accessed!\n",
- 			      PFID(&ctxt->ldc_op_data->op_fid1), stripe_index,
- 			      rc);
+ 		lock_res_and_lock(lock);
+-		ldlm_clear_converting(lock);
+-		ldlm_set_cbpending(lock);
+-		ldlm_set_bl_ast(lock);
++		if (ldlm_is_converting(lock)) {
++			ldlm_clear_converting(lock);
++			ldlm_set_cbpending(lock);
++			ldlm_set_bl_ast(lock);
++		}
+ 		unlock_res_and_lock(lock);
+ 		goto exit;
  	}
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index 5833f59..ad54bd2 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -854,7 +854,7 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 			   aa->lock_handle.cookie, reply->lock_handle.cookie,
+ 			   req->rq_export->exp_client_uuid.uuid,
+ 			   libcfs_id2str(req->rq_peer));
+-		rc = -ESTALE;
++		rc = ELDLM_NO_LOCK_DATA;
+ 		goto out;
+ 	}
+ 
+@@ -905,15 +905,30 @@ static int lock_convert_interpret(const struct lu_env *env,
+ 	unlock_res_and_lock(lock);
+ out:
+ 	if (rc) {
++		int flag;
 +
- 	return ent;
+ 		lock_res_and_lock(lock);
+ 		if (ldlm_is_converting(lock)) {
+ 			ldlm_clear_converting(lock);
+ 			ldlm_set_cbpending(lock);
+ 			ldlm_set_bl_ast(lock);
++			lock->l_policy_data.l_inodebits.cancel_bits = 0;
+ 		}
+ 		unlock_res_and_lock(lock);
+-	}
+ 
++		/* fallback to normal lock cancel. If rc means there is no
++		 * valid lock on server, do only local cancel
++		 */
++		if (rc == ELDLM_NO_LOCK_DATA)
++			flag = LCF_LOCAL;
++		else
++			flag = LCF_ASYNC;
++
++		rc = ldlm_cli_cancel(&aa->lock_handle, flag);
++		if (rc < 0)
++			LDLM_DEBUG(lock, "failed to cancel lock: rc = %d\n",
++				   rc);
++	}
+ 	LDLM_LOCK_PUT(lock);
+ 	return rc;
  }
- 
-@@ -2186,8 +2183,7 @@ static struct lu_dirent *lmv_dirent_next(struct lmv_dir_ctxt *ctxt)
- 			continue;
- 
- 		if (!stripe->sd_ent) {
--			/* locate starting entry */
--			stripe_dirent_next(ctxt, stripe, i);
-+			stripe_dirent_load(ctxt, stripe, i);
- 			if (!stripe->sd_ent) {
- 				LASSERT(stripe->sd_eof);
- 				continue;
-@@ -2208,7 +2204,8 @@ static struct lu_dirent *lmv_dirent_next(struct lmv_dir_ctxt *ctxt)
- 		stripe = &ctxt->ldc_stripes[min];
- 		ent = stripe->sd_ent;
- 		/* pop found dirent */
--		stripe_dirent_next(ctxt, stripe, min);
-+		stripe->sd_ent = stripe_dirent_get(ctxt, lu_dirent_next(ent),
-+						   min);
+@@ -942,6 +957,15 @@ int ldlm_cli_convert(struct ldlm_lock *lock, u32 *flags)
+ 		return -EINVAL;
  	}
  
- 	return ent;
++	/* this is better to check earlier and it is done so already,
++	 * but this check is kept too as final one to issue an error
++	 * if any new code will miss such check.
++	 */
++	if (!exp_connect_lock_convert(exp)) {
++		LDLM_ERROR(lock, "server doesn't support lock convert\n");
++		return -EPROTO;
++	}
++
+ 	if (lock->l_resource->lr_type != LDLM_IBITS) {
+ 		LDLM_ERROR(lock, "convert works with IBITS locks only.");
+ 		return -EINVAL;
+@@ -970,13 +994,12 @@ int ldlm_cli_convert(struct ldlm_lock *lock, u32 *flags)
+ 
+ 	ptlrpc_request_set_replen(req);
+ 
+-	/* That could be useful to use cancel portals for convert as well
+-	 * as high-priority handling. This will require changes in
+-	 * ldlm_cancel_handler to understand convert RPC as well.
+-	 *
+-	 * req->rq_request_portal = LDLM_CANCEL_REQUEST_PORTAL;
+-	 * req->rq_reply_portal = LDLM_CANCEL_REPLY_PORTAL;
++	/*
++	 * Use cancel portals for convert as well as high-priority handling.
+ 	 */
++	req->rq_request_portal = LDLM_CANCEL_REQUEST_PORTAL;
++	req->rq_reply_portal = LDLM_CANCEL_REPLY_PORTAL;
++
+ 	ptlrpc_at_set_req_timeout(req);
+ 
+ 	if (exp->exp_obd->obd_svc_stats)
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index dff349f..0844318 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -209,7 +209,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 				  OBD_CONNECT_GRANT_PARAM |
+ 				  OBD_CONNECT_SHORTIO | OBD_CONNECT_FLAGS2;
+ 
+-	data->ocd_connect_flags2 = OBD_CONNECT2_FLR;
++	data->ocd_connect_flags2 = OBD_CONNECT2_FLR | OBD_CONNECT2_LOCK_CONVERT;
+ 
+ 	if (sbi->ll_flags & LL_SBI_LRU_RESIZE)
+ 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 8b1a1ca..f835abb 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -371,11 +371,16 @@ void ll_lock_cancel_bits(struct ldlm_lock *lock, u64 to_cancel)
+  */
+ int ll_md_need_convert(struct ldlm_lock *lock)
+ {
++	struct ldlm_namespace *ns = ldlm_lock_to_ns(lock);
+ 	struct inode *inode;
+ 	u64 wanted = lock->l_policy_data.l_inodebits.cancel_bits;
+ 	u64 bits = lock->l_policy_data.l_inodebits.bits & ~wanted;
+ 	enum ldlm_mode mode = LCK_MINMODE;
+ 
++	if (!lock->l_conn_export ||
++	    !exp_connect_lock_convert(lock->l_conn_export))
++		return 0;
++
+ 	if (!wanted || !bits || ldlm_is_cancel(lock))
+ 		return 0;
+ 
+@@ -410,7 +415,7 @@ int ll_md_need_convert(struct ldlm_lock *lock)
+ 	lock_res_and_lock(lock);
+ 	if (ktime_after(ktime_get(),
+ 			ktime_add(lock->l_last_used,
+-				  ktime_set(10, 0)))) {
++				  ktime_set(ns->ns_dirty_age_limit, 0)))) {
+ 		unlock_res_and_lock(lock);
+ 		return 0;
+ 	}
 -- 
 1.8.3.1
