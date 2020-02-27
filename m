@@ -1,258 +1,365 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:09:19 -0500
-Subject: [lustre-devel] [PATCH 091/622] lnet: Add ioctl to get health stats
+Date: Thu, 27 Feb 2020 16:09:31 -0500
+Subject: [lustre-devel] [PATCH 103/622] lustre: protocol: MDT as a statfs
+ proxy
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-92-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-104-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-At the time of this patch the sysfs statistics features is
-still in development. Therefore, using ioctl to get the stats
-from LNet.
+MDT can act as a proxy for statfs data. this should
+make df faster (RTT vs RTT*(#MDTs+1)) and enable
+idling connections so that clients don't connect to
+each OST just to report statfs data. the protocol
+has been changing slightly to let MDT differentiate
+self and aggregated statfs.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9120
-Lustre-commit: 10958cac798d ("LU-9120 lnet: Add ioctl to get health stats")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32776
-Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+also, obd_statfs has got a new field "granted" where
+OST reports how much space has been granted to the
+requesting MDT so that space can be added to available
+space.
+
+client's NID is used to distribute MDS_STATFS among
+MDTS.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10018
+Lustre-commit: b500d5193360 ("LU-10018 protocol: MDT as a statfs proxy")
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/29136
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h          |  1 +
- include/uapi/linux/lnet/libcfs_ioctl.h |  3 ++-
- include/uapi/linux/lnet/lnet-dlc.h     | 31 ++++++++++++++++-----
- net/lnet/lnet/api-ni.c                 | 49 ++++++++++++++++++++++++++++++++++
- net/lnet/lnet/peer.c                   | 29 ++++++++++++++++----
- 5 files changed, 101 insertions(+), 12 deletions(-)
+ fs/lustre/include/obd.h                 |  1 +
+ fs/lustre/include/obd_class.h           |  7 +++-
+ fs/lustre/include/obd_support.h         |  2 +
+ fs/lustre/llite/llite_lib.c             |  9 ++++-
+ fs/lustre/lmv/lmv_obd.c                 | 65 ++++++++++++++++++++++++++-------
+ fs/lustre/mdc/mdc_request.c             | 13 +++++++
+ fs/lustre/ptlrpc/layout.c               |  2 +-
+ fs/lustre/ptlrpc/pack_generic.c         |  2 +-
+ fs/lustre/ptlrpc/wiretest.c             |  8 ++--
+ include/uapi/linux/lustre/lustre_idl.h  |  3 +-
+ include/uapi/linux/lustre/lustre_user.h |  7 ++--
+ 11 files changed, 92 insertions(+), 27 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index bd6ea90..ba237df 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -823,6 +823,7 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
- 			  u32 *ni_peer_tx_credits, u32 *peer_tx_credits,
- 			  u32 *peer_rtr_credits, u32 *peer_min_rtr_credtis,
- 			  u32 *peer_tx_qnob);
-+int lnet_get_peer_ni_hstats(struct lnet_ioctl_peer_ni_hstats *stats);
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 175a99f..9286755 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -442,6 +442,7 @@ struct lmv_obd {
  
- static inline bool
- lnet_is_peer_ni_healthy_locked(struct lnet_peer_ni *lpni)
-diff --git a/include/uapi/linux/lnet/libcfs_ioctl.h b/include/uapi/linux/lnet/libcfs_ioctl.h
-index 458a634..683d508 100644
---- a/include/uapi/linux/lnet/libcfs_ioctl.h
-+++ b/include/uapi/linux/lnet/libcfs_ioctl.h
-@@ -149,6 +149,7 @@ struct libcfs_debug_ioctl_data {
- #define IOC_LIBCFS_GET_PEER_LIST	_IOWR(IOC_LIBCFS_TYPE, 100, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_GET_LOCAL_NI_MSG_STATS  _IOWR(IOC_LIBCFS_TYPE, 101, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_SET_HEALHV		_IOWR(IOC_LIBCFS_TYPE, 102, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_MAX_NR		102
-+#define IOC_LIBCFS_GET_LOCAL_HSTATS	_IOWR(IOC_LIBCFS_TYPE, 103, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_MAX_NR		103
+ 	u32			tgts_size; /* size of tgts array */
+ 	struct lmv_tgt_desc	**tgts;
++	int			lmv_statfs_start;
  
- #endif /* __LIBCFS_IOCTL_H__ */
-diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
-index 2d3aad8..8e9850c 100644
---- a/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/include/uapi/linux/lnet/lnet-dlc.h
-@@ -163,6 +163,31 @@ struct lnet_ioctl_element_stats {
- 	__u32 iel_drop_count;
- };
+ 	struct obd_connect_data	conn_data;
+ 	struct kobject		*lmv_tgts_kobj;
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index 0153c50..a3ef5d5 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -47,6 +47,8 @@
+ #define OBD_STATFS_FROM_CACHE   0x0002
+ /* the statfs is only for retrieving information from MDT0 */
+ #define OBD_STATFS_FOR_MDT0	0x0004
++/* get aggregated statfs from MDT */
++#define OBD_STATFS_SUM		0x0008
  
-+enum lnet_health_type {
-+	LNET_HEALTH_TYPE_LOCAL_NI = 0,
-+	LNET_HEALTH_TYPE_PEER_NI,
-+};
+ /* OBD Device Declarations */
+ extern rwlock_t obd_dev_lock;
+@@ -947,7 +949,10 @@ static inline int obd_statfs(const struct lu_env *env, struct obd_export *exp,
+ 
+ 	CDEBUG(D_SUPER, "osfs %lld, max_age %lld\n",
+ 	       obd->obd_osfs_age, max_age);
+-	if (obd->obd_osfs_age < max_age) {
++	/* ignore cache if aggregated isn't expected */
++	if (obd->obd_osfs_age < max_age ||
++	    ((obd->obd_osfs.os_state & OS_STATE_SUM) &&
++	     !(flags & OBD_STATFS_SUM))) {
+ 		rc = OBP(obd, statfs)(env, exp, osfs, max_age, flags);
+ 		if (rc == 0) {
+ 			spin_lock(&obd->obd_osfs_lock);
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 28becfa..3d14723 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -137,7 +137,9 @@
+ #define OBD_FAIL_MDS_GET_ROOT_NET			0x11b
+ #define OBD_FAIL_MDS_GET_ROOT_PACK			0x11c
+ #define OBD_FAIL_MDS_STATFS_PACK			0x11d
++#define OBD_FAIL_MDS_STATFS_SUM_PACK			0x11d
+ #define OBD_FAIL_MDS_STATFS_NET				0x11e
++#define OBD_FAIL_MDS_STATFS_SUM_NET			0x11e
+ #define OBD_FAIL_MDS_GETATTR_NAME_NET			0x11f
+ #define OBD_FAIL_MDS_PIN_NET				0x120
+ #define OBD_FAIL_MDS_UNPIN_NET				0x121
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index c04146f..8b3e2a3 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -211,7 +211,8 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 
+ 	data->ocd_connect_flags2 = OBD_CONNECT2_FLR |
+ 				   OBD_CONNECT2_LOCK_CONVERT |
+-				   OBD_CONNECT2_DIR_MIGRATE;
++				   OBD_CONNECT2_DIR_MIGRATE |
++				   OBD_CONNECT2_SUM_STATFS;
+ 
+ 	if (sbi->ll_flags & LL_SBI_LRU_RESIZE)
+ 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
+@@ -1751,6 +1752,9 @@ int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
+ 	       osfs->os_bavail, osfs->os_blocks, osfs->os_ffree,
+ 	       osfs->os_files);
+ 
++	if (osfs->os_state & OS_STATE_SUM)
++		goto out;
 +
-+struct lnet_ioctl_local_ni_hstats {
-+	struct libcfs_ioctl_hdr hlni_hdr;
-+	lnet_nid_t hlni_nid;
-+	__u32 hlni_local_interrupt;
-+	__u32 hlni_local_dropped;
-+	__u32 hlni_local_aborted;
-+	__u32 hlni_local_no_route;
-+	__u32 hlni_local_timeout;
-+	__u32 hlni_local_error;
-+	__s32 hlni_health_value;
-+};
-+
-+struct lnet_ioctl_peer_ni_hstats {
-+	__u32 hlpni_remote_dropped;
-+	__u32 hlpni_remote_timeout;
-+	__u32 hlpni_remote_error;
-+	__u32 hlpni_network_timeout;
-+	__s32 hlpni_health_value;
-+};
-+
- struct lnet_ioctl_element_msg_stats {
- 	struct libcfs_ioctl_hdr im_hdr;
- 	__u32 im_idx;
-@@ -230,12 +255,6 @@ struct lnet_ioctl_peer_cfg {
- 	void __user *prcfg_bulk;
- };
+ 	if (sbi->ll_flags & LL_SBI_LAZYSTATFS)
+ 		flags |= OBD_STATFS_NODELAY;
  
--
--enum lnet_health_type {
--	LNET_HEALTH_TYPE_LOCAL_NI = 0,
--	LNET_HEALTH_TYPE_PEER_NI,
--};
--
- struct lnet_ioctl_reset_health_cfg {
- 	struct libcfs_ioctl_hdr rh_hdr;
- 	enum lnet_health_type rh_type;
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index 0cadb2a..14a8f2c 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -3192,6 +3192,42 @@ u32 lnet_get_dlc_seq_locked(void)
- 	lnet_net_unlock(LNET_LOCK_EX);
+@@ -1779,6 +1783,7 @@ int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
+ 		osfs->os_ffree = obd_osfs.os_ffree;
+ 	}
+ 
++out:
+ 	return rc;
  }
  
-+static int
-+lnet_get_local_ni_hstats(struct lnet_ioctl_local_ni_hstats *stats)
+@@ -1793,7 +1798,7 @@ int ll_statfs(struct dentry *de, struct kstatfs *sfs)
+ 	ll_stats_ops_tally(ll_s2sbi(sb), LPROC_LL_STAFS, 1);
+ 
+ 	/* Some amount of caching on the client is allowed */
+-	rc = ll_statfs_internal(ll_s2sbi(sb), &osfs, 0);
++	rc = ll_statfs_internal(ll_s2sbi(sb), &osfs, OBD_STATFS_SUM);
+ 	if (rc)
+ 		return rc;
+ 
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index c7bf8c7..90a46c4 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -1325,6 +1325,33 @@ static int lmv_process_config(struct obd_device *obd, u32 len, void *buf)
+ 	return rc;
+ }
+ 
++static int lmv_select_statfs_mdt(struct lmv_obd *lmv, u32 flags)
 +{
-+	int cpt, rc = 0;
-+	struct lnet_ni *ni;
-+	lnet_nid_t nid = stats->hlni_nid;
++	int i;
 +
-+	cpt = lnet_net_lock_current();
-+	ni = lnet_nid2ni_locked(nid, cpt);
++	if (flags & OBD_STATFS_FOR_MDT0)
++		return 0;
 +
-+	if (!ni) {
-+		rc = -ENOENT;
-+		goto unlock;
++	if (lmv->lmv_statfs_start || lmv->desc.ld_tgt_count == 1)
++		return lmv->lmv_statfs_start;
++
++	/* choose initial MDT for this client */
++	for (i = 0;; i++) {
++		struct lnet_process_id lnet_id;
++
++		if (LNetGetId(i, &lnet_id) == -ENOENT)
++			break;
++
++		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
++			lmv->lmv_statfs_start =
++				lnet_id.nid % lmv->desc.ld_tgt_count;
++			break;
++		}
 +	}
 +
-+	stats->hlni_local_interrupt =
-+		atomic_read(&ni->ni_hstats.hlt_local_interrupt);
-+	stats->hlni_local_dropped =
-+		atomic_read(&ni->ni_hstats.hlt_local_dropped);
-+	stats->hlni_local_aborted =
-+		atomic_read(&ni->ni_hstats.hlt_local_aborted);
-+	stats->hlni_local_no_route =
-+		atomic_read(&ni->ni_hstats.hlt_local_no_route);
-+	stats->hlni_local_timeout =
-+		atomic_read(&ni->ni_hstats.hlt_local_timeout);
-+	stats->hlni_local_error =
-+		atomic_read(&ni->ni_hstats.hlt_local_error);
-+	stats->hlni_health_value =
-+		atomic_read(&ni->ni_healthv);
-+
-+unlock:
-+	lnet_net_unlock(cpt);
-+
-+	return rc;
++	return lmv->lmv_statfs_start;
 +}
 +
- /**
-  * LNet ioctl handler.
-  *
-@@ -3399,6 +3435,19 @@ u32 lnet_get_dlc_seq_locked(void)
- 		return rc;
+ static int lmv_statfs(const struct lu_env *env, struct obd_export *exp,
+ 		      struct obd_statfs *osfs, time64_t max_age, u32 flags)
+ {
+@@ -1332,41 +1359,51 @@ static int lmv_statfs(const struct lu_env *env, struct obd_export *exp,
+ 	struct lmv_obd *lmv = &obd->u.lmv;
+ 	struct obd_statfs *temp;
+ 	int rc = 0;
+-	u32 i;
++	u32 i, idx;
+ 
+ 	temp = kzalloc(sizeof(*temp), GFP_NOFS);
+ 	if (!temp)
+ 		return -ENOMEM;
+ 
+-	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+-		if (!lmv->tgts[i] || !lmv->tgts[i]->ltd_exp)
++	/* distribute statfs among MDTs */
++	idx = lmv_select_statfs_mdt(lmv, flags);
++
++	for (i = 0; i < lmv->desc.ld_tgt_count; i++, idx++) {
++		idx = idx % lmv->desc.ld_tgt_count;
++		if (!lmv->tgts[idx] || !lmv->tgts[idx]->ltd_exp)
+ 			continue;
+ 
+-		rc = obd_statfs(env, lmv->tgts[i]->ltd_exp, temp,
++		rc = obd_statfs(env, lmv->tgts[idx]->ltd_exp, temp,
+ 				max_age, flags);
+ 		if (rc) {
+ 			CERROR("can't stat MDS #%d (%s), error %d\n", i,
+-			       lmv->tgts[i]->ltd_exp->exp_obd->obd_name,
++			       lmv->tgts[idx]->ltd_exp->exp_obd->obd_name,
+ 			       rc);
+ 			goto out_free_temp;
+ 		}
+ 
++		if (temp->os_state & OS_STATE_SUM ||
++		    flags == OBD_STATFS_FOR_MDT0) {
++			/* Reset to the last aggregated values
++			 * and don't sum with non-aggrated data.
++			 * If the statfs is from mount, it needs to retrieve
++			 * necessary information from MDT0. i.e. mount does
++			 * not need the merged osfs from all of MDT. Also
++			 * clients can be mounted as long as MDT0 is in
++			 * service
++			 */
++			*osfs = *temp;
++			break;
++		}
++
+ 		if (i == 0) {
+ 			*osfs = *temp;
+-			/* If the statfs is from mount, it will needs
+-			 * retrieve necessary information from MDT0.
+-			 * i.e. mount does not need the merged osfs
+-			 * from all of MDT.
+-			 * And also clients can be mounted as long as
+-			 * MDT0 is in service
+-			 */
+-			if (flags & OBD_STATFS_FOR_MDT0)
+-				goto out_free_temp;
+ 		} else {
+ 			osfs->os_bavail += temp->os_bavail;
+ 			osfs->os_blocks += temp->os_blocks;
+ 			osfs->os_ffree += temp->os_ffree;
+ 			osfs->os_files += temp->os_files;
++			osfs->os_granted += temp->os_granted;
+ 		}
  	}
  
-+	case IOC_LIBCFS_GET_LOCAL_HSTATS: {
-+		struct lnet_ioctl_local_ni_hstats *stats = arg;
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index b173937..3341761 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -1495,6 +1495,19 @@ static int mdc_statfs(const struct lu_env *env,
+ 		goto output;
+ 	}
+ 
++	if ((flags & OBD_STATFS_SUM) &&
++	    (exp_connect_flags2(exp) & OBD_CONNECT2_SUM_STATFS)) {
++		/* request aggregated states */
++		struct mdt_body *body;
 +
-+		if (stats->hlni_hdr.ioc_len < sizeof(*stats))
-+			return -EINVAL;
-+
-+		mutex_lock(&the_lnet.ln_api_mutex);
-+		rc = lnet_get_local_ni_hstats(stats);
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+
-+		return rc;
++		body = req_capsule_client_get(&req->rq_pill, &RMF_MDT_BODY);
++		if (!body) {
++			rc = -EPROTO;
++			goto out;
++		}
++		body->mbo_valid = OBD_MD_FLAGSTATFS;
 +	}
 +
- 	case IOC_LIBCFS_ADD_PEER_NI: {
- 		struct lnet_ioctl_peer_cfg *cfg = arg;
+ 	ptlrpc_request_set_replen(req);
  
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 9dbb3bd4..4a38ca6 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -3339,6 +3339,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- {
- 	struct lnet_ioctl_element_stats *lpni_stats;
- 	struct lnet_ioctl_element_msg_stats *lpni_msg_stats;
-+	struct lnet_ioctl_peer_ni_hstats *lpni_hstats;
- 	struct lnet_peer_ni_credit_info *lpni_info;
- 	struct lnet_peer_ni *lpni;
- 	struct lnet_peer *lp;
-@@ -3354,7 +3355,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 	}
+ 	if (flags & OBD_STATFS_NODELAY) {
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index 70344b9..225a73e 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -1252,7 +1252,7 @@ struct req_format RQF_MDS_GET_ROOT =
+ EXPORT_SYMBOL(RQF_MDS_GET_ROOT);
  
- 	size = sizeof(nid) + sizeof(*lpni_info) + sizeof(*lpni_stats) +
--	       sizeof(*lpni_msg_stats);
-+	       sizeof(*lpni_msg_stats) + sizeof(*lpni_hstats);
- 	size *= lp->lp_nnis;
- 	if (size > cfg->prcfg_size) {
- 		cfg->prcfg_size = size;
-@@ -3380,6 +3381,9 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 	lpni_msg_stats = kzalloc(sizeof(*lpni_msg_stats), GFP_KERNEL);
- 	if (!lpni_msg_stats)
- 		goto out_free_stats;
-+	lpni_hstats = kzalloc(sizeof(*lpni_hstats), GFP_NOFS);
-+	if (!lpni_hstats)
-+		goto out_free_msg_stats;
+ struct req_format RQF_MDS_STATFS =
+-	DEFINE_REQ_FMT0("MDS_STATFS", empty, obd_statfs_server);
++	DEFINE_REQ_FMT0("MDS_STATFS", mdt_body_only, obd_statfs_server);
+ EXPORT_SYMBOL(RQF_MDS_STATFS);
  
+ struct req_format RQF_MDS_SYNC =
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index d09cf3f..e71f79d 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -1645,7 +1645,7 @@ void lustre_swab_obd_statfs(struct obd_statfs *os)
+ 	__swab32s(&os->os_state);
+ 	__swab32s(&os->os_fprecreated);
+ 	BUILD_BUG_ON(offsetof(typeof(*os), os_fprecreated) == 0);
+-	BUILD_BUG_ON(offsetof(typeof(*os), os_spare2) == 0);
++	__swab32s(&os->os_granted);
+ 	BUILD_BUG_ON(offsetof(typeof(*os), os_spare3) == 0);
+ 	BUILD_BUG_ON(offsetof(typeof(*os), os_spare4) == 0);
+ 	BUILD_BUG_ON(offsetof(typeof(*os), os_spare5) == 0);
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 1afbb41..30083c2 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1696,10 +1696,10 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)(int)offsetof(struct obd_statfs, os_fprecreated));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_fprecreated) == 4, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_fprecreated));
+-	LASSERTF((int)offsetof(struct obd_statfs, os_spare2) == 112, "found %lld\n",
+-		 (long long)(int)offsetof(struct obd_statfs, os_spare2));
+-	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_spare2) == 4, "found %lld\n",
+-		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_spare2));
++	LASSERTF((int)offsetof(struct obd_statfs, os_granted) == 112, "found %lld\n",
++		 (long long)(int)offsetof(struct obd_statfs, os_granted));
++	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_granted) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_granted));
+ 	LASSERTF((int)offsetof(struct obd_statfs, os_spare3) == 116, "found %lld\n",
+ 		 (long long)(int)offsetof(struct obd_statfs, os_spare3));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_spare3) == 4, "found %lld\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 249a3d5..c65663a 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -793,6 +793,7 @@ struct ptlrpc_body_v2 {
+ 							 */
+ #define OBD_CONNECT2_DIR_MIGRATE	0x4ULL		/* migrate striped dir
+ 							 */
++#define OBD_CONNECT2_SUM_STATFS		0x8ULL /* MDT return aggregated stats */
+ #define OBD_CONNECT2_FLR		0x20ULL		/* FLR support */
+ #define OBD_CONNECT2_WBC_INTENTS	0x40ULL /* create/unlink/... intents
+ 						 * for wbc, also operations
+@@ -1167,7 +1168,7 @@ static inline __u32 lov_mds_md_size(__u16 stripes, __u32 lmm_magic)
+ #define OBD_MD_FLXATTRLS	(0x0000002000000000ULL) /* xattr list */
+ #define OBD_MD_FLXATTRRM	(0x0000004000000000ULL) /* xattr remove */
+ #define OBD_MD_FLACL		(0x0000008000000000ULL) /* ACL */
+-/*	OBD_MD_FLRMTPERM	(0x0000010000000000ULL) remote perm, obsolete */
++#define OBD_MD_FLAGSTATFS	(0x0000010000000000ULL) /* aggregated statfs */
+ #define OBD_MD_FLMDSCAPA	(0x0000020000000000ULL) /* MDS capability */
+ #define OBD_MD_FLOSSCAPA	(0x0000040000000000ULL) /* OSS capability */
+ /*	OBD_MD_FLCKSPLIT	(0x0000080000000000ULL) obsolete 2.3.58*/
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 421c977..f25bb9b 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -104,6 +104,7 @@ enum obd_statfs_state {
+ 	OS_STATE_NOPRECREATE	= 0x00000004, /**< no object precreation */
+ 	OS_STATE_ENOSPC		= 0x00000020, /**< not enough free space */
+ 	OS_STATE_ENOINO		= 0x00000040, /**< not enough inodes */
++	OS_STATE_SUM		= 0x00000100, /**< aggregated for all tagrets */
+ };
  
- 	lpni = NULL;
-@@ -3387,7 +3391,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 	while ((lpni = lnet_get_next_peer_ni_locked(lp, NULL, lpni)) != NULL) {
- 		nid = lpni->lpni_nid;
- 		if (copy_to_user(bulk, &nid, sizeof(nid)))
--			goto out_free_msg_stats;
-+			goto out_free_hstats;
- 		bulk += sizeof(nid);
- 
- 		memset(lpni_info, 0, sizeof(*lpni_info));
-@@ -3406,7 +3410,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 		lpni_info->cr_peer_min_tx_credits = lpni->lpni_mintxcredits;
- 		lpni_info->cr_peer_tx_qnob = lpni->lpni_txqnob;
- 		if (copy_to_user(bulk, lpni_info, sizeof(*lpni_info)))
--			goto out_free_msg_stats;
-+			goto out_free_hstats;
- 		bulk += sizeof(*lpni_info);
- 
- 		memset(lpni_stats, 0, sizeof(*lpni_stats));
-@@ -3417,15 +3421,30 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 		lpni_stats->iel_drop_count =
- 			lnet_sum_stats(&lpni->lpni_stats, LNET_STATS_TYPE_DROP);
- 		if (copy_to_user(bulk, lpni_stats, sizeof(*lpni_stats)))
--			goto out_free_msg_stats;
-+			goto out_free_hstats;
- 		bulk += sizeof(*lpni_stats);
- 		lnet_usr_translate_stats(lpni_msg_stats, &lpni->lpni_stats);
- 		if (copy_to_user(bulk, lpni_msg_stats, sizeof(*lpni_msg_stats)))
--			goto out_free_msg_stats;
-+			goto out_free_hstats;
- 		bulk += sizeof(*lpni_msg_stats);
-+		lpni_hstats->hlpni_network_timeout =
-+			atomic_read(&lpni->lpni_hstats.hlt_network_timeout);
-+		lpni_hstats->hlpni_remote_dropped =
-+			atomic_read(&lpni->lpni_hstats.hlt_remote_dropped);
-+		lpni_hstats->hlpni_remote_timeout =
-+			atomic_read(&lpni->lpni_hstats.hlt_remote_timeout);
-+		lpni_hstats->hlpni_remote_error =
-+			atomic_read(&lpni->lpni_hstats.hlt_remote_error);
-+		lpni_hstats->hlpni_health_value =
-+			atomic_read(&lpni->lpni_healthv);
-+		if (copy_to_user(bulk, lpni_hstats, sizeof(*lpni_hstats)))
-+			goto out_free_hstats;
-+		bulk += sizeof(*lpni_hstats);
- 	}
- 	rc = 0;
- 
-+out_free_hstats:
-+	kfree(lpni_hstats);
- out_free_msg_stats:
- 	kfree(lpni_msg_stats);
- out_free_stats:
+ struct obd_statfs {
+@@ -121,9 +122,9 @@ struct obd_statfs {
+ 	__u32	os_fprecreated;	/* objs available now to the caller
+ 				 * used in QoS code to find preferred OSTs
+ 				 */
+-	__u32	os_spare2;	/* Unused padding fields.  Remember */
+-	__u32	os_spare3;	/* to fix lustre_swab_obd_statfs() */
+-	__u32	os_spare4;
++	__u32	os_granted;	/* space granted for MDS */
++	__u32	os_spare3;	/* Unused padding fields.  Remember */
++	__u32	os_spare4;	/* to fix lustre_swab_obd_statfs() */
+ 	__u32	os_spare5;
+ 	__u32	os_spare6;
+ 	__u32	os_spare7;
 -- 
 1.8.3.1
