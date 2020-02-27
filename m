@@ -1,81 +1,101 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:15 -0500
-Subject: [lustre-devel] [PATCH 447/622] lustre: lmv: disable remote file
- statahead
+Date: Thu, 27 Feb 2020 16:15:23 -0500
+Subject: [lustre-devel] [PATCH 455/622] lustre: dom: manual OST-to-DOM
+ migration via mirroring
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-448-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-456-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-Remote file statahead is not supported, because such file needs
-two RPCs to fetch both LOOKUP and GETATTR lock, on LOOKUP success
-we only know file FID, thus can't prepare an inode correctly.
+Allow DOM mirroring, update LOV/LOD code to check not just
+first component for DOM pattern but cycle through all mirrors
+if any. Sanity checks allows one DOM component in a mirror
+and it should be the first one. Multiple DOM components are
+allowed only with the same for now.
 
-Disable this to avoid noise messages and confusion.
+Do OST file migration to MDT by using FLR. That can't be done
+by layout swapping, because MDT data will be tied to temporary
+volatile file but we want to keep data with the original file.
+The mirroring allows that with the following steps:
+- extent layout with new mirror on MDT, no data is copied but
+  new mirror stays in 'stale' state. The reason is the same
+  problem with volatile file.
+- resync mirrors, now new DOM layout is filled with data.
+- remove first mirror
 
-Update sanity.sh test_60g.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11681
-Lustre-commit: 02b5a407081c ("LU-11681 lmv: disable remote file statahead")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33930
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11421
+Lustre-commit: 44a721b8c106 ("LU-11421 dom: manual OST-to-DOM migration via mirroring")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35359
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lmv/lmv_obd.c | 25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ fs/lustre/lov/lov_object.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index d323250..26021bb 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -3416,25 +3416,28 @@ static int lmv_intent_getattr_async(struct obd_export *exp,
- 	struct md_op_data *op_data = &minfo->mi_data;
- 	struct obd_device *obd = exp->exp_obd;
- 	struct lmv_obd *lmv = &obd->u.lmv;
--	struct lmv_tgt_desc *tgt = NULL;
-+	struct lmv_tgt_desc *ptgt = NULL;
-+	struct lmv_tgt_desc *ctgt;
+diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
+index 52d8c30..5c4d8f9 100644
+--- a/fs/lustre/lov/lov_object.c
++++ b/fs/lustre/lov/lov_object.c
+@@ -543,7 +543,13 @@ static int lov_init_dom(const struct lu_env *env, struct lov_device *dev,
+ 	u32 idx = 0;
+ 	int rc;
  
- 	if (!fid_is_sane(&op_data->op_fid2))
- 		return -EINVAL;
+-	LASSERT(index == 0);
++	/* DOM entry may be not zero index due to FLR but must start from 0 */
++	if (unlikely(lle->lle_extent->e_start != 0)) {
++		CERROR("%s: DOM entry must be the first stripe in a mirror\n",
++		       lov2obd(dev->ld_lov)->obd_name);
++		dump_lsm(D_ERROR, lov->lo_lsm);
++		return -EINVAL;
++	}
  
--	tgt = lmv_find_target(lmv, &op_data->op_fid1);
--	if (IS_ERR(tgt))
--		return PTR_ERR(tgt);
-+	ptgt = lmv_locate_tgt(lmv, op_data);
-+	if (IS_ERR(ptgt))
-+		return PTR_ERR(ptgt);
-+
-+	ctgt = lmv_find_target(lmv, &op_data->op_fid2);
-+	if (IS_ERR(ctgt))
-+		return PTR_ERR(ctgt);
+ 	/* find proper MDS device */
+ 	rc = lov_fld_lookup(dev, fid, &idx);
+@@ -636,6 +642,7 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 	int result = 0;
+ 	unsigned int seq;
+ 	int i, j;
++	bool dom_size = 0;
  
- 	/*
--	 * no special handle for remote dir, which needs to fetch both LOOKUP
--	 * lock on parent, and then UPDATE lock on child MDT, which makes all
--	 * complicated because this is done async. So only LOOKUP lock is
--	 * fetched for remote dir, but considering remote dir is rare case,
--	 * and not supporting it in statahead won't cause any issue, just leave
--	 * it as is.
-+	 * remote object needs two RPCs to lookup and getattr, considering the
-+	 * complexity don't support statahead for now.
- 	 */
-+	if (ctgt != ptgt)
-+		return -EREMOTE;
+ 	LASSERT(lsm->lsm_entry_count > 0);
+ 	LASSERT(!lov->lo_lsm);
+@@ -679,6 +686,18 @@ static int lov_init_composite(const struct lu_env *env, struct lov_device *dev,
+ 			lle->lle_comp_ops = &raid0_ops;
+ 			break;
+ 		case LOV_PATTERN_MDT:
++			/* Allowed to have several DOM stripes in different
++			 * mirrors with the same DoM size.
++			 */
++			if (!dom_size) {
++				dom_size = lle->lle_lsme->lsme_extent.e_end;
++			} else if (dom_size !=
++				   lle->lle_lsme->lsme_extent.e_end) {
++				CERROR("%s: DOM entries with different sizes\n",
++				       lov2obd(dev->ld_lov)->obd_name);
++				dump_lsm(D_ERROR, lsm);
++				return -EINVAL;
++			}
+ 			lle->lle_comp_ops = &dom_ops;
+ 			break;
+ 		default:
+@@ -869,7 +888,8 @@ static void lov_fini_composite(const struct lu_env *env,
+ 		struct lov_layout_entry *entry;
  
--	return md_intent_getattr_async(tgt->ltd_exp, minfo);
-+	return md_intent_getattr_async(ptgt->ltd_exp, minfo);
- }
+ 		lov_foreach_layout_entry(lov, entry)
+-			entry->lle_comp_ops->lco_fini(env, entry);
++			if (entry->lle_comp_ops)
++				entry->lle_comp_ops->lco_fini(env, entry);
  
- static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+ 		kvfree(comp->lo_entries);
+ 		comp->lo_entries = NULL;
 -- 
 1.8.3.1
