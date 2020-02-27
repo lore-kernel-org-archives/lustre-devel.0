@@ -1,89 +1,76 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:09:35 -0500
-Subject: [lustre-devel] [PATCH 107/622] lnet: router handling
+Date: Thu, 27 Feb 2020 16:12:57 -0500
+Subject: [lustre-devel] [PATCH 309/622] lustre: lov: fix wrong calculated
+ length for fiemap
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-108-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-310-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Wang Shilong <wshilong@ddn.com>
 
-Re-create the md and mdh if the router checker ping times out.
-When re-transmitting a message do so even if the peer is marked down
-to fulfill the message's retry quota.
+lov_stripe_intersects() will return a closed interval
+[@obd_start, @obd_end], so to calcuate length of interval we need
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11272
-Lustre-commit: 05becd69bc0c ("LU-11272 lnet: router handling")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33043
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
+ @obd_end - @obd_start + 1
+
+rather than
+
+ @obd_end - @obd_start
+
+Wrong extent length will make us return wrong fiemap information.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12361
+Lustre-commit: 225e7b8c70fb ("LU-12361 lov: fix wrong calculated length for fiemap")
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-on: https://review.whamcloud.com/34998
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Gu Zheng <gzheng@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 12 ++++++++++--
- net/lnet/lnet/router.c   |  8 +++++++-
- 2 files changed, 17 insertions(+), 3 deletions(-)
+ fs/lustre/lov/lov_object.c | 4 ++--
+ fs/lustre/lov/lov_offset.c | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index eb0b48d..3cab970 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -678,7 +678,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
-  *     may drop the lnet_net_lock
+diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
+index 7543ef2..27e0ca5 100644
+--- a/fs/lustre/lov/lov_object.c
++++ b/fs/lustre/lov/lov_object.c
+@@ -1677,7 +1677,7 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+ 	if (lun_start == lun_end)
+ 		return 0;
+ 
+-	req_fm_len = obd_object_end - lun_start;
++	req_fm_len = obd_object_end - lun_start + 1;
+ 	fs->fs_fm->fm_length = 0;
+ 	len_mapped_single_call = 0;
+ 
+@@ -1723,7 +1723,7 @@ static int fiemap_for_stripe(const struct lu_env *env, struct cl_object *obj,
+ 			fs->fs_fm->fm_mapped_extents = 1;
+ 
+ 			fm_ext[0].fe_logical = lun_start;
+-			fm_ext[0].fe_length = obd_object_end - lun_start;
++			fm_ext[0].fe_length = obd_object_end - lun_start + 1;
+ 			fm_ext[0].fe_flags |= FIEMAP_EXTENT_UNKNOWN;
+ 
+ 			goto inactive_tgt;
+diff --git a/fs/lustre/lov/lov_offset.c b/fs/lustre/lov/lov_offset.c
+index bb67d82..b53ce43 100644
+--- a/fs/lustre/lov/lov_offset.c
++++ b/fs/lustre/lov/lov_offset.c
+@@ -226,6 +226,8 @@ u64 lov_size_to_stripe(struct lov_stripe_md *lsm, int index, u64 file_size,
+ /* given an extent in an lov and a stripe, calculate the extent of the stripe
+  * that is contained within the lov extent.  this returns true if the given
+  * stripe does intersect with the lov extent.
++ *
++ * Closed interval [@obd_start, @obd_end] will be returned.
   */
- static int
--lnet_peer_alive_locked(struct lnet_ni *ni, struct lnet_peer_ni *lp)
-+lnet_peer_alive_locked(struct lnet_ni *ni, struct lnet_peer_ni *lp,
-+		       struct lnet_msg *msg)
- {
- 	time64_t now = ktime_get_seconds();
- 
-@@ -689,6 +690,13 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		return 1;
- 
- 	/*
-+	 * If we're resending a message, let's attempt to send it even if
-+	 * the peer is down to fulfill our resend quota on the message
-+	 */
-+	if (msg->msg_retry_count > 0)
-+		return 1;
-+
-+	/*
- 	 * Peer appears dead, but we should avoid frequent NI queries (at
- 	 * most once per lnet_queryinterval seconds).
- 	 */
-@@ -746,7 +754,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 
- 	/* NB 'lp' is always the next hop */
- 	if (!(msg->msg_target.pid & LNET_PID_USERFLAG) &&
--	    !lnet_peer_alive_locked(ni, lp)) {
-+	    !lnet_peer_alive_locked(ni, lp, msg)) {
- 		the_lnet.ln_counters[cpt]->drop_count++;
- 		the_lnet.ln_counters[cpt]->drop_length += msg->msg_len;
- 		lnet_net_unlock(cpt);
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index 7c3bbd8..66a116c 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -1042,7 +1042,13 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- 	}
- 
- 	rcd = rtr->lpni_rcd;
--	if (!rcd || rcd->rcd_nnis > rcd->rcd_pingbuffer->pb_nnis)
-+
-+	/* The response to the router checker ping could've timed out and
-+	 * the mdh might've been invalidated, so we need to update it
-+	 * again.
-+	 */
-+	if (!rcd || rcd->rcd_nnis > rcd->rcd_pingbuffer->pb_nnis ||
-+	    LNetMDHandleIsInvalid(rcd->rcd_mdh))
- 		rcd = lnet_update_rc_data_locked(rtr);
- 	if (!rcd)
- 		return;
+ int lov_stripe_intersects(struct lov_stripe_md *lsm, int index, int stripeno,
+ 			  struct lu_extent *ext, u64 *obd_start, u64 *obd_end)
 -- 
 1.8.3.1
