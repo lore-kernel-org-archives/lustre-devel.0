@@ -1,56 +1,51 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:08 -0500
-Subject: [lustre-devel] [PATCH 320/622] lnet: fix cpt locking
+Date: Thu, 27 Feb 2020 16:12:53 -0500
+Subject: [lustre-devel] [PATCH 305/622] lnet: adds checking msg len
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-321-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-306-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Alexander Boyko <c17825@cray.com>
 
-In lnet_select_pathway() the call to lnet_handle_send_case_locked()
-can result in sd_cpt being changed. If this function returns
-REPEAT_SEND, we'll go back to the again label. It is possible at
-this time to initiate discovery, which will unlock the cpt.
-If the local cpt isn't updated we could potentially be manipulating
-the wrong cpt resulting in some form of corruption or dead lock.
+The LNET can't handle a msg with len larger than LNET_MTU.
+The next error occurred for DOM 1MB
+ LNetError: 3137:0:(lib-move.c:4143:lnet_parse()) 192.168.8.1 at tcp,
+ src 192.168.8.1 at tcp: bad PUT payload 1051832 (1048576 max expected)
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12163
-Lustre-commit: f6d63067e1ec ("LU-12163 lnet: fix cpt locking")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34607
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: Chris Horn <hornc@cray.com>
+The patch adds fragment size check.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12140
+Lustre-commit: 4d43a6c3b182 ("LU-12140 lnet: adds checking msg len")
+Signed-off-by: Alexander Boyko <c17825@cray.com>
+Cray-bug-id: LUS-7174
+Reviewed-on: https://review.whamcloud.com/34975
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ net/lnet/lnet/lib-md.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 8eeb5ec..0ee3a55 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -2390,10 +2390,15 @@ struct lnet_ni *
+diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
+index 7ea0f5e..4a70c76 100644
+--- a/net/lnet/lnet/lib-md.c
++++ b/net/lnet/lnet/lib-md.c
+@@ -325,6 +325,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 		CERROR("Invalid option: too many fragments %u, %d max\n",
+ 		       umd->length, LNET_MAX_IOV);
+ 		return -EINVAL;
++	} else if (umd->length > LNET_MTU) {
++		CERROR("Invalid length: too big fragment size %u, %d max\n",
++		       umd->length, LNET_MTU);
++		return -EINVAL;
+ 	}
  
- 	rc = lnet_handle_send_case_locked(&send_data);
- 
-+	/* Update the local cpt since send_data.sd_cpt might've been
-+	 * updated as a result of calling lnet_handle_send_case_locked().
-+	 */
-+	cpt = send_data.sd_cpt;
-+
- 	if (rc == REPEAT_SEND)
- 		goto again;
- 
--	lnet_net_unlock(send_data.sd_cpt);
-+	lnet_net_unlock(cpt);
- 
- 	return rc;
- }
+ 	return 0;
 -- 
 1.8.3.1
