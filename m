@@ -1,203 +1,142 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:13 -0500
-Subject: [lustre-devel] [PATCH 145/622] lnet: unlink md if fail to send
- recovery
+Date: Thu, 27 Feb 2020 16:10:14 -0500
+Subject: [lustre-devel] [PATCH 146/622] lustre: obd: use correct names for
+ conn_uuid
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-146-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-147-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+The LUSTRE_R[OW]_ATTR() macros assume that the name of the sysfs
+file to create matches the beginning of the function names. In
+the case of LUSTRE_RO_ATTR(conn_uuid) this maps to the function
+conn_uuid_show() and generated sysfs files "conn_uuid". While it
+makes sense to standardize this interface we need to keep the
+old xxx_conn_uuid. We can create these xxx_conn_uuid sysfs files
+by using the base sysfs attr macro LUSTRE_ATTR().
 
-MD for recovery ping should be unlinked if we fail to send the GET.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11474
-Lustre-commit: e0132e16df15 ("LU-11474 lnet: unlink md if fail to send recovery")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33306
-Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
+Lustre-commit: f2bf876ef77e ("LU-8066 obd: use correct names for conn_uuid")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/33213
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h |  7 ++++--
- net/lnet/lnet/lib-move.c       | 48 +++++++++++++++++++++++++++++++++---------
- 2 files changed, 43 insertions(+), 12 deletions(-)
+ fs/lustre/mdc/lproc_mdc.c           |  7 ++++---
+ fs/lustre/mgc/lproc_mgc.c           |  5 +++--
+ fs/lustre/obdclass/lprocfs_status.c | 24 ------------------------
+ fs/lustre/osc/lproc_osc.c           |  5 +++--
+ 4 files changed, 10 insertions(+), 31 deletions(-)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index f82ebb6..b2159b0 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -317,7 +317,8 @@ struct lnet_tx_queue {
- #define LNET_NI_STATE_ACTIVE		(1 << 1)
- #define LNET_NI_STATE_FAILED		(1 << 2)
- #define LNET_NI_STATE_RECOVERY_PENDING	(1 << 3)
--#define LNET_NI_STATE_DELETING		(1 << 4)
-+#define LNET_NI_STATE_RECOVERY_FAILED	BIT(4)
-+#define LNET_NI_STATE_DELETING		BIT(5)
+diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
+index 0c52bcf..746dd21 100644
+--- a/fs/lustre/mdc/lproc_mdc.c
++++ b/fs/lustre/mdc/lproc_mdc.c
+@@ -303,8 +303,8 @@ static ssize_t max_mod_rpcs_in_flight_store(struct kobject *kobj,
  
- enum lnet_stats_type {
- 	LNET_STATS_TYPE_SEND	= 0,
-@@ -606,8 +607,10 @@ struct lnet_peer_ni {
- #define LNET_PEER_NI_NON_MR_PREF	BIT(0)
- /* peer is being recovered. */
- #define LNET_PEER_NI_RECOVERY_PENDING	BIT(1)
-+/* recovery ping failed */
-+#define LNET_PEER_NI_RECOVERY_FAILED	BIT(2)
- /* peer is being deleted */
--#define LNET_PEER_NI_DELETING		BIT(2)
-+#define LNET_PEER_NI_DELETING		BIT(3)
+ LUSTRE_RW_ATTR(max_pages_per_rpc);
  
- struct lnet_peer {
- 	/* chain on pt_peer_list */
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 38ee970..b54fbab 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -2615,13 +2615,13 @@ struct lnet_mt_event_info {
+-#define mdc_conn_uuid_show conn_uuid_show
+-LUSTRE_RO_ATTR(mdc_conn_uuid);
++LUSTRE_ATTR(mds_conn_uuid, 0444, conn_uuid_show, NULL);
++LUSTRE_RO_ATTR(conn_uuid);
  
- /* called with cpt and ni_lock held */
- static void
--lnet_unlink_ni_recovery_mdh_locked(struct lnet_ni *ni, int cpt)
-+lnet_unlink_ni_recovery_mdh_locked(struct lnet_ni *ni, int cpt, bool force)
- {
- 	struct lnet_handle_md recovery_mdh;
+ LUSTRE_RO_ATTR(ping);
  
- 	LNetInvalidateMDHandle(&recovery_mdh);
+@@ -529,7 +529,8 @@ static ssize_t mdc_dom_min_repsize_seq_write(struct file *file,
+ 	&lustre_attr_max_rpcs_in_flight.attr,
+ 	&lustre_attr_max_mod_rpcs_in_flight.attr,
+ 	&lustre_attr_max_pages_per_rpc.attr,
+-	&lustre_attr_mdc_conn_uuid.attr,
++	&lustre_attr_mds_conn_uuid.attr,
++	&lustre_attr_conn_uuid.attr,
+ 	&lustre_attr_ping.attr,
+ 	NULL,
+ };
+diff --git a/fs/lustre/mgc/lproc_mgc.c b/fs/lustre/mgc/lproc_mgc.c
+index 4c276f9..676d479 100644
+--- a/fs/lustre/mgc/lproc_mgc.c
++++ b/fs/lustre/mgc/lproc_mgc.c
+@@ -66,13 +66,14 @@ struct lprocfs_vars lprocfs_mgc_obd_vars[] = {
+ 	{ NULL }
+ };
  
--	if (ni->ni_state & LNET_NI_STATE_RECOVERY_PENDING) {
-+	if (ni->ni_state & LNET_NI_STATE_RECOVERY_PENDING || force) {
- 		recovery_mdh = ni->ni_ping_mdh;
- 		LNetInvalidateMDHandle(&ni->ni_ping_mdh);
- 	}
-@@ -2675,12 +2675,22 @@ struct lnet_mt_event_info {
- 		if (!(ni->ni_state & LNET_NI_STATE_ACTIVE) ||
- 		    healthv == LNET_MAX_HEALTH_VALUE) {
- 			list_del_init(&ni->ni_recovery);
--			lnet_unlink_ni_recovery_mdh_locked(ni, 0);
-+			lnet_unlink_ni_recovery_mdh_locked(ni, 0, false);
- 			lnet_ni_unlock(ni);
- 			lnet_ni_decref_locked(ni, 0);
- 			lnet_net_unlock(0);
- 			continue;
- 		}
-+
-+		/* if the local NI failed recovery we must unlink the md.
-+		 * But we want to keep the local_ni on the recovery queue
-+		 * so we can continue the attempts to recover it.
-+		 */
-+		if (ni->ni_state & LNET_NI_STATE_RECOVERY_FAILED) {
-+			lnet_unlink_ni_recovery_mdh_locked(ni, 0, true);
-+			ni->ni_state &= ~LNET_NI_STATE_RECOVERY_FAILED;
-+		}
-+
- 		lnet_ni_unlock(ni);
- 		lnet_net_unlock(0);
+-#define mgs_conn_uuid_show conn_uuid_show
+-LUSTRE_RO_ATTR(mgs_conn_uuid);
++LUSTRE_ATTR(mgs_conn_uuid, 0444, conn_uuid_show, NULL);
++LUSTRE_RO_ATTR(conn_uuid);
  
-@@ -2829,7 +2839,7 @@ struct lnet_mt_event_info {
- 				struct lnet_ni, ni_recovery);
- 		list_del_init(&ni->ni_recovery);
- 		lnet_ni_lock(ni);
--		lnet_unlink_ni_recovery_mdh_locked(ni, 0);
-+		lnet_unlink_ni_recovery_mdh_locked(ni, 0, true);
- 		lnet_ni_unlock(ni);
- 		lnet_ni_decref_locked(ni, 0);
- 	}
-@@ -2838,13 +2848,14 @@ struct lnet_mt_event_info {
+ LUSTRE_RO_ATTR(ping);
+ 
+ static struct attribute *mgc_attrs[] = {
+ 	&lustre_attr_mgs_conn_uuid.attr,
++	&lustre_attr_conn_uuid.attr,
+ 	&lustre_attr_ping.attr,
+ 	NULL,
+ };
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index b3dbe85..cce9bec 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -524,30 +524,6 @@ int lprocfs_rd_server_uuid(struct seq_file *m, void *data)
  }
+ EXPORT_SYMBOL(lprocfs_rd_server_uuid);
  
- static void
--lnet_unlink_lpni_recovery_mdh_locked(struct lnet_peer_ni *lpni, int cpt)
-+lnet_unlink_lpni_recovery_mdh_locked(struct lnet_peer_ni *lpni, int cpt,
-+				     bool force)
- {
- 	struct lnet_handle_md recovery_mdh;
- 
- 	LNetInvalidateMDHandle(&recovery_mdh);
- 
--	if (lpni->lpni_state & LNET_PEER_NI_RECOVERY_PENDING) {
-+	if (lpni->lpni_state & LNET_PEER_NI_RECOVERY_PENDING || force) {
- 		recovery_mdh = lpni->lpni_recovery_ping_mdh;
- 		LNetInvalidateMDHandle(&lpni->lpni_recovery_ping_mdh);
- 	}
-@@ -2867,7 +2878,7 @@ struct lnet_mt_event_info {
- 				 lpni_recovery) {
- 		list_del_init(&lpni->lpni_recovery);
- 		spin_lock(&lpni->lpni_lock);
--		lnet_unlink_lpni_recovery_mdh_locked(lpni, LNET_LOCK_EX);
-+		lnet_unlink_lpni_recovery_mdh_locked(lpni, LNET_LOCK_EX, true);
- 		spin_unlock(&lpni->lpni_lock);
- 		lnet_peer_ni_decref_locked(lpni);
- 	}
-@@ -2933,12 +2944,22 @@ struct lnet_mt_event_info {
- 		if (lpni->lpni_state & LNET_PEER_NI_DELETING ||
- 		    healthv == LNET_MAX_HEALTH_VALUE) {
- 			list_del_init(&lpni->lpni_recovery);
--			lnet_unlink_lpni_recovery_mdh_locked(lpni, 0);
-+			lnet_unlink_lpni_recovery_mdh_locked(lpni, 0, false);
- 			spin_unlock(&lpni->lpni_lock);
- 			lnet_peer_ni_decref_locked(lpni);
- 			lnet_net_unlock(0);
- 			continue;
- 		}
-+
-+		/* If the peer NI has failed recovery we must unlink the
-+		 * md. But we want to keep the peer ni on the recovery
-+		 * queue so we can try to continue recovering it
-+		 */
-+		if (lpni->lpni_state & LNET_PEER_NI_RECOVERY_FAILED) {
-+			lnet_unlink_lpni_recovery_mdh_locked(lpni, 0, true);
-+			lpni->lpni_state &= ~LNET_PEER_NI_RECOVERY_FAILED;
-+		}
-+
- 		spin_unlock(&lpni->lpni_lock);
- 		lnet_net_unlock(0);
- 
-@@ -3152,11 +3173,14 @@ struct lnet_mt_event_info {
- 		}
- 		lnet_ni_lock(ni);
- 		ni->ni_state &= ~LNET_NI_STATE_RECOVERY_PENDING;
-+		if (status)
-+			ni->ni_state |= LNET_NI_STATE_RECOVERY_FAILED;
- 		lnet_ni_unlock(ni);
- 		lnet_net_unlock(0);
- 
- 		if (status != 0) {
--			CERROR("local NI recovery failed with %d\n", status);
-+			CERROR("local NI (%s) recovery failed with %d\n",
-+			       libcfs_nid2str(nid), status);
- 			return;
- 		}
- 		/* need to increment healthv for the ni here, because in
-@@ -3178,12 +3202,15 @@ struct lnet_mt_event_info {
- 		}
- 		spin_lock(&lpni->lpni_lock);
- 		lpni->lpni_state &= ~LNET_PEER_NI_RECOVERY_PENDING;
-+		if (status)
-+			lpni->lpni_state |= LNET_PEER_NI_RECOVERY_FAILED;
- 		spin_unlock(&lpni->lpni_lock);
- 		lnet_peer_ni_decref_locked(lpni);
- 		lnet_net_unlock(cpt);
- 
- 		if (status != 0)
--			CERROR("peer NI recovery failed with %d\n", status);
-+			CERROR("peer NI (%s) recovery failed with %d\n",
-+			       libcfs_nid2str(nid), status);
- 	}
+-int lprocfs_rd_conn_uuid(struct seq_file *m, void *data)
+-{
+-	struct obd_device *obd = data;
+-	struct ptlrpc_connection *conn;
+-	int rc;
+-
+-	LASSERT(obd);
+-
+-	rc = lprocfs_climp_check(obd);
+-	if (rc)
+-		return rc;
+-
+-	conn = obd->u.cli.cl_import->imp_connection;
+-	if (conn && obd->u.cli.cl_import)
+-		seq_printf(m, "%s\n", conn->c_remote_uuid.uuid);
+-	else
+-		seq_puts(m, "<none>\n");
+-
+-	up_read(&obd->u.cli.cl_sem);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(lprocfs_rd_conn_uuid);
+-
+ /**
+  * Lock statistics structure for access, possibly only on this CPU.
+  *
+diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
+index f025275..d9030b7 100644
+--- a/fs/lustre/osc/lproc_osc.c
++++ b/fs/lustre/osc/lproc_osc.c
+@@ -173,8 +173,8 @@ static ssize_t max_dirty_mb_store(struct kobject *kobj,
  }
+ LUSTRE_RW_ATTR(max_dirty_mb);
  
-@@ -3214,6 +3241,7 @@ struct lnet_mt_event_info {
- 		       libcfs_nid2str(ev_info->mt_nid),
- 		       (event->status) ? "unsuccessfully" :
- 		       "successfully", event->status);
-+		lnet_handle_recovery_reply(ev_info, event->status);
- 		break;
- 	default:
- 		CERROR("Unexpected event: %d\n", event->type);
+-#define ost_conn_uuid_show conn_uuid_show
+-LUSTRE_RO_ATTR(ost_conn_uuid);
++LUSTRE_ATTR(ost_conn_uuid, 0444, conn_uuid_show, NULL);
++LUSTRE_RO_ATTR(conn_uuid);
+ 
+ LUSTRE_RO_ATTR(ping);
+ 
+@@ -962,6 +962,7 @@ void lproc_osc_attach_seqstat(struct obd_device *dev)
+ 	&lustre_attr_short_io_bytes.attr,
+ 	&lustre_attr_resend_count.attr,
+ 	&lustre_attr_ost_conn_uuid.attr,
++	&lustre_attr_conn_uuid.attr,
+ 	&lustre_attr_ping.attr,
+ 	&lustre_attr_idle_timeout.attr,
+ 	&lustre_attr_idle_connect.attr,
 -- 
 1.8.3.1
