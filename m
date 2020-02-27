@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:09:15 -0500
-Subject: [lustre-devel] [PATCH 087/622] lnet: remove duplicate timeout
- mechanism
+Date: Thu, 27 Feb 2020 16:09:16 -0500
+Subject: [lustre-devel] [PATCH 088/622] lnet: handle fatal device error
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-88-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-89-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,91 +12,97 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <ashehata@whamcloud.com>
 
-Remove the duplicate GET/PUT timeout mechanism currently implemented
-for discovery, as it has been replaced by a more generic timeout
-mechanism for all GET/PUT messages.
+The o2iblnd can receive device status on the QP event handler.
+There are three in specific that are being handled in this patch:
+IB_EVENT_DEVICE_FATAL
+IB_EVENT_PORT_ERR
+IB_EVENT_PORT_ACTIVE
+For DEVICE_FATAL and PORT_ERR the NI associated with the QP is set
+in fatal error mode. This NI will no longer be selected when sending
+messages. When PORT_ACTIVE is received the NI associated with the QP
+has the fatal error cleared and future messages can use that NI.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-9120
-Lustre-commit: 0b1947d14188 ("LU-9120 lnet: remove duplicate timeout mechanism")
+Lustre-commit: 6b1571209a99 ("LU-9120 lnet: handle fatal device error")
 Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32992
+Reviewed-on: https://review.whamcloud.com/32772
 Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
 Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/peer.c | 39 ---------------------------------------
- 1 file changed, 39 deletions(-)
+ include/linux/lnet/lib-types.h      |  7 +++++++
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 13 +++++++++++++
+ net/lnet/lnet/lib-move.c            |  6 +++++-
+ 3 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 4a62f9a..ca9b90b 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -2925,25 +2925,6 @@ static int lnet_peer_rediscover(struct lnet_peer *lp)
- }
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index d815a87..2b3e76a 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -443,6 +443,13 @@ struct lnet_ni {
+ 	atomic_t		ni_healthv;
  
- /*
-- * Returns the first peer on the ln_dc_working queue if its timeout
-- * has expired. Takes the current time as an argument so as to not
-- * obsessively re-check the clock. The oldest discovery request will
-- * be at the head of the queue.
-- */
--static struct lnet_peer *lnet_peer_get_dc_timed_out(time64_t now)
--{
--	struct lnet_peer *lp;
--
--	if (list_empty(&the_lnet.ln_dc_working))
--		return NULL;
--	lp = list_first_entry(&the_lnet.ln_dc_working,
--			      struct lnet_peer, lp_dc_list);
--	if (now < lp->lp_last_queued + lnet_transaction_timeout)
--		return NULL;
--	return lp;
--}
--
--/*
-  * Discovering this peer is taking too long. Cancel any Ping or Push
-  * that discovery is waiting on by unlinking the relevant MDs. The
-  * lnet_discovery_event_handler() will proceed from here and complete
-@@ -2998,8 +2979,6 @@ static int lnet_peer_discovery_wait_for_work(void)
- 			break;
- 		if (!list_empty(&the_lnet.ln_msg_resend))
- 			break;
--		if (lnet_peer_get_dc_timed_out(ktime_get_real_seconds()))
--			break;
- 		lnet_net_unlock(cpt);
+ 	/*
++	 * Set to 1 by the LND when it receives an event telling it the device
++	 * has gone into a fatal state. Set to 0 when the LND receives an
++	 * even telling it the device is back online.
++	 */
++	atomic_t		ni_fatal_error_on;
++
++	/*
+ 	 * equivalent interfaces to use
+ 	 * This is an array because socklnd bonding can still be configured
+ 	 */
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index c6e8e73..293a859 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -3567,6 +3567,19 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		rdma_notify(conn->ibc_cmid, IB_EVENT_COMM_EST);
+ 		return;
+ 
++	case IB_EVENT_PORT_ERR:
++	case IB_EVENT_DEVICE_FATAL:
++		CERROR("Fatal device error for NI %s\n",
++		       libcfs_nid2str(conn->ibc_peer->ibp_ni->ni_nid));
++		atomic_set(&conn->ibc_peer->ibp_ni->ni_fatal_error_on, 1);
++		return;
++
++	case IB_EVENT_PORT_ACTIVE:
++		CERROR("Port reactivated for NI %s\n",
++		       libcfs_nid2str(conn->ibc_peer->ibp_ni->ni_nid));
++		atomic_set(&conn->ibc_peer->ibp_ni->ni_fatal_error_on, 0);
++		return;
++
+ 	default:
+ 		CERROR("%s: Async QP event type %d\n",
+ 		       libcfs_nid2str(conn->ibc_peer->ibp_nid), event->event);
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 55cbf57..8d5f1e5 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -1303,9 +1303,11 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		unsigned int distance;
+ 		int ni_credits;
+ 		int ni_healthv;
++		int ni_fatal;
+ 
+ 		ni_credits = atomic_read(&ni->ni_tx_credits);
+ 		ni_healthv = atomic_read(&ni->ni_healthv);
++		ni_fatal = atomic_read(&ni->ni_fatal_error_on);
  
  		/*
-@@ -3068,7 +3047,6 @@ static void lnet_resend_msgs(void)
- static int lnet_peer_discovery(void *arg)
- {
- 	struct lnet_peer *lp;
--	time64_t now;
- 	int rc;
- 
- 	CDEBUG(D_NET, "started\n");
-@@ -3159,23 +3137,6 @@ static int lnet_peer_discovery(void *arg)
- 				break;
- 		}
- 
--		/*
--		 * Now that the ln_dc_request queue has been emptied
--		 * check the ln_dc_working queue for peers that are
--		 * taking too long. Move all that are found to the
--		 * ln_dc_expired queue and time out any pending
--		 * Ping or Push. We have to drop the lnet_net_lock
--		 * in the loop because lnet_peer_cancel_discovery()
--		 * calls LNetMDUnlink().
--		 */
--		now = ktime_get_real_seconds();
--		while ((lp = lnet_peer_get_dc_timed_out(now)) != NULL) {
--			list_move(&lp->lp_dc_list, &the_lnet.ln_dc_expired);
--			lnet_net_unlock(LNET_LOCK_EX);
--			lnet_peer_cancel_discovery(lp);
--			lnet_net_lock(LNET_LOCK_EX);
--		}
--
- 		lnet_net_unlock(LNET_LOCK_EX);
- 	}
- 
+ 		 * calculate the distance from the CPT on which
+@@ -1334,7 +1336,9 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		 * Select on health, shorter distance, available
+ 		 * credits, then round-robin.
+ 		 */
+-		if (ni_healthv < best_healthv) {
++		if (ni_fatal) {
++			continue;
++		} else if (ni_healthv < best_healthv) {
+ 			continue;
+ 		} else if (ni_healthv > best_healthv) {
+ 			best_healthv = ni_healthv;
 -- 
 1.8.3.1
