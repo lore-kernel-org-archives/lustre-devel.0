@@ -1,107 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:58 -0500
-Subject: [lustre-devel] [PATCH 070/622] lustre: lfsck: layout LFSCK for
- mirrored file
+Date: Thu, 27 Feb 2020 16:09:43 -0500
+Subject: [lustre-devel] [PATCH 115/622] lustre: obdclass: remove unused
+ ll_import_cachep
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-71-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-116-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Fan Yong <fan.yong@intel.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-This patch makes the layout LFSCK to support mirrored file
-as following:
+The ll_import_cache is not used anywhere, and can be removed.
 
-1. Verify mirrored file's LOV EA and PFID EA, including all
-   kinds of inconsistencies as non-mirrored file may hit.
-
-2. Rebuild mirrored file's LOV EA from orphan OST-objects,
-   recover the component's status/flags before the crash:
-   init, stale, and so on.
-
-3. For the mirrored file with dangling reference (OST object),
-   it does NOT rebuild the lost OST-object from other replica,
-   instead, it either reports the curruption or re-create empty
-   OST-object that follows the same rules as non-mirrored case.
-
-Some code cleanup and new test cases for LFSCK against mirrored file.
-
-For the linux client we want to keep the wire protocol in sync.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10288
-Lustre-commit: 36ba989752c6 ("LU-10288 lfsck: layout LFSCK for mirrored file")
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Reviewed-on: https://review.whamcloud.com/32705
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10899
+Lustre-commit: e23250110729 ("LU-10899 obdclass: remove unused ll_import_cachep")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33119
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/pack_generic.c         |  4 +++-
- fs/lustre/ptlrpc/wiretest.c             | 16 ++++++++++++----
- include/uapi/linux/lustre/lustre_user.h |  4 +++-
- 3 files changed, 18 insertions(+), 6 deletions(-)
+ fs/lustre/obdclass/genops.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
-index 9cea826..d09cf3f 100644
---- a/fs/lustre/ptlrpc/pack_generic.c
-+++ b/fs/lustre/ptlrpc/pack_generic.c
-@@ -2066,7 +2066,9 @@ void lustre_swab_lov_comp_md_v1(struct lov_comp_md_v1 *lum)
- 		__swab64s(&ent->lcme_extent.e_end);
- 		__swab32s(&ent->lcme_offset);
- 		__swab32s(&ent->lcme_size);
--		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding) == 0);
-+		__swab32s(&ent->lcme_layout_gen);
-+		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding_1) == 0);
-+		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding_2) == 0);
+diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
+index fc50aba..a122332 100644
+--- a/fs/lustre/obdclass/genops.c
++++ b/fs/lustre/obdclass/genops.c
+@@ -48,7 +48,6 @@
+ static struct kmem_cache *obd_device_cachep;
+ struct kmem_cache *obdo_cachep;
+ EXPORT_SYMBOL(obdo_cachep);
+-static struct kmem_cache *import_cachep;
  
- 		v1 = (struct lov_user_md_v1 *)((char *)lum + off);
- 		stripe_count = v1->lmm_stripe_count;
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index b4bb30d..e22f8f8 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1536,10 +1536,18 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_size));
- 	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_size) == 4, "found %lld\n",
- 		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_size));
--	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding) == 32, "found %lld\n",
--		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding));
--	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding) == 16, "found %lld\n",
--		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_layout_gen) == 32, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_layout_gen));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_layout_gen) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_layout_gen));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_1) == 36, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_1));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_1) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_1));
-+	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_2) == 40, "found %lld\n",
-+		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_2));
-+	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_2) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_2));
- 	LASSERTF(LCME_FL_INIT == 0x00000010UL, "found 0x%.8xUL\n",
- 		 (unsigned int)LCME_FL_INIT);
- 	LASSERTF(LCME_FL_NEG == 0x80000000UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index b2f5b57..8fd5b26 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -517,7 +517,9 @@ struct lov_comp_md_entry_v1 {
- 						 * start from lov_comp_md_v1
- 						 */
- 	__u32			lcme_size;	/* size of component blob */
--	__u64			lcme_padding[2];
-+	__u32			lcme_layout_gen;
-+	__u32			lcme_padding_1;
-+	__u64			lcme_padding_2;
- } __packed;
+ static struct kobj_type class_ktype;
+ static struct workqueue_struct *zombie_wq;
+@@ -648,8 +647,6 @@ void obd_cleanup_caches(void)
+ 	obd_device_cachep = NULL;
+ 	kmem_cache_destroy(obdo_cachep);
+ 	obdo_cachep = NULL;
+-	kmem_cache_destroy(import_cachep);
+-	import_cachep = NULL;
+ }
  
- #define SEQ_ID_MAX		0x0000FFFF
+ int obd_init_caches(void)
+@@ -667,13 +664,6 @@ int obd_init_caches(void)
+ 	if (!obdo_cachep)
+ 		goto out;
+ 
+-	LASSERT(!import_cachep);
+-	import_cachep = kmem_cache_create("ll_import_cache",
+-					  sizeof(struct obd_import),
+-					  0, 0, NULL);
+-	if (!import_cachep)
+-		goto out;
+-
+ 	return 0;
+ out:
+ 	obd_cleanup_caches();
 -- 
 1.8.3.1
