@@ -1,167 +1,96 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:38 -0500
-Subject: [lustre-devel] [PATCH 590/622] lustre: ldlm: signal vs CP callback
- race
+Date: Thu, 27 Feb 2020 16:17:56 -0500
+Subject: [lustre-devel] [PATCH 608/622] lustre: lustre: Reserve
+ OST_FALLOCATE(fallocate) opcode
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-591-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-609-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+From: Swapnil Pimpale <spimpale@ddn.com>
 
-In case of interrupted wait for a CP AST
-failed_lock_cleanup() sets LDLM_FL_LOCAL_ONLY, so
-the client wouldn't cancel the lock on CP AST.
+A new RPC, OST_FALLOCATE has been added for
+space preallocation. This patch reserves
+OST_FALLOCATE opcode for fallocate syscall.
+Reserving opcode upfront would ensure consistency
+and would avoid protocol interoperability issues
+in the future.
 
-A lock isn't canceled on the server on reception
-
-Cray-bug-id: LUS-2021
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7791
-Lustre-commit: 7fff052c930d ("LU-7791 ldlm: signal vs CP callback race")
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-by: Alexander Boyko <c17825@cray.com>
-Reviewed-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-on: https://review.whamcloud.com/19898
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-3606
+Lustre-commit: 46a11df089c9 ("LU-3606 lustre: Reserve OST_FALLOCATE(fallocate) opcode")
+Signed-off-by: Swapnil Pimpale <spimpale@ddn.com>
+Signed-off-by: Li Xi <lixi@ddn.com>
+Signed-off-by: Abrarahmed Momin <abrar.momin@gmail.com>
+Signed-off-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-on: https://review.whamcloud.com/37277
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h |  1 +
- fs/lustre/ldlm/ldlm_lockd.c     | 51 +++++++++++++++++++++++++----------------
- fs/lustre/ldlm/ldlm_request.c   |  3 +++
- 3 files changed, 35 insertions(+), 20 deletions(-)
+ fs/lustre/ptlrpc/lproc_ptlrpc.c        | 3 ++-
+ fs/lustre/ptlrpc/wiretest.c            | 4 +++-
+ include/uapi/linux/lustre/lustre_idl.h | 2 ++
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index a26ac76..7dfef0f 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -302,6 +302,7 @@
- #define OBD_FAIL_LDLM_CP_CB_WAIT3			0x321
- #define OBD_FAIL_LDLM_CP_CB_WAIT4			0x322
- #define OBD_FAIL_LDLM_CP_CB_WAIT5			0x323
-+#define OBD_FAIL_LDLM_PAUSE_CANCEL_LOCAL		0x329
+diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+index f34aec3..fc7aa3e 100644
+--- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -67,6 +67,7 @@
+ 	{ OST_QUOTACTL,				"ost_quotactl" },
+ 	{ OST_QUOTA_ADJUST_QUNIT,		"ost_quota_adjust_qunit" },
+ 	{ OST_LADVISE,				"ost_ladvise" },
++	{ OST_FALLOCATE,			"ost_fallocate"},
+ 	{ MDS_GETATTR,				"mds_getattr" },
+ 	{ MDS_GETATTR_NAME,			"mds_getattr_lock" },
+ 	{ MDS_CLOSE,				"mds_close" },
+@@ -115,7 +116,7 @@
+ 	{ 401, /* was OBD_LOG_CANCEL */		"llog_cancel" },
+ 	{ 402, /* was OBD_QC_CALLBACK */	"obd_quota_callback" },
+ 	{ OBD_IDX_READ,				"dt_index_read" },
+-	{ LLOG_ORIGIN_HANDLE_CREATE,		 "llog_origin_handle_open" },
++	{ LLOG_ORIGIN_HANDLE_CREATE,		"llog_origin_handle_open" },
+ 	{ LLOG_ORIGIN_HANDLE_NEXT_BLOCK,	"llog_origin_handle_next_block" },
+ 	{ LLOG_ORIGIN_HANDLE_READ_HEADER,	"llog_origin_handle_read_header" },
+ 	{ 504, /*LLOG_ORIGIN_HANDLE_WRITE_REC*/	"llog_origin_handle_write_rec" },
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 96f327f..d94d2d9 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -106,7 +106,9 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)OST_QUOTA_ADJUST_QUNIT);
+ 	LASSERTF(OST_LADVISE == 21, "found %lld\n",
+ 		 (long long)OST_LADVISE);
+-	LASSERTF(OST_LAST_OPC == 22, "found %lld\n",
++	LASSERTF(OST_FALLOCATE == 22, "found %lld\n",
++		 (long long)OST_FALLOCATE);
++	LASSERTF(OST_LAST_OPC == 23, "found %lld\n",
+ 		 (long long)OST_LAST_OPC);
+ 	LASSERTF(OBD_OBJECT_EOF == 0xffffffffffffffffULL, "found 0x%.16llxULL\n",
+ 		 OBD_OBJECT_EOF);
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index df2e34b..12ab369 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -956,6 +956,7 @@ enum ost_cmd {
+ 	OST_QUOTACTL	= 19,
+ 	OST_QUOTA_ADJUST_QUNIT = 20, /* not used since 2.4 */
+ 	OST_LADVISE	= 21,
++	OST_FALLOCATE	= 22,
+ 	OST_LAST_OPC /* must be < 33 to avoid MDS_GETATTR */
+ };
+ #define OST_FIRST_OPC  OST_REPLY
+@@ -2789,6 +2790,7 @@ struct obdo {
+ #define o_dropped o_misc
+ #define o_cksum   o_nlink
+ #define o_grant_used o_data_version
++#define o_falloc_mode o_nlink
  
- #define OBD_FAIL_LDLM_GRANT_CHECK			0x32a
- #define OBD_FAIL_LDLM_LOCAL_CANCEL_PAUSE		0x32c
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index 32b7be1..b252fef 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -187,15 +187,29 @@ void ldlm_handle_bl_callback(struct ldlm_namespace *ns,
- 	LDLM_LOCK_RELEASE(lock);
- }
- 
-+static int ldlm_callback_reply(struct ptlrpc_request *req, int rc)
-+{
-+	if (req->rq_no_reply)
-+		return 0;
-+
-+	req->rq_status = rc;
-+	if (!req->rq_packed_final) {
-+		rc = lustre_pack_reply(req, 1, NULL, NULL);
-+		if (rc)
-+			return rc;
-+	}
-+	return ptlrpc_reply(req);
-+}
-+
- /*
-  * Callback handler for receiving incoming completion ASTs.
-  *
-  * This only can happen on client side.
-  */
--static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
--				    struct ldlm_namespace *ns,
--				    struct ldlm_request *dlm_req,
--				    struct ldlm_lock *lock)
-+static int ldlm_handle_cp_callback(struct ptlrpc_request *req,
-+				   struct ldlm_namespace *ns,
-+				   struct ldlm_request *dlm_req,
-+				   struct ldlm_lock *lock)
- {
- 	int lvb_len;
- 	LIST_HEAD(ast_list);
-@@ -206,6 +220,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_CANCEL_BL_CB_RACE)) {
- 		long to = HZ;
- 
-+		ldlm_callback_reply(req, 0);
-+
- 		while (to > 0) {
- 			schedule_timeout_interruptible(to);
- 			if (ldlm_is_granted(lock) ||
-@@ -250,6 +266,12 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 		lock_res_and_lock(lock);
- 	}
- 
-+	if (ldlm_is_failed(lock)) {
-+		unlock_res_and_lock(lock);
-+		LDLM_LOCK_RELEASE(lock);
-+		return -EINVAL;
-+	}
-+
- 	if (ldlm_is_destroyed(lock) ||
- 	    ldlm_is_granted(lock)) {
- 		/* bug 11300: the lock has already been granted */
-@@ -321,6 +343,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 		wake_up(&lock->l_waitq);
- 	}
- 	LDLM_LOCK_RELEASE(lock);
-+
-+	return 0;
- }
- 
- /**
-@@ -373,20 +397,6 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
- 	LDLM_LOCK_RELEASE(lock);
- }
- 
--static int ldlm_callback_reply(struct ptlrpc_request *req, int rc)
--{
--	if (req->rq_no_reply)
--		return 0;
--
--	req->rq_status = rc;
--	if (!req->rq_packed_final) {
--		rc = lustre_pack_reply(req, 1, NULL, NULL);
--		if (rc)
--			return rc;
--	}
--	return ptlrpc_reply(req);
--}
--
- static int __ldlm_bl_to_thread(struct ldlm_bl_work_item *blwi,
- 			       enum ldlm_cancel_flags cancel_flags)
- {
-@@ -714,8 +724,9 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
- 	case LDLM_CP_CALLBACK:
- 		CDEBUG(D_INODE, "completion ast\n");
- 		req_capsule_extend(&req->rq_pill, &RQF_LDLM_CP_CALLBACK);
--		ldlm_callback_reply(req, 0);
--		ldlm_handle_cp_callback(req, ns, dlm_req, lock);
-+		rc = ldlm_handle_cp_callback(req, ns, dlm_req, lock);
-+		if (!OBD_FAIL_CHECK(OBD_FAIL_LDLM_CANCEL_BL_CB_RACE))
-+			ldlm_callback_reply(req, rc);
- 		break;
- 	case LDLM_GL_CALLBACK:
- 		CDEBUG(D_INODE, "glimpse ast\n");
-diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
-index 7eba8d2..fcb2af5 100644
---- a/fs/lustre/ldlm/ldlm_request.c
-+++ b/fs/lustre/ldlm/ldlm_request.c
-@@ -964,6 +964,9 @@ static u64 ldlm_cli_cancel_local(struct ldlm_lock *lock)
- 		bool local_only;
- 
- 		LDLM_DEBUG(lock, "client-side cancel");
-+		OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_PAUSE_CANCEL_LOCAL,
-+				 cfs_fail_val);
-+
- 		/* Set this flag to prevent others from getting new references*/
- 		lock_res_and_lock(lock);
- 		ldlm_set_cbpending(lock);
+ /* request structure for OST's */
+ struct ost_body {
 -- 
 1.8.3.1
