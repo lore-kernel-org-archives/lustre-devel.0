@@ -1,404 +1,230 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:53 -0500
-Subject: [lustre-devel] [PATCH 425/622] lnet: support non-default network
- namespace
+Date: Thu, 27 Feb 2020 16:15:05 -0500
+Subject: [lustre-devel] [PATCH 437/622] lustre: llite: Fix extents_stats
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-426-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-438-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Aurelien Degremont <degremoa@amazon.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Replace hard coded references to default root network namespace
-(&init_net) in LNET code (LNET, socklnd and o2iblnd).
+Patch 32517 from LU-8066 that landed in OpenSFS branch changed:
+        (1 << LL_HIST_START << i)
 
-When a network interface is created, Lustre records the current
-network namespace. This patch improves the LNET code to use
-this reference namespace most of the time instead of the root
-network namespace. When using lctl, lnetctl or insmod, we
-use the current process network namespace.
-When starting the listening acceptor, we use the namespace of the
-process that triggers this start.
+to
 
-An additional patch is needed for RPCSEC GSS support.
+        BIT(LL_HIST_START << i)
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12236
-Lustre-commit: 93b08edfb1c6 ("LU-12236 lnet: support non-default network namespace")
-Signed-off-by: Aurelien Degremont <degremoa@amazon.com>
-Reviewed-on: https://review.whamcloud.com/34768
-Reviewed-by: Chris Horn <hornc@cray.com>
+But these are not equivalent because this changes the order
+of operations.  The earlier one does the operations in this
+order:
+        (1 << LL_HIST_START) << i
+
+The new one is this order:
+        1 << (LL_HIST_START << i)
+
+Which is quite different, as it's left shifting
+LL_HIST_START directly, and LL_HIST_START is a number of
+bits.
+
+The goal is really just to start with BIT(LL_HIST_START)
+and left shift by one (going from 4K, to 8K, etc) each
+time, so just use:
+        BIT(LL_HIST_START + i)
+
+The result of this was that all i/os over 8K were placed in
+the 4K-8K stat bucket, because the loop exited early.
+
+Also add mmap'ed reads & writes to extents_stats.
+
+Add test for extents_stats.
+
+This was only broken in the OpenSFS branch but we want the
+improvements.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12394
+Lustre-commit: d31a4dad4e69 ("LU-12394 llite: Fix extents_stats")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35075
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h       |  9 +++++----
- net/lnet/klnds/o2iblnd/o2iblnd.c    | 22 +++++++++++-----------
- net/lnet/klnds/o2iblnd/o2iblnd.h    |  9 ++++-----
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c |  8 +++++---
- net/lnet/klnds/socklnd/socklnd.c    |  2 +-
- net/lnet/klnds/socklnd/socklnd_cb.c |  3 ++-
- net/lnet/lnet/acceptor.c            | 11 +++++++----
- net/lnet/lnet/config.c              |  6 +++---
- net/lnet/lnet/lib-socket.c          | 13 +++++++------
- 9 files changed, 45 insertions(+), 38 deletions(-)
+ fs/lustre/llite/file.c        | 23 +++++++++++++++++------
+ fs/lustre/llite/llite_mmap.c  | 11 +++++++++++
+ fs/lustre/llite/lproc_llite.c |  6 +++---
+ fs/lustre/llite/vvp_io.c      |  4 ----
+ 4 files changed, 31 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index b1407b3..b889af2 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -717,7 +717,7 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
- void lnet_unregister_lnd(struct lnet_lnd *lnd);
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 35e31ad..fa61b09 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -1670,6 +1670,7 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ {
+ 	struct lu_env *env;
+ 	struct vvp_io_args *args;
++	struct file *file = iocb->ki_filp;
+ 	ssize_t result;
+ 	u16 refcheck;
+ 	ssize_t rc2;
+@@ -1693,7 +1694,7 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ 	if (cached)
+ 		return result;
  
- int lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
--		 u32 local_ip, u32 peer_ip, int peer_port);
-+		 u32 local_ip, u32 peer_ip, int peer_port, struct net *ns);
- void lnet_connect_console_error(int rc, lnet_nid_t peer_nid,
- 				u32 peer_ip, int port);
- int lnet_count_acceptor_nets(void);
-@@ -738,18 +738,19 @@ struct lnet_inetdev {
- 	char	li_name[IFNAMSIZ];
- };
+-	ll_ras_enter(iocb->ki_filp);
++	ll_ras_enter(file);
  
--int lnet_inet_enumerate(struct lnet_inetdev **dev_list);
-+int lnet_inet_enumerate(struct lnet_inetdev **dev_list, struct net *ns);
- int lnet_sock_setbuf(struct socket *socket, int txbufsize, int rxbufsize);
- int lnet_sock_getbuf(struct socket *socket, int *txbufsize, int *rxbufsize);
- int lnet_sock_getaddr(struct socket *socket, bool remote, u32 *ip, int *port);
- int lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout);
- int lnet_sock_read(struct socket *sock, void *buffer, int nob, int timeout);
+ 	result = ll_do_fast_read(iocb, to);
+ 	if (result < 0 || iov_iter_count(to) == 0)
+@@ -1707,7 +1708,7 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ 	args->u.normal.via_iter = to;
+ 	args->u.normal.via_iocb = iocb;
  
--int lnet_sock_listen(struct socket **sockp, u32 ip, int port, int backlog);
-+int lnet_sock_listen(struct socket **sockp, u32 ip, int port, int backlog,
-+		     struct net *ns);
- int lnet_sock_accept(struct socket **newsockp, struct socket *sock);
- int lnet_sock_connect(struct socket **sockp, int *fatal,
- 		      u32 local_ip, int local_port,
--		      u32 peer_ip, int peer_port);
-+		      u32 peer_ip, int peer_port, struct net *ns);
- void libcfs_sock_release(struct socket *sock);
+-	rc2 = ll_file_io_generic(env, args, iocb->ki_filp, CIT_READ,
++	rc2 = ll_file_io_generic(env, args, file, CIT_READ,
+ 				 &iocb->ki_pos, iov_iter_count(to));
+ 	if (rc2 > 0)
+ 		result += rc2;
+@@ -1716,6 +1717,11 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
  
- int lnet_peers_start_down(void);
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index bb7590f..f3176e1 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2358,7 +2358,7 @@ static int kiblnd_dummy_callback(struct rdma_cm_id *cmid,
- 	return 0;
+ 	cl_env_put(env, &refcheck);
+ out:
++	if (result > 0)
++		ll_rw_stats_tally(ll_i2sbi(file_inode(file)), current->pid,
++				  LUSTRE_FPRIVATE(file), iocb->ki_pos, result,
++				  READ);
++
+ 	return result;
  }
  
--static int kiblnd_dev_need_failover(struct kib_dev *dev)
-+static int kiblnd_dev_need_failover(struct kib_dev *dev, struct net *ns)
- {
- 	struct rdma_cm_id *cmid;
- 	struct sockaddr_in srcaddr;
-@@ -2382,8 +2382,8 @@ static int kiblnd_dev_need_failover(struct kib_dev *dev)
- 	 * a. rdma_bind_addr(), it will conflict with listener cmid
- 	 * b. rdma_resolve_addr() to zero addr
+@@ -1784,6 +1790,7 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	struct lu_env *env;
+ 	struct vvp_io_args *args;
+ 	ssize_t rc_tiny = 0, rc_normal;
++	struct file *file = iocb->ki_filp;
+ 	u16 refcheck;
+ 	bool cached;
+ 	int result;
+@@ -1812,8 +1819,8 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	 * pages, and we can't do append writes because we can't guarantee the
+ 	 * required DLM locks are held to protect file size.
  	 */
--	cmid = kiblnd_rdma_create_id(kiblnd_dummy_callback, dev, RDMA_PS_TCP,
--				     IB_QPT_RC);
-+	cmid = kiblnd_rdma_create_id(ns, kiblnd_dummy_callback, dev,
-+				     RDMA_PS_TCP, IB_QPT_RC);
- 	if (IS_ERR(cmid)) {
- 		rc = PTR_ERR(cmid);
- 		CERROR("Failed to create cmid for failover: %d\n", rc);
-@@ -2412,7 +2412,7 @@ static int kiblnd_dev_need_failover(struct kib_dev *dev)
- 	return rc;
+-	if (ll_sbi_has_tiny_write(ll_i2sbi(file_inode(iocb->ki_filp))) &&
+-	    !(iocb->ki_filp->f_flags & (O_DIRECT | O_SYNC | O_APPEND)))
++	if (ll_sbi_has_tiny_write(ll_i2sbi(file_inode(file))) &&
++	    !(file->f_flags & (O_DIRECT | O_SYNC | O_APPEND)))
+ 		rc_tiny = ll_do_tiny_write(iocb, from);
+ 
+ 	/* In case of error, go on and try normal write - Only stop if tiny
+@@ -1832,8 +1839,8 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	args->u.normal.via_iter = from;
+ 	args->u.normal.via_iocb = iocb;
+ 
+-	rc_normal = ll_file_io_generic(env, args, iocb->ki_filp, CIT_WRITE,
+-				    &iocb->ki_pos, iov_iter_count(from));
++	rc_normal = ll_file_io_generic(env, args, file, CIT_WRITE,
++				       &iocb->ki_pos, iov_iter_count(from));
+ 
+ 	/* On success, combine bytes written. */
+ 	if (rc_tiny >= 0 && rc_normal > 0)
+@@ -1846,6 +1853,10 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 
+ 	cl_env_put(env, &refcheck);
+ out:
++	if (rc_normal > 0)
++		ll_rw_stats_tally(ll_i2sbi(file_inode(file)), current->pid,
++				  LUSTRE_FPRIVATE(file), iocb->ki_pos,
++				  rc_normal, WRITE);
+ 	return rc_normal;
  }
  
--int kiblnd_dev_failover(struct kib_dev *dev)
-+int kiblnd_dev_failover(struct kib_dev *dev, struct net *ns)
- {
- 	LIST_HEAD(zombie_tpo);
- 	LIST_HEAD(zombie_ppo);
-@@ -2429,7 +2429,7 @@ int kiblnd_dev_failover(struct kib_dev *dev)
- 	LASSERT(*kiblnd_tunables.kib_dev_failover > 1 ||
- 		dev->ibd_can_failover || !dev->ibd_hdev);
- 
--	rc = kiblnd_dev_need_failover(dev);
-+	rc = kiblnd_dev_need_failover(dev, ns);
- 	if (rc <= 0)
- 		goto out;
- 
-@@ -2454,7 +2454,7 @@ int kiblnd_dev_failover(struct kib_dev *dev)
- 		rdma_destroy_id(cmid);
+diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
+index 71799cd..5c13164 100644
+--- a/fs/lustre/llite/llite_mmap.c
++++ b/fs/lustre/llite/llite_mmap.c
+@@ -406,6 +406,12 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+ 		result = VM_FAULT_LOCKED;
  	}
- 
--	cmid = kiblnd_rdma_create_id(kiblnd_cm_callback, dev, RDMA_PS_TCP,
-+	cmid = kiblnd_rdma_create_id(ns, kiblnd_cm_callback, dev, RDMA_PS_TCP,
- 				     IB_QPT_RC);
- 	if (IS_ERR(cmid)) {
- 		rc = PTR_ERR(cmid);
-@@ -2683,7 +2683,7 @@ static void kiblnd_shutdown(struct lnet_ni *ni)
- 		kiblnd_base_shutdown();
+ 	sigprocmask(SIG_SETMASK, &old, NULL);
++
++	if (vmf->page && result == VM_FAULT_LOCKED)
++		ll_rw_stats_tally(ll_i2sbi(file_inode(vma->vm_file)),
++				  current->pid, LUSTRE_FPRIVATE(vma->vm_file),
++				  cl_offset(NULL, vmf->page->index), PAGE_SIZE,
++				  READ);
+ 	return result;
  }
  
--static int kiblnd_base_startup(void)
-+static int kiblnd_base_startup(struct net *ns)
- {
- 	struct kib_sched_info *sched;
- 	int rc;
-@@ -2758,7 +2758,7 @@ static int kiblnd_base_startup(void)
+@@ -459,6 +465,11 @@ static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
+ 		break;
  	}
  
- 	if (*kiblnd_tunables.kib_dev_failover)
--		rc = kiblnd_thread_start(kiblnd_failover_thread, NULL,
-+		rc = kiblnd_thread_start(kiblnd_failover_thread, ns,
- 					 "kiblnd_failover");
- 
- 	if (rc) {
-@@ -2856,7 +2856,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	LASSERT(ni->ni_net->net_lnd == &the_o2iblnd);
- 
- 	if (kiblnd_data.kib_init == IBLND_INIT_NOTHING) {
--		rc = kiblnd_base_startup();
-+		rc = kiblnd_base_startup(ni->ni_net_ns);
- 		if (rc)
- 			return rc;
- 	}
-@@ -2894,7 +2894,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 		goto failed;
- 	}
- 
--	rc = lnet_inet_enumerate(&ifaces);
-+	rc = lnet_inet_enumerate(&ifaces, ni->ni_net_ns);
- 	if (rc < 0)
- 		goto failed;
- 
-@@ -2925,7 +2925,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	INIT_LIST_HEAD(&ibdev->ibd_fail_list);
- 
- 	/* initialize the device */
--	rc = kiblnd_dev_failover(ibdev);
-+	rc = kiblnd_dev_failover(ibdev, ni->ni_net_ns);
- 	if (rc) {
- 		CERROR("ko2iblnd: Can't initialize device: rc = %d\n", rc);
- 		goto failed;
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 2f7ca52..1285ab1 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -109,10 +109,9 @@ struct kib_tunables {
- 					IBLND_CREDIT_HIGHWATER_V1 : \
- 					t->lnd_peercredits_hiw)
- 
--#define kiblnd_rdma_create_id(cb, dev, ps, qpt) rdma_create_id(current->nsproxy->net_ns, \
--							       cb, dev, \
--							       ps, qpt)
--
-+# define kiblnd_rdma_create_id(ns, cb, dev, ps, qpt) rdma_create_id(ns, cb, \
-+								    dev, ps, \
-+								    qpt)
- /* 2 OOB shall suffice for 1 keepalive and 1 returning credits */
- #define IBLND_OOB_CAPABLE(v)	((v) != IBLND_MSG_VERSION_1)
- #define IBLND_OOB_MSGS(v)	(IBLND_OOB_CAPABLE(v) ? 2 : 0)
-@@ -1030,7 +1029,7 @@ int kiblnd_cm_callback(struct rdma_cm_id *cmid,
- 		       struct rdma_cm_event *event);
- int kiblnd_translate_mtu(int value);
- 
--int kiblnd_dev_failover(struct kib_dev *dev);
-+int kiblnd_dev_failover(struct kib_dev *dev, struct net *ns);
- int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer_ni **peerp,
- 		       lnet_nid_t nid);
- void kiblnd_destroy_peer(struct kib_peer_ni *peer_ni);
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 69918cf..1110553 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1330,8 +1330,9 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	LASSERT(net);
- 	LASSERT(peer_ni->ibp_connecting > 0);
- 
--	cmid = kiblnd_rdma_create_id(kiblnd_cm_callback, peer_ni, RDMA_PS_TCP,
--				     IB_QPT_RC);
-+	cmid = kiblnd_rdma_create_id(peer_ni->ibp_ni->ni_net_ns,
-+				     kiblnd_cm_callback, peer_ni,
-+				     RDMA_PS_TCP, IB_QPT_RC);
- 
- 	if (IS_ERR(cmid)) {
- 		CERROR("Can't create CMID for %s: %ld\n",
-@@ -3830,6 +3831,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- {
- 	rwlock_t *glock = &kiblnd_data.kib_global_lock;
- 	struct kib_dev *dev;
-+	struct net *ns = arg;
- 	wait_queue_entry_t wait;
- 	unsigned long flags;
- 	int rc;
-@@ -3856,7 +3858,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 			dev->ibd_failover = 1;
- 			write_unlock_irqrestore(glock, flags);
- 
--			rc = kiblnd_dev_failover(dev);
-+			rc = kiblnd_dev_failover(dev, ns);
- 
- 			write_lock_irqsave(glock, flags);
- 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 0f5c7fc..78f6c7e 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -2718,7 +2718,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 		net_tunables->lct_peer_rtr_credits =
- 			*ksocknal_tunables.ksnd_peerrtrcredits;
- 
--	rc = lnet_inet_enumerate(&ifaces);
-+	rc = lnet_inet_enumerate(&ifaces, ni->ni_net_ns);
- 	if (rc < 0)
- 		goto fail_1;
- 
-diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
-index 581f734..0132727 100644
---- a/net/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/net/lnet/klnds/socklnd/socklnd_cb.c
-@@ -1871,7 +1871,8 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 
- 		rc = lnet_connect(&sock, peer_ni->ksnp_id.nid,
- 				  route->ksnr_myipaddr,
--				  route->ksnr_ipaddr, route->ksnr_port);
-+				  route->ksnr_ipaddr, route->ksnr_port,
-+				  peer_ni->ksnp_ni->ni_net_ns);
- 		if (rc)
- 			goto failed;
- 
-diff --git a/net/lnet/lnet/acceptor.c b/net/lnet/lnet/acceptor.c
-index 1854347..23b5bf0 100644
---- a/net/lnet/lnet/acceptor.c
-+++ b/net/lnet/lnet/acceptor.c
-@@ -44,6 +44,7 @@
- 	int			pta_shutdown;
- 	struct socket		*pta_sock;
- 	struct completion	pta_signal;
-+	struct net		*pta_ns;
- } lnet_acceptor_state = {
- 	.pta_shutdown = 1
- };
-@@ -142,7 +143,7 @@
- 
- int
- lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
--	     u32 local_ip, u32 peer_ip, int peer_port)
-+	     u32 local_ip, u32 peer_ip, int peer_port, struct net *ns)
- {
- 	struct lnet_acceptor_connreq cr;
- 	struct socket *sock;
-@@ -158,7 +159,7 @@
- 		/* Iterate through reserved ports. */
- 
- 		rc = lnet_sock_connect(&sock, &fatal, local_ip, port, peer_ip,
--				       peer_port);
-+				       peer_port, ns);
- 		if (rc) {
- 			if (fatal)
- 				goto failed;
-@@ -335,8 +336,9 @@
- 
- 	LASSERT(!lnet_acceptor_state.pta_sock);
- 
--	rc = lnet_sock_listen(&lnet_acceptor_state.pta_sock, 0, accept_port,
--			      accept_backlog);
-+	rc = lnet_sock_listen(&lnet_acceptor_state.pta_sock,
-+			      0, accept_port, accept_backlog,
-+			      lnet_acceptor_state.pta_ns);
- 	if (rc) {
- 		if (rc == -EADDRINUSE)
- 			LCONSOLE_ERROR_MSG(0x122, "Can't start acceptor on port %d: port already in use\n",
-@@ -457,6 +459,7 @@
- 	if (!lnet_count_acceptor_nets())  /* not required */
- 		return 0;
- 
-+	lnet_acceptor_state.pta_ns = current->nsproxy->net_ns;
- 	task = kthread_run(lnet_acceptor, (void *)(uintptr_t)secure,
- 			   "acceptor_%03ld", secure);
- 	if (IS_ERR(task)) {
-diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
-index a2a9c79..2c8edcd 100644
---- a/net/lnet/lnet/config.c
-+++ b/net/lnet/lnet/config.c
-@@ -1563,7 +1563,7 @@ struct lnet_ni *
- 	return count;
++	if (ret == VM_FAULT_LOCKED)
++		ll_rw_stats_tally(ll_i2sbi(file_inode(vma->vm_file)),
++				  current->pid, LUSTRE_FPRIVATE(vma->vm_file),
++				  cl_offset(NULL, vmf->page->index), PAGE_SIZE,
++				  WRITE);
+ 	return ret;
  }
  
--int lnet_inet_enumerate(struct lnet_inetdev **dev_list)
-+int lnet_inet_enumerate(struct lnet_inetdev **dev_list, struct net *ns)
- {
- 	struct lnet_inetdev *ifaces = NULL;
- 	struct net_device *dev;
-@@ -1571,7 +1571,7 @@ int lnet_inet_enumerate(struct lnet_inetdev **dev_list)
- 	int nip = 0;
+diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+index 6eb3d33..c2ec3fb 100644
+--- a/fs/lustre/llite/lproc_llite.c
++++ b/fs/lustre/llite/lproc_llite.c
+@@ -1937,7 +1937,7 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
+ 		lprocfs_oh_clear(&io_extents->pp_extents[cur].pp_w_hist);
+ 	}
  
- 	rtnl_lock();
--	for_each_netdev(&init_net, dev) {
-+	for_each_netdev(ns, dev) {
- 		int flags = dev_get_flags(dev);
- 		const struct in_ifaddr *ifa;
- 		struct in_device *in_dev;
-@@ -1642,7 +1642,7 @@ int lnet_inet_enumerate(struct lnet_inetdev **dev_list)
- 	int rc;
- 	int i;
+-	for (i = 0; (count >= (1 << LL_HIST_START << i)) &&
++	for (i = 0; (count >= BIT(LL_HIST_START + i)) &&
+ 	     (i < (LL_HIST_MAX - 1)); i++)
+ 		;
+ 	if (rw == 0) {
+@@ -2032,7 +2032,7 @@ static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
+ 	for (i = 0; i < LL_OFFSET_HIST_MAX; i++) {
+ 		if (offset[i].rw_pid != 0)
+ 			seq_printf(seq,
+-				   "%3c %10d %14llu %14llu %17lu %17lu %14llu\n",
++				   "%3c %10d %14llu %14llu %17lu %17lu %14lld\n",
+ 				   offset[i].rw_op == READ ? 'R' : 'W',
+ 				   offset[i].rw_pid,
+ 				   offset[i].rw_range_start,
+@@ -2045,7 +2045,7 @@ static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
+ 	for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
+ 		if (process[i].rw_pid != 0)
+ 			seq_printf(seq,
+-				   "%3c %10d %14llu %14llu %17lu %17lu %14llu\n",
++				   "%3c %10d %14llu %14llu %17lu %17lu %14lld\n",
+ 				   process[i].rw_op == READ ? 'R' : 'W',
+ 				   process[i].rw_pid,
+ 				   process[i].rw_range_start,
+diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
+index 68455d5..847fb5e 100644
+--- a/fs/lustre/llite/vvp_io.c
++++ b/fs/lustre/llite/vvp_io.c
+@@ -791,8 +791,6 @@ static int vvp_io_read_start(const struct lu_env *env,
+ 		if (result < cnt)
+ 			io->ci_continue = 0;
+ 		io->ci_nob += result;
+-		ll_rw_stats_tally(ll_i2sbi(inode), current->pid,
+-				  vio->vui_fd, pos, result, READ);
+ 		result = 0;
+ 	}
+ 	return result;
+@@ -1069,8 +1067,6 @@ static int vvp_io_write_start(const struct lu_env *env,
  
--	nip = lnet_inet_enumerate(&ifaces);
-+	nip = lnet_inet_enumerate(&ifaces, current->nsproxy->net_ns);
- 	if (nip < 0) {
- 		if (nip != -ENOENT) {
- 			LCONSOLE_ERROR_MSG(0x117,
-diff --git a/net/lnet/lnet/lib-socket.c b/net/lnet/lnet/lib-socket.c
-index d430d6f..046bd2d 100644
---- a/net/lnet/lnet/lib-socket.c
-+++ b/net/lnet/lnet/lib-socket.c
-@@ -156,7 +156,7 @@
- 
- static int
- lnet_sock_create(struct socket **sockp, int *fatal, u32 local_ip,
--		 int local_port)
-+		 int local_port, struct net *ns)
- {
- 	struct sockaddr_in locaddr;
- 	struct socket *sock;
-@@ -166,7 +166,7 @@
- 	/* All errors are fatal except bind failure if the port is in use */
- 	*fatal = 1;
- 
--	rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, 0, &sock);
-+	rc = sock_create_kern(ns, PF_INET, SOCK_STREAM, 0, &sock);
- 	*sockp = sock;
- 	if (rc) {
- 		CERROR("Can't create socket: %d\n", rc);
-@@ -282,12 +282,12 @@
- 
- int
- lnet_sock_listen(struct socket **sockp, u32 local_ip, int local_port,
--		 int backlog)
-+		 int backlog, struct net *ns)
- {
- 	int fatal;
- 	int rc;
- 
--	rc = lnet_sock_create(sockp, &fatal, local_ip, local_port);
-+	rc = lnet_sock_create(sockp, &fatal, local_ip, local_port, ns);
- 	if (rc) {
- 		if (!fatal)
- 			CERROR("Can't create socket: port %d already in use\n",
-@@ -347,12 +347,13 @@
- 
- int
- lnet_sock_connect(struct socket **sockp, int *fatal, u32 local_ip,
--		  int local_port, u32 peer_ip, int peer_port)
-+		  int local_port, u32 peer_ip, int peer_port,
-+		  struct net *ns)
- {
- 	struct sockaddr_in srvaddr;
- 	int rc;
- 
--	rc = lnet_sock_create(sockp, fatal, local_ip, local_port);
-+	rc = lnet_sock_create(sockp, fatal, local_ip, local_port, ns);
- 	if (rc)
- 		return rc;
- 
+ 		if (result < cnt)
+ 			io->ci_continue = 0;
+-		ll_rw_stats_tally(ll_i2sbi(inode), current->pid,
+-				  vio->vui_fd, pos, result, WRITE);
+ 		result = 0;
+ 	}
+ 	return result;
 -- 
 1.8.3.1
