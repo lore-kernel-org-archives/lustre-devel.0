@@ -1,62 +1,46 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:24 -0500
-Subject: [lustre-devel] [PATCH 396/622] lnet: libcfs: Reduce memory frag due
- to HA debug msg
+Date: Thu, 27 Feb 2020 16:14:26 -0500
+Subject: [lustre-devel] [PATCH 398/622] lustre: uapi: add unused enum
+ obd_statfs_state
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-397-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-399-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Ann Koehler <amk@cray.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-The dynamic allocation and freeing of Lustre trace pages has been
-shown to cause memory fragmentation that sometimes prevents
-applications from getting the contiguous memory they need to run. In
-one such occurrence over 99% of the messages were the matched open
-trace messages issued by mdc_close():
+The 3rd and 4th bit field of enum obd_statfs_state are for values
+that have been obsoleted since Lustre 1.6. Lets make this clear
+for end user applications.
 
-DEBUG_REQ(D_HA, mod->mod_open_req, "matched open; tag %d", tag);
-
-D_HA is included in the default set of debug flags. This has proven
-to be quite useful in debugging connection issues particularly at
-mount time. So removing all HA message from the default tracing is
-not a good option.
-
-However, the matched open debug message has not proven itself to be
-as generally useful. So moving the message under a different debug
-flag, one that must be explicitly enabled, reduces the amount of
-default tracing and thereby helps reduce fragmentation without
-causing much loss of functionality. Using D_RPCTRACE to match the
-corresponding open debug message in mdc_set_open_replay_data.
-
-Cray-bug-id: LUS-7560
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12524
-Lustre-commit: 076a5961f20b ("LU-12524 libcfs: Reduce memory frag due to HA debug msg")
-Signed-off-by: Ann Koehler <amk@cray.com>
-Reviewed-on: https://review.whamcloud.com/35449
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12501
+Lustre-commit: e4d92a8a08ac ("LU-12501 utils: fix 'lfs df' printing loop")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35456
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_request.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/uapi/linux/lustre/lustre_user.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index a26efa1..7bc6196 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -937,7 +937,7 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
- 
- 		mod->mod_close_req = req;
- 
--		DEBUG_REQ(D_HA, mod->mod_open_req, "matched open");
-+		DEBUG_REQ(D_RPCTRACE, mod->mod_open_req, "matched open");
- 		/* We no longer want to preserve this open for replay even
- 		 * though the open was committed. b=3632, b=3633
- 		 */
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 86f3111..9c849ce 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -102,6 +102,8 @@ enum obd_statfs_state {
+ 	OS_STATE_DEGRADED	= 0x00000001, /**< RAID degraded/rebuilding */
+ 	OS_STATE_READONLY	= 0x00000002, /**< filesystem is read-only */
+ 	OS_STATE_NOPRECREATE	= 0x00000004, /**< no object precreation */
++	OS_STATE_UNUSED1	= 0x00000008, /**< obsolete 1.6, was EROFS=30 */
++	OS_STATE_UNUSED2	= 0x00000010, /**< obsolete 1.6, was EROFS=30 */
+ 	OS_STATE_ENOSPC		= 0x00000020, /**< not enough free space */
+ 	OS_STATE_ENOINO		= 0x00000040, /**< not enough inodes */
+ 	OS_STATE_SUM		= 0x00000100, /**< aggregated for all tagrets */
 -- 
 1.8.3.1
