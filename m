@@ -1,52 +1,40 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:39 -0500
-Subject: [lustre-devel] [PATCH 171/622] lustre: llite: handle -ENODATA in
- ll_layout_fetch()
+Date: Thu, 27 Feb 2020 16:10:46 -0500
+Subject: [lustre-devel] [PATCH 178/622] lustre: update version to 2.11.99
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-172-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-179-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+With nearly all of the the missing patches from the
+lustre 2.12 version merged upstream its time to update
+the upstream clients version.
 
-In ll_layout_fetch() handle -ENODATA returns from mdc_getxattr(). This
-is needed for interop and restores the behavior from before commit
-0f42b388432c (LU-11380 mdc: move empty xattr to mdc layer) landed.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11662
-Lustre-commit: e3f367f3660d ("LU-11662 llite: handle -ENODATA in ll_layout_fetch()")
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33665
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ include/uapi/linux/lustre/lustre_ver.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 44337a2..25d7986 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -4433,8 +4433,13 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
+diff --git a/include/uapi/linux/lustre/lustre_ver.h b/include/uapi/linux/lustre/lustre_ver.h
+index d7c53c5..8ceb57d 100644
+--- a/include/uapi/linux/lustre/lustre_ver.h
++++ b/include/uapi/linux/lustre/lustre_ver.h
+@@ -2,10 +2,10 @@
+ #define _LUSTRE_VER_H_
  
- 	rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode), OBD_MD_FLXATTR,
- 			 XATTR_NAME_LOV, lmmsize, &req);
--	if (rc < 0)
-+	if (rc < 0) {
-+		if (rc == -ENODATA) {
-+			rc = 0;
-+			goto out; /* empty layout */
-+		}
- 		return rc;
-+	}
+ #define LUSTRE_MAJOR 2
+-#define LUSTRE_MINOR 10
++#define LUSTRE_MINOR 11
+ #define LUSTRE_PATCH 99
+ #define LUSTRE_FIX 0
+-#define LUSTRE_VERSION_STRING "2.10.99"
++#define LUSTRE_VERSION_STRING "2.11.99"
  
- 	lmmsize = rc;
- 	rc = 0;
+ #define OBD_OCD_VERSION(major, minor, patch, fix)			\
+ 	(((major) << 24) + ((minor) << 16) + ((patch) << 8) + (fix))
 -- 
 1.8.3.1
