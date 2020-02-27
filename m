@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:35 -0500
-Subject: [lustre-devel] [PATCH 227/622] lustre: ldlm: don't convert wrong
- resource
+Date: Thu, 27 Feb 2020 16:11:44 -0500
+Subject: [lustre-devel] [PATCH 236/622] lustre: osc: pass client page size
+ during reconnect too
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-228-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-237-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,43 +13,45 @@ To: lustre-devel@lists.lustre.org
 
 From: Mikhail Pershin <mpershin@whamcloud.com>
 
-During enqueue the returned lock may have different resource
-and local client lock replaces resource too. But there is
-a valid race with bl_ast and reply from server, so BL AST
-may come earlier and find client lock with old resource.
-In that case ldlm_handle_bl_callback() should proceed with
-normal cancel and don't use cancel_bits for lock convert.
+Client page size is reported to the server in ocd_grant_blkbits
+and server returns back device blocksize. During reconnect that
+ocd_grant_blkbits contains server device blocksize which is used
+by server as client page size wrongly.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11836
-Lustre-commit: 2bc71659db69 ("LU-11836 ldlm: don't convert wrong resource")
+Patch sets ocd_grant_blkbits to the client page size again during
+reconnect so server will get expected information.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11752
+Lustre-commit: 5bec8f95cc10 ("LU-11752 osc: pass client page size during reconnect too")
 Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34264
+Reviewed-on: https://review.whamcloud.com/33847
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_lockd.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ fs/lustre/osc/osc_request.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index 6905ee5..2985e37 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -131,8 +131,14 @@ void ldlm_handle_bl_callback(struct ldlm_namespace *ns,
- 		 * NOTE: ld can be NULL or can be not NULL but zeroed if
- 		 * passed from ldlm_bl_thread_blwi(), check below used bits
- 		 * in ld to make sure it is valid description.
-+		 *
-+		 * If server may replace lock resource keeping the same cookie,
-+		 * never use cancel bits from different resource, full cancel
-+		 * is to be used.
- 		 */
--		if (ld && ld->l_policy_data.l_inodebits.bits)
-+		if (ld && ld->l_policy_data.l_inodebits.bits &&
-+		    ldlm_res_eq(&ld->l_resource.lr_name,
-+				&lock->l_resource->lr_name))
- 			lock->l_policy_data.l_inodebits.cancel_bits =
- 				ld->l_policy_data.l_inodebits.cancel_bits;
- 		/* if there is no valid ld and lock is cbpending already
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index dca141f..a7e4f7a 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -3003,10 +3003,13 @@ int osc_reconnect(const struct lu_env *env, struct obd_export *exp,
+ 
+ 		spin_lock(&cli->cl_loi_list_lock);
+ 		grant = cli->cl_avail_grant + cli->cl_reserved_grant;
+-		if (data->ocd_connect_flags & OBD_CONNECT_GRANT_PARAM)
++		if (data->ocd_connect_flags & OBD_CONNECT_GRANT_PARAM) {
++			/* restore ocd_grant_blkbits as client page bits */
++			data->ocd_grant_blkbits = PAGE_SHIFT;
+ 			grant += cli->cl_dirty_grant;
+-		else
++		} else {
+ 			grant += cli->cl_dirty_pages << PAGE_SHIFT;
++		}
+ 		data->ocd_grant = grant ? : 2 * cli_brw_size(obd);
+ 		lost_grant = cli->cl_lost_grant;
+ 		cli->cl_lost_grant = 0;
 -- 
 1.8.3.1
