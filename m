@@ -1,479 +1,538 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:20 -0500
-Subject: [lustre-devel] [PATCH 572/622] lustre: sysfs: use string helper
- like functions for sysfs
+Date: Thu, 27 Feb 2020 16:18:06 -0500
+Subject: [lustre-devel] [PATCH 618/622] lnet: use LIST_HEAD() for local
+ lists.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-573-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-619-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-For a very long time the Linux kernel has supported the function
-memparse() that allowed the passing in of memory sizes with the
-suffix set of K, M, G, T, P, E. Lustre adopted this approach
-with its proc / sysfs implementation. The difference being that
-lustre expanded this functionality to allow sizes with a
-fractional component, such as 1.5G for example. The code used to
-parse for the numerical value is heavily tied into the debugfs
-seq_file handling and stomps on the passed in buffer which you
-can't do with sysfs files.
+From: Mr NeilBrown <neilb@suse.de>
 
-Similar functionality to what Lustre does today exist in newer
-linux kernels in the form of string helpers. Currently the
-string helpers only convert a numerical value to human readable
-format. A new function, string_to_size(), was created that takes
-a string and turns it into a numerical value. This enables the
-use of string helper suffixes i.e MiB, kB etc with the lustre
-tunables and we can now support 10 base numbers i.e MB, kB as
-well. Already string helper suffixes are used for debugfs files
-so I expect this to be adopted over time so it should be
-encouraged to use string_to_size() for newer lustre sysfs files.
+When declaring a local list head, instead of
 
-At the same time we want to perserve the original behavior of
-using the suffix set of K, M, G, T, P, E. To do this we create
-the function sysfs_memparse() that supports the new string helper
-suffixes as well as the older set of suffixes. This new code is
-also way simpler than what is currently done with the current code.
+   struct list_head list;
+   INIT_LIST_HEAD(&list);
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9091
-Lustre-commit: d9e0c9f346d0 ("LU-9091 sysfs: use string helper like functions for sysfs")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/35658
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+use
+   LIST_HEAD(list);
+
+which does both steps.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
+Lustre-commit: 135b5c0009e5 ("LU-9679 lnet: use LIST_HEAD() for local lists.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/36954
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lprocfs_status.h  |   4 +
- fs/lustre/lov/lproc_lov.c           |   4 +-
- fs/lustre/mdc/lproc_mdc.c           |  27 +++---
- fs/lustre/obdclass/class_obd.c      |  61 ++++++++++++
- fs/lustre/obdclass/lprocfs_status.c | 179 ++++++++++++++++++++++++++++++++++++
- fs/lustre/osc/lproc_osc.c           |  27 ++----
- 6 files changed, 271 insertions(+), 31 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c |  7 ++-----
+ net/lnet/klnds/socklnd/socklnd_cb.c |  3 +--
+ net/lnet/lnet/api-ni.c              | 20 +++++---------------
+ net/lnet/lnet/config.c              | 28 ++++++++--------------------
+ net/lnet/lnet/lib-move.c            | 30 ++++++++----------------------
+ net/lnet/lnet/net_fault.c           | 14 ++++----------
+ net/lnet/lnet/peer.c                |  8 ++------
+ net/lnet/lnet/router.c              | 15 ++++-----------
+ net/lnet/selftest/console.c         |  4 +---
+ 9 files changed, 35 insertions(+), 94 deletions(-)
 
-diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
-index ac62560..22d7741 100644
---- a/fs/lustre/include/lprocfs_status.h
-+++ b/fs/lustre/include/lprocfs_status.h
-@@ -42,6 +42,7 @@
- #include <linux/debugfs.h>
- #include <linux/seq_file.h>
- #include <linux/spinlock.h>
-+#include <linux/string_helpers.h>
- #include <linux/types.h>
- #include <linux/device.h>
- 
-@@ -484,6 +485,9 @@ int lprocfs_write_u64_helper(const char __user *buffer,
- int lprocfs_write_frac_u64_helper(const char __user *buffer,
- 				  unsigned long count,
- 				  u64 *val, int mult);
-+int string_to_size(u64 *size, const char *buffer, size_t count);
-+int sysfs_memparse(const char *buffer, size_t count, u64 *val,
-+		    const char *defunit);
- char *lprocfs_find_named_value(const char *buffer, const char *name,
- 			       size_t *count);
- void lprocfs_oh_tally(struct obd_histogram *oh, unsigned int value);
-diff --git a/fs/lustre/lov/lproc_lov.c b/fs/lustre/lov/lproc_lov.c
-index c528a8b..37ef084 100644
---- a/fs/lustre/lov/lproc_lov.c
-+++ b/fs/lustre/lov/lproc_lov.c
-@@ -57,8 +57,8 @@ static ssize_t stripesize_store(struct kobject *kobj, struct attribute *attr,
- 	u64 val;
- 	int rc;
- 
--	rc = kstrtoull(buf, 10, &val);
--	if (rc)
-+	rc = sysfs_memparse(buf, count, &val, "B");
-+	if (rc < 0)
- 		return rc;
- 
- 	lov_fix_desc_stripe_size(&val);
-diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
-index 454b69d..c438198 100644
---- a/fs/lustre/mdc/lproc_mdc.c
-+++ b/fs/lustre/mdc/lproc_mdc.c
-@@ -61,12 +61,19 @@ static ssize_t mdc_max_dirty_mb_seq_write(struct file *file,
- 	struct seq_file *sfl = file->private_data;
- 	struct obd_device *dev = sfl->private;
- 	struct client_obd *cli = &dev->u.cli;
--	__s64 pages_number;
-+	char kernbuf[22] = "";
-+	u64 pages_number;
- 	int rc;
- 
--	rc = lprocfs_write_frac_u64_helper(buffer, count, &pages_number,
--					   1 << (20 - PAGE_SHIFT));
--	if (rc)
-+	if (count >= sizeof(kernbuf))
-+		return -EINVAL;
-+
-+	if (copy_from_user(kernbuf, buffer, count))
-+		return -EFAULT;
-+	kernbuf[count] = 0;
-+
-+	rc = sysfs_memparse(kernbuf, count, &pages_number, "MiB");
-+	if (rc < 0)
- 		return rc;
- 
- 	/* MB -> pages */
-@@ -111,6 +118,7 @@ static int mdc_cached_mb_seq_show(struct seq_file *m, void *v)
- 	struct obd_device *dev = sfl->private;
- 	struct client_obd *cli = &dev->u.cli;
- 	u64 pages_number;
-+	const char *tmp;
- 	long rc;
- 	char kernbuf[128];
- 
-@@ -121,18 +129,13 @@ static int mdc_cached_mb_seq_show(struct seq_file *m, void *v)
- 		return -EFAULT;
- 	kernbuf[count] = 0;
- 
--	buffer += lprocfs_find_named_value(kernbuf, "used_mb:", &count) -
--		  kernbuf;
--	rc = lprocfs_write_frac_u64_helper(buffer, count, &pages_number,
--					   1 << (20 - PAGE_SHIFT));
--	if (rc)
-+	tmp = lprocfs_find_named_value(kernbuf, "used_mb:", &count);
-+	rc = sysfs_memparse(tmp, count, &pages_number, "MiB");
-+	if (rc < 0)
- 		return rc;
- 
- 	pages_number >>= PAGE_SHIFT;
- 
--	if (pages_number < 0)
--		return -ERANGE;
--
- 	rc = atomic_long_read(&cli->cl_lru_in_list) - pages_number;
- 	if (rc > 0) {
- 		struct lu_env *env;
-diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
-index 0718fdb..d462317 100644
---- a/fs/lustre/obdclass/class_obd.c
-+++ b/fs/lustre/obdclass/class_obd.c
-@@ -524,6 +524,20 @@ static long obd_class_ioctl(struct file *filp, unsigned int cmd,
- 	.fops		= &obd_psdev_fops,
- };
- 
-+#define test_string_to_size_one(value, result, def_unit)		\
-+({									\
-+	u64 __size;							\
-+	int __ret;							\
-+									\
-+	BUILD_BUG_ON(strlen(value) >= 23);				\
-+	__ret = sysfs_memparse((value), (result), &__size,		\
-+			       (def_unit));				\
-+	if (__ret == 0 && (u64)result != __size)			\
-+		CERROR("string_helper: size %llu != result %llu\n",	\
-+		       __size, (u64)result);				\
-+	__ret;								\
-+})
-+
- static int obd_init_checks(void)
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index f769a45..67780d0 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1384,11 +1384,9 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  {
- 	u64 u64val, div64val;
-@@ -590,6 +604,53 @@ static int obd_init_checks(void)
- 		ret = -EINVAL;
+ 	rwlock_t *glock = &kiblnd_data.kib_global_lock;
+ 	char *reason = NULL;
+-	struct list_head txs;
++	LIST_HEAD(txs);
+ 	unsigned long flags;
+ 
+-	INIT_LIST_HEAD(&txs);
+-
+ 	write_lock_irqsave(glock, flags);
+ 	if (!peer_ni->ibp_reconnecting) {
+ 		if (peer_ni->ibp_accepting)
+@@ -2218,7 +2216,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ {
+ 	struct kib_peer_ni *peer_ni = conn->ibc_peer;
+ 	struct kib_tx *tx;
+-	struct list_head txs;
++	LIST_HEAD(txs);
+ 	unsigned long flags;
+ 	int active;
+ 
+@@ -2277,7 +2275,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  	}
  
-+	/* invalid string */
-+	ret = test_string_to_size_one("256B34", 256, "B");
-+	if (ret == 0)
-+		CERROR("string_helpers: format should be number then units\n");
-+	ret = test_string_to_size_one("132OpQ", 132, "B");
-+	if (ret == 0)
-+		CERROR("string_helpers: invalid units should be rejected\n");
-+	ret = 0;
-+
-+	/* small values */
-+	test_string_to_size_one("0B", 0, "B");
-+	ret = test_string_to_size_one("1.82B", 1, "B");
-+	if (ret == 0)
-+		CERROR("string_helpers: number string with 'B' and '.' should be invalid\n");
-+	ret = 0;
-+	test_string_to_size_one("512B", 512, "B");
-+	test_string_to_size_one("1.067kB", 1067, "B");
-+	test_string_to_size_one("1.042KiB", 1067, "B");
-+
-+	/* Lustre special handling */
-+	test_string_to_size_one("16", 16777216, "MiB");
-+	test_string_to_size_one("65536", 65536, "B");
-+	test_string_to_size_one("128K", 131072, "B");
-+	test_string_to_size_one("1M", 1048576, "B");
-+	test_string_to_size_one("256.5G", 275414777856ULL, "GiB");
-+
-+	/* normal values */
-+	test_string_to_size_one("8.39MB", 8390000, "MiB");
-+	test_string_to_size_one("8.00MiB", 8388608, "MiB");
-+	test_string_to_size_one("256GB", 256000000, "GiB");
-+	test_string_to_size_one("238.731 GiB", 256335459385ULL, "GiB");
-+
-+	/* huge values */
-+	test_string_to_size_one("0.4TB", 400000000000ULL, "TiB");
-+	test_string_to_size_one("12.5TiB", 13743895347200ULL, "TiB");
-+	test_string_to_size_one("2PB", 2000000000000000ULL, "PiB");
-+	test_string_to_size_one("16PiB", 18014398509481984ULL, "PiB");
-+
-+	/* huge values should overflow */
-+	ret = test_string_to_size_one("1000EiB", 0, "EiB");
-+	if (ret != -EOVERFLOW)
-+		CERROR("string_helpers: Failed to detect overflow\n");
-+	ret = test_string_to_size_one("1000EB", 0, "EiB");
-+	if (ret != -EOVERFLOW)
-+		CERROR("string_helpers: Failed to detect overflow\n");
-+	ret = 0;
-+
- 	return ret;
- }
+ 	/* grab pending txs while I have the lock */
+-	INIT_LIST_HEAD(&txs);
+ 	list_splice_init(&peer_ni->ibp_tx_queue, &txs);
  
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 4fc35c5..325005d 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -217,6 +217,185 @@ static void obd_connect_data_seqprint(struct seq_file *m,
- 			   ocd->ocd_maxmodrpcs);
- }
+ 	if (!kiblnd_peer_active(peer_ni) ||	/* peer_ni has been deleted */
+diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
+index fb933e3..66b0ac7 100644
+--- a/net/lnet/klnds/socklnd/socklnd_cb.c
++++ b/net/lnet/klnds/socklnd/socklnd_cb.c
+@@ -2491,14 +2491,13 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 	wait_queue_entry_t wait;
+ 	struct ksock_conn *conn;
+ 	struct ksock_sched *sched;
+-	struct list_head enomem_conns;
++	LIST_HEAD(enomem_conns);
+ 	int nenomem_conns;
+ 	time64_t timeout;
+ 	int i;
+ 	int peer_index = 0;
+ 	time64_t deadline = ktime_get_seconds();
  
-+/**
-+ * string_to_size - convert ASCII string representing a numerical
-+ *		    value with optional units to 64-bit binary value
-+ *
-+ * @size:	The numerical value extract out of @buffer
-+ * @buffer:	passed in string to parse
-+ * @count:	length of the @buffer
-+ *
-+ * This function returns a 64-bit binary value if @buffer contains a valid
-+ * numerical string. The string is parsed to 3 significant figures after
-+ * the decimal point. Support the string containing an optional units at
-+ * the end which can be base 2 or base 10 in value. If no units are given
-+ * the string is assumed to just a numerical value.
-+ *
-+ * Returns:	@count if the string is successfully parsed,
-+ *		-errno on invalid input strings. Error values:
-+ *
-+ *  - ``-EINVAL``: @buffer is not a proper numerical string
-+ *  - ``-EOVERFLOW``: results does not fit into 64 bits.
-+ *  - ``-E2BIG ``: @buffer is not large
-+ */
-+int string_to_size(u64 *size, const char *buffer, size_t count)
-+{
-+	/* For string_get_size() it can support values above exabytes,
-+	 * (ZiB, YiB) due to breaking the return value into a size and
-+	 * bulk size to avoid 64 bit overflow. We don't break the size
-+	 * up into block size units so we don't support ZiB or YiB.
-+	 */
-+	static const char *const units_10[] = {
-+		"kB", "MB", "GB", "TB", "PB", "EB"
-+	};
-+	static const char *const units_2[] = {
-+		"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"
-+	};
-+	static const char *const *const units_str[] = {
-+		[STRING_UNITS_2] = units_2,
-+		[STRING_UNITS_10] = units_10,
-+	};
-+	static const unsigned int coeff[] = {
-+		[STRING_UNITS_10] = 1000,
-+		[STRING_UNITS_2] = 1024,
-+	};
-+	enum string_size_units unit;
-+	u64 whole, blk_size = 1;
-+	char kernbuf[22], *end;
-+	size_t len = count;
-+	int rc;
-+	int i;
-+
-+	if (count >= sizeof(kernbuf))
-+		return -E2BIG;
-+
-+	*size = 0;
-+	/* 'iB' is used for based 2 numbers. If @buffer contains only a 'B'
-+	 * or only numbers then we treat it as a direct number which doesn't
-+	 * matter if its STRING_UNITS_2 or STRING_UNIT_10.
-+	 */
-+	unit = strstr(buffer, "iB") ? STRING_UNITS_2 : STRING_UNITS_10;
-+	i = unit == STRING_UNITS_2 ? ARRAY_SIZE(units_2) - 1 :
-+				     ARRAY_SIZE(units_10) - 1;
-+	do {
-+		end = strstr(buffer, units_str[unit][i]);
-+		if (end) {
-+			for (; i >= 0; i--)
-+				blk_size *= coeff[unit];
-+			len -= strlen(end);
-+			break;
-+		}
-+	} while (i--);
-+
-+	/* as 'B' is a substring of all units, we need to handle it
-+	 * separately.
-+	 */
-+	if (!end) {
-+		/* 'B' is only acceptable letter at this point */
-+		end = strchr(buffer, 'B');
-+		if (end) {
-+			len -= strlen(end);
-+
-+			if (count - len > 2 ||
-+			    (count - len == 2 && strcmp(end, "B\n") != 0))
-+				return -EINVAL;
-+		}
-+		/* kstrtoull will error out if it has non digits */
-+		goto numbers_only;
-+	}
-+
-+	end = strchr(buffer, '.');
-+	if (end) {
-+		/* need to limit 3 decimal places */
-+		char rem[4] = "000";
-+		u64 frac = 0;
-+		size_t off;
-+
-+		len = end - buffer;
-+		end++;
-+
-+		/* limit to 3 decimal points */
-+		off = min_t(size_t, 3, strspn(end, "0123456789"));
-+		/* need to limit frac_d to a u32 */
-+		memcpy(rem, end, off);
-+		rc = kstrtoull(rem, 10, &frac);
-+		if (rc)
-+			return rc;
-+
-+		if (fls64(frac) + fls64(blk_size) - 1 > 64)
-+			return -EOVERFLOW;
-+
-+		frac *= blk_size;
-+		do_div(frac, 1000);
-+		*size += frac;
-+	}
-+numbers_only:
-+	snprintf(kernbuf, sizeof(kernbuf), "%.*s", (int)len, buffer);
-+	rc = kstrtoull(kernbuf, 10, &whole);
-+	if (rc)
-+		return rc;
-+
-+	if (whole != 0 && fls64(whole) + fls64(blk_size) - 1 > 64)
-+		return -EOVERFLOW;
-+
-+	*size += whole * blk_size;
-+
-+	return count;
-+}
-+EXPORT_SYMBOL(string_to_size);
-+
-+/**
-+ * sysfs_memparse - parse a ASCII string to 64-bit binary value,
-+ *		    with optional units
-+ *
-+ * @buffer:	kernel pointer to input string
-+ * @count:	number of bytes in the input @buffer
-+ * @val:	(output) binary value returned to caller
-+ * @defunit:	default unit suffix to use if none is provided
-+ *
-+ * Parses a string into a number. The number stored at @buffer is
-+ * potentially suffixed with K, M, G, T, P, E. Besides these other
-+ * valid suffix units are shown in the string_to_size() function.
-+ * If the string lacks a suffix then the defunit is used. The defunit
-+ * should be given as a binary unit (e.g. MiB) as that is the standard
-+ * for tunables in Lustre. If no unit suffix is given (e.g. 'G'), then
-+ * it is assumed to be in binary units.
-+ *
-+ * Returns:	0 on success or -errno on failure.
-+ */
-+int sysfs_memparse(const char *buffer, size_t count, u64 *val,
-+		   const char *defunit)
-+{
-+	char param[23];
-+	int rc;
-+
-+	if (count >= sizeof(param))
-+		return -E2BIG;
-+
-+	count = strlen(buffer);
-+	if (count && buffer[count - 1] == '\n')
-+		count--;
-+
-+	if (!count)
-+		return -EINVAL;
-+
-+	if (isalpha(buffer[count - 1])) {
-+		if (buffer[count - 1] != 'B') {
-+			scnprintf(param, sizeof(param), "%.*siB",
-+				  (int)count, buffer);
-+		} else {
-+			memcpy(param, buffer, count + 1);
-+		}
-+	} else {
-+		scnprintf(param, sizeof(param), "%.*s%s", (int)count,
-+			  buffer, defunit);
-+	}
-+
-+	rc = string_to_size(val, param, strlen(param));
-+	return rc < 0 ? rc : 0;
-+}
-+EXPORT_SYMBOL(sysfs_memparse);
-+
- int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
- 			     int mult)
+-	INIT_LIST_HEAD(&enomem_conns);
+ 	init_waitqueue_entry(&wait, current);
+ 
+ 	spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index b9c38f3..8f59266 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -2062,11 +2062,9 @@ static void lnet_push_target_fini(void)
+ lnet_shutdown_lndnets(void)
  {
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index d545d1b..5cf2148 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -203,10 +203,10 @@ static ssize_t osc_cached_mb_seq_write(struct file *file,
- 	struct seq_file *m = file->private_data;
- 	struct obd_device *dev = m->private;
- 	struct client_obd *cli = &dev->u.cli;
--	long pages_number, rc;
-+	u64 pages_number;
-+	const char *tmp;
-+	long rc;
- 	char kernbuf[128];
--	int mult;
--	u64 val;
+ 	struct lnet_net *net;
+-	struct list_head resend;
++	LIST_HEAD(resend);
+ 	struct lnet_msg *msg, *tmp;
  
- 	if (count >= sizeof(kernbuf))
- 		return -EINVAL;
-@@ -215,19 +215,12 @@ static ssize_t osc_cached_mb_seq_write(struct file *file,
- 		return -EFAULT;
- 	kernbuf[count] = 0;
- 
--	mult = 1 << (20 - PAGE_SHIFT);
--	buffer += lprocfs_find_named_value(kernbuf, "used_mb:", &count) -
--		  kernbuf;
--	rc = lprocfs_write_frac_u64_helper(buffer, count, &val, mult);
--	if (rc)
-+	tmp = lprocfs_find_named_value(kernbuf, "used_mb:", &count);
-+	rc = sysfs_memparse(tmp, count, &pages_number, "MiB");
-+	if (rc < 0)
- 		return rc;
- 
--	if (val > LONG_MAX)
--		return -ERANGE;
--	pages_number = (long)val;
+-	INIT_LIST_HEAD(&resend);
 -
--	if (pages_number < 0)
--		return -ERANGE;
-+	pages_number >>= PAGE_SHIFT;
+ 	/* NB called holding the global mutex */
  
- 	rc = atomic_long_read(&cli->cl_lru_in_list) - pages_number;
- 	if (rc > 0) {
-@@ -277,11 +270,11 @@ static ssize_t cur_grant_bytes_store(struct kobject *kobj,
- 	struct obd_device *obd = container_of(kobj, struct obd_device,
- 					      obd_kset.kobj);
- 	struct client_obd *cli = &obd->u.cli;
-+	u64 val;
+ 	/* All quiet on the API front */
+@@ -2202,7 +2200,7 @@ static void lnet_push_target_fini(void)
+ {
+ 	struct lnet_ni *ni;
+ 	struct lnet_net *net_l = NULL;
+-	struct list_head local_ni_list;
++	LIST_HEAD(local_ni_list);
+ 	int ni_count = 0;
+ 	u32 lnd_type;
+ 	struct lnet_lnd *lnd;
+@@ -2214,8 +2212,6 @@ static void lnet_push_target_fini(void)
+ 	int peerrtrcredits =
+ 		net->net_tunables.lct_peer_rtr_credits;
+ 
+-	INIT_LIST_HEAD(&local_ni_list);
+-
+ 	/*
+ 	 * make sure that this net is unique. If it isn't then
+ 	 * we are adding interfaces to an already existing network, and
+@@ -2509,11 +2505,9 @@ void lnet_lib_exit(void)
+ 	int ni_count;
+ 	struct lnet_ping_buffer *pbuf;
+ 	struct lnet_handle_md ping_mdh;
+-	struct list_head net_head;
++	LIST_HEAD(net_head);
+ 	struct lnet_net *net;
+ 
+-	INIT_LIST_HEAD(&net_head);
+-
+ 	mutex_lock(&the_lnet.ln_api_mutex);
+ 
+ 	CDEBUG(D_OTHER, "refs %d\n", the_lnet.ln_refcount);
+@@ -3098,9 +3092,7 @@ static int lnet_handle_legacy_ip2nets(char *ip2nets,
+ 	struct lnet_net *net;
+ 	char *nets;
  	int rc;
--	unsigned long long val;
+-	struct list_head net_head;
+-
+-	INIT_LIST_HEAD(&net_head);
++	LIST_HEAD(net_head);
  
--	rc = kstrtoull(buffer, 10, &val);
--	if (rc)
-+	rc = sysfs_memparse(buffer, count, &val, "MiB");
-+	if (rc < 0)
- 		return rc;
+ 	rc = lnet_parse_ip2nets(&nets, ip2nets);
+ 	if (rc < 0)
+@@ -3282,13 +3274,11 @@ int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
+ lnet_dyn_add_net(struct lnet_ioctl_config_data *conf)
+ {
+ 	struct lnet_net *net;
+-	struct list_head net_head;
++	LIST_HEAD(net_head);
+ 	int rc;
+ 	struct lnet_ioctl_config_lnd_tunables tun;
+ 	char *nets = conf->cfg_config_u.cfg_net.net_intf;
  
- 	/* this is only for shrinking grant */
+-	INIT_LIST_HEAD(&net_head);
+-
+ 	/* Create a net/ni structures for the network string */
+ 	rc = lnet_parse_networks(&net_head, nets, use_tcp_bonding);
+ 	if (rc <= 0)
+diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
+index f50df88..9d3813c 100644
+--- a/net/lnet/lnet/config.c
++++ b/net/lnet/lnet/config.c
+@@ -889,14 +889,12 @@ struct lnet_ni *
+ static int
+ lnet_str2tbs_sep(struct list_head *tbs, char *str)
+ {
+-	struct list_head pending;
++	LIST_HEAD(pending);
+ 	char *sep;
+ 	int nob;
+ 	int i;
+ 	struct lnet_text_buf *ltb;
+ 
+-	INIT_LIST_HEAD(&pending);
+-
+ 	/* Split 'str' into separate commands */
+ 	for (;;) {
+ 		/* skip leading whitespace */
+@@ -973,7 +971,7 @@ struct lnet_ni *
+ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ {
+ 	char num[16];
+-	struct list_head pending;
++	LIST_HEAD(pending);
+ 	char *sep;
+ 	char *sep2;
+ 	char *parsed;
+@@ -985,8 +983,6 @@ struct lnet_ni *
+ 	int nob;
+ 	int scanned;
+ 
+-	INIT_LIST_HEAD(&pending);
+-
+ 	sep = strchr(str, '[');
+ 	if (!sep)			/* nothing to expand */
+ 		return 0;
+@@ -1097,8 +1093,8 @@ struct lnet_ni *
+ {
+ 	/* static scratch buffer OK (single threaded) */
+ 	static char cmd[LNET_SINGLE_TEXTBUF_NOB];
+-	struct list_head nets;
+-	struct list_head gateways;
++	LIST_HEAD(nets);
++	LIST_HEAD(gateways);
+ 	struct list_head *tmp1;
+ 	struct list_head *tmp2;
+ 	u32 net;
+@@ -1114,9 +1110,6 @@ struct lnet_ni *
+ 	int got_hops = 0;
+ 	unsigned int priority = 0;
+ 
+-	INIT_LIST_HEAD(&gateways);
+-	INIT_LIST_HEAD(&nets);
+-
+ 	/* save a copy of the string for error messages */
+ 	strncpy(cmd, str, sizeof(cmd));
+ 	cmd[sizeof(cmd) - 1] = '\0';
+@@ -1260,13 +1253,11 @@ struct lnet_ni *
+ int
+ lnet_parse_routes(char *routes, int *im_a_router)
+ {
+-	struct list_head tbs;
++	LIST_HEAD(tbs);
+ 	int rc = 0;
+ 
+ 	*im_a_router = 0;
+ 
+-	INIT_LIST_HEAD(&tbs);
+-
+ 	if (lnet_str2tbs_sep(&tbs, routes) < 0) {
+ 		CERROR("Error parsing routes\n");
+ 		rc = -EINVAL;
+@@ -1453,9 +1444,9 @@ struct lnet_ni *
+ {
+ 	static char networks[LNET_SINGLE_TEXTBUF_NOB];
+ 	static char source[LNET_SINGLE_TEXTBUF_NOB];
+-	struct list_head raw_entries;
+-	struct list_head matched_nets;
+-	struct list_head current_nets;
++	LIST_HEAD(raw_entries);
++	LIST_HEAD(matched_nets);
++	LIST_HEAD(current_nets);
+ 	struct list_head *t;
+ 	struct list_head *t2;
+ 	struct lnet_text_buf *tb;
+@@ -1467,15 +1458,12 @@ struct lnet_ni *
+ 	int dup;
+ 	int rc;
+ 
+-	INIT_LIST_HEAD(&raw_entries);
+ 	if (lnet_str2tbs_sep(&raw_entries, ip2nets) < 0) {
+ 		CERROR("Error parsing ip2nets\n");
+ 		LASSERT(!lnet_tbnob);
+ 		return -EINVAL;
+ 	}
+ 
+-	INIT_LIST_HEAD(&matched_nets);
+-	INIT_LIST_HEAD(&current_nets);
+ 	networks[0] = 0;
+ 	count = 0;
+ 	len = 0;
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index cd36d52..cd7ac7f 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -166,7 +166,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	struct lnet_test_peer *tp;
+ 	struct list_head *el;
+ 	struct list_head *next;
+-	struct list_head cull;
++	LIST_HEAD(cull);
+ 
+ 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
+ 	if (threshold) {
+@@ -184,9 +184,6 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		return 0;
+ 	}
+ 
+-	/* removing entries */
+-	INIT_LIST_HEAD(&cull);
+-
+ 	lnet_net_lock(0);
+ 
+ 	list_for_each_safe(el, next, &the_lnet.ln_test_peers) {
+@@ -216,11 +213,9 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	struct lnet_test_peer *tp;
+ 	struct list_head *el;
+ 	struct list_head *next;
+-	struct list_head cull;
++	LIST_HEAD(cull);
+ 	int fail = 0;
+ 
+-	INIT_LIST_HEAD(&cull);
+-
+ 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
+ 	lnet_net_lock(0);
+ 
+@@ -2620,7 +2615,6 @@ struct lnet_mt_event_info {
+ lnet_finalize_expired_responses(void)
+ {
+ 	struct lnet_libmd *md;
+-	struct list_head local_queue;
+ 	struct lnet_rsp_tracker *rspt, *tmp;
+ 	ktime_t now;
+ 	int i;
+@@ -2629,7 +2623,7 @@ struct lnet_mt_event_info {
+ 		return;
+ 
+ 	cfs_cpt_for_each(i, lnet_cpt_table()) {
+-		INIT_LIST_HEAD(&local_queue);
++		LIST_HEAD(local_queue);
+ 
+ 		lnet_net_lock(i);
+ 		if (!the_lnet.ln_mt_rstq[i]) {
+@@ -2856,8 +2850,8 @@ struct lnet_mt_event_info {
+ lnet_recover_local_nis(void)
+ {
+ 	struct lnet_mt_event_info *ev_info;
+-	struct list_head processed_list;
+-	struct list_head local_queue;
++	LIST_HEAD(processed_list);
++	LIST_HEAD(local_queue);
+ 	struct lnet_handle_md mdh;
+ 	struct lnet_ni *tmp;
+ 	struct lnet_ni *ni;
+@@ -2865,9 +2859,6 @@ struct lnet_mt_event_info {
+ 	int healthv;
+ 	int rc;
+ 
+-	INIT_LIST_HEAD(&local_queue);
+-	INIT_LIST_HEAD(&processed_list);
+-
+ 	/* splice the recovery queue on a local queue. We will iterate
+ 	 * through the local queue and update it as needed. Once we're
+ 	 * done with the traversal, we'll splice the local queue back on
+@@ -3091,11 +3082,9 @@ struct lnet_mt_event_info {
+ lnet_clean_resendqs(void)
+ {
+ 	struct lnet_msg *msg, *tmp;
+-	struct list_head msgs;
++	LIST_HEAD(msgs);
+ 	int i;
+ 
+-	INIT_LIST_HEAD(&msgs);
+-
+ 	cfs_cpt_for_each(i, lnet_cpt_table()) {
+ 		lnet_net_lock(i);
+ 		list_splice_init(the_lnet.ln_mt_resendqs[i], &msgs);
+@@ -3114,8 +3103,8 @@ struct lnet_mt_event_info {
+ lnet_recover_peer_nis(void)
+ {
+ 	struct lnet_mt_event_info *ev_info;
+-	struct list_head processed_list;
+-	struct list_head local_queue;
++	LIST_HEAD(processed_list);
++	LIST_HEAD(local_queue);
+ 	struct lnet_handle_md mdh;
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_peer_ni *tmp;
+@@ -3123,9 +3112,6 @@ struct lnet_mt_event_info {
+ 	int healthv;
+ 	int rc;
+ 
+-	INIT_LIST_HEAD(&local_queue);
+-	INIT_LIST_HEAD(&processed_list);
+-
+ 	/* Always use cpt 0 for locking across all interactions with
+ 	 * ln_mt_peerNIRecovq
+ 	 */
+diff --git a/net/lnet/lnet/net_fault.c b/net/lnet/lnet/net_fault.c
+index 8408e93..515aa05 100644
+--- a/net/lnet/lnet/net_fault.c
++++ b/net/lnet/lnet/net_fault.c
+@@ -201,11 +201,9 @@ struct lnet_drop_rule {
+ {
+ 	struct lnet_drop_rule *rule;
+ 	struct lnet_drop_rule *tmp;
+-	struct list_head zombies;
++	LIST_HEAD(zombies);
+ 	int n = 0;
+ 
+-	INIT_LIST_HEAD(&zombies);
+-
+ 	lnet_net_lock(LNET_LOCK_EX);
+ 	list_for_each_entry_safe(rule, tmp, &the_lnet.ln_drop_rules, dr_link) {
+ 		if (rule->dr_attr.fa_src != src && src)
+@@ -725,9 +723,8 @@ struct delay_daemon_data {
+ lnet_delay_rule_check(void)
+ {
+ 	struct lnet_delay_rule *rule;
+-	struct list_head msgs;
++	LIST_HEAD(msgs);
+ 
+-	INIT_LIST_HEAD(&msgs);
+ 	while (1) {
+ 		if (list_empty(&delay_dd.dd_sched_rules))
+ 			break;
+@@ -886,14 +883,11 @@ struct delay_daemon_data {
+ {
+ 	struct lnet_delay_rule *rule;
+ 	struct lnet_delay_rule *tmp;
+-	struct list_head rule_list;
+-	struct list_head msg_list;
++	LIST_HEAD(rule_list);
++	LIST_HEAD(msg_list);
+ 	int n = 0;
+ 	bool cleanup;
+ 
+-	INIT_LIST_HEAD(&rule_list);
+-	INIT_LIST_HEAD(&msg_list);
+-
+ 	if (shutdown) {
+ 		src = 0;
+ 		dst = 0;
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 0d7fbd4..b76ff94 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -1912,9 +1912,7 @@ static void lnet_peer_discovery_complete(struct lnet_peer *lp)
+ {
+ 	struct lnet_msg *msg, *tmp;
+ 	int rc = 0;
+-	struct list_head pending_msgs;
+-
+-	INIT_LIST_HEAD(&pending_msgs);
++	LIST_HEAD(pending_msgs);
+ 
+ 	CDEBUG(D_NET, "Discovery complete. Dequeue peer %s\n",
+ 	       libcfs_nid2str(lp->lp_primary_nid));
+@@ -3238,11 +3236,9 @@ static int lnet_peer_discovery_wait_for_work(void)
+ static void lnet_resend_msgs(void)
+ {
+ 	struct lnet_msg *msg, *tmp;
+-	struct list_head resend;
++	LIST_HEAD(resend);
+ 	int rc;
+ 
+-	INIT_LIST_HEAD(&resend);
+-
+ 	spin_lock(&the_lnet.ln_msg_resend_lock);
+ 	list_splice(&the_lnet.ln_msg_resend, &resend);
+ 	spin_unlock(&the_lnet.ln_msg_resend_lock);
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index 7ba406a..69df212 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -717,19 +717,16 @@ static void lnet_shuffle_seed(void)
+ int
+ lnet_del_route(u32 net, lnet_nid_t gw_nid)
+ {
+-	struct list_head rnet_zombies;
++	LIST_HEAD(rnet_zombies);
+ 	struct lnet_remotenet *rnet;
+ 	struct lnet_remotenet *tmp;
+ 	struct list_head *rn_list;
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_route *route;
+-	struct list_head zombies;
++	LIST_HEAD(zombies);
+ 	struct lnet_peer *lp = NULL;
+ 	int i = 0;
+ 
+-	INIT_LIST_HEAD(&rnet_zombies);
+-	INIT_LIST_HEAD(&zombies);
+-
+ 	CDEBUG(D_NET, "Del route: net %s : gw %s\n",
+ 	       libcfs_net2str(net), libcfs_nid2str(gw_nid));
+ 
+@@ -1152,14 +1149,12 @@ bool lnet_router_checker_active(void)
+ lnet_rtrpool_free_bufs(struct lnet_rtrbufpool *rbp, int cpt)
+ {
+ 	int npages = rbp->rbp_npages;
+-	struct list_head tmp;
++	LIST_HEAD(tmp);
+ 	struct lnet_rtrbuf *rb;
+ 
+ 	if (!rbp->rbp_nbuffers) /* not initialized or already freed */
+ 		return;
+ 
+-	INIT_LIST_HEAD(&tmp);
+-
+ 	lnet_net_lock(cpt);
+ 	list_splice_init(&rbp->rbp_msgs, &tmp);
+ 	lnet_drop_routed_msgs_locked(&tmp, cpt);
+@@ -1181,7 +1176,7 @@ bool lnet_router_checker_active(void)
+ static int
+ lnet_rtrpool_adjust_bufs(struct lnet_rtrbufpool *rbp, int nbufs, int cpt)
+ {
+-	struct list_head rb_list;
++	LIST_HEAD(rb_list);
+ 	struct lnet_rtrbuf *rb;
+ 	int num_rb;
+ 	int num_buffers = 0;
+@@ -1213,8 +1208,6 @@ bool lnet_router_checker_active(void)
+ 	rbp->rbp_req_nbuffers = nbufs;
+ 	lnet_net_unlock(cpt);
+ 
+-	INIT_LIST_HEAD(&rb_list);
+-
+ 	/*
+ 	 * allocate the buffers on a local list first.  If all buffers are
+ 	 * allocated successfully then join this list to the rbp buffer
+diff --git a/net/lnet/selftest/console.c b/net/lnet/selftest/console.c
+index 9f32c1f..cc2c61d 100644
+--- a/net/lnet/selftest/console.c
++++ b/net/lnet/selftest/console.c
+@@ -1484,12 +1484,10 @@ static void lstcon_group_ndlink_release(struct lstcon_group *,
+ lstcon_ndlist_stat(struct list_head *ndlist,
+ 		   int timeout, struct list_head __user *result_up)
+ {
+-	struct list_head head;
++	LIST_HEAD(head);
+ 	struct lstcon_rpc_trans *trans;
+ 	int rc;
+ 
+-	INIT_LIST_HEAD(&head);
+-
+ 	rc = lstcon_rpc_trans_ndlist(ndlist, &head,
+ 				     LST_TRANS_STATQRY, NULL, NULL, &trans);
+ 	if (rc) {
 -- 
 1.8.3.1
