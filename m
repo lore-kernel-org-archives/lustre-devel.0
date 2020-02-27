@@ -1,240 +1,335 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:40 -0500
-Subject: [lustre-devel] [PATCH 232/622] lustre: llite: optimizations for not
- granted lock processing
+Date: Thu, 27 Feb 2020 16:12:33 -0500
+Subject: [lustre-devel] [PATCH 285/622] lustre: obd: round values to nearest
+ MiB for *_mb syfs files
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-233-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-286-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andrew Perepechko <c17827@cray.com>
+Several sysfs files report their settings with the functions
+lprocfs_read_frac_helper() which has the intent of showing
+fractional values i.e 1.5 MiB. This approach has caused problems
+with shells which don't handle fractional representation and the
+values reported don't faithfully represent the original value the
+configurator passed into the sysfs file. To resolve this lets
+instead always round up the value the configurator passed into
+the sysfs file to the nearest MiB value. This way it is always
+guaranteed the values reported are always exactly some MiB value.
 
-This patch removes ll_md_blocking_ast() processing for
-not granted locks. The reason is ll_invalidate_negative_children()
-can slow down I/O significantly without a reason if there
-are thousands or millions of files in the directory
-cache.
-
-Seagate-bug-id: MRP-3409
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8047
-Lustre-commit: 2c126c5a73ed ("LU-8047 llite: optimizations for not granted lock processing")
-Signed-off-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-on: https://review.whamcloud.com/19665
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11157
+Lustre-commit: ba2817fe3ead ("LU-11157 obd: round values to nearest MiB for *_mb syfs files")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/34317
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_dlm.h | 5 +++++
- fs/lustre/ldlm/ldlm_extent.c   | 2 +-
- fs/lustre/ldlm/ldlm_internal.h | 3 +--
- fs/lustre/ldlm/ldlm_lock.c     | 6 +++---
- fs/lustre/ldlm/ldlm_lockd.c    | 4 ++--
- fs/lustre/ldlm/ldlm_request.c  | 7 +++----
- fs/lustre/llite/namei.c        | 4 ++++
- fs/lustre/osc/osc_lock.c       | 8 ++++----
- fs/lustre/osc/osc_request.c    | 2 +-
- 9 files changed, 24 insertions(+), 17 deletions(-)
+ fs/lustre/include/lprocfs_status.h |  5 ++-
+ fs/lustre/llite/llite_internal.h   |  6 +--
+ fs/lustre/llite/lproc_llite.c      | 78 +++++++++++++++-----------------------
+ fs/lustre/mdc/lproc_mdc.c          |  8 ++--
+ fs/lustre/osc/lproc_osc.c          | 21 +++++-----
+ 5 files changed, 50 insertions(+), 68 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index a95555e..355049f 100644
---- a/fs/lustre/include/lustre_dlm.h
-+++ b/fs/lustre/include/lustre_dlm.h
-@@ -876,6 +876,11 @@ struct ldlm_resource {
- 	struct lu_ref			lr_reference;
- };
+diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
+index 8d74822..9f62d4e 100644
+--- a/fs/lustre/include/lprocfs_status.h
++++ b/fs/lustre/include/lprocfs_status.h
+@@ -63,6 +63,9 @@ static inline unsigned int pct(unsigned long a, unsigned long b)
+ 	return b ? a * 100 / b : 0;
+ }
  
-+static inline int ldlm_is_granted(struct ldlm_lock *lock)
-+{
-+	return lock->l_req_mode == lock->l_granted_mode;
-+}
++#define PAGES_TO_MiB(pages)	((pages) >> (20 - PAGE_SHIFT))
++#define MiB_TO_PAGES(mb)	((mb) << (20 - PAGE_SHIFT))
 +
- static inline bool ldlm_has_layout(struct ldlm_lock *lock)
+ struct lprocfs_static_vars {
+ 	struct lprocfs_vars		*obd_vars;
+ 	const struct attribute_group	*sysfs_vars;
+@@ -363,8 +366,6 @@ enum {
+ 
+ int lprocfs_write_frac_helper(const char __user *buffer,
+ 			      unsigned long count, int *val, int mult);
+-int lprocfs_read_frac_helper(char *buffer, unsigned long count,
+-			     long val, int mult);
+ 
+ int lprocfs_stats_alloc_one(struct lprocfs_stats *stats,
+ 			    unsigned int cpuid);
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index 9d7345a..eb7e0dc 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -297,18 +297,16 @@ int ll_listsecurity(struct inode *inode, char *secctx_name,
+ void ll_inode_size_lock(struct inode *inode);
+ void ll_inode_size_unlock(struct inode *inode);
+ 
+-/* FIXME: replace the name of this with LL_I to conform to kernel stuff */
+-/* static inline struct ll_inode_info *LL_I(struct inode *inode) */
+ static inline struct ll_inode_info *ll_i2info(struct inode *inode)
  {
- 	return lock->l_resource->lr_type == LDLM_IBITS &&
-diff --git a/fs/lustre/ldlm/ldlm_extent.c b/fs/lustre/ldlm/ldlm_extent.c
-index 7c72d04..98e2a75 100644
---- a/fs/lustre/ldlm/ldlm_extent.c
-+++ b/fs/lustre/ldlm/ldlm_extent.c
-@@ -151,7 +151,7 @@ void ldlm_extent_add_lock(struct ldlm_resource *res,
- 	struct ldlm_interval_tree *tree;
- 	int idx;
+ 	return container_of(inode, struct ll_inode_info, lli_vfs_inode);
+ }
  
--	LASSERT(lock->l_granted_mode == lock->l_req_mode);
-+	LASSERT(ldlm_is_granted(lock));
+ /* default to about 64M of readahead on a given system. */
+-#define SBI_DEFAULT_READAHEAD_MAX	(64UL << (20 - PAGE_SHIFT))
++#define SBI_DEFAULT_READAHEAD_MAX		MiB_TO_PAGES(64UL)
  
- 	LASSERT(RB_EMPTY_NODE(&lock->l_rb));
+ /* default to read-ahead full files smaller than 2MB on the second read */
+-#define SBI_DEFAULT_READAHEAD_WHOLE_MAX (2UL << (20 - PAGE_SHIFT))
++#define SBI_DEFAULT_READAHEAD_WHOLE_MAX		MiB_TO_PAGES(2UL)
  
-diff --git a/fs/lustre/ldlm/ldlm_internal.h b/fs/lustre/ldlm/ldlm_internal.h
-index df57c02..ede48b2 100644
---- a/fs/lustre/ldlm/ldlm_internal.h
-+++ b/fs/lustre/ldlm/ldlm_internal.h
-@@ -310,8 +310,7 @@ static inline int is_granted_or_cancelled(struct ldlm_lock *lock)
- 	int ret = 0;
- 
- 	lock_res_and_lock(lock);
--	if ((lock->l_req_mode == lock->l_granted_mode) &&
--	    !ldlm_is_cp_reqd(lock))
-+	if (ldlm_is_granted(lock) && !ldlm_is_cp_reqd(lock))
- 		ret = 1;
- 	else if (ldlm_is_failed(lock) || ldlm_is_cancel(lock))
- 		ret = 1;
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index cc96fbd..b6c49c5 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -992,7 +992,7 @@ void ldlm_grant_lock_with_skiplist(struct ldlm_lock *lock)
+ enum ra_stat {
+ 	RA_STAT_HIT = 0,
+diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+index cc9f80e..165d37f 100644
+--- a/fs/lustre/llite/lproc_llite.c
++++ b/fs/lustre/llite/lproc_llite.c
+@@ -326,15 +326,13 @@ static ssize_t max_read_ahead_mb_show(struct kobject *kobj,
  {
- 	struct sl_insert_point prev;
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
+-	long pages_number;
+-	int mult;
++	unsigned long ra_max_mb;
  
--	LASSERT(lock->l_req_mode == lock->l_granted_mode);
-+	LASSERT(ldlm_is_granted(lock));
+ 	spin_lock(&sbi->ll_lock);
+-	pages_number = sbi->ll_ra_info.ra_max_pages;
++	ra_max_mb = PAGES_TO_MiB(sbi->ll_ra_info.ra_max_pages);
+ 	spin_unlock(&sbi->ll_lock);
  
- 	search_granted_lock(&lock->l_resource->lr_granted, lock, &prev);
- 	ldlm_granted_list_add_lock(lock, &prev);
-@@ -1591,7 +1591,7 @@ enum ldlm_error ldlm_lock_enqueue(const struct lu_env *env,
- 	struct ldlm_resource *res = lock->l_resource;
+-	mult = 1 << (20 - PAGE_SHIFT);
+-	return lprocfs_read_frac_helper(buf, PAGE_SIZE, pages_number, mult);
++	return scnprintf(buf, PAGE_SIZE, "%lu\n", ra_max_mb);
+ }
  
- 	lock_res_and_lock(lock);
--	if (lock->l_req_mode == lock->l_granted_mode) {
-+	if (ldlm_is_granted(lock)) {
- 		/* The server returned a blocked lock, but it was granted
- 		 * before we got a chance to actually enqueue it.  We don't
- 		 * need to do anything else.
-@@ -1799,7 +1799,7 @@ void ldlm_lock_cancel(struct ldlm_lock *lock)
- 	ldlm_resource_unlink_lock(lock);
- 	ldlm_lock_destroy_nolock(lock);
+ static ssize_t max_read_ahead_mb_store(struct kobject *kobj,
+@@ -344,21 +342,19 @@ static ssize_t max_read_ahead_mb_store(struct kobject *kobj,
+ {
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
++	u64 ra_max_mb, pages_number;
+ 	int rc;
+-	unsigned long pages_number;
+-	int pages_shift;
  
--	if (lock->l_granted_mode == lock->l_req_mode)
-+	if (ldlm_is_granted(lock))
- 		ldlm_pool_del(&ns->ns_pool, lock);
+-	pages_shift = 20 - PAGE_SHIFT;
+-	rc = kstrtoul(buffer, 10, &pages_number);
++	rc = kstrtoull(buffer, 10, &ra_max_mb);
+ 	if (rc)
+ 		return rc;
  
- 	/* Make sure we will not be called again for same lock what is possible
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index 2985e37..db0da99 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -193,7 +193,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 
- 		while (to > 0) {
- 			schedule_timeout_interruptible(to);
--			if (lock->l_granted_mode == lock->l_req_mode ||
-+			if (ldlm_is_granted(lock) ||
- 			    ldlm_is_destroyed(lock))
- 				break;
- 		}
-@@ -236,7 +236,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+-	pages_number <<= pages_shift; /* MB -> pages */
+-
++	pages_number = round_up(ra_max_mb, 1024 * 1024) >> PAGE_SHIFT;
+ 	if (pages_number > totalram_pages() / 2) {
+-		CERROR("%s: can't set max_readahead_mb=%lu > %luMB\n",
+-		       sbi->ll_fsname, pages_number >> pages_shift,
+-		       totalram_pages() >> (pages_shift + 1)); /*1/2 of RAM*/
++		/* 1/2 of RAM */
++		CERROR("%s: can't set max_readahead_mb=%llu > %luMB\n",
++		       sbi->ll_fsname, PAGES_TO_MiB(pages_number),
++		       PAGES_TO_MiB(totalram_pages()));
+ 		return -ERANGE;
  	}
  
- 	if (ldlm_is_destroyed(lock) ||
--	    lock->l_granted_mode == lock->l_req_mode) {
-+	    ldlm_is_granted(lock)) {
- 		/* bug 11300: the lock has already been granted */
- 		unlock_res_and_lock(lock);
- 		LDLM_DEBUG(lock, "Double grant race happened");
-diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
-index b9e9ae9..7c3935f 100644
---- a/fs/lustre/ldlm/ldlm_request.c
-+++ b/fs/lustre/ldlm/ldlm_request.c
-@@ -292,8 +292,7 @@ static void failed_lock_cleanup(struct ldlm_namespace *ns,
- 	/* Set a flag to prevent us from sending a CANCEL (bug 407) */
- 	lock_res_and_lock(lock);
- 	/* Check that lock is not granted or failed, we might race. */
--	if ((lock->l_req_mode != lock->l_granted_mode) &&
--	    !ldlm_is_failed(lock)) {
-+	if (!ldlm_is_granted(lock) && !ldlm_is_failed(lock)) {
- 		/* Make sure that this lock will not be found by raced
- 		 * bl_ast and -EINVAL reply is sent to server anyways.
- 		 * bug 17645
-@@ -477,7 +476,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 		 * a tiny window for completion to get in
- 		 */
- 		lock_res_and_lock(lock);
--		if (lock->l_req_mode != lock->l_granted_mode)
-+		if (!ldlm_is_granted(lock))
- 			rc = ldlm_fill_lvb(lock, &req->rq_pill, RCL_SERVER,
- 					   lock->l_lvb_data, lvb_len);
- 		unlock_res_and_lock(lock);
-@@ -2196,7 +2195,7 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
- 	 * This happens whenever a lock enqueue is the request that triggers
- 	 * recovery.
- 	 */
--	if (lock->l_granted_mode == lock->l_req_mode)
-+	if (ldlm_is_granted(lock))
- 		flags = LDLM_FL_REPLAY | LDLM_FL_BLOCK_GRANTED;
- 	else if (lock->l_granted_mode)
- 		flags = LDLM_FL_REPLAY | LDLM_FL_BLOCK_CONV;
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 3e3fbd9..e410ff0 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -464,6 +464,10 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
- 		break;
+@@ -376,15 +372,13 @@ static ssize_t max_read_ahead_per_file_mb_show(struct kobject *kobj,
+ {
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
+-	long pages_number;
+-	int mult;
++	unsigned long ra_max_file_mb;
+ 
+ 	spin_lock(&sbi->ll_lock);
+-	pages_number = sbi->ll_ra_info.ra_max_pages_per_file;
++	ra_max_file_mb = PAGES_TO_MiB(sbi->ll_ra_info.ra_max_pages_per_file);
+ 	spin_unlock(&sbi->ll_lock);
+ 
+-	mult = 1 << (20 - PAGE_SHIFT);
+-	return lprocfs_read_frac_helper(buf, PAGE_SIZE, pages_number, mult);
++	return scnprintf(buf, PAGE_SIZE, "%lu\n", ra_max_file_mb);
+ }
+ 
+ static ssize_t max_read_ahead_per_file_mb_store(struct kobject *kobj,
+@@ -394,22 +388,18 @@ static ssize_t max_read_ahead_per_file_mb_store(struct kobject *kobj,
+ {
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
++	u64 ra_max_file_mb, pages_number;
+ 	int rc;
+-	unsigned long pages_number;
+-	int pages_shift;
+ 
+-	pages_shift = 20 - PAGE_SHIFT;
+-	rc = kstrtoul(buffer, 10, &pages_number);
++	rc = kstrtoull(buffer, 10, &ra_max_file_mb);
+ 	if (rc)
+ 		return rc;
+ 
+-	pages_number <<= pages_shift; /* MB -> pages */
+-
++	pages_number = round_up(ra_max_file_mb, 1024 * 1024) >> PAGE_SHIFT;
+ 	if (pages_number > sbi->ll_ra_info.ra_max_pages) {
+-		CERROR("%s: can't set max_readahead_per_file_mb=%lu > max_read_ahead_mb=%lu\n",
+-		       sbi->ll_fsname,
+-		       pages_number >> pages_shift,
+-		       sbi->ll_ra_info.ra_max_pages >> pages_shift);
++		CERROR("%s: can't set max_readahead_per_file_mb=%llu > max_read_ahead_mb=%lu\n",
++		       sbi->ll_fsname, PAGES_TO_MiB(pages_number),
++		       PAGES_TO_MiB(sbi->ll_ra_info.ra_max_pages));
+ 		return -ERANGE;
  	}
- 	case LDLM_CB_CANCELING:
-+		/* Nothing to do for non-granted locks */
-+		if (!ldlm_is_granted(lock))
-+			break;
-+
- 		if (ldlm_is_converting(lock)) {
- 			/* this is called on already converted lock, so
- 			 * ibits has remained bits only and cancel_bits
-diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
-index eccea37..29d8373 100644
---- a/fs/lustre/osc/osc_lock.c
-+++ b/fs/lustre/osc/osc_lock.c
-@@ -105,7 +105,7 @@ static int osc_lock_invariant(struct osc_lock *ols)
- 		return 0;
  
- 	if (!ergo(ols->ols_state == OLS_GRANTED,
--		  olock && olock->l_req_mode == olock->l_granted_mode &&
-+		  olock && ldlm_is_granted(olock) &&
- 		  ols->ols_hold))
- 		return 0;
- 	return 1;
-@@ -227,7 +227,7 @@ static void osc_lock_granted(const struct lu_env *env, struct osc_lock *oscl,
+@@ -427,15 +417,13 @@ static ssize_t max_read_ahead_whole_mb_show(struct kobject *kobj,
+ {
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
+-	long pages_number;
+-	int mult;
++	unsigned long ra_max_whole_mb;
  
- 	/* Lock must have been granted. */
- 	lock_res_and_lock(dlmlock);
--	if (dlmlock->l_granted_mode == dlmlock->l_req_mode) {
-+	if (ldlm_is_granted(dlmlock)) {
- 		struct ldlm_extent *ext = &dlmlock->l_policy_data.l_extent;
- 		struct cl_lock_descr *descr = &oscl->ols_cl.cls_lock->cll_descr;
+ 	spin_lock(&sbi->ll_lock);
+-	pages_number = sbi->ll_ra_info.ra_max_read_ahead_whole_pages;
++	ra_max_whole_mb = PAGES_TO_MiB(sbi->ll_ra_info.ra_max_read_ahead_whole_pages);
+ 	spin_unlock(&sbi->ll_lock);
  
-@@ -336,7 +336,7 @@ static int osc_lock_upcall_speculative(void *cookie,
- 	LASSERT(dlmlock);
+-	mult = 1 << (20 - PAGE_SHIFT);
+-	return lprocfs_read_frac_helper(buf, PAGE_SIZE, pages_number, mult);
++	return scnprintf(buf, PAGE_SIZE, "%lu\n", ra_max_whole_mb);
+ }
  
- 	lock_res_and_lock(dlmlock);
--	LASSERT(dlmlock->l_granted_mode == dlmlock->l_req_mode);
-+	LASSERT(ldlm_is_granted(dlmlock));
+ static ssize_t max_read_ahead_whole_mb_store(struct kobject *kobj,
+@@ -445,24 +433,21 @@ static ssize_t max_read_ahead_whole_mb_store(struct kobject *kobj,
+ {
+ 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+ 					      ll_kset.kobj);
++	u64 ra_max_whole_mb, pages_number;
+ 	int rc;
+-	unsigned long pages_number;
+-	int pages_shift;
  
- 	/* there is no osc_lock associated with speculative lock */
- 	osc_lock_lvb_update(env, osc, dlmlock, NULL);
-@@ -401,7 +401,7 @@ static int __osc_dlm_blocking_ast(const struct lu_env *env,
- 	LASSERT(flag == LDLM_CB_CANCELING);
+-	pages_shift = 20 - PAGE_SHIFT;
+-	rc = kstrtoul(buffer, 10, &pages_number);
++	rc = kstrtoull(buffer, 10, &ra_max_whole_mb);
+ 	if (rc)
+ 		return rc;
+-	pages_number <<= pages_shift; /* MB -> pages */
  
- 	lock_res_and_lock(dlmlock);
--	if (dlmlock->l_granted_mode != dlmlock->l_req_mode) {
-+	if (!ldlm_is_granted(dlmlock)) {
- 		dlmlock->l_ast_data = NULL;
- 		unlock_res_and_lock(dlmlock);
- 		return 0;
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index c55d5a9..7190da9 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -3163,7 +3163,7 @@ static int osc_cancel_weight(struct ldlm_lock *lock)
- 	 * Cancel all unused and granted extent lock.
++	pages_number = round_up(ra_max_whole_mb, 1024 * 1024) >> PAGE_SHIFT;
+ 	/* Cap this at the current max readahead window size, the readahead
+ 	 * algorithm does this anyway so it's pointless to set it larger.
  	 */
- 	if (lock->l_resource->lr_type == LDLM_EXTENT &&
--	    lock->l_granted_mode == lock->l_req_mode &&
-+	    ldlm_is_granted(lock) &&
- 	    osc_ldlm_weigh_ast(lock) == 0)
- 		return 1;
+ 	if (pages_number > sbi->ll_ra_info.ra_max_pages_per_file) {
+-		CERROR("%s: can't set max_read_ahead_whole_mb=%lu > max_read_ahead_per_file_mb=%lu\n",
+-		       sbi->ll_fsname,
+-		       pages_number >> pages_shift,
+-		       sbi->ll_ra_info.ra_max_pages_per_file >> pages_shift);
++		CERROR("%s: can't set max_read_ahead_whole_mb=%llu > max_read_ahead_per_file_mb=%lu\n",
++		       sbi->ll_fsname, PAGES_TO_MiB(pages_number),
++		       PAGES_TO_MiB(sbi->ll_ra_info.ra_max_pages_per_file));
+ 		return -ERANGE;
+ 	}
+ 
+@@ -479,12 +464,11 @@ static int ll_max_cached_mb_seq_show(struct seq_file *m, void *v)
+ 	struct super_block *sb = m->private;
+ 	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct cl_client_cache *cache = sbi->ll_cache;
+-	int shift = 20 - PAGE_SHIFT;
+ 	long max_cached_mb;
+ 	long unused_mb;
+ 
+-	max_cached_mb = cache->ccc_lru_max >> shift;
+-	unused_mb = atomic_long_read(&cache->ccc_lru_left) >> shift;
++	max_cached_mb = PAGES_TO_MiB(cache->ccc_lru_max);
++	unused_mb = PAGES_TO_MiB(atomic_long_read(&cache->ccc_lru_left));
+ 	seq_printf(m,
+ 		   "users: %d\n"
+ 		   "max_cached_mb: %ld\n"
+@@ -538,7 +522,7 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 	if (pages_number < 0 || pages_number > totalram_pages()) {
+ 		CERROR("%s: can't set max cache more than %lu MB\n",
+ 		       sbi->ll_fsname,
+-		       totalram_pages() >> (20 - PAGE_SHIFT));
++		       PAGES_TO_MiB(totalram_pages()));
+ 		return -ERANGE;
+ 	}
+ 	/* Allow enough cache so clients can make well-formed RPCs */
+diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
+index 81167bbd..454b69d 100644
+--- a/fs/lustre/mdc/lproc_mdc.c
++++ b/fs/lustre/mdc/lproc_mdc.c
+@@ -47,7 +47,7 @@ static int mdc_max_dirty_mb_seq_show(struct seq_file *m, void *v)
+ 	unsigned long val;
+ 
+ 	spin_lock(&cli->cl_loi_list_lock);
+-	val = cli->cl_dirty_max_pages >> (20 - PAGE_SHIFT);
++	val = PAGES_TO_MiB(cli->cl_dirty_max_pages);
+ 	spin_unlock(&cli->cl_loi_list_lock);
+ 
+ 	seq_printf(m, "%lu\n", val);
+@@ -69,10 +69,10 @@ static ssize_t mdc_max_dirty_mb_seq_write(struct file *file,
+ 	if (rc)
+ 		return rc;
+ 
+-	pages_number >>= PAGE_SHIFT;
+-
++	/* MB -> pages */
++	pages_number = round_up(pages_number, 1024 * 1024) >> PAGE_SHIFT;
+ 	if (pages_number <= 0 ||
+-	    pages_number >= OSC_MAX_DIRTY_MB_MAX << (20 - PAGE_SHIFT) ||
++	    pages_number >= MiB_TO_PAGES(OSC_MAX_DIRTY_MB_MAX) ||
+ 	    pages_number > totalram_pages() / 4) /* 1/4 of RAM */
+ 		return -ERANGE;
+ 
+diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
+index 5faf518..775bf74 100644
+--- a/fs/lustre/osc/lproc_osc.c
++++ b/fs/lustre/osc/lproc_osc.c
+@@ -134,12 +134,13 @@ static ssize_t max_dirty_mb_show(struct kobject *kobj,
+ 	struct obd_device *dev = container_of(kobj, struct obd_device,
+ 					      obd_kset.kobj);
+ 	struct client_obd *cli = &dev->u.cli;
+-	long val;
+-	int mult;
++	unsigned long val;
+ 
+-	val = cli->cl_dirty_max_pages;
+-	mult = 1 << (20 - PAGE_SHIFT);
+-	return lprocfs_read_frac_helper(buf, PAGE_SIZE, val, mult);
++	spin_lock(&cli->cl_loi_list_lock);
++	val = PAGES_TO_MiB(cli->cl_dirty_max_pages);
++	spin_unlock(&cli->cl_loi_list_lock);
++
++	return scnprintf(buf, PAGE_SIZE, "%lu\n", val);
+ }
+ 
+ static ssize_t max_dirty_mb_store(struct kobject *kobj,
+@@ -150,17 +151,15 @@ static ssize_t max_dirty_mb_store(struct kobject *kobj,
+ 	struct obd_device *dev = container_of(kobj, struct obd_device,
+ 					      obd_kset.kobj);
+ 	struct client_obd *cli = &dev->u.cli;
+-	unsigned long pages_number;
++	unsigned long pages_number, max_dirty_mb;
+ 	int rc;
+ 
+-	rc = kstrtoul(buffer, 10, &pages_number);
++	rc = kstrtoul(buffer, 10, &max_dirty_mb);
+ 	if (rc)
+ 		return rc;
+ 
+-	pages_number *= 1 << (20 - PAGE_SHIFT); /* MB -> pages */
+-
+-	if (pages_number <= 0 ||
+-	    pages_number >= OSC_MAX_DIRTY_MB_MAX << (20 - PAGE_SHIFT) ||
++	pages_number = MiB_TO_PAGES(max_dirty_mb);
++	if (pages_number >= MiB_TO_PAGES(OSC_MAX_DIRTY_MB_MAX) ||
+ 	    pages_number > totalram_pages() / 4) /* 1/4 of RAM */
+ 		return -ERANGE;
  
 -- 
 1.8.3.1
