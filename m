@@ -1,108 +1,83 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:22 -0500
-Subject: [lustre-devel] [PATCH 034/622] lustre: mgc: remove obsolete IR
- swabbing workaround
+Date: Thu, 27 Feb 2020 16:08:23 -0500
+Subject: [lustre-devel] [PATCH 035/622] lustre: ptlrpc: add dir migration
+ connect flag
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-35-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-36-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-The OBD_CONNECT_MNE_SWAB check was added to the MGC for compatibility
-with servers in the 2.2.0-2.2.55 range (in 2012) with big-endian
-clients.  2.2 was not an LTS release and is no longer being used.
+Add dir migration connect flag to prevent collision with other
+features. Though dir migration code exists, it will be reworked,
+and the new RPC protocol won't be compatible with current one.
 
-Remove the checks on the client for OBD_CONNECT_MNE_SWAB being set,
-and assume that the server does not have this bug.  This will allow
-the removal of the rest of this workaround from the server code once
-there are no more clients depending on the presence of this flag.
+Also handle the previously-added OBD_CONNECT2_FLR flag.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1644
-Lustre-commit: a0c644fde340 ("LU-1644 mgc: remove obsolete IR swabbing workaround")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32087
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4684
+Lustre-commit: 14b98596fa24 ("LU-4684 ptlrpc: add dir migration connect flag")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/31914
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_import.h |  4 ----
- fs/lustre/mgc/mgc_request.c       |  9 +--------
- fs/lustre/ptlrpc/import.c         | 21 ---------------------
- 3 files changed, 1 insertion(+), 33 deletions(-)
+ fs/lustre/obdclass/lprocfs_status.c    | 8 ++++++--
+ fs/lustre/ptlrpc/wiretest.c            | 4 ++++
+ include/uapi/linux/lustre/lustre_idl.h | 2 ++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_import.h b/fs/lustre/include/lustre_import.h
-index 522e5b7..0d7bb0f 100644
---- a/fs/lustre/include/lustre_import.h
-+++ b/fs/lustre/include/lustre_import.h
-@@ -289,10 +289,6 @@ struct obd_import {
- 					imp_resend_replay:1,
- 					/* disable normal recovery, for test only. */
- 					imp_no_pinger_recover:1,
--#if OBD_OCD_VERSION(3, 0, 53, 0) > LUSTRE_VERSION_CODE
--					/* need IR MNE swab */
--					imp_need_mne_swab:1,
--#endif
- 					/* import must be reconnected instead of
- 					 * chosing new connection
- 					 */
-diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
-index ca4b8a9..c114aa8 100644
---- a/fs/lustre/mgc/mgc_request.c
-+++ b/fs/lustre/mgc/mgc_request.c
-@@ -1436,14 +1436,7 @@ static int mgc_process_recover_log(struct obd_device *obd,
- 		goto out;
- 	}
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 33c76c1..66d2679 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -111,8 +111,12 @@
+ 	"compact_obdo",
+ 	"second_flags",
+ 	/* flags2 names */
+-	"file_secctx",
+-	"lockaheadv2",
++	"file_secctx",	/* 0x01 */
++	"lockaheadv2",	/* 0x02 */
++	"dir_migrate",	/* 0x04 */
++	"unknown",	/* 0x08 */
++	"unknown",	/* 0x10 */
++	"flr",		/* 0x20 */
+ 	NULL
+ };
  
--	mne_swab = !!ptlrpc_rep_need_swab(req);
--#if OBD_OCD_VERSION(3, 0, 53, 0) > LUSTRE_VERSION_CODE
--	/* This import flag means the server did an extra swab of IR MNE
--	 * records (fixed in LU-1252), reverse it here if needed. LU-1644
--	 */
--	if (unlikely(req->rq_import->imp_need_mne_swab))
--		mne_swab = !mne_swab;
--#endif
-+	mne_swab = ptlrpc_rep_need_swab(req);
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index bcd0229..46d5e74 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1111,6 +1111,10 @@ void lustre_assert_wire_constants(void)
+ 		 OBD_CONNECT2_FILE_SECCTX);
+ 	LASSERTF(OBD_CONNECT2_LOCKAHEAD == 0x2ULL, "found 0x%.16llxULL\n",
+ 		 OBD_CONNECT2_LOCKAHEAD);
++	LASSERTF(OBD_CONNECT2_DIR_MIGRATE == 0x4ULL, "found 0x%.16llxULL\n",
++		 OBD_CONNECT2_DIR_MIGRATE);
++	LASSERTF(OBD_CONNECT2_FLR == 0x20ULL, "found 0x%.16llxULL\n",
++		 OBD_CONNECT2_FLR);
+ 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
+ 		 (unsigned int)OBD_CKSUM_CRC32);
+ 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 589bb81..e898e67 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -791,6 +791,8 @@ struct ptlrpc_body_v2 {
+ #define OBD_CONNECT2_LOCKAHEAD		0x2ULL		/* ladvise lockahead
+ 							 * v2
+ 							 */
++#define OBD_CONNECT2_DIR_MIGRATE	0x4ULL		/* migrate striped dir
++							 */
+ #define OBD_CONNECT2_FLR		0x20ULL		/* FLR support */
  
- 	for (i = 0; i < nrpages && ealen > 0; i++) {
- 		int rc2;
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index dca4aa0..f69b907 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -780,27 +780,6 @@ static int ptlrpc_connect_set_flags(struct obd_import *imp,
- 		warned = true;
- 	}
- 
--#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
--	/*
--	 * Check if server has LU-1252 fix applied to not always swab
--	 * the IR MNE entries. Do this only once per connection.  This
--	 * fixup is version-limited, because we don't want to carry the
--	 * OBD_CONNECT_MNE_SWAB flag around forever, just so long as we
--	 * need interop with unpatched 2.2 servers.  For newer servers,
--	 * the client will do MNE swabbing only as needed.  LU-1644
--	 */
--	if (unlikely((ocd->ocd_connect_flags & OBD_CONNECT_VERSION) &&
--		     !(ocd->ocd_connect_flags & OBD_CONNECT_MNE_SWAB) &&
--		     OBD_OCD_VERSION_MAJOR(ocd->ocd_version) == 2 &&
--		     OBD_OCD_VERSION_MINOR(ocd->ocd_version) == 2 &&
--		     OBD_OCD_VERSION_PATCH(ocd->ocd_version) < 55 &&
--		     !strcmp(imp->imp_obd->obd_type->typ_name,
--			     LUSTRE_MGC_NAME)))
--		imp->imp_need_mne_swab = 1;
--	else /* clear if server was upgraded since last connect */
--		imp->imp_need_mne_swab = 0;
--#endif
--
- 	if (ocd->ocd_connect_flags & OBD_CONNECT_CKSUM) {
- 		/*
- 		 * We sent to the server ocd_cksum_types with bits set
+ /* XXX README XXX:
 -- 
 1.8.3.1
