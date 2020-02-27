@@ -1,274 +1,254 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:52 -0500
-Subject: [lustre-devel] [PATCH 484/622] lustre: osc: glimpse - search for
- active lock
+Date: Thu, 27 Feb 2020 16:15:59 -0500
+Subject: [lustre-devel] [PATCH 491/622] lustre: som: integrate LSOM with lfs
+ find
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-485-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-492-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: Qian Yingjin <qian@ddn.com>
 
-When there are lock-ahead write locks on a file, the server
-sends one glimpse AST RPC to each client having such (it
-may have many) locks. This callback is sent to the lock
-having the highest offset.
+The patch integrates LSOM functionality with lfs find so that it
+is possible to use LSOM functionality directly on the client. The
+MDS fills in the mbo_size and mbo_blocks fields from the LSOM
+xattr, if the actual size/blocks are not available, and then set
+new OBD_MD_FLLSIZE and OBD_MD_FLLBLOCKS flags in the reply so that
+the client knows these fields are valid.
 
-Client's glimpse callback goes up to the clio layers and
-gets the global (not lock-specific) view of size.  The clio
-layers are connected to the extent lock through the
-l_ast_data (which points to the OSC object).
+The lfs find command adds "-l|--lazy" option to allow the use of
+LSOM data from the MDS.
 
-Speculative locks (AGL, lockahead) do not have l_ast_data
-initialised until an IO happens under the lock. Thus, some
-speculative locks may not have l_ast_data initialized.
+Add a new version of ioctl(LL_IOC_MDC_GETINFO) call that also returns
+valid flags from the MDS RPC to userspace in struct lov_user_mds_data
+so that it is possible to determine whether the size and blocks are
+returned by the call.  The old LL_IOC_MDC_GETINFO ioctl number is
+renamed to LL_IOC_MDC_GETINFO_OLD and is binary compatible, but
+newly-compiled applications will use the new struct lov_user_mds_data.
 
-It is possible for the client to do a write using one lock
-(changing file size), but for the glimpse AST to be sent to
-another lock without l_ast_data initialized.  Currently, a
-lock with no l_ast_data set returns ELDLM_NO_LOCK_DATA to
-the server.  In this case, this means we do not return the
-updated size.
+New llapi interfaces llapi_get_lum_file(), llapi_get_lum_dir(),
+llapi_get_lum_file_fd(), llapi_get_lum_dir_fd() are added to fetch
+valid stat() attributes and LOV info to the user.
 
-The solution is to search the granted lock tree for any lock
-with initialized l_ast_data (it points to the OSC object
-which is the same for all the extent locks) and to reach the
-clio layers for the size through this lock instead.
-
-cray-bug-id: LUS-6747
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11670
-Lustre-commit: b3461d11dcb0 ("LU-11670 osc: glimpse - search for active lock")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33660
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11367
+Lustre-commit: 11aa7f8704c4 ("LU-11367 som: integrate LSOM with lfs find")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35167
+Reviewed-by: Li Xi <lixi@ddn.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_dlm.h  | 17 ++++++++++++++++-
- fs/lustre/include/obd_support.h |  1 +
- fs/lustre/ldlm/ldlm_lock.c      | 39 ++++++++++++++++++++-------------------
- fs/lustre/osc/osc_lock.c        | 41 ++++++++++++++++++++++++++++++++++++-----
- 4 files changed, 73 insertions(+), 25 deletions(-)
+ fs/lustre/llite/dir.c                   | 97 +++++++++++++++++++++++++++++++--
+ include/uapi/linux/lustre/lustre_idl.h  |  3 +
+ include/uapi/linux/lustre/lustre_user.h | 17 +++++-
+ 3 files changed, 108 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index 4060bb4..f7d2d9c 100644
---- a/fs/lustre/include/lustre_dlm.h
-+++ b/fs/lustre/include/lustre_dlm.h
-@@ -809,6 +809,20 @@ struct ldlm_lock {
- };
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index 812f535..4dccd24 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -1604,16 +1604,24 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	case LL_IOC_LOV_GETSTRIPE:
+ 	case LL_IOC_LOV_GETSTRIPE_NEW:
+ 	case LL_IOC_MDC_GETINFO:
++	case LL_IOC_MDC_GETINFO_OLD:
+ 	case IOC_MDC_GETFILEINFO:
++	case IOC_MDC_GETFILEINFO_OLD:
+ 	case IOC_MDC_GETFILESTRIPE: {
+ 		struct ptlrpc_request *request = NULL;
+ 		struct lov_user_md __user *lump;
+ 		struct lov_mds_md *lmm = NULL;
+ 		struct mdt_body *body;
+ 		char *filename = NULL;
++		lstat_t __user *statp = NULL;
++		struct statx __user *stxp = NULL;
++		u64 __user *flagsp = NULL;
++		u32 __user *lmmsizep = NULL;
++		struct lu_fid __user *fidp = NULL;
+ 		int lmmsize;
  
- /**
-+ * Describe the overlap between two locks.  itree_overlap_cb data.
-+ */
-+struct ldlm_match_data {
-+	struct ldlm_lock	*lmd_old;
-+	struct ldlm_lock	*lmd_lock;
-+	enum ldlm_mode		*lmd_mode;
-+	union ldlm_policy_data	*lmd_policy;
-+	u64			 lmd_flags;
-+	u64			 lmd_skip_flags;
-+	int			 lmd_unref;
-+	bool			 lmd_has_ast_data;
-+};
+-		if (cmd == IOC_MDC_GETFILEINFO ||
++		if (cmd == IOC_MDC_GETFILEINFO_OLD ||
++		    cmd == IOC_MDC_GETFILEINFO ||
+ 		    cmd == IOC_MDC_GETFILESTRIPE) {
+ 			filename = ll_getname((const char __user *)arg);
+ 			if (IS_ERR(filename))
+@@ -1635,7 +1643,9 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		}
+ 
+ 		if (rc == -ENODATA && (cmd == IOC_MDC_GETFILEINFO ||
+-				       cmd == LL_IOC_MDC_GETINFO)) {
++				       cmd == LL_IOC_MDC_GETINFO ||
++				       cmd == IOC_MDC_GETFILEINFO_OLD ||
++				       cmd == LL_IOC_MDC_GETINFO_OLD)) {
+ 			lmmsize = 0;
+ 			rc = 0;
+ 		}
+@@ -1647,10 +1657,21 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		    cmd == LL_IOC_LOV_GETSTRIPE ||
+ 		    cmd == LL_IOC_LOV_GETSTRIPE_NEW) {
+ 			lump = (struct lov_user_md __user *)arg;
++		} else if (cmd == IOC_MDC_GETFILEINFO_OLD ||
++			   cmd == LL_IOC_MDC_GETINFO_OLD){
++			struct lov_user_mds_data_v1 __user *lmdp;
 +
-+/**
-  * LDLM resource description.
-  * Basically, resource is a representation for a single object.
-  * Object has a name which is currently 4 64-bit integers. LDLM user is
-@@ -1163,7 +1177,8 @@ static inline enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns,
- 	return ldlm_lock_match_with_skip(ns, flags, 0, res_id, type, policy,
- 					 mode, lh, unref);
- }
--
-+struct ldlm_lock *search_itree(struct ldlm_resource *res,
-+			       struct ldlm_match_data *data);
- enum ldlm_mode ldlm_revalidate_lock_handle(const struct lustre_handle *lockh,
- 					   u64 *bits);
- void ldlm_lock_cancel(struct ldlm_lock *lock);
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 506535b..acfd098 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -330,6 +330,7 @@
- #define OBD_FAIL_OSC_DELAY_SETTIME			0x412
- #define OBD_FAIL_OSC_CONNECT_GRANT_PARAM		0x413
- #define OBD_FAIL_OSC_DELAY_IO				0x414
-+#define OBD_FAIL_OSC_NO_SIZE_DATA			0x415
++			lmdp = (struct lov_user_mds_data_v1 __user *)arg;
++			statp = &lmdp->lmd_st;
++			lump = &lmdp->lmd_lmm;
+ 		} else {
+ 			struct lov_user_mds_data __user *lmdp;
  
- #define OBD_FAIL_PTLRPC					0x500
- #define OBD_FAIL_PTLRPC_ACK				0x501
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index b6c49c5..d14221a 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -1045,19 +1045,6 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- }
+ 			lmdp = (struct lov_user_mds_data __user *)arg;
++			fidp = &lmdp->lmd_fid;
++			stxp = &lmdp->lmd_stx;
++			flagsp = &lmdp->lmd_flags;
++			lmmsizep = &lmdp->lmd_lmmsize;
+ 			lump = &lmdp->lmd_lmm;
+ 		}
  
- /**
-- * Describe the overlap between two locks.  itree_overlap_cb data.
-- */
--struct lock_match_data {
--	struct ldlm_lock	*lmd_old;
--	struct ldlm_lock	*lmd_lock;
--	enum ldlm_mode		*lmd_mode;
--	union ldlm_policy_data	*lmd_policy;
--	u64			 lmd_flags;
--	u64			 lmd_skip_flags;
--	int			 lmd_unref;
--};
--
--/**
-  * Check if the given @lock meets the criteria for a match.
-  * A reference on the lock is taken if matched.
-  *
-@@ -1066,9 +1053,9 @@ struct lock_match_data {
+@@ -1670,8 +1691,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			rc = -EOVERFLOW;
+ 		}
+ 
+-		if (cmd == IOC_MDC_GETFILEINFO || cmd == LL_IOC_MDC_GETINFO) {
+-			struct lov_user_mds_data __user *lmdp;
++		if (cmd == IOC_MDC_GETFILEINFO_OLD ||
++		    cmd == LL_IOC_MDC_GETINFO_OLD) {
+ 			lstat_t st = { 0 };
+ 
+ 			st.st_dev = inode->i_sb->s_dev;
+@@ -1690,8 +1711,72 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 						     sbi->ll_flags &
+ 						     LL_SBI_32BIT_API);
+ 
+-			lmdp = (struct lov_user_mds_data __user *)arg;
+-			if (copy_to_user(&lmdp->lmd_st, &st, sizeof(st))) {
++			if (copy_to_user(statp, &st, sizeof(st))) {
++				rc = -EFAULT;
++				goto out_req;
++			}
++		} else if (cmd == IOC_MDC_GETFILEINFO ||
++			   cmd == LL_IOC_MDC_GETINFO) {
++			struct statx stx = { 0 };
++			u64 valid = body->mbo_valid;
++
++			stx.stx_blksize = PAGE_SIZE;
++			stx.stx_nlink = body->mbo_nlink;
++			stx.stx_uid = body->mbo_uid;
++			stx.stx_gid = body->mbo_gid;
++			stx.stx_mode = body->mbo_mode;
++			stx.stx_ino = cl_fid_build_ino(&body->mbo_fid1,
++						       sbi->ll_flags &
++						       LL_SBI_32BIT_API);
++			stx.stx_size = body->mbo_size;
++			stx.stx_blocks = body->mbo_blocks;
++			stx.stx_atime.tv_sec = body->mbo_atime;
++			stx.stx_ctime.tv_sec = body->mbo_ctime;
++			stx.stx_mtime.tv_sec = body->mbo_mtime;
++			stx.stx_rdev_major = MAJOR(body->mbo_rdev);
++			stx.stx_rdev_minor = MINOR(body->mbo_rdev);
++			stx.stx_dev_major = MAJOR(inode->i_sb->s_dev);
++			stx.stx_dev_minor = MINOR(inode->i_sb->s_dev);
++			stx.stx_mask |= STATX_BASIC_STATS;
++
++			/*
++			 * For a striped directory, the size and blocks returned
++			 * from MDT is not correct.
++			 * The size and blocks are aggregated by client across
++			 * all stripes.
++			 * Thus for a striped directory, do not return the valid
++			 * FLSIZE and FLBLOCKS flags to the caller.
++			 * However, this whould be better decided by the MDS
++			 * instead of the client.
++			 */
++			if (cmd == LL_IOC_MDC_GETINFO &&
++			    ll_i2info(inode)->lli_lsm_md)
++				valid &= ~(OBD_MD_FLSIZE | OBD_MD_FLBLOCKS);
++
++			if (flagsp && copy_to_user(flagsp, &valid,
++						   sizeof(*flagsp))) {
++				rc = -EFAULT;
++				goto out_req;
++			}
++
++			if (fidp && copy_to_user(fidp, &body->mbo_fid1,
++						 sizeof(*fidp))) {
++				rc = -EFAULT;
++				goto out_req;
++			}
++
++			if (!(valid & OBD_MD_FLSIZE))
++				stx.stx_mask &= ~STATX_SIZE;
++			if (!(valid & OBD_MD_FLBLOCKS))
++				stx.stx_mask &= ~STATX_BLOCKS;
++
++			if (stxp && copy_to_user(stxp, &stx, sizeof(stx))) {
++				rc = -EFAULT;
++				goto out_req;
++			}
++
++			if (lmmsizep && copy_to_user(lmmsizep, &lmmsize,
++						     sizeof(*lmmsizep))) {
+ 				rc = -EFAULT;
+ 				goto out_req;
+ 			}
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 47321ae..d4b29d8 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1211,6 +1211,9 @@ static inline __u32 lov_mds_md_size(__u16 stripes, __u32 lmm_magic)
+ #define OBD_MD_FLPROJID		(0x0100000000000000ULL) /* project ID */
+ #define OBD_MD_SECCTX        (0x0200000000000000ULL) /* embed security xattr */
+ 
++#define OBD_MD_FLLAZYSIZE    (0x0400000000000000ULL) /* Lazy size */
++#define OBD_MD_FLLAZYBLOCKS  (0x0800000000000000ULL) /* Lazy blocks */
++
+ #define OBD_MD_FLALLQUOTA (OBD_MD_FLUSRQUOTA | \
+ 			   OBD_MD_FLGRPQUOTA | \
+ 			   OBD_MD_FLPRJQUOTA)
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 695ceb2..06a691b 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -371,8 +371,10 @@ struct ll_ioc_lease_id {
+ #define IOC_MDC_TYPE		'i'
+ #define IOC_MDC_LOOKUP		_IOWR(IOC_MDC_TYPE, 20, struct obd_device *)
+ #define IOC_MDC_GETFILESTRIPE	_IOWR(IOC_MDC_TYPE, 21, struct lov_user_md *)
+-#define IOC_MDC_GETFILEINFO	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data *)
+-#define LL_IOC_MDC_GETINFO	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data *)
++#define IOC_MDC_GETFILEINFO_OLD	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data_v1 *)
++#define IOC_MDC_GETFILEINFO	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data)
++#define LL_IOC_MDC_GETINFO_OLD	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data_v1 *)
++#define LL_IOC_MDC_GETINFO	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data)
+ 
+ #define MAX_OBD_NAME 128 /* If this changes, a NEW ioctl must be added */
+ 
+@@ -636,12 +638,21 @@ static inline __u32 lov_user_md_size(__u16 stripes, __u32 lmm_magic)
+  * is possible the application has already #included <sys/stat.h>.
   */
- static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- {
--	struct lock_match_data *data = vdata;
-+	struct ldlm_match_data *data = vdata;
- 	union ldlm_policy_data *lpol = &lock->l_policy_data;
--	enum ldlm_mode match;
-+	enum ldlm_mode match = LCK_MINMODE;
+ #ifdef HAVE_LOV_USER_MDS_DATA
+-#define lov_user_mds_data lov_user_mds_data_v1
++#define lov_user_mds_data lov_user_mds_data_v2
+ struct lov_user_mds_data_v1 {
+ 	lstat_t lmd_st;			/* MDS stat struct */
+ 	struct lov_user_md_v1 lmd_lmm;	/* LOV EA V1 user data */
+ } __packed;
  
- 	if (lock == data->lmd_old)
- 		return true;
-@@ -1098,6 +1085,17 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 
- 	if (!(lock->l_req_mode & *data->lmd_mode))
- 		return false;
++struct lov_user_mds_data_v2 {
++	struct lu_fid lmd_fid;		/* Lustre FID */
++	struct statx lmd_stx;		/* MDS statx struct */
++	__u64 lmd_flags;		/* MDS stat flags */
++	__u32 lmd_lmmsize;		/* LOV EA size */
++	__u32 lmd_padding;		/* unused */
++	struct lov_user_md_v1 lmd_lmm;	/* LOV EA user data */
++} __attribute__((packed));
 +
-+	/* When we search for ast_data, we are not doing a traditional match,
-+	 * so we don't worry about IBITS or extent matching.
-+	 */
-+	if (data->lmd_has_ast_data) {
-+		if (!lock->l_ast_data)
-+			return false;
-+
-+		goto matched;
-+	}
-+
- 	match = lock->l_req_mode;
- 
- 	switch (lock->l_resource->lr_type) {
-@@ -1138,6 +1136,7 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	if (data->lmd_skip_flags & lock->l_flags)
- 		return false;
- 
-+matched:
- 	if (data->lmd_flags & LDLM_FL_TEST_LOCK) {
- 		LDLM_LOCK_GET(lock);
- 		ldlm_lock_touch_in_lru(lock);
-@@ -1159,8 +1158,8 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
-  *
-  * Return:	a referenced lock or NULL.
-  */
--static struct ldlm_lock *search_itree(struct ldlm_resource *res,
--				      struct lock_match_data *data)
-+struct ldlm_lock *search_itree(struct ldlm_resource *res,
-+			       struct ldlm_match_data *data)
- {
- 	int idx;
- 
-@@ -1185,6 +1184,7 @@ static struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 
- 	return NULL;
- }
-+EXPORT_SYMBOL(search_itree);
- 
- /*
-  * Search for a lock with given properties in a queue.
-@@ -1195,7 +1195,7 @@ static struct ldlm_lock *search_itree(struct ldlm_resource *res,
-  * Return:	a referenced lock or NULL.
-  */
- static struct ldlm_lock *search_queue(struct list_head *queue,
--				      struct lock_match_data *data)
-+				      struct ldlm_match_data *data)
- {
- 	struct ldlm_lock *lock;
- 
-@@ -1280,7 +1280,7 @@ enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 					 enum ldlm_mode mode,
- 					 struct lustre_handle *lockh, int unref)
- {
--	struct lock_match_data data = {
-+	struct ldlm_match_data data = {
- 		.lmd_old	= NULL,
- 		.lmd_lock	= NULL,
- 		.lmd_mode	= &mode,
-@@ -1288,6 +1288,7 @@ enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 		.lmd_flags	= flags,
- 		.lmd_skip_flags	= skip_flags,
- 		.lmd_unref	= unref,
-+		.lmd_has_ast_data = false,
- 	};
- 	struct ldlm_resource *res;
- 	struct ldlm_lock *lock;
-diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
-index c748e58..dcddf17 100644
---- a/fs/lustre/osc/osc_lock.c
-+++ b/fs/lustre/osc/osc_lock.c
-@@ -549,6 +549,10 @@ int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
- 	struct ost_lvb *lvb;
- 	struct req_capsule *cap;
- 	struct cl_object *obj = NULL;
-+	struct ldlm_resource *res = dlmlock->l_resource;
-+	struct ldlm_match_data matchdata = { 0 };
-+	union ldlm_policy_data policy;
-+	enum ldlm_mode mode = LCK_PW | LCK_GROUP | LCK_PR;
- 	int result;
- 	u16 refcheck;
- 
-@@ -559,13 +563,40 @@ int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
- 		result = PTR_ERR(env);
- 		goto out;
- 	}
-+	policy.l_extent.start = 0;
-+	policy.l_extent.end = LUSTRE_EOF;
- 
--	lock_res_and_lock(dlmlock);
--	if (dlmlock->l_ast_data) {
--		obj = osc2cl(dlmlock->l_ast_data);
--		cl_object_get(obj);
-+	matchdata.lmd_mode = &mode;
-+	matchdata.lmd_policy = &policy;
-+	matchdata.lmd_flags = LDLM_FL_TEST_LOCK | LDLM_FL_CBPENDING;
-+	matchdata.lmd_unref = 1;
-+	matchdata.lmd_has_ast_data = true;
-+
-+	LDLM_LOCK_GET(dlmlock);
-+
-+	/* If any dlmlock has l_ast_data set, we must find it or we risk
-+	 * missing a size update done under a different lock.
-+	 */
-+	while (dlmlock) {
-+		lock_res_and_lock(dlmlock);
-+		if (dlmlock->l_ast_data) {
-+			obj = osc2cl(dlmlock->l_ast_data);
-+			cl_object_get(obj);
-+		}
-+		unlock_res_and_lock(dlmlock);
-+		LDLM_LOCK_PUT(dlmlock);
-+
-+		dlmlock = NULL;
-+
-+		if (!obj && res->lr_type == LDLM_EXTENT) {
-+			if (OBD_FAIL_CHECK(OBD_FAIL_OSC_NO_SIZE_DATA))
-+				break;
-+
-+			lock_res(res);
-+			dlmlock = search_itree(res, &matchdata);
-+			unlock_res(res);
-+		}
- 	}
--	unlock_res_and_lock(dlmlock);
- 
- 	if (obj) {
- 		/* Do not grab the mutex of cl_lock for glimpse.
+ struct lov_user_mds_data_v3 {
+ 	lstat_t lmd_st;			/* MDS stat struct */
+ 	struct lov_user_md_v3 lmd_lmm;	/* LOV EA V3 user data */
 -- 
 1.8.3.1
