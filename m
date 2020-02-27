@@ -1,50 +1,50 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:45 -0500
-Subject: [lustre-devel] [PATCH 177/622] lustre: obdclass: lu_dirent record
- length missing '0'
+Date: Thu, 27 Feb 2020 16:11:26 -0500
+Subject: [lustre-devel] [PATCH 218/622] lustre: osc: check if opg is in lru
+ list without locking
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-178-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-219-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Li Dongyang <dongyangli@ddn.com>
 
-In lu_dirent packing, a '0' is appended after name, but it's not
-counted in size calcuation, which may cause crash.
+osc_lru_use is called for every page queued for io,
+we can just check if the osc_page is in the lru list
+without taking the cl_lru_list_lock and return if not
+as a fast path.
+Note we still need to do the check again after locking
+as it could be removed from the lru list by another thread.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11753
-Lustre-commit: 77f01308c509 ("LU-11753 obdclass: lu_dirent record length missing '0'")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33865
-Reviewed-by: Stephan Thiell <sthiell@stanford.edu>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11775
+Lustre-commit: b3af0798682b ("LU-11775 osc: check if opg is in lru list without locking")
+Signed-off-by: Li Dongyang <dongyangli@ddn.com>
+Reviewed-on: https://review.whamcloud.com/33860
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_idl.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ fs/lustre/osc/osc_page.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 599fe86..4236a43 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -480,10 +480,11 @@ static inline size_t lu_dirent_calc_size(size_t namelen, __u16 attr)
- 	if (attr & LUDA_TYPE) {
- 		const size_t align = sizeof(struct luda_type) - 1;
- 
--		size = (sizeof(struct lu_dirent) + namelen + align) & ~align;
-+		size = (sizeof(struct lu_dirent) + namelen + 1 + align) &
-+		       ~align;
- 		size += sizeof(struct luda_type);
- 	} else {
--		size = sizeof(struct lu_dirent) + namelen;
-+		size = sizeof(struct lu_dirent) + namelen + 1;
- 	}
- 
- 	return (size + 7) & ~7;
+diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
+index 4dc6c18..7382e0d 100644
+--- a/fs/lustre/osc/osc_page.c
++++ b/fs/lustre/osc/osc_page.c
+@@ -494,6 +494,9 @@ static void osc_lru_use(struct client_obd *cli, struct osc_page *opg)
+ 	 * ops_lru should be empty
+ 	 */
+ 	if (opg->ops_in_lru) {
++		if (list_empty(&opg->ops_lru))
++			return;
++
+ 		spin_lock(&cli->cl_lru_list_lock);
+ 		if (!list_empty(&opg->ops_lru)) {
+ 			__osc_lru_del(cli, opg);
 -- 
 1.8.3.1
