@@ -1,97 +1,183 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:09:45 -0500
-Subject: [lustre-devel] [PATCH 117/622] lustre: obdclass: Add
- lbug_on_eviction option
+Date: Thu, 27 Feb 2020 16:09:56 -0500
+Subject: [lustre-devel] [PATCH 128/622] lustre: flr: add 'nosync' flag for
+ FLR mirrors
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-118-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-129-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Ryan Haasken <haasken@cray.com>
+From: Bobi Jam <bobijam@whamcloud.com>
 
-Add an lbug_on_eviction sysfs interface.  When it is set to a non-zero
-value on a client, it will cause the client to LBUG whenever it is
-evicted by the server. Note, an MDS is a client to OSTs, and every
-server is a client of MGS. Thus, it is probably desireable to leave
-this set to zero on servers.
+This patch allows 'nosync' flag to be set for FLR mirror components,
+which makes lfs mirror resync skip on mirrors with this flag unless
+mirror resync explicitly requested those mirrors to be resync.
 
-Cray-bug-id: LUS-2591
-WC-bug-id: https://jira.whamcloud.com/browse/LU-5026
-Lustre-commit: 97381ffc9231 ("LU-5026 obdclass: Add lbug_on_eviction option")
-Signed-off-by: Ryan Haasken <haasken@cray.com>
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/10257
+This flag can be cleared by set '^nosync' on any component of the
+mirror.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11400
+Lustre-commit: 8a0554450eaa ("LU-11400 flr: add 'nosync' flag for FLR mirrors")
+Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33205
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h | 1 +
- fs/lustre/obdclass/class_obd.c  | 2 ++
- fs/lustre/obdclass/obd_sysfs.c  | 2 ++
- fs/lustre/ptlrpc/import.c       | 1 +
- 4 files changed, 6 insertions(+)
+ fs/lustre/lov/lov_ea.c                  |  3 +++
+ fs/lustre/lov/lov_internal.h            |  1 +
+ fs/lustre/lov/lov_pack.c                |  3 +++
+ fs/lustre/ptlrpc/pack_generic.c         |  2 +-
+ fs/lustre/ptlrpc/wiretest.c             | 18 +++++++++++++-----
+ include/uapi/linux/lustre/lustre_user.h |  8 ++++++--
+ 6 files changed, 27 insertions(+), 8 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 3d14723..04ef76f 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -43,6 +43,7 @@
- extern unsigned int obd_debug_peer_on_timeout;
- extern unsigned int obd_dump_on_timeout;
- extern unsigned int obd_dump_on_eviction;
-+extern unsigned int obd_lbug_on_eviction;
- /* obd_timeout should only be used for recovery, not for
-  * networking / disk / timings affected by load (use Adaptive Timeouts)
-  */
-diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
-index 7e436af..4ef9cca 100644
---- a/fs/lustre/obdclass/class_obd.c
-+++ b/fs/lustre/obdclass/class_obd.c
-@@ -56,6 +56,8 @@
- EXPORT_SYMBOL(obd_dump_on_timeout);
- unsigned int obd_dump_on_eviction;
- EXPORT_SYMBOL(obd_dump_on_eviction);
-+unsigned int obd_lbug_on_eviction;
-+EXPORT_SYMBOL(obd_lbug_on_eviction);
- unsigned long obd_max_dirty_pages;
- EXPORT_SYMBOL(obd_max_dirty_pages);
- atomic_long_t obd_dirty_pages;
-diff --git a/fs/lustre/obdclass/obd_sysfs.c b/fs/lustre/obdclass/obd_sysfs.c
-index cd2917e..73e44e7 100644
---- a/fs/lustre/obdclass/obd_sysfs.c
-+++ b/fs/lustre/obdclass/obd_sysfs.c
-@@ -118,6 +118,7 @@ static ssize_t static_uintvalue_store(struct kobject *kobj,
- LUSTRE_STATIC_UINT_ATTR(at_extra, &at_extra);
- LUSTRE_STATIC_UINT_ATTR(at_early_margin, &at_early_margin);
- LUSTRE_STATIC_UINT_ATTR(at_history, &at_history);
-+LUSTRE_STATIC_UINT_ATTR(lbug_on_eviction, &obd_lbug_on_eviction);
+diff --git a/fs/lustre/lov/lov_ea.c b/fs/lustre/lov/lov_ea.c
+index edca3b0..31a18d0 100644
+--- a/fs/lustre/lov/lov_ea.c
++++ b/fs/lustre/lov/lov_ea.c
+@@ -478,6 +478,9 @@ static int lsm_verify_comp_md_v1(struct lov_comp_md_v1 *lcm,
+ 		lsm->lsm_entries[i] = lsme;
+ 		lsme->lsme_id = le32_to_cpu(lcme->lcme_id);
+ 		lsme->lsme_flags = le32_to_cpu(lcme->lcme_flags);
++		if (lsme->lsme_flags & LCME_FL_NOSYNC)
++			lsme->lsme_timestamp =
++				le64_to_cpu(lcme->lcme_timestamp);
+ 		lu_extent_le_to_cpu(&lsme->lsme_extent, &lcme->lcme_extent);
  
- static ssize_t max_dirty_mb_show(struct kobject *kobj, struct attribute *attr,
- 				 char *buf)
-@@ -280,6 +281,7 @@ static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
- 	&lustre_sattr_at_extra.u.attr,
- 	&lustre_sattr_at_early_margin.u.attr,
- 	&lustre_sattr_at_history.u.attr,
-+	&lustre_sattr_lbug_on_eviction.u.attr,
- 	NULL,
+ 		if (i == entry_count - 1) {
+diff --git a/fs/lustre/lov/lov_internal.h b/fs/lustre/lov/lov_internal.h
+index 5dba8d3..376ac52 100644
+--- a/fs/lustre/lov/lov_internal.h
++++ b/fs/lustre/lov/lov_internal.h
+@@ -50,6 +50,7 @@ struct lov_stripe_md_entry {
+ 	u32			lsme_magic;
+ 	u32			lsme_flags;
+ 	u32			lsme_pattern;
++	u64			lsme_timestamp;
+ 	u32			lsme_stripe_size;
+ 	u16			lsme_stripe_count;
+ 	u16			lsme_layout_gen;
+diff --git a/fs/lustre/lov/lov_pack.c b/fs/lustre/lov/lov_pack.c
+index 3dbc6aa..5f8b281 100644
+--- a/fs/lustre/lov/lov_pack.c
++++ b/fs/lustre/lov/lov_pack.c
+@@ -201,6 +201,9 @@ ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
+ 
+ 		lcme->lcme_id = cpu_to_le32(lsme->lsme_id);
+ 		lcme->lcme_flags = cpu_to_le32(lsme->lsme_flags);
++		if (lsme->lsme_flags & LCME_FL_NOSYNC)
++			lcme->lcme_timestamp =
++				cpu_to_le64(lsme->lsme_timestamp);
+ 		lcme->lcme_extent.e_start =
+ 			cpu_to_le64(lsme->lsme_extent.e_start);
+ 		lcme->lcme_extent.e_end =
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 6da9aca..d93dbe1 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -2062,13 +2062,13 @@ void lustre_swab_lov_comp_md_v1(struct lov_comp_md_v1 *lum)
+ 		}
+ 		__swab32s(&ent->lcme_id);
+ 		__swab32s(&ent->lcme_flags);
++		__swab64s(&ent->lcme_timestamp);
+ 		__swab64s(&ent->lcme_extent.e_start);
+ 		__swab64s(&ent->lcme_extent.e_end);
+ 		__swab32s(&ent->lcme_offset);
+ 		__swab32s(&ent->lcme_size);
+ 		__swab32s(&ent->lcme_layout_gen);
+ 		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding_1) == 0);
+-		BUILD_BUG_ON(offsetof(typeof(*ent), lcme_padding_2) == 0);
+ 
+ 		v1 = (struct lov_user_md_v1 *)((char *)lum + off);
+ 		stripe_count = v1->lmm_stripe_count;
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 42af0b8..c6dd256 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1532,14 +1532,14 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_layout_gen));
+ 	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_layout_gen) == 4, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_layout_gen));
+-	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_1) == 36, "found %lld\n",
++	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_timestamp) == 36, "found %lld\n",
++		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_timestamp));
++	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_timestamp) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_timestamp));
++	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_1) == 44, "found %lld\n",
+ 		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_1));
+ 	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_1) == 4, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_1));
+-	LASSERTF((int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_2) == 40, "found %lld\n",
+-		 (long long)(int)offsetof(struct lov_comp_md_entry_v1, lcme_padding_2));
+-	LASSERTF((int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_2) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lov_comp_md_entry_v1 *)0)->lcme_padding_2));
+ 	LASSERTF(LCME_FL_INIT == 0x00000010UL, "found 0x%.8xUL\n",
+ 		 (unsigned int)LCME_FL_INIT);
+ 	LASSERTF(LCME_FL_NEG == 0x80000000UL, "found 0x%.8xUL\n",
+@@ -1666,6 +1666,10 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)(int)offsetof(struct obd_statfs, os_bavail));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_bavail) == 8, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_bavail));
++	LASSERTF((int)offsetof(struct obd_statfs, os_files) == 32, "found %lld\n",
++		 (long long)(int)offsetof(struct obd_statfs, os_files));
++	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_files) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_files));
+ 	LASSERTF((int)offsetof(struct obd_statfs, os_ffree) == 40, "found %lld\n",
+ 		 (long long)(int)offsetof(struct obd_statfs, os_ffree));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_ffree) == 8, "found %lld\n",
+@@ -1682,6 +1686,10 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)(int)offsetof(struct obd_statfs, os_namelen));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_namelen) == 4, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_namelen));
++	LASSERTF((int)offsetof(struct obd_statfs, os_maxbytes) == 96, "found %lld\n",
++		 (long long)(int)offsetof(struct obd_statfs, os_maxbytes));
++	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_maxbytes) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct obd_statfs *)0)->os_maxbytes));
+ 	LASSERTF((int)offsetof(struct obd_statfs, os_state) == 104, "found %lld\n",
+ 		 (long long)(int)offsetof(struct obd_statfs, os_state));
+ 	LASSERTF((int)sizeof(((struct obd_statfs *)0)->os_state) == 4, "found %lld\n",
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index f25bb9b..bff6f76 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -483,16 +483,20 @@ enum lov_comp_md_entry_flags {
+ 	LCME_FL_PREF_RW		= LCME_FL_PREF_RD | LCME_FL_PREF_WR,
+ 	LCME_FL_OFFLINE		= 0x00000008,	/* Not used */
+ 	LCME_FL_INIT		= 0x00000010,	/* instantiated */
++	LCME_FL_NOSYNC		= 0x00000020,	/* FLR: no sync for the mirror */
+ 	LCME_FL_NEG		= 0x80000000,	/* used to indicate a negative
+ 						 * flag, won't be stored on disk
+ 						 */
  };
  
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index b11bb2f..73a345f 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -1385,6 +1385,7 @@ int ptlrpc_import_recovery_state_machine(struct obd_import *imp)
- 					   "%s: This client was evicted by %.*s; in progress operations using this service will fail.\n",
- 					   imp->imp_obd->obd_name, target_len,
- 					   target_start);
-+			LASSERTF(!obd_lbug_on_eviction, "LBUG upon eviction");
- 		}
- 		CDEBUG(D_HA, "evicted from %s@%s; invalidating\n",
- 		       obd2cli_tgt(imp->imp_obd),
+ #define LCME_KNOWN_FLAGS	(LCME_FL_NEG | LCME_FL_INIT | LCME_FL_STALE | \
+-				 LCME_FL_PREF_RW)
++				 LCME_FL_PREF_RW | LCME_FL_NOSYNC)
+ /* The flags can be set by users at mirror creation time. */
+ #define LCME_USER_FLAGS		(LCME_FL_PREF_RW)
+ 
++/* The flags are for mirrors */
++#define LCME_MIRROR_FLAGS	(LCME_FL_NOSYNC)
++
+ /* the highest bit in obdo::o_layout_version is used to mark if the file is
+  * being resynced.
+  */
+@@ -519,8 +523,8 @@ struct lov_comp_md_entry_v1 {
+ 						 */
+ 	__u32			lcme_size;	/* size of component blob */
+ 	__u32			lcme_layout_gen;
++	__u64			lcme_timestamp;	/* snapshot time if applicable*/
+ 	__u32			lcme_padding_1;
+-	__u64			lcme_padding_2;
+ } __packed;
+ 
+ #define SEQ_ID_MAX		0x0000FFFF
 -- 
 1.8.3.1
