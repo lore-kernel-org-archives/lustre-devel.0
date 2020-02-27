@@ -1,62 +1,52 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:10 -0500
-Subject: [lustre-devel] [PATCH 202/622] lustre: clio: fix incorrect
- invariant in cl_io_iter_fini()
+Date: Thu, 27 Feb 2020 16:11:15 -0500
+Subject: [lustre-devel] [PATCH 207/622] lustre: ptlrpc: improve memory
+ allocation for service RPCs
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-203-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-208-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-It was discovered during PFL testing that if LINVRNT() is enabled
-that cl_io_iter_fini() will crash with the following backtrace:
+From: Andrew Perepechko <c17827@cray.com>
 
-    kernel: LustreError: 16009:0:(cl_io.c:439:cl_io_iter_fini())
-            ASSERTION( io->ci_state == CIS_UNLOCKED ) failed
-    kernel: cl_io_iter_fini+0x10c/0x110 [obdclass]
-    kernel: cl_io_loop+0x46/0x220 [obdclass]
-    kernel: cl_setattr_ost+0x1ed/0x2a0 [lustre]
-    kernel: ll_setattr_raw+0x7b0/0x9a0 [lustre]
-    kernel: notify_change+0x1dc/0x430
-    kernel: do_truncate+0x72/0xc0
-    kernel: do_sys_ftruncate+0xf5/0x160
+The memory for service RPCs are not always page aligned
+for its size i.e 17KiB for example. Round up to the nearest
+power of 2 so we can effectively use the whole allocated buffer.
 
-This is due to the incorrect assumption that the ci_state will
-always be CIS_UNLOCKED, but by looking at the behavior of
-cl_io_loop() it can be seen that is not the case with PFL.
-We do want to make sure the IO state is not in the middle of
-some other action (up to CIS_IT_STARTED or CIS_IO_FINISHED or
-later) when cl_io_iter_fini() is called.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11828
-Lustre-commit: 8160b9bdf16c ("LU-11828 clio: fix incorrect invariant in cl_io_iter_fini()")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/33915
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11897
+Cray-bug-id: LUS-6657
+Lustre-commit: 3a90458bd84d ("LU-11897 ost: improve memory allocation for ost")
+Signed-off-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-on: https://review.whamcloud.com/34127
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/cl_io.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ fs/lustre/ptlrpc/service.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
-index a98be15..4278bc0 100644
---- a/fs/lustre/obdclass/cl_io.c
-+++ b/fs/lustre/obdclass/cl_io.c
-@@ -412,7 +412,8 @@ void cl_io_iter_fini(const struct lu_env *env, struct cl_io *io)
- 	const struct cl_io_slice *scan;
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index b94ed6a..7bc578c 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -641,6 +641,13 @@ struct ptlrpc_service *
+ 	service->srv_rep_portal	= conf->psc_buf.bc_rep_portal;
+ 	service->srv_req_portal	= conf->psc_buf.bc_req_portal;
  
- 	LINVRNT(cl_io_is_loopable(io));
--	LINVRNT(io->ci_state < CIS_LOCKED || io->ci_state > CIS_IO_FINISHED);
-+	LINVRNT(io->ci_state <= CIS_IT_STARTED ||
-+		io->ci_state > CIS_IO_FINISHED);
- 	LINVRNT(cl_io_invariant(io));
- 
- 	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
++	/* With slab/alloc_pages buffer size will be rounded up to 2^n */
++	if (service->srv_buf_size & (service->srv_buf_size - 1)) {
++		int round = size_roundup_power2(service->srv_buf_size);
++
++		service->srv_buf_size = round;
++	}
++
+ 	/* Increase max reply size to next power of two */
+ 	service->srv_max_reply_size = 1;
+ 	while (service->srv_max_reply_size <
 -- 
 1.8.3.1
