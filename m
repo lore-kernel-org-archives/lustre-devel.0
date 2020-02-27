@@ -1,73 +1,96 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:07 -0500
-Subject: [lustre-devel] [PATCH 259/622] lustre: uapi: reserve connect flag
- for plain layout
+Date: Thu, 27 Feb 2020 16:12:11 -0500
+Subject: [lustre-devel] [PATCH 263/622] lnet: properly cleanup lnet debugfs
+ files
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-260-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-264-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+The function lnet_router_debugfs_remove() is suppose to cleanup
+the lnet specific debugfs files but that is not happening at all.
+Change lnet_remove_debugfs() from doing the final debugfs lnet
+and libcfs cleanup to doing specific debugfs file removal. We
+can make libcfs module unloading to directly finish the entire
+libcfs and debugfs tree removal instead. With this change we can
+make lnet_router_debugfs_fini() call lnet_remove_debugfs().
 
-Reserve OBD_CONNECT2_PLAIN_LAYOUT flag, so that client supporting
-plain layout won't enable plain layout if MDT doesn't support,
-and in contrary, MDT supporting plain layout won't send such layout
-to client that doesn't support.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11213
-Lustre-commit: 14ee65e77bdc ("LU-11213 uapi: reserve connect flag for plain layout")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34656
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11986
+Lustre-commit: 8cb7ccf54e2d ("LU-11986 lnet: properly cleanup lnet debugfs files")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/34669
+Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lprocfs_status.c    | 1 +
- fs/lustre/ptlrpc/wiretest.c            | 2 ++
- include/uapi/linux/lustre/lustre_idl.h | 1 +
- 3 files changed, 4 insertions(+)
+ include/linux/libcfs/libcfs.h |  1 +
+ net/lnet/libcfs/module.c      | 16 ++++++++++++----
+ net/lnet/lnet/router_proc.c   |  1 +
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 254a600..a7c274a 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -124,6 +124,7 @@
- 	"selinux_policy",	/* 0x400 */
- 	"lsom",			/* 0x800 */
- 	"pcc",			/* 0x1000 */
-+	"plain_layout",		/* 0x2000 */
- 	NULL
- };
+diff --git a/include/linux/libcfs/libcfs.h b/include/linux/libcfs/libcfs.h
+index 33f7477..d3a9754 100644
+--- a/include/linux/libcfs/libcfs.h
++++ b/include/linux/libcfs/libcfs.h
+@@ -57,6 +57,7 @@ static inline int notifier_from_ioctl_errno(int err)
+ extern struct workqueue_struct *cfs_rehash_wq;
  
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 22447e2..4a268f6 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1150,6 +1150,8 @@ void lustre_assert_wire_constants(void)
- 		 OBD_CONNECT2_LSOM);
- 	LASSERTF(OBD_CONNECT2_PCC == 0x1000ULL, "found 0x%.16llxULL\n",
- 		 OBD_CONNECT2_PCC);
-+	LASSERTF(OBD_CONNECT2_PLAIN_LAYOUT == 0x2000ULL, "found 0x%.16llxULL\n",
-+		 OBD_CONNECT2_PLAIN_LAYOUT);
- 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
- 		 (unsigned int)OBD_CKSUM_CRC32);
- 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 46c3369..1b4b018 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -808,6 +808,7 @@ struct ptlrpc_body_v2 {
- #define OBD_CONNECT2_SELINUX_POLICY    0x400ULL	/* has client SELinux policy */
- #define OBD_CONNECT2_LSOM	       0x800ULL	/* LSOM support */
- #define OBD_CONNECT2_PCC	       0x1000ULL /* Persistent Client Cache */
-+#define OBD_CONNECT2_PLAIN_LAYOUT      0x2000ULL /* Plain Directory Layout */
+ void lnet_insert_debugfs(struct ctl_table *table);
++void lnet_remove_debugfs(struct ctl_table *table);
  
- /* XXX README XXX:
-  * Please DO NOT add flag values here before first ensuring that this same
+ /*
+  * Memory
+diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
+index 37a3fee..2e803d6 100644
+--- a/net/lnet/libcfs/module.c
++++ b/net/lnet/libcfs/module.c
+@@ -691,12 +691,18 @@ static void lnet_insert_debugfs_links(
+ 				       symlinks->target);
+ }
+ 
+-static void lnet_remove_debugfs(void)
++void lnet_remove_debugfs(struct ctl_table *table)
+ {
+-	debugfs_remove_recursive(lnet_debugfs_root);
++	for (; table && table->procname; table++) {
++		struct qstr dname = QSTR_INIT(table->procname,
++					      strlen(table->procname));
++		struct dentry *dentry;
+ 
+-	lnet_debugfs_root = NULL;
++		dentry = d_hash_and_lookup(lnet_debugfs_root, &dname);
++		debugfs_remove(dentry);
++	}
+ }
++EXPORT_SYMBOL_GPL(lnet_remove_debugfs);
+ 
+ static DEFINE_MUTEX(libcfs_startup);
+ static int libcfs_active;
+@@ -771,7 +777,9 @@ static void libcfs_exit(void)
+ {
+ 	int rc;
+ 
+-	lnet_remove_debugfs();
++	/* Remove everthing */
++	debugfs_remove_recursive(lnet_debugfs_root);
++	lnet_debugfs_root = NULL;
+ 
+ 	if (cfs_rehash_wq)
+ 		destroy_workqueue(cfs_rehash_wq);
+diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
+index 45abcfb..8517411 100644
+--- a/net/lnet/lnet/router_proc.c
++++ b/net/lnet/lnet/router_proc.c
+@@ -936,4 +936,5 @@ void lnet_router_debugfs_init(void)
+ 
+ void lnet_router_debugfs_fini(void)
+ {
++	lnet_remove_debugfs(lnet_table);
+ }
 -- 
 1.8.3.1
