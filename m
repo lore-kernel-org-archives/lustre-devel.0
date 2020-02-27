@@ -1,54 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:50 -0500
-Subject: [lustre-devel] [PATCH 302/622] lustre: ptlrpc: Add more flags to
- DEBUG_REQ_FLAGS macro
+Date: Thu, 27 Feb 2020 16:13:06 -0500
+Subject: [lustre-devel] [PATCH 318/622] lnet: handle remote health error
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-303-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-319-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-The rq_req_unlinked, rq_reply_unlinked and rq_receiving_reply flags
-determine whether a PtlRPC request can transition out of
-RQ_PHASE_UNREG_RPC. Add these flags to the DEBUG_REQ_FLAGS macro to
-aid in debugging issues where requests are stuck in this unregistering
-state.
+When a peer is dead set the health status to REMOTE_DROPPED
+in order to handle health properly for the peer.
+When dropping a routed message set REMOTE_ERROR. Routed messages
+are dropped when the routing feature is turned off which could
+be considered a configuration error if it happens in the middle
+of traffic. Therefore, it's better to flag this issue at this
+point without resending the message.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12333
-Lustre-commit: 5bcc3a330e21 ("LU-12333 ptlrpc: Add more flags to DEBUG_REQ_FLAGS macro")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/34949
-Reviewed-by: Ann Koehler <amk@cray.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12344
+Lustre-commit: b45e3d96fc4d ("LU-12344 lnet: handle remote health error")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34967
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ net/lnet/lnet/lib-move.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index f96265b..383d59e 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -1069,9 +1069,12 @@ static inline void lustre_set_rep_swabbed(struct ptlrpc_request *req,
- 	FLAG(req->rq_no_resend, "N"),					      \
- 	FLAG(req->rq_waiting, "W"),					      \
- 	FLAG(req->rq_wait_ctx, "C"), FLAG(req->rq_hp, "H"),		      \
--	FLAG(req->rq_committed, "M")
-+	FLAG(req->rq_committed, "M"),                                          \
-+	FLAG(req->rq_req_unlinked, "Q"),                                       \
-+	FLAG(req->rq_reply_unlinked, "U"),                                     \
-+	FLAG(req->rq_receiving_reply, "r")
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 7c135c4..8eeb5ec 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -770,7 +770,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
  
--#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s%s"
-+#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
+ 		CNETERR("Dropping message for %s: peer not alive\n",
+ 			libcfs_id2str(msg->msg_target));
+-		msg->msg_health_status = LNET_MSG_STATUS_LOCAL_DROPPED;
++		msg->msg_health_status = LNET_MSG_STATUS_REMOTE_DROPPED;
+ 		if (do_send)
+ 			lnet_finalize(msg, -EHOSTUNREACH);
  
- void _debug_req(struct ptlrpc_request *req,
- 		struct libcfs_debug_msg_data *data, const char *fmt, ...)
+@@ -786,6 +786,9 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 			libcfs_id2str(msg->msg_target));
+ 		if (do_send) {
+ 			msg->msg_no_resend = true;
++			CDEBUG(D_NET,
++			       "msg %p to %s canceled and will not be resent\n",
++			       msg, libcfs_id2str(msg->msg_target));
+ 			lnet_finalize(msg, -ECANCELED);
+ 		}
+ 
+@@ -1065,6 +1068,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 			     0, 0, 0, msg->msg_hdr.payload_length);
+ 		list_del_init(&msg->msg_list);
+ 		msg->msg_no_resend = true;
++		msg->msg_health_status = LNET_MSG_STATUS_REMOTE_ERROR;
+ 		lnet_finalize(msg, -ECANCELED);
+ 	}
+ 
 -- 
 1.8.3.1
