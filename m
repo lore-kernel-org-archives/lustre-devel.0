@@ -1,100 +1,100 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:18:00 -0500
-Subject: [lustre-devel] [PATCH 612/622] lustre: llite: Update mdc and lite
- stats on open|creat
+Date: Thu, 27 Feb 2020 16:18:01 -0500
+Subject: [lustre-devel] [PATCH 613/622] lustre: osc: glimpse and lock cancel
+ race
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-613-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-614-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Olaf Faaland <faaland1@llnl.gov>
+From: Alexander Zarochentsev <c17826@cray.com>
 
-Increment "create" counter in mdc/<instance>/md_stats, and
-"mknod" counter in llite/<instance>stats when an open with
-the CREAT flag results in a newly created file.
+osc_dlm_blocking_ast0 clears l_ast_data before writing
+file data to OST and opens a race window. Neither a glimpse
+AST nor ldlm_cb_interpret can find correct file attributes at
+that moment.
 
-The mknod counter is chosen for consistency with
-patch http://review.whamcloud.com/20246
- "LU-8150 mdt: Track open+create as mknod"
-but the mdc counter set does not include mknod.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11114
-Lustre-commit: 4b8518ee4fa5 ("LU-11114 llite: Update mdc and lite stats on open|creat")
-Signed-off-by: Olaf Faaland <faaland1@llnl.gov>
-Reviewed-on: https://review.whamcloud.com/36948
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Emoly Liu <emoly@whamcloud.com>
+Cray-bug-id: LUS-8344
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13128
+Lustre-commit: 7c99f67d9d39 ("LU-13128 osc: glimpse and lock cancel race")
+Signed-off-by: Alexander Zarochentsev <c17826@cray.com>
+Reviewed-on: https://review.whamcloud.com/37215
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-by: Andriy Skulysh <c17819@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/namei.c   | 12 ++++++++++--
- fs/lustre/mdc/mdc_locks.c |  6 ++++++
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ fs/lustre/include/obd_support.h | 1 +
+ fs/lustre/mdc/mdc_dev.c         | 2 +-
+ fs/lustre/osc/osc_lock.c        | 8 ++++++--
+ 3 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 89317db..cf2a77f 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -605,7 +605,8 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
- static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 			       struct lookup_intent *it,
- 			       struct inode *parent, struct dentry **de,
--			       void *secctx, u32 secctxlen)
-+			       void *secctx, u32 secctxlen,
-+			       ktime_t kstart)
- {
- 	struct inode *inode = NULL;
- 	u64 bits = 0;
-@@ -708,6 +709,11 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 		}
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 7dfef0f..f7fed0e 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -332,6 +332,7 @@
+ #define OBD_FAIL_OSC_CONNECT_GRANT_PARAM		0x413
+ #define OBD_FAIL_OSC_DELAY_IO				0x414
+ #define OBD_FAIL_OSC_NO_SIZE_DATA			0x415
++#define OBD_FAIL_OSC_DELAY_CANCEL			0x416
+ 
+ #define OBD_FAIL_PTLRPC					0x500
+ #define OBD_FAIL_PTLRPC_ACK				0x501
+diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
+index 496491f..5a6be44 100644
+--- a/fs/lustre/mdc/mdc_dev.c
++++ b/fs/lustre/mdc/mdc_dev.c
+@@ -313,7 +313,6 @@ static int mdc_dlm_blocking_ast0(const struct lu_env *env,
+ 
+ 	if (dlmlock->l_ast_data) {
+ 		obj = osc2cl(dlmlock->l_ast_data);
+-		dlmlock->l_ast_data = NULL;
+ 		cl_object_get(obj);
+ 	}
+ 	unlock_res_and_lock(dlmlock);
+@@ -332,6 +331,7 @@ static int mdc_dlm_blocking_ast0(const struct lu_env *env,
+ 		 */
+ 		/* losing a lock, update kms */
+ 		lock_res_and_lock(dlmlock);
++		dlmlock->l_ast_data = NULL;
+ 		cl_object_attr_lock(obj);
+ 		attr->cat_kms = 0;
+ 		cl_object_attr_update(env, obj, attr, CAT_KMS);
+diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
+index ce592d7..3bb5bbd 100644
+--- a/fs/lustre/osc/osc_lock.c
++++ b/fs/lustre/osc/osc_lock.c
+@@ -419,13 +419,13 @@ static int __osc_dlm_blocking_ast(const struct lu_env *env,
+ 
+ 	if (dlmlock->l_ast_data) {
+ 		obj = osc2cl(dlmlock->l_ast_data);
+-		dlmlock->l_ast_data = NULL;
+-
+ 		cl_object_get(obj);
  	}
  
-+	if (it_disposition(it, DISP_OPEN_CREATE)) {
-+		ll_stats_ops_tally(ll_i2sbi(parent), LPROC_LL_MKNOD,
-+				   ktime_us_delta(ktime_get(), kstart));
-+	}
-+
- out:
- 	if (rc != 0 && it->it_op & IT_OPEN) {
- 		ll_intent_drop_lock(it);
-@@ -722,6 +728,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 				   u32 *secctxlen,
- 				   struct pcc_create_attach *pca)
- {
-+	ktime_t kstart = ktime_get();
- 	struct lookup_intent lookup_it = { .it_op = IT_LOOKUP };
- 	struct dentry *save = dentry, *retval;
- 	struct ptlrpc_request *req = NULL;
-@@ -887,7 +894,8 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 	ll_unlock_md_op_lsm(op_data);
- 	rc = ll_lookup_it_finish(req, it, parent, &dentry,
- 				 secctx ? *secctx : NULL,
--				 secctxlen ? *secctxlen : 0);
-+				 secctxlen ? *secctxlen : 0,
-+				kstart);
- 	if (rc != 0) {
- 		ll_intent_release(it);
- 		retval = ERR_PTR(rc);
-diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
-index 60bbae1..b252605 100644
---- a/fs/lustre/mdc/mdc_locks.c
-+++ b/fs/lustre/mdc/mdc_locks.c
-@@ -733,6 +733,12 @@ static int mdc_finish_enqueue(struct obd_export *exp,
- 			mdc_set_open_replay_data(NULL, NULL, it);
- 		}
+ 	unlock_res_and_lock(dlmlock);
  
-+		if (it_disposition(it, DISP_OPEN_CREATE) &&
-+		    !it_open_error(DISP_OPEN_CREATE, it)) {
-+			lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+					     LPROC_MD_CREATE);
-+		}
++	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_CANCEL, 5);
 +
- 		if (body->mbo_valid & (OBD_MD_FLDIREA | OBD_MD_FLEASIZE)) {
- 			void *eadata;
+ 	/* if l_ast_data is NULL, the dlmlock was enqueued by AGL or
+ 	 * the object has been destroyed.
+ 	 */
+@@ -442,6 +442,10 @@ static int __osc_dlm_blocking_ast(const struct lu_env *env,
  
+ 		/* losing a lock, update kms */
+ 		lock_res_and_lock(dlmlock);
++		/* clearing l_ast_data after flushing data,
++		 * to let glimpse ast find the lock and the object
++		 */
++		dlmlock->l_ast_data = NULL;
+ 		cl_object_attr_lock(obj);
+ 		/* Must get the value under the lock to avoid race. */
+ 		old_kms = cl2osc(obj)->oo_oinfo->loi_kms;
 -- 
 1.8.3.1
