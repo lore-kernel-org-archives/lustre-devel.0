@@ -1,75 +1,72 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:48 -0500
-Subject: [lustre-devel] [PATCH 060/622] lnet: ko2iblnd: determine gaps
- correctly
+Date: Thu, 27 Feb 2020 16:09:01 -0500
+Subject: [lustre-devel] [PATCH 073/622] lustre: hsm: add
+ OBD_CONNECT2_ARCHIVE_ID_ARRAY to pass archive_id lists in array
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-61-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-74-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Teddy Zheng <teddy@ddn.com>
 
-We're allowed to start at a non-aligned page offset in the first
-fragment and end at a non-aligned page offset in the last fragment.
+Clients registed to MDS with OBD_CONNECT2_ARCHIVE_ID_ARRAY will
+use array to pass ARCHIVED IDs. While clients without it still
+use bitmap. This flag allows old clients connect to new MDSs.
 
-When checking the iovec exclude both of the first and last fragments
-from the tx_gaps check.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11064
-Lustre-commit: e40ea6fd4494 ("LU-11064 lnd: determine gaps correctly")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32586
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10114
+Lustre-commit: 1c7e7d1243f7 ("LU-10114 hsm: add OBD_CONNECT2_ARCHIVE_ID_ARRAY to pass archive_id lists in array")
+Signed-off-by: Teddy Zheng <teddy@ddn.com>
+Signed-off-by: Li Xi <lixi@ddn.com>
+Reviewed-on: https://review.whamcloud.com/32806
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ fs/lustre/obdclass/lprocfs_status.c    | 1 +
+ fs/lustre/ptlrpc/wiretest.c            | 2 ++
+ include/uapi/linux/lustre/lustre_idl.h | 1 +
+ 3 files changed, 4 insertions(+)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index c2ce3b9..60706b4 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -737,6 +737,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	struct kib_net *net = ni->ni_data;
- 	struct scatterlist *sg;
- 	int fragnob;
-+	int max_nkiov;
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 385359f..fbd46df 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -119,6 +119,7 @@
+ 	"flr",		/* 0x20 */
+ 	"wbc",		/* 0x40 */
+ 	"lock_convert",	/* 0x80 */
++	"archive_id_array",	/* 0x100 */
+ 	NULL
+ };
  
- 	CDEBUG(D_NET, "niov %d offset %d nob %d\n", nkiov, offset, nob);
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index e22f8f8..1afbb41 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1141,6 +1141,8 @@ void lustre_assert_wire_constants(void)
+ 		 OBD_CONNECT2_WBC_INTENTS);
+ 	LASSERTF(OBD_CONNECT2_LOCK_CONVERT == 0x80ULL, "found 0x%.16llxULL\n",
+ 		 OBD_CONNECT2_LOCK_CONVERT);
++	LASSERTF(OBD_CONNECT2_ARCHIVE_ID_ARRAY == 0x100ULL, "found 0x%.16llxULL\n",
++		 OBD_CONNECT2_ARCHIVE_ID_ARRAY);
+ 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
+ 		 (unsigned int)OBD_CKSUM_CRC32);
+ 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 75326c0..dc9872cf3 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -800,6 +800,7 @@ struct ptlrpc_body_v2 {
+ 						 * locks
+ 						 */
+ #define OBD_CONNECT2_LOCK_CONVERT	0x80ULL /* IBITS lock convert support */
++#define OBD_CONNECT2_ARCHIVE_ID_ARRAY  0x100ULL	/* store HSM archive_id in array */
  
-@@ -751,16 +752,24 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 		LASSERT(nkiov > 0);
- 	}
- 
-+	max_nkiov = nkiov;
-+
- 	sg = tx->tx_frags;
- 	do {
- 		LASSERT(nkiov > 0);
- 
- 		fragnob = min((int)(kiov->bv_len - offset), nob);
- 
--		if ((fragnob < (int)(kiov->bv_len - offset)) && nkiov > 1) {
-+		/* We're allowed to start at a non-aligned page offset in
-+		 * the first fragment and end at a non-aligned page offset
-+		 * in the last fragment.
-+		 */
-+		if ((fragnob < (int)(kiov->bv_len - offset)) &&
-+		    nkiov < max_nkiov && nob > fragnob) {
- 			CDEBUG(D_NET,
--			       "fragnob %d < available page %d: with remaining %d kiovs\n",
--			       fragnob, (int)(kiov->bv_len - offset), nkiov);
-+			       "fragnob %d < available page %d: with remaining %d kiovs with %d nob left\n",
-+			       fragnob, (int)(kiov->bv_len - offset),
-+			       nkiov, nob);
- 			tx->tx_gaps = true;
- 		}
- 
+ /* XXX README XXX:
+  * Please DO NOT add flag values here before first ensuring that this same
 -- 
 1.8.3.1
