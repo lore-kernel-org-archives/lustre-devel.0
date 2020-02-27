@@ -1,9 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:25 -0500
-Subject: [lustre-devel] [PATCH 337/622] lnet: peer aliveness
+Date: Thu, 27 Feb 2020 16:09:22 -0500
+Subject: [lustre-devel] [PATCH 094/622] lnet: add global health statistics
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-338-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-95-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,332 +12,234 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <ashehata@whamcloud.com>
 
-Peer NI aliveness is now solely dependent on the health
-infrastructure. With the addition of router_sensitivity_percentage,
-peer NI is considered dead if its health drops below the percentage
-specified of the total health. Setting the percentage to 100% means
-that a peer_ni is considered dead if it's interface is less than
-fully healthy.
+Added global health statistics
 
-Removed obsolete code that queries the peer NI every second since
-the health infrastructure introduces the recovery mechanism which
-is designed to recover the health of peer NIs.
+Print that from lnetctl.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11300
-Lustre-commit: 8e498d3f23ea ("LU-11300 lnet: peer aliveness")
+lnetctl stats show
+
+lnet_selftest passes the statistics block over the wire. This,
+unfortunately, creates an unnecessary backwards compatibility link
+for lnet_selftest, which shouldn't be there. This patch breaks
+this backwards compatibility, which means lnet_selftest will
+not work with older selftest modules.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9120
+Lustre-commit: 15020fd977af ("LU-9120 lnet: add global health statistics")
 Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33186
+Reviewed-on: https://review.whamcloud.com/32949
 Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h  |  25 ++++++---
- include/linux/lnet/lib-types.h |   2 -
- net/lnet/lnet/lib-move.c       | 124 +++++------------------------------------
- net/lnet/lnet/peer.c           |   7 ++-
- net/lnet/lnet/router.c         |  11 ++--
- net/lnet/lnet/router_proc.c    |   3 +-
- 6 files changed, 42 insertions(+), 130 deletions(-)
+ include/linux/lnet/lib-lnet.h        |  2 ++
+ include/uapi/linux/lnet/lnet-types.h | 13 +++++++++++++
+ net/lnet/lnet/api-ni.c               | 13 +++++++++++++
+ net/lnet/lnet/lib-move.c             | 11 +++++++++++
+ net/lnet/lnet/lib-msg.c              | 28 +++++++++++++++++++++++-----
+ 5 files changed, 62 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index eae55d5..d5704b7 100644
+index 74660d3..e4d9ccc 100644
 --- a/include/linux/lnet/lib-lnet.h
 +++ b/include/linux/lnet/lib-lnet.h
-@@ -846,15 +846,6 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
- 	return NULL;
+@@ -445,6 +445,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ 
+ 	rspt = kzalloc(sizeof(*rspt), GFP_NOFS);
+ 	lnet_net_lock(cpt);
++	the_lnet.ln_counters[cpt]->rst_alloc++;
+ 	lnet_net_unlock(cpt);
+ 	return rspt;
+ }
+@@ -454,6 +455,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ {
+ 	kfree(rspt);
+ 	lnet_net_lock(cpt);
++	the_lnet.ln_counters[cpt]->rst_alloc--;
+ 	lnet_net_unlock(cpt);
  }
  
--static inline void
--lnet_peer_set_alive(struct lnet_peer_ni *lp)
--{
--	lp->lpni_last_query = ktime_get_seconds();
--	lp->lpni_last_alive = lp->lpni_last_query;
--	if (!lp->lpni_alive)
--		lnet_notify_locked(lp, 0, 1, lp->lpni_last_alive);
--}
--
- static inline bool
- lnet_peer_is_multi_rail(struct lnet_peer *lp)
- {
-@@ -889,6 +880,22 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
- 	return false;
- }
- 
-+/*
-+ * A peer is alive if it satisfies the following two conditions:
-+ *  1. peer health >= LNET_MAX_HEALTH_VALUE * router_sensitivity_percentage
-+ *  2. the cached NI status received when we discover the peer is UP
-+ */
-+static inline bool
-+lnet_is_peer_ni_alive(struct lnet_peer_ni *lpni)
-+{
-+	bool halive = false;
-+
-+	halive = (atomic_read(&lpni->lpni_healthv) >=
-+		 (LNET_MAX_HEALTH_VALUE * router_sensitivity_percentage / 100));
-+
-+	return halive && lpni->lpni_ns_status == LNET_NI_STATUS_UP;
-+}
-+
- static inline void
- lnet_inc_healthv(atomic_t *healthv)
- {
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index ecc6dee..9a09fad 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -553,8 +553,6 @@ struct lnet_peer_ni {
- 	int			 lpni_rtrcredits;
- 	/* low water mark */
- 	int			 lpni_minrtrcredits;
--	/* alive/dead? */
--	bool			 lpni_alive;
- 	/* notification outstanding? */
- 	bool			 lpni_notify;
- 	/* outstanding notification for LND? */
+diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
+index 2afdd83..1da72c4 100644
+--- a/include/uapi/linux/lnet/lnet-types.h
++++ b/include/uapi/linux/lnet/lnet-types.h
+@@ -278,11 +278,24 @@ struct lnet_ping_info {
+ struct lnet_counters {
+ 	__u32	msgs_alloc;
+ 	__u32	msgs_max;
++	__u32	rst_alloc;
+ 	__u32	errors;
+ 	__u32	send_count;
+ 	__u32	recv_count;
+ 	__u32	route_count;
+ 	__u32	drop_count;
++	__u32	resend_count;
++	__u32	response_timeout_count;
++	__u32	local_interrupt_count;
++	__u32	local_dropped_count;
++	__u32	local_aborted_count;
++	__u32	local_no_route_count;
++	__u32	local_timeout_count;
++	__u32	local_error_count;
++	__u32	remote_dropped_count;
++	__u32	remote_error_count;
++	__u32	remote_timeout_count;
++	__u32	network_timeout_count;
+ 	__u64	send_length;
+ 	__u64	recv_length;
+ 	__u64	route_length;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 82703dd..d58006d 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -694,7 +694,20 @@ static void lnet_assert_wire_constants(void)
+ 	cfs_percpt_for_each(ctr, i, the_lnet.ln_counters) {
+ 		counters->msgs_max += ctr->msgs_max;
+ 		counters->msgs_alloc += ctr->msgs_alloc;
++		counters->rst_alloc += ctr->rst_alloc;
+ 		counters->errors += ctr->errors;
++		counters->resend_count += ctr->resend_count;
++		counters->response_timeout_count += ctr->response_timeout_count;
++		counters->local_interrupt_count += ctr->local_interrupt_count;
++		counters->local_dropped_count += ctr->local_dropped_count;
++		counters->local_aborted_count += ctr->local_aborted_count;
++		counters->local_no_route_count += ctr->local_no_route_count;
++		counters->local_timeout_count += ctr->local_timeout_count;
++		counters->local_error_count += ctr->local_error_count;
++		counters->remote_dropped_count += ctr->remote_dropped_count;
++		counters->remote_error_count += ctr->remote_error_count;
++		counters->remote_timeout_count += ctr->remote_timeout_count;
++		counters->network_timeout_count += ctr->network_timeout_count;
+ 		counters->send_count += ctr->send_count;
+ 		counters->recv_count += ctr->recv_count;
+ 		counters->route_count += ctr->route_count;
 diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 99ff882..af3cd1e 100644
+index c33cf8d..6a3704d 100644
 --- a/net/lnet/lnet/lib-move.c
 +++ b/net/lnet/lnet/lib-move.c
-@@ -609,86 +609,16 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- }
+@@ -2501,6 +2501,10 @@ struct lnet_mt_event_info {
+ 				md->md_rspt_ptr = NULL;
+ 				lnet_res_unlock(i);
  
- /*
-- * This function can be called from two paths:
-- *	1. when sending a message
-- *	2. when decommiting a message (lnet_msg_decommit_tx())
-- * In both these cases the peer_ni should have it's reference count
-- * acquired by the caller and therefore it is safe to drop the spin
-- * lock before calling lnd_query()
-- */
--static void
--lnet_ni_query_locked(struct lnet_ni *ni, struct lnet_peer_ni *lp)
--{
--	time64_t last_alive = 0;
--	int cpt = lnet_cpt_of_nid_locked(lp->lpni_nid, ni);
--
--	LASSERT(lnet_peer_aliveness_enabled(lp));
--	LASSERT(ni->ni_net->net_lnd->lnd_query);
--
--	lnet_net_unlock(cpt);
--	ni->ni_net->net_lnd->lnd_query(ni, lp->lpni_nid, &last_alive);
--	lnet_net_lock(cpt);
--
--	lp->lpni_last_query = ktime_get_seconds();
--
--	if (last_alive) /* NI has updated timestamp */
--		lp->lpni_last_alive = last_alive;
--}
--
--/* NB: always called with lnet_net_lock held */
--static inline int
--lnet_peer_is_alive(struct lnet_peer_ni *lp, unsigned long now)
--{
--	int alive;
--	time64_t deadline;
--
--	LASSERT(lnet_peer_aliveness_enabled(lp));
--
--	/* Trust lnet_notify() if it has more recent aliveness news, but
--	 * ignore the initial assumed death (see lnet_peers_start_down()).
--	 */
--	spin_lock(&lp->lpni_lock);
--	if (!lp->lpni_alive && lp->lpni_alive_count > 0 &&
--	    lp->lpni_timestamp >= lp->lpni_last_alive) {
--		spin_unlock(&lp->lpni_lock);
--		return 0;
--	}
--
--	deadline = lp->lpni_last_alive +
--		   lp->lpni_net->net_tunables.lct_peer_timeout;
--	alive = deadline > now;
--
--	/* Update obsolete lpni_alive except for routers assumed to be dead
--	 * initially, because router checker would update aliveness in this
--	 * case, and moreover lpni_last_alive at peer creation is assumed.
--	 */
--	if (alive && !lp->lpni_alive &&
--	    !(lnet_isrouter(lp) && !lp->lpni_alive_count)) {
--		spin_unlock(&lp->lpni_lock);
--		lnet_notify_locked(lp, 0, 1, lp->lpni_last_alive);
--	} else {
--		spin_unlock(&lp->lpni_lock);
--	}
--
--	return alive;
--}
--
--/*
-  * NB: returns 1 when alive, 0 when dead, negative when error;
-  *     may drop the lnet_net_lock
-  */
- static int
--lnet_peer_alive_locked(struct lnet_ni *ni, struct lnet_peer_ni *lp,
-+lnet_peer_alive_locked(struct lnet_ni *ni, struct lnet_peer_ni *lpni,
- 		       struct lnet_msg *msg)
- {
--	time64_t now = ktime_get_seconds();
--
--	if (!lnet_peer_aliveness_enabled(lp))
-+	if (!lnet_peer_aliveness_enabled(lpni))
- 		return -ENODEV;
++				lnet_net_lock(i);
++				the_lnet.ln_counters[i]->response_timeout_count++;
++				lnet_net_unlock(i);
++
+ 				list_del_init(&rspt->rspt_on_list);
  
--	if (lnet_peer_is_alive(lp, now))
--		return 1;
--
- 	/*
- 	 * If we're resending a message, let's attempt to send it even if
- 	 * the peer is down to fulfill our resend quota on the message
-@@ -696,35 +626,16 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	if (msg->msg_retry_count > 0)
- 		return 1;
+ 				CDEBUG(D_NET,
+@@ -2567,6 +2571,11 @@ struct lnet_mt_event_info {
+ 			lnet_peer_ni_decref_locked(lpni);
  
--	/*
--	 * Peer appears dead, but we should avoid frequent NI queries (at
--	 * most once per lnet_queryinterval seconds).
--	 */
--	if (lp->lpni_last_query) {
--		static const int lnet_queryinterval = 1;
--		time64_t next_query;
--
--		next_query = lp->lpni_last_query + lnet_queryinterval;
--
--		if (now < next_query) {
--			if (lp->lpni_alive)
--				CWARN("Unexpected aliveness of peer %s: %lld < %lld (%d/%d)\n",
--				      libcfs_nid2str(lp->lpni_nid),
--				      now, next_query,
--				      lnet_queryinterval,
--				      lp->lpni_net->net_tunables.lct_peer_timeout);
--			return 0;
--		}
--	}
--
--	/* query NI for latest aliveness news */
--	lnet_ni_query_locked(ni, lp);
-+	/* try and send recovery messages irregardless */
-+	if (msg->msg_recovery)
-+		return 1;
- 
--	if (lnet_peer_is_alive(lp, now))
-+	/* always send any responses */
-+	if (msg->msg_type == LNET_MSG_ACK ||
-+	    msg->msg_type == LNET_MSG_REPLY)
- 		return 1;
- 
--	lnet_notify_locked(lp, 0, 0, lp->lpni_last_alive);
--	return 0;
-+	return lnet_is_peer_ni_alive(lpni);
- }
- 
- /**
-@@ -4184,18 +4095,11 @@ void lnet_monitor_thr_stop(void)
- 	/* Multi-Rail: Primary NID of source. */
- 	msg->msg_initiator = lnet_peer_primary_nid_locked(src_nid);
- 
--	if (lnet_isrouter(msg->msg_rxpeer)) {
--		lnet_peer_set_alive(msg->msg_rxpeer);
--		if (avoid_asym_router_failure &&
--		    LNET_NIDNET(src_nid) != LNET_NIDNET(from_nid)) {
--			/* received a remote message from router, update
--			 * remote NI status on this router.
--			 * NB: multi-hop routed message will be ignored.
--			 */
--			lnet_router_ni_update_locked(msg->msg_rxpeer,
--						     LNET_NIDNET(src_nid));
--		}
--	}
-+	/* mark the status of this lpni as UP since we received a message
-+	 * from it. The ping response reports back the ns_status which is
-+	 * marked on the remote as up or down and we cache it here.
-+	 */
-+	msg->msg_rxpeer->lpni_ns_status = LNET_NI_STATUS_UP;
- 
- 	lnet_msg_commit(msg, cpt);
- 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 91ad6b4..8669fbb 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -3296,7 +3296,7 @@ void lnet_peer_discovery_stop(void)
+ 			lnet_net_unlock(cpt);
++			CDEBUG(D_NET, "resending %s->%s: %s recovery %d\n",
++			       libcfs_nid2str(src_nid),
++			       libcfs_id2str(msg->msg_target),
++			       lnet_msgtyp2str(msg->msg_type),
++			       msg->msg_recovery);
+ 			rc = lnet_send(src_nid, msg, LNET_NID_ANY);
+ 			if (rc) {
+ 				CERROR("Error sending %s to %s: %d\n",
+@@ -2576,6 +2585,8 @@ struct lnet_mt_event_info {
+ 				lnet_finalize(msg, rc);
+ 			}
+ 			lnet_net_lock(cpt);
++			if (!rc)
++				the_lnet.ln_counters[cpt]->resend_count++;
+ 		}
  	}
+ }
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index dc51a17..70decc7 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -546,41 +546,52 @@
+ {
+ 	struct lnet_ni *ni = msg->msg_txni;
+ 	struct lnet_peer_ni *lpni = msg->msg_txpeer;
++	struct lnet_counters *counters = the_lnet.ln_counters[0];
  
- 	if (lnet_isrouter(lp) || lnet_peer_aliveness_enabled(lp))
--		aliveness = lp->lpni_alive ? "up" : "down";
-+		aliveness = (lnet_is_peer_ni_alive(lp)) ? "up" : "down";
+ 	switch (hstatus) {
+ 	case LNET_MSG_STATUS_LOCAL_INTERRUPT:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_interrupt);
++		counters->local_interrupt_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_LOCAL_DROPPED:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_dropped);
++		counters->local_dropped_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_LOCAL_ABORTED:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_aborted);
++		counters->local_aborted_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_LOCAL_NO_ROUTE:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_no_route);
++		counters->local_no_route_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_LOCAL_TIMEOUT:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_timeout);
++		counters->local_timeout_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_LOCAL_ERROR:
+ 		atomic_inc(&ni->ni_hstats.hlt_local_error);
++		counters->local_error_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_REMOTE_DROPPED:
+ 		if (lpni)
+ 			atomic_inc(&lpni->lpni_hstats.hlt_remote_dropped);
++		counters->remote_dropped_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_REMOTE_ERROR:
+ 		if (lpni)
+ 			atomic_inc(&lpni->lpni_hstats.hlt_remote_error);
++		counters->remote_error_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_REMOTE_TIMEOUT:
+ 		if (lpni)
+ 			atomic_inc(&lpni->lpni_hstats.hlt_remote_timeout);
++		counters->remote_timeout_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_NETWORK_TIMEOUT:
+ 		if (lpni)
+ 			atomic_inc(&lpni->lpni_hstats.hlt_network_timeout);
++		counters->network_timeout_count++;
+ 		break;
+ 	case LNET_MSG_STATUS_OK:
+ 		break;
+@@ -601,6 +612,10 @@
+ 	enum lnet_msg_hstatus hstatus = msg->msg_health_status;
+ 	bool lo = false;
  
- 	CDEBUG(D_WARNING, "%-24s %4d %5s %5d %5d %5d %5d %5d %ld\n",
- 	       libcfs_nid2str(lp->lpni_nid), atomic_read(&lp->lpni_refcount),
-@@ -3353,7 +3353,8 @@ void lnet_peer_discovery_stop(void)
- 			if (lnet_isrouter(lp) ||
- 			    lnet_peer_aliveness_enabled(lp))
- 				snprintf(aliveness, LNET_MAX_STR_LEN,
--					 lp->lpni_alive ? "up" : "down");
-+					 lnet_is_peer_ni_alive(lp)
-+					 ? "up" : "down");
++	/* if we're shutting down no point in handling health. */
++	if (the_lnet.ln_state != LNET_STATE_RUNNING)
++		return -1;
++
+ 	LASSERT(msg->msg_txni);
  
- 			*nid = lp->lpni_nid;
- 			*refcount = atomic_read(&lp->lpni_refcount);
-@@ -3439,7 +3440,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 		if (lnet_isrouter(lpni) ||
- 		    lnet_peer_aliveness_enabled(lpni))
- 			snprintf(lpni_info->cr_aliveness, LNET_MAX_STR_LEN,
--				 lpni->lpni_alive ? "up" : "down");
-+				 lnet_is_peer_ni_alive(lpni) ? "up" : "down");
+ 	/* if we're sending to the LOLND then the msg_txpeer will not be
+@@ -611,15 +626,18 @@
+ 	else
+ 		lo = true;
  
- 		lpni_info->cr_refcount = atomic_read(&lpni->lpni_refcount);
- 		lpni_info->cr_ni_peer_tx_credits = lpni->lpni_net ?
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index 40725d2..d5b4914 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -165,8 +165,10 @@ static int rtr_sensitivity_set(const char *val,
+-	lnet_incr_hstats(msg, hstatus);
+-
+ 	if (hstatus != LNET_MSG_STATUS_OK &&
+ 	    ktime_compare(ktime_get(), msg->msg_deadline) >= 0)
+ 		return -1;
  
- 	lp->lpni_timestamp = when;		/* update timestamp */
+-	/* if we're shutting down no point in handling health. */
+-	if (the_lnet.ln_state != LNET_STATE_RUNNING)
+-		return -1;
++	/* stats are only incremented for errors so avoid wasting time
++	 * incrementing statistics if there is no error.
++	 */
++	if (hstatus != LNET_MSG_STATUS_OK) {
++		lnet_net_lock(0);
++		lnet_incr_hstats(msg, hstatus);
++		lnet_net_unlock(0);
++	}
  
--	if (lp->lpni_alive_count &&		/* got old news */
--	    (!lp->lpni_alive) == (!alive)) {	/* new date for old news */
-+	/* got old news */
-+	if (lp->lpni_alive_count != 0 &&
-+	    /* new date for old news */
-+	    (!lnet_is_peer_ni_alive(lp)) == !alive) {
- 		spin_unlock(&lp->lpni_lock);
- 		CDEBUG(D_NET, "Old news\n");
- 		return;
-@@ -175,10 +177,9 @@ static int rtr_sensitivity_set(const char *val,
- 	/* Flag that notification is outstanding */
- 
- 	lp->lpni_alive_count++;
--	lp->lpni_alive = !!alive;	/* 1 bit! */
- 	lp->lpni_notify = 1;
- 	lp->lpni_notifylnd = notifylnd;
--	if (lp->lpni_alive)
-+	if (lnet_is_peer_ni_alive(lp))
- 		lp->lpni_ping_feats = LNET_PING_FEAT_INVAL; /* reset */
- 
- 	spin_unlock(&lp->lpni_lock);
-@@ -214,7 +215,7 @@ static int rtr_sensitivity_set(const char *val,
- 	 * lnet_notify_locked().
- 	 */
- 	while (lp->lpni_notify) {
--		alive = lp->lpni_alive;
-+		alive = lnet_is_peer_ni_alive(lp);
- 		notifylnd = lp->lpni_notifylnd;
- 
- 		lp->lpni_notifylnd = 0;
-diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
-index d41ff00..e9aef1e 100644
---- a/net/lnet/lnet/router_proc.c
-+++ b/net/lnet/lnet/router_proc.c
-@@ -529,7 +529,8 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 
- 			if (lnet_isrouter(peer) ||
- 			    lnet_peer_aliveness_enabled(peer))
--				aliveness = peer->lpni_alive ? "up" : "down";
-+				aliveness = lnet_is_peer_ni_alive(peer) ?
-+					"up" : "down";
- 
- 			if (lnet_peer_aliveness_enabled(peer)) {
- 				time64_t now = ktime_get_seconds();
+ 	CDEBUG(D_NET, "health check: %s->%s: %s: %s\n",
+ 	       libcfs_nid2str(msg->msg_txni->ni_nid),
 -- 
 1.8.3.1
