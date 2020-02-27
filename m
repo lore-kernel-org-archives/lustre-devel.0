@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:35 -0500
-Subject: [lustre-devel] [PATCH 467/622] lustre: llite: align field names in
- ll_sb_info
+Date: Thu, 27 Feb 2020 16:15:41 -0500
+Subject: [lustre-devel] [PATCH 473/622] lnet: o2iblnd: remove some unused
+ fields.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-468-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-474-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,141 +13,93 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.com>
 
-Align field names and most comments in
-struct ll_sb_info.
+Fields kib_min_reconnect_interval kib_max_reconnect_interval kib_ntx
+are never used or set.
 
-Signed-off-by: NeilBrown <neilb@suse.de>
+ibh_mr_shift is set but never used;
+rx_status is used (in a debug message) but never set.
+
+Remove them all.
+
+We could possibly remove ibh_mr_size too. It is only used
+for an error message.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: 68c04b8fdd5d ("LU-6142 o2iblnd: remove some unused fields.")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/35891
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h | 74 ++++++++++++++++++++--------------------
- 1 file changed, 37 insertions(+), 37 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 7 +------
+ net/lnet/klnds/o2iblnd/o2iblnd.h | 5 -----
+ 2 files changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 6186720..bb5f519 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -493,26 +493,26 @@ struct ll_sb_info {
- 	/* this protects pglist and ra_info.  It isn't safe to
- 	 * grab from interrupt contexts
- 	 */
--	spinlock_t		  ll_lock;
--	spinlock_t		  ll_pp_extent_lock; /* pp_extent entry*/
--	spinlock_t		  ll_process_lock; /* ll_rw_process_info */
--	struct obd_uuid	   ll_sb_uuid;
-+	spinlock_t		ll_lock;
-+	spinlock_t		ll_pp_extent_lock; /* pp_extent entry*/
-+	spinlock_t		ll_process_lock; /* ll_rw_process_info */
-+	struct obd_uuid		ll_sb_uuid;
- 	struct obd_export	*ll_md_exp;
- 	struct obd_export	*ll_dt_exp;
- 	struct obd_device	*ll_md_obd;
- 	struct obd_device	*ll_dt_obd;
- 	struct dentry		*ll_debugfs_entry;
--	struct lu_fid	     ll_root_fid; /* root object fid */
-+	struct lu_fid		ll_root_fid; /* root object fid */
- 
--	int		       ll_flags;
--	unsigned int		  ll_xattr_cache_enabled:1,
-+	int			ll_flags;
-+	unsigned int		ll_xattr_cache_enabled:1,
- 				ll_xattr_cache_set:1, /* already set to 0/1 */
--				  ll_client_common_fill_super_succeeded:1,
--				  ll_checksum_set:1;
-+				ll_client_common_fill_super_succeeded:1,
-+				ll_checksum_set:1;
- 
--	struct lustre_client_ocd  ll_lco;
-+	struct lustre_client_ocd ll_lco;
- 
--	struct lprocfs_stats     *ll_stats; /* lprocfs stats counter */
-+	struct lprocfs_stats	*ll_stats; /* lprocfs stats counter */
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index f3176e1..278823f 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2303,7 +2303,6 @@ static int kiblnd_net_init_pools(struct kib_net *net, struct lnet_ni *ni,
+ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
+ {
+ 	struct ib_device_attr *dev_attr = &hdev->ibh_ibdev->attrs;
+-	int rc = 0;
  
  	/*
- 	 * Used to track "unstable" pages on a client, and maintain a
-@@ -520,58 +520,58 @@ struct ll_sb_info {
- 	 * any page which is sent to a server as part of a bulk request,
- 	 * but is uncommitted to stable storage.
- 	 */
--	struct cl_client_cache    *ll_cache;
-+	struct cl_client_cache	*ll_cache;
+ 	 * It's safe to assume a HCA can handle a page size
+@@ -2326,15 +2325,11 @@ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
+ 			hdev->ibh_dev->ibd_dev_caps |= IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT;
+ 	} else {
+ 		CERROR("IB device does not support FMRs nor FastRegs, can't register memory: %d\n",
+-		       rc);
++		       -ENXIO);
+ 		return -ENXIO;
+ 	}
  
--	struct lprocfs_stats     *ll_ra_stats;
-+	struct lprocfs_stats	*ll_ra_stats;
+ 	hdev->ibh_mr_size = dev_attr->max_mr_size;
+-	if (hdev->ibh_mr_size == ~0ULL) {
+-		hdev->ibh_mr_shift = 64;
+-		return 0;
+-	}
  
--	struct ll_ra_info	 ll_ra_info;
--	unsigned int	      ll_namelen;
-+	struct ll_ra_info	ll_ra_info;
-+	unsigned int		ll_namelen;
- 	const struct file_operations	*ll_fop;
- 
--	struct lu_site	   *ll_site;
--	struct cl_device	 *ll_cl;
-+	struct lu_site		*ll_site;
-+	struct cl_device	*ll_cl;
- 	/* Statistics */
- 	struct ll_rw_extents_info ll_rw_extents_info;
--	int		       ll_extent_process_count;
-+	int			ll_extent_process_count;
- 	struct ll_rw_process_info ll_rw_process_info[LL_PROCESS_HIST_MAX];
--	unsigned int	      ll_offset_process_count;
-+	unsigned int		ll_offset_process_count;
- 	struct ll_rw_process_info ll_rw_offset_info[LL_OFFSET_HIST_MAX];
--	unsigned int	      ll_rw_offset_entry_count;
--	int		       ll_stats_track_id;
--	enum stats_track_type     ll_stats_track_type;
--	int		       ll_rw_stats_on;
-+	unsigned int		ll_rw_offset_entry_count;
-+	int			ll_stats_track_id;
-+	enum stats_track_type	ll_stats_track_type;
-+	int			ll_rw_stats_on;
- 
- 	/* metadata stat-ahead */
- 	unsigned int		ll_sa_running_max; /* max concurrent
- 						    * statahead instances
- 						    */
--	unsigned int	      ll_sa_max;     /* max statahead RPCs */
--	atomic_t		  ll_sa_total;   /* statahead thread started
--						  * count
--						  */
--	atomic_t		  ll_sa_wrong;   /* statahead thread stopped for
--						  * low hit ratio
--						  */
-+	unsigned int		ll_sa_max;	/* max statahead RPCs */
-+	atomic_t		ll_sa_total;	/* statahead thread started
-+						 * count
-+						 */
-+	atomic_t		ll_sa_wrong;	/* statahead thread stopped for
-+						 * low hit ratio
-+						 */
- 	atomic_t		ll_sa_running;	/* running statahead thread
- 						 * count
- 						 */
--	atomic_t		  ll_agl_total;  /* AGL thread started count */
-+	atomic_t		ll_agl_total;	/* AGL thread started count */
- 
--	dev_t			  ll_sdev_orig; /* save s_dev before assign for
-+	dev_t			ll_sdev_orig;	/* save s_dev before assign for
- 						 * clustered nfs
- 						 */
- 	/* root squash */
--	struct root_squash_info	  ll_squash;
--	struct path		 ll_mnt;
-+	struct root_squash_info	ll_squash;
-+	struct path		ll_mnt;
- 
- 	/* st_blksize returned by stat(2), when non-zero */
--	unsigned int		 ll_stat_blksize;
-+	unsigned int		ll_stat_blksize;
- 
- 	/* maximum relative age of cached statfs results */
--	unsigned int		  ll_statfs_max_age;
-+	unsigned int		ll_statfs_max_age;
- 
- 	struct kset		ll_kset;	/* sysfs object */
--	struct completion	 ll_kobj_unregister;
-+	struct completion	ll_kobj_unregister;
- 
- 	/* File heat */
- 	unsigned int		ll_heat_decay_weight;
+ 	CERROR("Invalid mr size: %#llx\n", hdev->ibh_mr_size);
+ 	return -EINVAL;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
+index 1285ab1..2f2337a 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -76,12 +76,9 @@
+ struct kib_tunables {
+ 	int *kib_dev_failover;		/* HCA failover */
+ 	unsigned int *kib_service;	/* IB service number */
+-	int *kib_min_reconnect_interval; /* first failed connection retry... */
+-	int *kib_max_reconnect_interval; /* exponentially increasing to this */
+ 	int *kib_cksum;			/* checksum struct kib_msg? */
+ 	int *kib_timeout;		/* comms timeout (seconds) */
+ 	int *kib_keepalive;		/* keepalive timeout (seconds) */
+-	int *kib_ntx;			/* # tx descs */
+ 	char **kib_default_ipif;	/* default IPoIB interface */
+ 	int *kib_retry_count;
+ 	int *kib_rnr_retry_count;
+@@ -178,7 +175,6 @@ struct kib_hca_dev {
+ 	int			ibh_page_shift;	/* page shift of current HCA */
+ 	int			ibh_page_size;	/* page size of current HCA */
+ 	u64			ibh_page_mask;	/* page mask of current HCA */
+-	int			ibh_mr_shift;	/* bits shift of max MR size */
+ 	u64			ibh_mr_size;	/* size of MR */
+ 	struct ib_pd		*ibh_pd;	/* PD */
+ 	struct kib_dev		*ibh_dev;	/* owner */
+@@ -492,7 +488,6 @@ struct kib_rx {					/* receive message */
+ 	struct list_head	rx_list;	/* queue for attention */
+ 	struct kib_conn        *rx_conn;	/* owning conn */
+ 	int			rx_nob;		/* # bytes received (-1 while posted) */
+-	enum ib_wc_status	rx_status;	/* completion status */
+ 	struct kib_msg	       *rx_msg;		/* message buffer (host vaddr) */
+ 	u64			rx_msgaddr;	/* message buffer (I/O addr) */
+ 	DEFINE_DMA_UNMAP_ADDR(rx_msgunmap);	/* for dma_unmap_single() */
 -- 
 1.8.3.1
