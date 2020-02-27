@@ -1,83 +1,172 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:57 -0500
-Subject: [lustre-devel] [PATCH 489/622] lustre: obdecho: avoid panic with
- partially object init
+Date: Thu, 27 Feb 2020 16:17:04 -0500
+Subject: [lustre-devel] [PATCH 556/622] lnet: discard LNetMEInsert
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-490-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-557-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexey Lyashkov <c17817@cray.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-in some cases (like ENOMEM) init function can't called, so
-any init related code should placed in the object delete handler,
-not in the object free.
+This function is unused and has never been used.
+It is not used by cray-dvs - the other user of LNet.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12707
-Lustre-commit: 1a9ca8417c60 ("LU-12707 obdecho: avoid panic with partially object init")
-Signed-off-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-on: https://review.whamcloud.com/35950
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+So discard it.
+
+Lustre-commit: bd5e458cc5fc ("LU-12678 lnet: discard LNetMEInsert")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/36858
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdecho/echo_client.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+ include/linux/lnet/api.h | 10 +-----
+ net/lnet/lnet/lib-me.c   | 91 ++----------------------------------------------
+ 2 files changed, 3 insertions(+), 98 deletions(-)
 
-diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
-index 84823ec..172fe11 100644
---- a/fs/lustre/obdecho/echo_client.c
-+++ b/fs/lustre/obdecho/echo_client.c
-@@ -444,10 +444,16 @@ static int echo_object_init(const struct lu_env *env, struct lu_object *obj,
- 	return 0;
- }
+diff --git a/include/linux/lnet/api.h b/include/linux/lnet/api.h
+index 4b152c8..ac602fc 100644
+--- a/include/linux/lnet/api.h
++++ b/include/linux/lnet/api.h
+@@ -91,7 +91,7 @@
+  * and a set of match criteria. The match criteria can be used to reject
+  * incoming requests based on process ID or the match bits provided in the
+  * request. MEs can be dynamically inserted into a match list by LNetMEAttach()
+- * and LNetMEInsert(), and removed from its list by LNetMEUnlink().
++ * and removed from its list by LNetMEUnlink().
+  * @{
+  */
+ int LNetMEAttach(unsigned int portal,
+@@ -102,14 +102,6 @@ int LNetMEAttach(unsigned int portal,
+ 		 enum lnet_ins_pos pos_in,
+ 		 struct lnet_handle_me *handle_out);
  
--static void echo_object_free(const struct lu_env *env, struct lu_object *obj)
-+static void echo_object_delete(const struct lu_env *env, struct lu_object *obj)
- {
- 	struct echo_object *eco = cl2echo_obj(lu2cl(obj));
--	struct echo_client_obd *ec = eco->eo_dev->ed_ec;
-+	struct echo_client_obd *ec;
-+
-+	/* object delete called unconditolally - layer init or not */
-+	if (!eco->eo_dev)
-+		return;
-+
-+	ec = eco->eo_dev->ed_ec;
+-int LNetMEInsert(struct lnet_handle_me current_in,
+-		 struct lnet_process_id match_id_in,
+-		 u64 match_bits_in,
+-		 u64 ignore_bits_in,
+-		 enum lnet_unlink unlink_in,
+-		 enum lnet_ins_pos position_in,
+-		 struct lnet_handle_me *handle_out);
+-
+ int LNetMEUnlink(struct lnet_handle_me current_in);
+ /** @} lnet_me */
  
- 	LASSERT(atomic_read(&eco->eo_npages) == 0);
+diff --git a/net/lnet/lnet/lib-me.c b/net/lnet/lnet/lib-me.c
+index 4fe6991..47cf498 100644
+--- a/net/lnet/lnet/lib-me.c
++++ b/net/lnet/lnet/lib-me.c
+@@ -63,8 +63,8 @@
+  *		appended to the match list. Allowed constants: LNET_INS_BEFORE,
+  *		LNET_INS_AFTER.
+  * @handle	On successful returns, a handle to the newly created ME object
+- *		is saved here. This handle can be used later in LNetMEInsert(),
+- *		LNetMEUnlink(), or LNetMDAttach() functions.
++ *		is saved here. This handle can be used later in LNetMEUnlink(),
++ *		or LNetMDAttach() functions.
+  *
+  * Return:	0 On success.
+  *		-EINVAL If @portal is invalid.
+@@ -125,93 +125,6 @@
+ EXPORT_SYMBOL(LNetMEAttach);
  
-@@ -455,10 +461,16 @@ static void echo_object_free(const struct lu_env *env, struct lu_object *obj)
- 	list_del_init(&eco->eo_obj_chain);
- 	spin_unlock(&ec->ec_lock);
- 
-+	kfree(eco->eo_oinfo);
-+}
-+
-+static void echo_object_free(const struct lu_env *env, struct lu_object *obj)
-+{
-+	struct echo_object *eco    = cl2echo_obj(lu2cl(obj));
-+
- 	lu_object_fini(obj);
- 	lu_object_header_fini(obj->lo_header);
- 
--	kfree(eco->eo_oinfo);
- 	kmem_cache_free(echo_object_kmem, eco);
- }
- 
-@@ -472,7 +484,7 @@ static int echo_object_print(const struct lu_env *env, void *cookie,
- 
- static const struct lu_object_operations echo_lu_obj_ops = {
- 	.loo_object_init	= echo_object_init,
--	.loo_object_delete	= NULL,
-+	.loo_object_delete	= echo_object_delete,
- 	.loo_object_release	= NULL,
- 	.loo_object_free	= echo_object_free,
- 	.loo_object_print	= echo_object_print,
+ /**
+- * Create and a match entry and insert it before or after the ME pointed to by
+- * @current_meh. The new ME is empty, i.e. not associated with a memory
+- * descriptor. LNetMDAttach() can be used to attach a MD to an empty ME.
+- *
+- * This function is identical to LNetMEAttach() except for the position
+- * where the new ME is inserted.
+- *
+- * @current_meh		A handle for a ME. The new ME will be inserted
+- *			immediately before or immediately after this ME.
+- * @match_id		See the discussion for LNetMEAttach().
+- * @match_bits
+- * @ignore_bits
+- * @unlink
+- * @pos
+- * @handle
+- *
+- * Return:		0 On success.
+- *			-ENOMEM If new ME object cannot be allocated.
+- *			-ENOENT If @current_meh does not point to a valid match entry.
+- */
+-int
+-LNetMEInsert(struct lnet_handle_me current_meh,
+-	     struct lnet_process_id match_id,
+-	     u64 match_bits, u64 ignore_bits,
+-	     enum lnet_unlink unlink, enum lnet_ins_pos pos,
+-	     struct lnet_handle_me *handle)
+-{
+-	struct lnet_me *current_me;
+-	struct lnet_me *new_me;
+-	struct lnet_portal *ptl;
+-	int cpt;
+-
+-	LASSERT(the_lnet.ln_refcount > 0);
+-
+-	if (pos == LNET_INS_LOCAL)
+-		return -EPERM;
+-
+-	new_me = kzalloc(sizeof(*new_me), GFP_NOFS);
+-	if (!new_me)
+-		return -ENOMEM;
+-
+-	cpt = lnet_cpt_of_cookie(current_meh.cookie);
+-
+-	lnet_res_lock(cpt);
+-
+-	current_me = lnet_handle2me(&current_meh);
+-	if (!current_me) {
+-		kfree(new_me);
+-
+-		lnet_res_unlock(cpt);
+-		return -ENOENT;
+-	}
+-
+-	LASSERT(current_me->me_portal < the_lnet.ln_nportals);
+-
+-	ptl = the_lnet.ln_portals[current_me->me_portal];
+-	if (lnet_ptl_is_unique(ptl)) {
+-		/* nosense to insertion on unique portal */
+-		kfree(new_me);
+-		lnet_res_unlock(cpt);
+-		return -EPERM;
+-	}
+-
+-	new_me->me_pos = current_me->me_pos;
+-	new_me->me_portal = current_me->me_portal;
+-	new_me->me_match_id = match_id;
+-	new_me->me_match_bits = match_bits;
+-	new_me->me_ignore_bits = ignore_bits;
+-	new_me->me_unlink = unlink;
+-	new_me->me_md = NULL;
+-
+-	lnet_res_lh_initialize(the_lnet.ln_me_containers[cpt], &new_me->me_lh);
+-
+-	if (pos == LNET_INS_AFTER)
+-		list_add(&new_me->me_list, &current_me->me_list);
+-	else
+-		list_add_tail(&new_me->me_list, &current_me->me_list);
+-
+-	lnet_me2handle(handle, new_me);
+-
+-	lnet_res_unlock(cpt);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(LNetMEInsert);
+-
+-/**
+  * Unlink a match entry from its match list.
+  *
+  * This operation also releases any resources associated with the ME. If a
 -- 
 1.8.3.1
