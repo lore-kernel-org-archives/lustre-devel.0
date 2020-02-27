@@ -1,164 +1,150 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:16 -0500
-Subject: [lustre-devel] [PATCH 148/622] lustre: llite: optimize read on open
- pages
+Date: Thu, 27 Feb 2020 16:10:20 -0500
+Subject: [lustre-devel] [PATCH 152/622] lustre: quota: fix setattr project
+ check
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-149-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-153-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Jinshan Xiong <jinshan.xiong@uber.com>
+From: Wang Shilong <wshilong@ddn.com>
 
-Current read-on-open implementation does allocate cl_page after data
-are piggied back by open request, which is expensive and not
-necessary.
+Similar patch motivated by upstream patch:
+ext4: fix setattr project check in fssetxattr ioctl
 
-This patch improves the case by just adding the pages into page cache.
-As long as those pages will be discarded at lock revocation, there
-should be no concerns.
+Currently, project quota could be changed by fssetxattr
+ioctl, and existed permission check inode_owner_or_capable()
+is obviously not enough, just think that common users could
+change project id of file, that could make users to
+break project quota easily.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11427
-Lustre-commit: 02e766f5ed95 ("LU-11427 llite: optimize read on open pages")
-Signed-off-by: Jinshan Xiong <jinshan.xiong@uber.com>
-Reviewed-on: https://review.whamcloud.com/33234
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+This patch try to follow same regular of xfs project
+quota:
+
+"Project Quota ID state is only allowed to change from
+within the init namespace. Enforce that restriction only
+if we are trying to change the quota ID state.
+Everything else is allowed in user namespaces."
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11101
+Lustre-commit: 2d3bbce0c9f3 ("LU-11101 quota: fix setattr project check")
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-on: https://review.whamcloud.com/32730
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c  | 58 +++++--------------------------------------------
- fs/lustre/llite/namei.c |  7 +++++-
- 2 files changed, 11 insertions(+), 54 deletions(-)
+ fs/lustre/llite/file.c           | 42 ++++++++++++++++++++++++++++++----------
+ fs/lustre/llite/llite_internal.h |  1 +
+ fs/lustre/llite/llite_lib.c      |  9 +++++++++
+ 3 files changed, 42 insertions(+), 10 deletions(-)
 
 diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index a46f5d3..2fd906f 100644
+index 2fd906f..ed0470d 100644
 --- a/fs/lustre/llite/file.c
 +++ b/fs/lustre/llite/file.c
-@@ -420,14 +420,10 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
- 	struct page *vmpage;
- 	struct niobuf_remote *rnb;
- 	char *data;
--	struct lu_env *env;
--	struct cl_io *io;
--	u16 refcheck;
- 	struct lustre_handle lockh;
- 	struct ldlm_lock *lock;
- 	unsigned long index, start;
- 	struct niobuf_local lnb;
--	int rc;
- 	bool dom_lock = false;
- 
- 	if (!obj)
-@@ -440,37 +436,21 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
- 			dom_lock = ldlm_has_dom(lock);
- 		LDLM_LOCK_PUT(lock);
- 	}
--
- 	if (!dom_lock)
- 		return;
- 
--	env = cl_env_get(&refcheck);
--	if (IS_ERR(env))
--		return;
--
- 	if (!req_capsule_has_field(&req->rq_pill, &RMF_NIOBUF_INLINE,
--				   RCL_SERVER)) {
--		rc = -ENODATA;
--		goto out_env;
--	}
-+				   RCL_SERVER))
-+		return;
- 
- 	rnb = req_capsule_server_get(&req->rq_pill, &RMF_NIOBUF_INLINE);
--	data = (char *)rnb + sizeof(*rnb);
--
--	if (!rnb || rnb->rnb_len == 0) {
--		rc = 0;
--		goto out_env;
--	}
-+	if (!rnb || rnb->rnb_len == 0)
-+		return;
- 
- 	CDEBUG(D_INFO, "Get data buffer along with open, len %i, i_size %llu\n",
- 	       rnb->rnb_len, i_size_read(inode));
- 
--	io = vvp_env_thread_io(env);
--	io->ci_obj = obj;
--	io->ci_ignore_layout = 1;
--	rc = cl_io_init(env, io, CIT_MISC, obj);
--	if (rc)
--		goto out_io;
-+	data = (char *)rnb + sizeof(*rnb);
- 
- 	lnb.lnb_file_offset = rnb->rnb_offset;
- 	start = lnb.lnb_file_offset / PAGE_SIZE;
-@@ -478,8 +458,6 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
- 	LASSERT(lnb.lnb_file_offset % PAGE_SIZE == 0);
- 	lnb.lnb_page_offset = 0;
- 	do {
--		struct cl_page *clp;
--
- 		lnb.lnb_data = data + (index << PAGE_SHIFT);
- 		lnb.lnb_len = rnb->rnb_len - (index << PAGE_SHIFT);
- 		if (lnb.lnb_len > PAGE_SIZE)
-@@ -495,35 +473,9 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
- 			      PTR_ERR(vmpage));
- 			break;
- 		}
--		lock_page(vmpage);
--		if (!vmpage->mapping) {
--			unlock_page(vmpage);
--			put_page(vmpage);
--			/* page was truncated */
--			rc = -ENODATA;
--			goto out_io;
--		}
--		clp = cl_page_find(env, obj, vmpage->index, vmpage,
--				   CPT_CACHEABLE);
--		if (IS_ERR(clp)) {
--			unlock_page(vmpage);
--			put_page(vmpage);
--			rc = PTR_ERR(clp);
--			goto out_io;
--		}
--
--		/* export page */
--		cl_page_export(env, clp, 1);
--		cl_page_put(env, clp);
--		unlock_page(vmpage);
- 		put_page(vmpage);
- 		index++;
- 	} while (rnb->rnb_len > (index << PAGE_SHIFT));
--	rc = 0;
--out_io:
--	cl_io_fini(env, io);
--out_env:
--	cl_env_put(env, &refcheck);
+@@ -2780,6 +2780,30 @@ int ll_ioctl_fsgetxattr(struct inode *inode, unsigned int cmd,
+ 	return 0;
  }
  
- static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 4ac62b2..530c2df 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -185,8 +185,13 @@ int ll_dom_lock_cancel(struct inode *inode, struct ldlm_lock *lock)
- 	int rc;
- 	u16 refcheck;
- 
--	if (!lli->lli_clob)
-+	if (!lli->lli_clob) {
-+		/* Due to DoM read on open, there may exist pages for Lustre
-+		 * regular file even though cl_object is not set up yet.
-+		 */
-+		truncate_inode_pages(inode->i_mapping, 0);
- 		return 0;
++int ll_ioctl_check_project(struct inode *inode, struct fsxattr *fa)
++{
++	/*
++	 * Project Quota ID state is only allowed to change from within the init
++	 * namespace. Enforce that restriction only if we are trying to change
++	 * the quota ID state. Everything else is allowed in user namespaces.
++	 */
++	if (current_user_ns() == &init_user_ns)
++		return 0;
++
++	if (ll_i2info(inode)->lli_projid != fa->fsx_projid)
++		return -EINVAL;
++
++	if (test_bit(LLIF_PROJECT_INHERIT, &ll_i2info(inode)->lli_flags)) {
++		if (!(fa->fsx_xflags & FS_XFLAG_PROJINHERIT))
++			return -EINVAL;
++	} else {
++		if (fa->fsx_xflags & FS_XFLAG_PROJINHERIT)
++			return -EINVAL;
 +	}
++
++	return 0;
++}
++
+ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
+ 			unsigned long arg)
+ {
+@@ -2791,22 +2815,20 @@ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
+ 	int rc = 0;
+ 	int flags;
  
- 	env = cl_env_get(&refcheck);
- 	if (IS_ERR(env))
+-	/* only root could change project ID */
+-	if (!capable(CAP_SYS_ADMIN))
+-		return -EPERM;
++	if (copy_from_user(&fsxattr,
++			   (const struct fsxattr __user *)arg,
++			   sizeof(fsxattr)))
++		return -EFAULT;
++
++	rc = ll_ioctl_check_project(inode, &fsxattr);
++	if (rc)
++		return rc;
+ 
+ 	op_data = ll_prep_md_op_data(NULL, inode, NULL, NULL, 0, 0,
+ 				     LUSTRE_OPC_ANY, NULL);
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
+ 
+-	if (copy_from_user(&fsxattr,
+-			   (const struct fsxattr __user *)arg,
+-			   sizeof(fsxattr))) {
+-		rc = -EFAULT;
+-		goto out_fsxattr;
+-	}
+-
+ 	flags = ll_xflags_to_inode_flags(fsxattr.fsx_xflags);
+ 	op_data->op_attr_flags = ll_inode_to_ext_flags(flags);
+ 	if (fsxattr.fsx_xflags & FS_XFLAG_PROJINHERIT)
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index edb5f2a..d6fc6a29 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -829,6 +829,7 @@ int ll_migrate(struct inode *parent, struct file *file,
+ int ll_get_fid_by_name(struct inode *parent, const char *name,
+ 		       int namelen, struct lu_fid *fid, struct inode **inode);
+ int ll_inode_permission(struct inode *inode, int mask);
++int ll_ioctl_check_project(struct inode *inode, struct fsxattr *fa);
+ int ll_ioctl_fsgetxattr(struct inode *inode, unsigned int cmd,
+ 			unsigned long arg);
+ int ll_ioctl_fssetxattr(struct inode *inode, unsigned int cmd,
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index be67652..859fdf4 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -2094,10 +2094,19 @@ int ll_iocontrol(struct inode *inode, struct file *file,
+ 		struct md_op_data *op_data;
+ 		struct cl_object *obj;
+ 		struct iattr *attr;
++		struct fsxattr fa = { 0 };
+ 
+ 		if (get_user(flags, (int __user *)arg))
+ 			return -EFAULT;
+ 
++		fa.fsx_projid = ll_i2info(inode)->lli_projid;
++		if (flags & LUSTRE_PROJINHERIT_FL)
++			fa.fsx_xflags = FS_XFLAG_PROJINHERIT;
++
++		rc = ll_ioctl_check_project(inode, &fa);
++		if (rc)
++			return rc;
++
+ 		op_data = ll_prep_md_op_data(NULL, inode, NULL, NULL, 0, 0,
+ 					     LUSTRE_OPC_ANY, NULL);
+ 		if (IS_ERR(op_data))
 -- 
 1.8.3.1
