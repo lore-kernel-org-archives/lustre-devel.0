@@ -1,67 +1,50 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:07:56 -0500
-Subject: [lustre-devel] [PATCH 008/622] lustre: obdecho: turn on async flag
- only for mode 3
+Date: Thu, 27 Feb 2020 16:07:58 -0500
+Subject: [lustre-devel] [PATCH 010/622] lustre: llite: increase whole-file
+ readahead to RPC size
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Rahul Deshmukh <rahul_deshmukh@xyratex.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-There are couple of problems in obdfilter-survey:
-- Type of test brw i.e. "g" was not followed with npages,
-- Target netdisk was not set properly and
-- Turn ON async flag only for mode 3.
+Increase the default whole-file readahead limit to match the current
+RPC size.  That ensures that files smaller than the RPC size will be
+read in a single round-trip instead of sending multiple smaller RPCs.
 
-This patch fixes the last problem which is kernel side.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-5031
-Lustre-commit: 9f38647a7b24 ("LU-5031 tests: obdfilter-survey fixes")
-Signed-off-by: Rahul Deshmukh <rahul_deshmukh@xyratex.com>
-Reviewed-on: http://review.whamcloud.com/10264
-Reviewed-by: Cliff White <cliff.white@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-7990
+Lustre-commit: 627d0133d9d7 ("LU-7990 llite: increase whole-file readahead to RPC size")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/26955
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdecho/echo_client.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ fs/lustre/llite/llite_lib.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
-index ca963bb..3984cb4 100644
---- a/fs/lustre/obdecho/echo_client.c
-+++ b/fs/lustre/obdecho/echo_client.c
-@@ -1425,7 +1425,7 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
- 	struct obdo *oa = &data->ioc_obdo1;
- 	struct echo_object *eco;
- 	int rc;
--	int async = 1;
-+	int async = 0;
- 	long test_mode;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index aaa8ad2..12aafe0 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -465,6 +465,12 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
  
- 	LASSERT(oa->o_valid & OBD_MD_FLGROUP);
-@@ -1438,14 +1438,14 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
+ 	sbi->ll_dt_exp->exp_connect_data = *data;
  
- 	/* OFD/obdfilter works only via prep/commit */
- 	test_mode = (long)data->ioc_pbuf1;
--	if (test_mode == 1)
--		async = 0;
--
- 	if (!ed->ed_next && test_mode != 3) {
- 		test_mode = 3;
- 		data->ioc_plen1 = data->ioc_count;
- 	}
- 
-+	if (test_mode == 3)
-+		async = 1;
++	/* Don't change value if it was specified in the config log */
++	if (sbi->ll_ra_info.ra_max_read_ahead_whole_pages == -1)
++		sbi->ll_ra_info.ra_max_read_ahead_whole_pages =
++			max_t(unsigned long, SBI_DEFAULT_READAHEAD_WHOLE_MAX,
++			      (data->ocd_brw_size >> PAGE_SHIFT));
 +
- 	/* Truncate batch size to maximum */
- 	if (data->ioc_plen1 > PTLRPC_MAX_BRW_SIZE)
- 		data->ioc_plen1 = PTLRPC_MAX_BRW_SIZE;
+ 	err = obd_fid_init(sbi->ll_dt_exp->exp_obd, sbi->ll_dt_exp,
+ 			   LUSTRE_SEQ_METADATA);
+ 	if (err) {
 -- 
 1.8.3.1
