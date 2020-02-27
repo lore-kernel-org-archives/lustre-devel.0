@@ -1,92 +1,88 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:16 -0500
-Subject: [lustre-devel] [PATCH 028/622] lustre: idl: remove obsolete
- directory split flags
+Date: Thu, 27 Feb 2020 16:08:19 -0500
+Subject: [lustre-devel] [PATCH 031/622] lustre: ldlm: change
+ LDLM_POOL_ADD_VAR macro to inline function
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-29-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-32-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+Simple cleanup to create inline funciton ldlm_pool_add_var().
 
-The directory split functionality from the old CMD (pre-DNE)
-feature was never usable in production, and was removed before
-the DNE 2.4 release.  Remove old flags relating to this feature.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1187
-Lustre-commit: 5c53c353fd82 ("LU-1187 idl: remove obsolete directory split flags")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/31700
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.hpdd.intel.com/browse/LU-8066
+Lustre-commit: 05a36534ba2d ("LU-8066 ldlm: move all remaining files from procfs to debugfs")
+Signed-off-by: Dmitry Eremin <dmiter4ever@gmail.com>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/29255
+WC-bug-id: https://jira.hpdd.intel.com/browse/LU-3319
+Lustre-commit: 4ad445ccd54 ("LU-3319 procfs: move ldlm proc handling over to seq_file")
+Reviewed-on: http://review.whamcloud.com/7293
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Peng Tao <bergwolf@gmail.com>
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Yang Sheng <ys@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_lib.c                | 2 --
- fs/lustre/ptlrpc/wiretest.c            | 4 ----
- include/uapi/linux/lustre/lustre_idl.h | 4 ++--
- 3 files changed, 2 insertions(+), 8 deletions(-)
+ fs/lustre/ldlm/ldlm_internal.h | 10 ++++++++++
+ fs/lustre/ldlm/ldlm_pool.c     | 11 ++---------
+ 2 files changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
-index d4b2bb9..467503c 100644
---- a/fs/lustre/mdc/mdc_lib.c
-+++ b/fs/lustre/mdc/mdc_lib.c
-@@ -520,8 +520,6 @@ void mdc_getattr_pack(struct ptlrpc_request *req, u64 valid, u32 flags,
- 						    &RMF_MDT_BODY);
+diff --git a/fs/lustre/ldlm/ldlm_internal.h b/fs/lustre/ldlm/ldlm_internal.h
+index 6e54521..96dff1d 100644
+--- a/fs/lustre/ldlm/ldlm_internal.h
++++ b/fs/lustre/ldlm/ldlm_internal.h
+@@ -292,6 +292,16 @@ enum ldlm_policy_res {
+ 	}								    \
+ 	struct __##var##__dummy_write {; } /* semicolon catcher */
  
- 	b->mbo_valid = valid;
--	if (op_data->op_bias & MDS_CHECK_SPLIT)
--		b->mbo_valid |= OBD_MD_FLCKSPLIT;
- 	if (op_data->op_bias & MDS_CROSS_REF)
- 		b->mbo_valid |= OBD_MD_FLCROSSREF;
- 	b->mbo_eadatasize = ea_size;
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 21698cc..bcd0229 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1341,8 +1341,6 @@ void lustre_assert_wire_constants(void)
- 		 OBD_MD_FLMDSCAPA);
- 	LASSERTF(OBD_MD_FLOSSCAPA == (0x0000040000000000ULL), "found 0x%.16llxULL\n",
- 		 OBD_MD_FLOSSCAPA);
--	LASSERTF(OBD_MD_FLCKSPLIT == (0x0000080000000000ULL), "found 0x%.16llxULL\n",
--		 OBD_MD_FLCKSPLIT);
- 	LASSERTF(OBD_MD_FLCROSSREF == (0x0000100000000000ULL), "found 0x%.16llxULL\n",
- 		 OBD_MD_FLCROSSREF);
- 	LASSERTF(OBD_MD_FLGETATTRLOCK == (0x0000200000000000ULL), "found 0x%.16llxULL\n",
-@@ -1866,8 +1864,6 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF((int)sizeof(((struct ll_fid *)0)->f_type) == 4, "found %lld\n",
- 		 (long long)(int)sizeof(((struct ll_fid *)0)->f_type));
++static inline void
++ldlm_add_var(struct lprocfs_vars *vars, struct dentry *debugfs_entry,
++	     const char *name, void *data, const struct file_operations *ops)
++{
++	vars->name = name;
++	vars->data = data;
++	vars->fops = ops;
++	ldebugfs_add_vars(debugfs_entry, vars, NULL);
++}
++
+ static inline int is_granted_or_cancelled(struct ldlm_lock *lock)
+ {
+ 	int ret = 0;
+diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+index 04bf5de..d2149a6 100644
+--- a/fs/lustre/ldlm/ldlm_pool.c
++++ b/fs/lustre/ldlm/ldlm_pool.c
+@@ -504,14 +504,6 @@ static ssize_t grant_speed_show(struct kobject *kobj, struct attribute *attr,
+ LDLM_POOL_SYSFS_WRITER_NOLOCK_STORE(lock_volume_factor, atomic);
+ LUSTRE_RW_ATTR(lock_volume_factor);
  
--	LASSERTF(MDS_CHECK_SPLIT == 0x00000001UL, "found 0x%.8xUL\n",
--		(unsigned int)MDS_CHECK_SPLIT);
- 	LASSERTF(MDS_CROSS_REF == 0x00000002UL, "found 0x%.8xUL\n",
- 		(unsigned int)MDS_CROSS_REF);
- 	LASSERTF(MDS_VTX_BYPASS == 0x00000004UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 0bce63d..589bb81 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1131,7 +1131,7 @@ static inline __u32 lov_mds_md_size(__u16 stripes, __u32 lmm_magic)
- /*	OBD_MD_FLRMTPERM	(0x0000010000000000ULL) remote perm, obsolete */
- #define OBD_MD_FLMDSCAPA	(0x0000020000000000ULL) /* MDS capability */
- #define OBD_MD_FLOSSCAPA	(0x0000040000000000ULL) /* OSS capability */
--#define OBD_MD_FLCKSPLIT	(0x0000080000000000ULL) /* Check split on server */
-+/*	OBD_MD_FLCKSPLIT	(0x0000080000000000ULL) obsolete 2.3.58*/
- #define OBD_MD_FLCROSSREF	(0x0000100000000000ULL) /* Cross-ref case */
- #define OBD_MD_FLGETATTRLOCK	(0x0000200000000000ULL) /* Get IOEpoch attributes
- 							 * under lock; for xattr
-@@ -1640,7 +1640,7 @@ struct mdt_rec_setattr {
- #define MDS_ATTR_PROJID		0x10000ULL /* = 65536 */
+-#define LDLM_POOL_ADD_VAR(_name, var, ops)			\
+-	do {							\
+-		pool_vars[0].name = #_name;			\
+-		pool_vars[0].data = var;			\
+-		pool_vars[0].fops = ops;			\
+-		ldebugfs_add_vars(pl->pl_debugfs_entry, pool_vars, NULL);\
+-	} while (0)
+-
+ /* These are for pools in /sys/fs/lustre/ldlm/namespaces/.../pool */
+ static struct attribute *ldlm_pl_attrs[] = {
+ 	&lustre_attr_grant_speed.attr,
+@@ -571,7 +563,8 @@ static int ldlm_pool_debugfs_init(struct ldlm_pool *pl)
  
- enum mds_op_bias {
--	MDS_CHECK_SPLIT		= 1 << 0,
-+/*	MDS_CHECK_SPLIT		= 1 << 0, obsolete before 2.3.58 */
- 	MDS_CROSS_REF		= 1 << 1,
- 	MDS_VTX_BYPASS		= 1 << 2,
- 	MDS_PERM_BYPASS		= 1 << 3,
+ 	memset(pool_vars, 0, sizeof(pool_vars));
+ 
+-	LDLM_POOL_ADD_VAR(state, pl, &lprocfs_pool_state_fops);
++	ldlm_add_var(&pool_vars[0], pl->pl_debugfs_entry, "state", pl,
++		     &lprocfs_pool_state_fops);
+ 
+ 	pl->pl_stats = lprocfs_alloc_stats(LDLM_POOL_LAST_STAT -
+ 					   LDLM_POOL_FIRST_STAT, 0);
 -- 
 1.8.3.1
