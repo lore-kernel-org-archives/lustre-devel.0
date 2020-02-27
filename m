@@ -1,105 +1,49 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:06 -0500
-Subject: [lustre-devel] [PATCH 438/622] lustre: llite: don't miss every
- first stride page
+Date: Thu, 27 Feb 2020 16:15:20 -0500
+Subject: [lustre-devel] [PATCH 452/622] lustre: ptlrpc: check buffer length
+ in lustre_msg_string()
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-439-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-453-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Emoly Liu <emoly@whamcloud.com>
 
-Whenever we need skip some pages for stride io read, we
-will calculate next start page index, however, this page
-index is skipped every time, because loop start from index + 1
+Check buffer length in lustre_msg_string() in case of any invalid
+access.
 
-Testing command: iozone -w -c -i 5 -t1 -j 2 -s 100m -r 1m -F data
-Without patch: 587384.69 kB/sec
-
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                      16  19  19   |          0   0   0
-2:                       0   0  19   |          0   0   0
-4:                       0   0  19   |          0   0   0
-8:                       0   0  19   |          0   0   0
-16:                      0   0  19   |          0   0   0
-32:                      0   0  19   |          0   0   0
-64:                      0   0  19   |          0   0   0
-128:                     0   0  19   |          0   0   0
-256:                     0   0  19   |          0   0   0
-512:                    22  26  46   |          0   0   0
-1024:                   44  53 100   |          0   0   0
-
-With patch: 744635.56 kB/sec
-                        read                    write
-pages per rpc         rpcs   % cum % |       rpcs   % cum %
-1:                       0   0   0   |          0   0   0
-2:                       0   0   0   |          0   0   0
-4:                       0   0   0   |          0   0   0
-8:                       0   0   0   |          0   0   0
-16:                      0   0   0   |          0   0   0
-32:                      0   0   0   |          0   0   0
-64:                      0   0   0   |          0   0   0
-128:                     0   0   0   |          0   0   0
-256:                     0   0   0   |          0   0   0
-512:                     8  13  13   |          0   0   0
-1024:                   50  86 100   |          0   0   0
-
-We get better performances ~27% up here, and all 1 page RPC
-disappear.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12043
-Lustre-commit: 29d8eb5ee7df ("LU-12043 llite: don't miss every first stride page")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/35216
-Reviewed-by: Li Xi <lixi@ddn.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reported-by: Alibaba Cloud <yunye.ry@alibaba-inc.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12613
+Lustre-commit: 728c58d60fae ("LU-12613 ptlrpc: check buffer length in lustre_msg_string()")
+Signed-off-by: Emoly Liu <emoly@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35932
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+Reviewed-by: Yunye Ry <yunye.ry@alibaba-inc.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/rw.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ fs/lustre/ptlrpc/pack_generic.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index 9c4b89f..4fec9a6 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -407,12 +407,12 @@ static int ras_inside_ra_window(unsigned long idx, struct ra_io_arg *ria)
- 		} else if (stride_ria) {
- 			/* If it is not in the read-ahead window, and it is
- 			 * read-ahead mode, then check whether it should skip
--			 * the stride gap
-+			 * the stride gap.
- 			 */
- 			pgoff_t offset;
--			/* FIXME: This assertion only is valid when it is for
--			 * forward read-ahead, it will be fixed when backward
--			 * read-ahead is implemented
-+			/* NOTE: This assertion only is valid when it is for
-+			 * forward read-ahead, must adjust if backward
-+			 * readahead is implemented.
- 			 */
- 			LASSERTF(page_idx >= ria->ria_stoff,
- 				 "Invalid page_idx %lu rs %lu re %lu ro %lu rl %lu rp %lu\n",
-@@ -421,10 +421,11 @@ static int ras_inside_ra_window(unsigned long idx, struct ra_io_arg *ria)
- 				 ria->ria_length, ria->ria_pages);
- 			offset = page_idx - ria->ria_stoff;
- 			offset = offset % (ria->ria_length);
--			if (offset > ria->ria_pages) {
--				page_idx += ria->ria_length - offset;
--				CDEBUG(D_READA, "i %lu skip %lu\n", page_idx,
--				       ria->ria_length - offset);
-+			if (offset >= ria->ria_pages) {
-+				page_idx += ria->ria_length - offset - 1;
-+				CDEBUG(D_READA,
-+				       "Stride: jump %lu pages to %lu\n",
-+				       ria->ria_length - offset, page_idx);
- 				continue;
- 			}
- 		}
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 4a0856a..9b28624 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -712,6 +712,11 @@ char *lustre_msg_string(struct lustre_msg *m, u32 index, u32 max_len)
+ 		       m, index, blen);
+ 		return NULL;
+ 	}
++	if (blen > PTLRPC_MAX_BUFLEN) {
++		CERROR("buffer length of msg %p buffer[%d] is invalid(%d)\n",
++		       m, index, blen);
++		return NULL;
++	}
+ 
+ 	if (max_len == 0) {
+ 		if (slen != blen - 1) {
 -- 
 1.8.3.1
