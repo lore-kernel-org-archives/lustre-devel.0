@@ -1,66 +1,51 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:38 -0500
-Subject: [lustre-devel] [PATCH 530/622] lustre: llite: use wait_event in
- cl_object_put_last()
+Date: Thu, 27 Feb 2020 16:16:42 -0500
+Subject: [lustre-devel] [PATCH 534/622] lustre: ptlrpc: ptlrpc_register_bulk
+ LBUG on ENOMEM
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-531-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-535-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+From: Ann Koehler <amk@cray.com>
 
-cl_object_put_last() contains an open-coded version
-of wait_event().
-Replace it with the library macro.
+Another path through ptl_send_rpc() can cause the assert reported
+in LU-10643. The assertion in ptlrpc_register_bulk() on
+!desc->bd_registered fails when an rpc is resent and the first
+send attempt failed to successfully attach the reply buffer. The
+bulk error cleanup in ptl_send_rpc() does not reset the
+bd_registered flag.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10467
-Lustre-commit: f963f19c94b5 ("LU-10467 llite: use wait_event in cl_object_put_last()")
-Signed-off-by: NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/36345
-Reviewed-by: Neil Brown <neilb@suse.de>
+Cray-bug-id: LUS-7946
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12816
+Lustre-commit: e6225c07ce4c ("LU-12816 ptlrpc: ptlrpc_register_bulk LBUG on ENOMEM")
+Signed-off-by: Ann Koehler <amk@cray.com>
+Reviewed-on: https://review.whamcloud.com/36309
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/lcommon_cl.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ fs/lustre/ptlrpc/niobuf.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/fs/lustre/llite/lcommon_cl.c b/fs/lustre/llite/lcommon_cl.c
-index 3129316..76f76a0 100644
---- a/fs/lustre/llite/lcommon_cl.c
-+++ b/fs/lustre/llite/lcommon_cl.c
-@@ -221,7 +221,6 @@ int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
- static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
- {
- 	struct lu_object_header *header = obj->co_lu.lo_header;
--	wait_queue_entry_t waiter;
- 
- 	if (unlikely(atomic_read(&header->loh_ref) != 1)) {
- 		struct lu_site *site = obj->co_lu.lo_dev->ld_site;
-@@ -229,18 +228,7 @@ static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
- 
- 		wq = lu_site_wq_from_fid(site, &header->loh_fid);
- 
--		init_waitqueue_entry(&waiter, current);
--		add_wait_queue(wq, &waiter);
--
--		while (1) {
--			set_current_state(TASK_UNINTERRUPTIBLE);
--			if (atomic_read(&header->loh_ref) == 1)
--				break;
--			schedule();
--		}
--
--		set_current_state(TASK_RUNNING);
--		remove_wait_queue(wq, &waiter);
-+		wait_event(*wq, atomic_read(&header->loh_ref) == 1);
- 	}
- 
- 	cl_object_put(env, obj);
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index 12a9a5e..fcf7bfa 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -720,6 +720,8 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	 * the chance to have long unlink to sluggish net is smaller here.
+ 	 */
+ 	ptlrpc_unregister_bulk(request, 0);
++	if (request->rq_bulk)
++		request->rq_bulk->bd_registered = 0;
+ out:
+ 	if (rc == -ENOMEM) {
+ 		/*
 -- 
 1.8.3.1
