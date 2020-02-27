@@ -1,82 +1,85 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:37 -0500
-Subject: [lustre-devel] [PATCH 169/622] lustre: llite: protect reading
- inode->i_data.nrpages
+Date: Thu, 27 Feb 2020 16:10:38 -0500
+Subject: [lustre-devel] [PATCH 170/622] lustre: mdt: fix read-on-open for
+ big PAGE_SIZE
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-170-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-171-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bobi Jam <bobijam@whamcloud.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-truncate_inode_pages() looks up pages in the radix tree without
-lock, and could miss finding pages removed from the radix tree
-by __remove_mapping(), so that after calling truncate_inode_pages()
-we need to read the nrpages of the inode->i_data with the protection
-of tree_lock.
+Client PAGE_SIZE can be larger than server one so data returned
+from server along with OPEN can be misaligned on client.
 
-Since it could still be in the race window of __remove_mapping()->
-__delete_from_page_cache()->page_cache_tree_delte(), before the
-nrpages being decreased.
+Patch replaces assertion on client with check and graceful exit,
+changes MDC_DOM_DEF_INLINE_REPSIZE to be PAGE_SIZE at least and
+updates mdt_dom_read_on_open() to return file tail for maximum
+possible page size that can fit into reply.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11582
-Lustre-commit: 04c172b68676 ("LU-11582 llite: protect reading inode->i_data.nrpages")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33639
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11595
+Lustre-commit: 4d7b022e373d ("LU-11595 mdt: fix read-on-open for big PAGE_SIZE")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33606
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_lib.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ fs/lustre/llite/file.c       | 22 ++++++++++++++++++++--
+ fs/lustre/mdc/mdc_internal.h |  3 ++-
+ 2 files changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index ed2d1c6..b766402 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -2011,6 +2011,8 @@ int ll_read_inode2(struct inode *inode, void *opaque)
- void ll_delete_inode(struct inode *inode)
- {
- 	struct ll_inode_info *lli = ll_i2info(inode);
-+	struct address_space *mapping = &inode->i_data;
-+	unsigned long nrpages;
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 246d5de..44337a2 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -447,8 +447,26 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 	if (!rnb || rnb->rnb_len == 0)
+ 		return;
  
- 	if (S_ISREG(inode->i_mode) && lli->lli_clob)
- 		/* discard all dirty pages before truncating them, required by
-@@ -2019,11 +2021,26 @@ void ll_delete_inode(struct inode *inode)
- 		cl_sync_file_range(inode, 0, OBD_OBJECT_EOF,
- 				   CL_FSYNC_LOCAL, 1);
- 
--	truncate_inode_pages_final(&inode->i_data);
-+	truncate_inode_pages_final(mapping);
- 
--	LASSERTF(!inode->i_data.nrpages,
--		 "inode=" DFID "(%p) nrpages=%lu, see http://jira.whamcloud.com/browse/LU-118\n",
--		 PFID(ll_inode2fid(inode)), inode, inode->i_data.nrpages);
-+	/* Workaround for LU-118: Note nrpages may not be totally updated when
-+	 * truncate_inode_pages() returns, as there can be a page in the process
-+	 * of deletion (inside __delete_from_page_cache()) in the specified
-+	 * range. Thus mapping->nrpages can be non-zero when this function
-+	 * returns even after truncation of the whole mapping.  Only do this if
-+	 * npages isn't already zero.
+-	CDEBUG(D_INFO, "Get data buffer along with open, len %i, i_size %llu\n",
+-	       rnb->rnb_len, i_size_read(inode));
++	/* LU-11595: Server may return whole file and that is OK always or
++	 * it may return just file tail and its offset must be aligned with
++	 * client PAGE_SIZE to be used on that client, if server's PAGE_SIZE is
++	 * smaller then offset may be not aligned and that data is just ignored.
 +	 */
-+	nrpages = mapping->nrpages;
-+	if (nrpages) {
-+		xa_lock_irq(&mapping->i_pages);
-+		nrpages = mapping->nrpages;
-+		xa_unlock_irq(&mapping->i_pages);
-+	} /* Workaround end */
++	if (rnb->rnb_offset % PAGE_SIZE)
++		return;
 +
-+	LASSERTF(nrpages == 0,
-+		 "%s: inode="DFID"(%p) nrpages=%lu, see https://jira.whamcloud.com/browse/LU-118\n",
-+		 ll_get_fsname(inode->i_sb, NULL, 0),
-+		 PFID(ll_inode2fid(inode)), inode, nrpages);
++	/* Server returns whole file or just file tail if it fills in
++	 * reply buffer, in both cases total size should be inode size.
++	 */
++	if (rnb->rnb_offset + rnb->rnb_len < i_size_read(inode)) {
++		CERROR("%s: server returns off/len %llu/%u < i_size %llu\n",
++		       ll_get_fsname(inode->i_sb, NULL, 0), rnb->rnb_offset,
++		       rnb->rnb_len, i_size_read(inode));
++		return;
++	}
++
++	CDEBUG(D_INFO, "Get data along with open at %llu len %i, i_size %llu\n",
++	       rnb->rnb_offset, rnb->rnb_len, i_size_read(inode));
  
- 	ll_clear_inode(inode);
- 	clear_inode(inode);
+ 	data = (char *)rnb + sizeof(*rnb);
+ 
+diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
+index b4af9778..7a6ec81 100644
+--- a/fs/lustre/mdc/mdc_internal.h
++++ b/fs/lustre/mdc/mdc_internal.h
+@@ -162,7 +162,8 @@ int mdc_ldlm_blocking_ast(struct ldlm_lock *dlmlock,
+ int mdc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data);
+ int mdc_fill_lvb(struct ptlrpc_request *req, struct ost_lvb *lvb);
+ 
+-#define MDC_DOM_DEF_INLINE_REPSIZE 8192
++/* the minimum inline repsize should be PAGE_SIZE at least */
++#define MDC_DOM_DEF_INLINE_REPSIZE max(8192UL, PAGE_SIZE)
+ #define MDC_DOM_MAX_INLINE_REPSIZE XATTR_SIZE_MAX
+ 
+ #endif
 -- 
 1.8.3.1
