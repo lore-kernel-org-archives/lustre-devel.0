@@ -1,151 +1,301 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:16 -0500
-Subject: [lustre-devel] [PATCH 328/622] lnet: select LO interface for sending
+Date: Thu, 27 Feb 2020 16:11:58 -0500
+Subject: [lustre-devel] [PATCH 250/622] lustre: lov: remove KEY_CACHE_SET to
+ simplify the code
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-329-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-251-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Yang Sheng <ys@whamcloud.com>
 
-In the following scenario
+We must invoke obd_set_info_async with KEY_CACHE_SET after
+obd_connect for OSC device. In fact, It can be combined
+in obd_connect to simplify the code.
 
-Lustre->LNetPrimaryNID with 0 at lo
-Discover is initiated on 0 at lo
-The peer is created with 0 at lo and <addr>@<net>
-The interface health of the peer's <addr>@<net> is decremented
-LNetPut() to self
-selection algorithm selects 0 at lo to send to
-
-This exposes an issue where we try and go through the peer credit
-management algorithm, but because there are no credits associated with
-0 at lo we end up indefinitely queuing the message. ptlrpc will then get
-stuck waiting for send completion on the message.
-
-This was exposed via conf-sanity 32a
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12339
-Lustre-commit: 69d1535ebdac ("LU-12339 lnet: select LO interface for sending")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34957
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Chris Horn <hornc@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12072
+Lustre-commit: 6d21fbbf018b ("LU-12072 lov: remove KEY_CACHE_SET to simplify the code")
+Signed-off-by: Yang Sheng <ys@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34419
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 53 ++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 38 insertions(+), 15 deletions(-)
+ fs/lustre/include/obd.h     |  2 +-
+ fs/lustre/ldlm/ldlm_lib.c   | 14 +++++++++++++
+ fs/lustre/llite/llite_lib.c | 13 ++----------
+ fs/lustre/lmv/lmv_obd.c     |  3 ++-
+ fs/lustre/lov/lov_obd.c     | 49 ++++++++++++++-------------------------------
+ fs/lustre/osc/osc_request.c | 17 ----------------
+ 6 files changed, 34 insertions(+), 64 deletions(-)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index de5951a..75049ec 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -751,6 +751,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	LASSERT(!do_send || msg->msg_tx_delayed);
- 	LASSERT(!msg->msg_receiving);
- 	LASSERT(msg->msg_tx_committed);
-+	/* can't get here if we're sending to the loopback interface */
-+	LASSERT(lp->lpni_nid != the_lnet.ln_loni->ni_nid);
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 758efc1..2195f85 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -446,6 +446,7 @@ struct lmv_obd {
+ 	struct lmv_tgt_desc	**tgts;
+ 	struct obd_connect_data	conn_data;
+ 	struct kobject		*lmv_tgts_kobj;
++	void			*lmv_cache;
+ };
  
- 	/* NB 'lp' is always the next hop */
- 	if (!(msg->msg_target.pid & LNET_PID_USERFLAG) &&
-@@ -1426,6 +1428,25 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- #define SRC_ANY_ROUTER_NMR_DST	(SRC_ANY | REMOTE_DST | NMR_DST)
+ struct niobuf_local {
+@@ -672,7 +673,6 @@ struct obd_device {
+ /*      KEY_SET_INFO in lustre_idl.h */
+ #define KEY_SPTLRPC_CONF	"sptlrpc_conf"
  
- static int
-+lnet_handle_lo_send(struct lnet_send_data *sd)
-+{
-+	struct lnet_msg *msg = sd->sd_msg;
-+	int cpt = sd->sd_cpt;
+-#define KEY_CACHE_SET		"cache_set"
+ #define KEY_CACHE_LRU_SHRINK	"cache_lru_shrink"
+ 
+ /* Flags for op_xvalid */
+diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+index 11955b1..4a982ab 100644
+--- a/fs/lustre/ldlm/ldlm_lib.c
++++ b/fs/lustre/ldlm/ldlm_lib.c
+@@ -40,6 +40,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LDLM
+ 
++#include <cl_object.h>
+ #include <obd.h>
+ #include <obd_class.h>
+ #include <lustre_dlm.h>
+@@ -579,6 +580,19 @@ int client_connect_import(const struct lu_env *env,
+ out_sem:
+ 	up_write(&cli->cl_sem);
+ 
++	if (!rc && localdata) {
++		LASSERT(!cli->cl_cache); /* only once */
++		cli->cl_cache = (struct cl_client_cache *)localdata;
++		cl_cache_incref(cli->cl_cache);
++		cli->cl_lru_left = &cli->cl_cache->ccc_lru_left;
 +
-+	/* No send credit hassles with LOLND */
-+	lnet_ni_addref_locked(the_lnet.ln_loni, cpt);
-+	msg->msg_hdr.dest_nid = cpu_to_le64(the_lnet.ln_loni->ni_nid);
-+	if (!msg->msg_routing)
-+		msg->msg_hdr.src_nid =
-+			cpu_to_le64(the_lnet.ln_loni->ni_nid);
-+	msg->msg_target.nid = the_lnet.ln_loni->ni_nid;
-+	lnet_msg_commit(msg, cpt);
-+	msg->msg_txni = the_lnet.ln_loni;
++		/* add this osc into entity list */
++		LASSERT(list_empty(&cli->cl_lru_osc));
++		spin_lock(&cli->cl_cache->ccc_lru_lock);
++		list_add(&cli->cl_lru_osc, &cli->cl_cache->ccc_lru);
++		spin_unlock(&cli->cl_cache->ccc_lru_lock);
++	}
 +
-+	return LNET_CREDIT_OK;
-+}
-+
-+static int
- lnet_handle_send(struct lnet_send_data *sd)
- {
- 	struct lnet_ni *best_ni = sd->sd_best_ni;
-@@ -1733,7 +1754,10 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 					     sd->sd_best_ni->ni_net->net_id);
+ 	return rc;
+ }
+ EXPORT_SYMBOL(client_connect_import);
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 795a1f1..57486b4 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -266,7 +266,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 	data->ocd_brw_size = MD_MAX_BRW_SIZE;
+ 
+ 	err = obd_connect(NULL, &sbi->ll_md_exp, sbi->ll_md_obd,
+-			  &sbi->ll_sb_uuid, data, NULL);
++			  &sbi->ll_sb_uuid, data, sbi->ll_cache);
+ 	if (err == -EBUSY) {
+ 		LCONSOLE_ERROR_MSG(0x14f,
+ 				   "An MDT (md %s) is performing recovery, of which this client is not a part. Please wait for recovery to complete, abort, or time out.\n",
+@@ -462,7 +462,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 	data->ocd_brw_size = DT_MAX_BRW_SIZE;
+ 
+ 	err = obd_connect(NULL, &sbi->ll_dt_exp, sbi->ll_dt_obd,
+-			  &sbi->ll_sb_uuid, data, NULL);
++			  &sbi->ll_sb_uuid, data, sbi->ll_cache);
+ 	if (err == -EBUSY) {
+ 		LCONSOLE_ERROR_MSG(0x150,
+ 				   "An OST (dt %s) is performing recovery, of which this client is not a part.  Please wait for recovery to complete, abort, or time out.\n",
+@@ -583,15 +583,6 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
  	}
+ 	cl_sb_init(sb);
  
--	if (sd->sd_best_lpni)
-+	if (sd->sd_best_lpni &&
-+	    sd->sd_best_lpni->lpni_nid == the_lnet.ln_loni->ni_nid)
-+		return lnet_handle_lo_send(sd);
-+	else if (sd->sd_best_lpni)
- 		return lnet_handle_send(sd);
- 
- 	CERROR("can't send to %s. no NI on %s\n",
-@@ -2074,7 +2098,15 @@ struct lnet_ni *
- 		 * try and see if we can reach it over another routed
- 		 * network
- 		 */
--		if (sd->sd_best_lpni) {
-+		if (sd->sd_best_lpni &&
-+		    sd->sd_best_lpni->lpni_nid == the_lnet.ln_loni->ni_nid) {
-+			/* in case we initially started with a routed
-+			 * destination, let's reset to local
-+			 */
-+			sd->sd_send_case &= ~REMOTE_DST;
-+			sd->sd_send_case |= LOCAL_DST;
-+			return lnet_handle_lo_send(sd);
-+		} else if (sd->sd_best_lpni) {
- 			/* in case we initially started with a routed
- 			 * destination, let's reset to local
- 			 */
-@@ -2284,19 +2316,12 @@ struct lnet_ni *
- 	 * is no need to go through any selection. We can just shortcut
- 	 * the entire process and send over lolnd
- 	 */
-+	send_data.sd_msg = msg;
-+	send_data.sd_cpt = cpt;
- 	if (LNET_NETTYP(LNET_NIDNET(dst_nid)) == LOLND) {
--		/* No send credit hassles with LOLND */
--		lnet_ni_addref_locked(the_lnet.ln_loni, cpt);
--		msg->msg_hdr.dest_nid = cpu_to_le64(the_lnet.ln_loni->ni_nid);
--		if (!msg->msg_routing)
--			msg->msg_hdr.src_nid =
--				cpu_to_le64(the_lnet.ln_loni->ni_nid);
--		msg->msg_target.nid = the_lnet.ln_loni->ni_nid;
--		lnet_msg_commit(msg, cpt);
--		msg->msg_txni = the_lnet.ln_loni;
-+		rc = lnet_handle_lo_send(&send_data);
- 		lnet_net_unlock(cpt);
+-	err = obd_set_info_async(NULL, sbi->ll_dt_exp, sizeof(KEY_CACHE_SET),
+-				 KEY_CACHE_SET, sizeof(*sbi->ll_cache),
+-				 sbi->ll_cache, NULL);
+-	if (err) {
+-		CERROR("%s: Set cache_set failed: rc = %d\n",
+-		       sbi->ll_dt_exp->exp_obd->obd_name, err);
+-		goto out_root;
+-	}
 -
--		return LNET_CREDIT_OK;
-+		return rc;
+ 	sb->s_root = d_make_root(root);
+ 	if (!sb->s_root) {
+ 		CERROR("%s: can't make root dentry\n",
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 6ad100c..9f3d6de 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -207,6 +207,7 @@ static int lmv_connect(const struct lu_env *env,
+ 
+ 	lmv->connected = 0;
+ 	lmv->conn_data = *data;
++	lmv->lmv_cache = localdata;
+ 
+ 	lmv->lmv_tgts_kobj = kobject_create_and_add("target_obds",
+ 						    &obd->obd_kset.kobj);
+@@ -299,7 +300,7 @@ static int lmv_connect_mdc(struct obd_device *obd, struct lmv_tgt_desc *tgt)
  	}
  
- 	/* find an existing peer_ni, or create one and mark it as having been
-@@ -2376,7 +2401,6 @@ struct lnet_ni *
- 		send_case |= SND_RESP;
+ 	rc = obd_connect(NULL, &mdc_exp, mdc_obd, &obd->obd_uuid,
+-			 &lmv->conn_data, NULL);
++			 &lmv->conn_data, lmv->lmv_cache);
+ 	if (rc) {
+ 		CERROR("target %s connect error %d\n", tgt->ltd_uuid.uuid, rc);
+ 		return rc;
+diff --git a/fs/lustre/lov/lov_obd.c b/fs/lustre/lov/lov_obd.c
+index cc0ca1c..240cc6f9 100644
+--- a/fs/lustre/lov/lov_obd.c
++++ b/fs/lustre/lov/lov_obd.c
+@@ -120,7 +120,7 @@ static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
+ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
+ 		      enum obd_notify_event ev);
  
- 	/* assign parameters to the send_data */
--	send_data.sd_msg = msg;
- 	send_data.sd_rtr_nid = rtr_nid;
- 	send_data.sd_src_nid = src_nid;
- 	send_data.sd_dst_nid = dst_nid;
-@@ -2387,7 +2411,6 @@ struct lnet_ni *
- 	send_data.sd_final_dst_lpni = lpni;
- 	send_data.sd_peer = peer;
- 	send_data.sd_md_cpt = md_cpt;
--	send_data.sd_cpt = cpt;
- 	send_data.sd_send_case = send_case;
+-int lov_connect_obd(struct obd_device *obd, u32 index, int activate,
++int lov_connect_osc(struct obd_device *obd, u32 index, int activate,
+ 		    struct obd_connect_data *data)
+ {
+ 	struct lov_obd *lov = &obd->u.lov;
+@@ -169,13 +169,13 @@ int lov_connect_obd(struct obd_device *obd, u32 index, int activate,
  
- 	rc = lnet_handle_send_case_locked(&send_data);
+ 	if (imp->imp_invalid) {
+ 		CDEBUG(D_CONFIG,
+-		       "not connecting OSC %s; administratively disabled\n",
++		       "%s: not connecting - administratively disabled\n",
+ 		       obd_uuid2str(tgt_uuid));
+ 		return 0;
+ 	}
+ 
+ 	rc = obd_connect(NULL, &lov->lov_tgts[index]->ltd_exp, tgt_obd,
+-			 &lov_osc_uuid, data, NULL);
++			 &lov_osc_uuid, data, lov->lov_cache);
+ 	if (rc || !lov->lov_tgts[index]->ltd_exp) {
+ 		CERROR("Target %s connect error %d\n",
+ 		       obd_uuid2str(tgt_uuid), rc);
+@@ -231,12 +231,17 @@ static int lov_connect(const struct lu_env *env,
+ 
+ 	lov_tgts_getref(obd);
+ 
++	if (localdata) {
++		lov->lov_cache = localdata;
++		cl_cache_incref(lov->lov_cache);
++	}
++
+ 	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+ 		tgt = lov->lov_tgts[i];
+ 		if (!tgt || obd_uuid_empty(&tgt->ltd_uuid))
+ 			continue;
+ 		/* Flags will be lowest common denominator */
+-		rc = lov_connect_obd(obd, i, tgt->ltd_activate, &lov->lov_ocd);
++		rc = lov_connect_osc(obd, i, tgt->ltd_activate, &lov->lov_ocd);
+ 		if (rc) {
+ 			CERROR("%s: lov connect tgt %d failed: %d\n",
+ 			       obd->obd_name, i, rc);
+@@ -381,20 +386,12 @@ static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
+ 			struct obd_uuid lov_osc_uuid = {"LOV_OSC_UUID"};
+ 
+ 			rc = obd_connect(NULL, &tgt->ltd_exp, tgt->ltd_obd,
+-					 &lov_osc_uuid, &lov->lov_ocd, NULL);
++					 &lov_osc_uuid, &lov->lov_ocd,
++					 lov->lov_cache);
+ 			if (rc || !tgt->ltd_exp) {
+ 				index = rc;
+ 				goto out;
+ 			}
+-			rc = obd_set_info_async(NULL, tgt->ltd_exp,
+-						sizeof(KEY_CACHE_SET),
+-						KEY_CACHE_SET,
+-						sizeof(struct cl_client_cache),
+-						lov->lov_cache, NULL);
+-			if (rc < 0) {
+-				index = rc;
+-				goto out;
+-			}
+ 		}
+ 
+ 		if (lov->lov_tgts[index]->ltd_activate == activate) {
+@@ -574,17 +571,16 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
+ 	CDEBUG(D_CONFIG, "idx=%d ltd_gen=%d ld_tgt_count=%d\n",
+ 	       index, tgt->ltd_gen, lov->desc.ld_tgt_count);
+ 
+-	if (lov->lov_connects == 0) {
++	if (lov->lov_connects == 0)
+ 		/* lov_connect hasn't been called yet. We'll do the
+-		 * lov_connect_obd on this target when that fn first runs,
++		 * lov_connect_osc on this target when that fn first runs,
+ 		 * because we don't know the connect flags yet.
+ 		 */
+ 		return 0;
+-	}
+ 
+ 	lov_tgts_getref(obd);
+ 
+-	rc = lov_connect_obd(obd, index, active, &lov->lov_ocd);
++	rc = lov_connect_osc(obd, index, active, &lov->lov_ocd);
+ 	if (rc)
+ 		goto out;
+ 
+@@ -594,15 +590,6 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
+ 		goto out;
+ 	}
+ 
+-	if (lov->lov_cache) {
+-		rc = obd_set_info_async(NULL, tgt->ltd_exp,
+-					sizeof(KEY_CACHE_SET), KEY_CACHE_SET,
+-					sizeof(struct cl_client_cache),
+-					lov->lov_cache, NULL);
+-		if (rc < 0)
+-			goto out;
+-	}
+-
+ 	rc = lov_notify(obd, tgt->ltd_exp->exp_obd,
+ 			active ? OBD_NOTIFY_CONNECT : OBD_NOTIFY_INACTIVE);
+ 
+@@ -1216,14 +1203,8 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 
+ 	lov_tgts_getref(obddev);
+ 
+-	if (KEY_IS(KEY_CHECKSUM)) {
++	if (KEY_IS(KEY_CHECKSUM))
+ 		do_inactive = true;
+-	} else if (KEY_IS(KEY_CACHE_SET)) {
+-		LASSERT(!lov->lov_cache);
+-		lov->lov_cache = val;
+-		do_inactive = true;
+-		cl_cache_incref(lov->lov_cache);
+-	}
+ 
+ 	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+ 		tgt = lov->lov_tgts[i];
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 7a99ef2..a988cbf 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -2899,23 +2899,6 @@ int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 		return 0;
+ 	}
+ 
+-	if (KEY_IS(KEY_CACHE_SET)) {
+-		struct client_obd *cli = &obd->u.cli;
+-
+-		LASSERT(!cli->cl_cache); /* only once */
+-		cli->cl_cache = val;
+-		cl_cache_incref(cli->cl_cache);
+-		cli->cl_lru_left = &cli->cl_cache->ccc_lru_left;
+-
+-		/* add this osc into entity list */
+-		LASSERT(list_empty(&cli->cl_lru_osc));
+-		spin_lock(&cli->cl_cache->ccc_lru_lock);
+-		list_add(&cli->cl_lru_osc, &cli->cl_cache->ccc_lru);
+-		spin_unlock(&cli->cl_cache->ccc_lru_lock);
+-
+-		return 0;
+-	}
+-
+ 	if (KEY_IS(KEY_CACHE_LRU_SHRINK)) {
+ 		struct client_obd *cli = &obd->u.cli;
+ 		long nr = atomic_long_read(&cli->cl_lru_in_list) >> 1;
 -- 
 1.8.3.1
