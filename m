@@ -1,9 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:09 -0500
-Subject: [lustre-devel] [PATCH 561/622] lustre: handle: discard OBD_FREE_RCU
+Date: Thu, 27 Feb 2020 16:17:14 -0500
+Subject: [lustre-devel] [PATCH 566/622] lustre: ldlm: add a counter to the
+ per-namespace data
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-562-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-567-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,164 +13,87 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-OBD_FREE_RCU and the hop_free call-back together form an overly
-complex mechanism equivalent to kfree_rcu() or call_rcu(...).
-Discard them and use the simpler approach.
+When we change the resource hash to rhashtable we won't have
+a per-bucket counter.  We could use the nelems global counter,
+but ldlm_resource goes to some trouble to avoid having any
+table-wide atomics, and hopefully rhashtable will grow the
+ability to disable the global counter in the near future.
+Having a counter we control makes it easier to manage the
+back-reference to the namespace when there is anything in the
+hash table.
 
-This removes the only use for the field h_size, so discard
-that too.
+So add a counter to the ldlm_ns_bucket.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12542
-Lustre-commit: 48830f888b6 ("LU-12542 handle: discard OBD_FREE_RCU")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8130
+Lustre-commit: f9314d6e9259e6c7 ("LU-8130 ldlm: add a counter to the per-namespace data")
 Signed-off-by: NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/35797
+Reviewed-on: https://review.whamcloud.com/36219
 Reviewed-by: Neil Brown <neilb@suse.de>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_handles.h  |  3 ---
- fs/lustre/include/obd_support.h     | 10 ----------
- fs/lustre/ldlm/ldlm_lock.c          | 16 ++++++++--------
- fs/lustre/obdclass/genops.c         |  3 +--
- fs/lustre/obdclass/lustre_handles.c | 15 ---------------
- 5 files changed, 9 insertions(+), 38 deletions(-)
+ fs/lustre/include/lustre_dlm.h |  2 ++
+ fs/lustre/ldlm/ldlm_resource.c | 10 +++++-----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_handles.h b/fs/lustre/include/lustre_handles.h
-index 7c93d72..8f733fd 100644
---- a/fs/lustre/include/lustre_handles.h
-+++ b/fs/lustre/include/lustre_handles.h
-@@ -46,7 +46,6 @@
- #include <linux/types.h>
- 
- struct portals_handle_ops {
--	void (*hop_free)(void *object, int size);
- 	/* hop_type is used for some debugging messages */
- 	char *hop_type;
- };
-@@ -72,7 +71,6 @@ struct portals_handle {
- 	/* newly added fields to handle the RCU issue. -jxiong */
- 	struct rcu_head			h_rcu;
- 	spinlock_t			h_lock;
--	unsigned int			h_size:31;
- 	unsigned int			h_in:1;
+diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
+index cc4b8b0..9ca79f4 100644
+--- a/fs/lustre/include/lustre_dlm.h
++++ b/fs/lustre/include/lustre_dlm.h
+@@ -306,6 +306,8 @@ struct ldlm_ns_bucket {
+ 	 * fact the network or overall system load is at fault
+ 	 */
+ 	struct adaptive_timeout     nsb_at_estimate;
++	/* counter of entries in this bucket */
++	atomic_t		nsb_count;
  };
  
-@@ -83,7 +81,6 @@ void class_handle_hash(struct portals_handle *,
- 		       const struct portals_handle_ops *ops);
- void class_handle_unhash(struct portals_handle *);
- void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
--void class_handle_free_cb(struct rcu_head *rcu);
- int class_handle_init(void);
- void class_handle_cleanup(void);
+ enum {
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 65ff32c..d009d5d 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -133,12 +133,11 @@ static ssize_t resource_count_show(struct kobject *kobj, struct attribute *attr,
+ 	struct ldlm_namespace *ns = container_of(kobj, struct ldlm_namespace,
+ 						 ns_kobj);
+ 	u64 res = 0;
+-	struct cfs_hash_bd bd;
+ 	int i;
  
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index acfd098..5969b6b 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -533,16 +533,6 @@
- #define POISON_PAGE(page, val) do { } while (0)
- #endif
- 
--#define OBD_FREE_RCU(ptr, size, handle)			\
--do {							\
--	struct portals_handle *__h = (handle);		\
--							\
--	__h->h_cookie = (unsigned long)(ptr);		\
--	__h->h_size = (size);				\
--	call_rcu(&__h->h_rcu, class_handle_free_cb);	\
--	POISON_PTR(ptr);				\
--} while (0)
--
- #define KEY_IS(str)					\
- 	(keylen >= (sizeof(str) - 1) &&			\
- 	memcmp(key, str, (sizeof(str) - 1)) == 0)
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index 2471e30..61bf028 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -153,6 +153,13 @@ struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock)
+ 	/* result is not strictly consistent */
+-	cfs_hash_for_each_bucket(ns->ns_rs_hash, &bd, i)
+-		res += cfs_hash_bd_count_get(&bd);
++	for (i = 0; i < (1 << ns->ns_bucket_bits); i++)
++		res += atomic_read(&ns->ns_rs_buckets[i].nsb_count);
+ 	return sprintf(buf, "%lld\n", res);
  }
- EXPORT_SYMBOL(ldlm_lock_get);
+ LUSTRE_RO_ATTR(resource_count);
+@@ -647,6 +646,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
  
-+static void lock_handle_free(struct rcu_head *rcu)
-+{
-+	struct ldlm_lock *lock = container_of(rcu, struct ldlm_lock,
-+					      l_handle.h_rcu);
-+	kmem_cache_free(ldlm_lock_slab, lock);
-+}
-+
- /**
-  * Release lock reference.
-  *
-@@ -186,7 +193,7 @@ void ldlm_lock_put(struct ldlm_lock *lock)
- 		kvfree(lock->l_lvb_data);
- 
- 		lu_ref_fini(&lock->l_reference);
--		OBD_FREE_RCU(lock, sizeof(*lock), &lock->l_handle);
-+		call_rcu(&lock->l_handle.h_rcu, lock_handle_free);
+ 		at_init(&nsb->nsb_at_estimate, ldlm_enqueue_min, 0);
+ 		nsb->nsb_namespace = ns;
++		atomic_set(&nsb->nsb_count, 0);
  	}
- }
- EXPORT_SYMBOL(ldlm_lock_put);
-@@ -358,14 +365,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
+ 
+ 	ns->ns_obd = obd;
+@@ -1126,7 +1126,7 @@ struct ldlm_resource *
  	}
- }
+ 	/* We won! Let's add the resource. */
+ 	cfs_hash_bd_add_locked(ns->ns_rs_hash, &bd, &res->lr_hash);
+-	if (cfs_hash_bd_count_get(&bd) == 1)
++	if (atomic_inc_return(&res->lr_ns_bucket->nsb_count) == 1)
+ 		ns_refcount = ldlm_namespace_get_return(ns);
  
--static void lock_handle_free(void *lock, int size)
--{
--	LASSERT(size == sizeof(struct ldlm_lock));
--	kmem_cache_free(ldlm_lock_slab, lock);
--}
--
- static struct portals_handle_ops lock_handle_ops = {
--	.hop_free   = lock_handle_free,
- 	.hop_type   = "ldlm",
- };
- 
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index a31e9ce..15bea0d 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -729,11 +729,10 @@ static void class_export_destroy(struct obd_export *exp)
- 	if (exp != obd->obd_self_export)
- 		class_decref(obd, "export", exp);
- 
--	OBD_FREE_RCU(exp, sizeof(*exp), &exp->exp_handle);
-+	kfree_rcu(exp, exp_handle.h_rcu);
- }
- 
- static struct portals_handle_ops export_handle_ops = {
--	.hop_free	= NULL,
- 	.hop_type	= "export",
- };
- 
-diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
-index 95a34db..99c68fe 100644
---- a/fs/lustre/obdclass/lustre_handles.c
-+++ b/fs/lustre/obdclass/lustre_handles.c
-@@ -167,21 +167,6 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
- }
- EXPORT_SYMBOL(class_handle2object);
- 
--void class_handle_free_cb(struct rcu_head *rcu)
--{
--	struct portals_handle *h;
--	void *ptr;
--
--	h = container_of(rcu, struct portals_handle, h_rcu);
--	ptr = (void *)(unsigned long)h->h_cookie;
--
--	if (h->h_ops->hop_free)
--		h->h_ops->hop_free(ptr, h->h_size);
--	else
--		kfree(ptr);
--}
--EXPORT_SYMBOL(class_handle_free_cb);
--
- int class_handle_init(void)
- {
- 	struct handle_bucket *bucket;
+ 	cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 1);
+@@ -1170,7 +1170,7 @@ static void __ldlm_resource_putref_final(struct cfs_hash_bd *bd,
+ 	cfs_hash_bd_unlock(ns->ns_rs_hash, bd, 1);
+ 	if (ns->ns_lvbo && ns->ns_lvbo->lvbo_free)
+ 		ns->ns_lvbo->lvbo_free(res);
+-	if (cfs_hash_bd_count_get(bd) == 0)
++	if (atomic_dec_and_test(&nsb->nsb_count))
+ 		ldlm_namespace_put(ns);
+ 	if (res->lr_itree)
+ 		kmem_cache_free(ldlm_interval_tree_slab, res->lr_itree);
 -- 
 1.8.3.1
