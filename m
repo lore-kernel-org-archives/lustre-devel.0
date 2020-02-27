@@ -1,116 +1,199 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:01 -0500
-Subject: [lustre-devel] [PATCH 193/622] lustre: sysfs: make ping sysfs file
- read and writable
+Date: Thu, 27 Feb 2020 16:11:04 -0500
+Subject: [lustre-devel] [PATCH 196/622] lustre: sptlrpc: split
+ sptlrpc_process_config()
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-194-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-197-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Starting with 4.15 kernels any sysfs read only is limited to
-root access only. To retain the ability for non root users
-to detect if a remote server is alive using the 'ping' sysfs
-file we need to change it to writable. Retain the read ability
-so older tools will work.
+Make sptlrpc_process_config() more than a single line wapper
+exporting function. Instead migrate the lcfg parsing out of
+__sptlrpc_process_config() so that we can use this function
+for both LCFG_PARAM and LCFG_SET_PARAM handling.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
-Lustre-commit: 6bbae72c6900 ("LU-8066 sysfs: make ping sysfs file read and writable")
+The first field parsed from struct lustre_cfg *lcfg is the
+target. This can be "_mgs", file system name, or an obd target
+i.e fsname-MDT0000. We can move to extracting the file system
+name out of the target string using server_name2fsname().
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10937
+Lustre-commit: 0ff7d548eb7b ("LU-10937 sptlrpc: split sptlrpc_process_config()")
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/33776
+Reviewed-on: https://review.whamcloud.com/33760
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lprocfs_status.h | 3 ++-
- fs/lustre/mdc/lproc_mdc.c          | 2 +-
- fs/lustre/mgc/lproc_mgc.c          | 2 +-
- fs/lustre/osc/lproc_osc.c          | 2 +-
- fs/lustre/ptlrpc/lproc_ptlrpc.c    | 9 +++++++++
- 5 files changed, 14 insertions(+), 4 deletions(-)
+ fs/lustre/include/lustre_disk.h |  1 +
+ fs/lustre/obdclass/obd_mount.c  |  5 ++-
+ fs/lustre/ptlrpc/sec_config.c   | 85 +++++++++++++++++++++++++----------------
+ 3 files changed, 57 insertions(+), 34 deletions(-)
 
-diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
-index 1ef548ae..c1079f1 100644
---- a/fs/lustre/include/lprocfs_status.h
-+++ b/fs/lustre/include/lprocfs_status.h
-@@ -462,7 +462,8 @@ int lprocfs_wr_uint(struct file *file, const char __user *buffer,
- struct adaptive_timeout;
- int lprocfs_at_hist_helper(struct seq_file *m, struct adaptive_timeout *at);
- int lprocfs_rd_timeouts(struct seq_file *m, void *data);
--
-+ssize_t ping_store(struct kobject *kobj, struct attribute *attr,
-+		   const char *buffer, size_t count);
- ssize_t ping_show(struct kobject *kobj, struct attribute *attr,
- 		  char *buffer);
+diff --git a/fs/lustre/include/lustre_disk.h b/fs/lustre/include/lustre_disk.h
+index 92618e8..b6b693f 100644
+--- a/fs/lustre/include/lustre_disk.h
++++ b/fs/lustre/include/lustre_disk.h
+@@ -145,6 +145,7 @@ struct lustre_sb_info {
+ /****************** prototypes *********************/
  
-diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
-index 746dd21..70c9eaf 100644
---- a/fs/lustre/mdc/lproc_mdc.c
-+++ b/fs/lustre/mdc/lproc_mdc.c
-@@ -306,7 +306,7 @@ static ssize_t max_mod_rpcs_in_flight_store(struct kobject *kobj,
- LUSTRE_ATTR(mds_conn_uuid, 0444, conn_uuid_show, NULL);
- LUSTRE_RO_ATTR(conn_uuid);
+ /* obd_mount.c */
++int server_name2fsname(const char *svname, char *fsname, const char **endptr);
  
--LUSTRE_RO_ATTR(ping);
-+LUSTRE_RW_ATTR(ping);
- 
- static ssize_t mdc_rpc_stats_seq_write(struct file *file,
- 				       const char __user *buf,
-diff --git a/fs/lustre/mgc/lproc_mgc.c b/fs/lustre/mgc/lproc_mgc.c
-index 676d479..0c716df 100644
---- a/fs/lustre/mgc/lproc_mgc.c
-+++ b/fs/lustre/mgc/lproc_mgc.c
-@@ -69,7 +69,7 @@ struct lprocfs_vars lprocfs_mgc_obd_vars[] = {
- LUSTRE_ATTR(mgs_conn_uuid, 0444, conn_uuid_show, NULL);
- LUSTRE_RO_ATTR(conn_uuid);
- 
--LUSTRE_RO_ATTR(ping);
-+LUSTRE_RW_ATTR(ping);
- 
- static struct attribute *mgc_attrs[] = {
- 	&lustre_attr_mgs_conn_uuid.attr,
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index ac64724..ea67d20 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -176,7 +176,7 @@ static ssize_t max_dirty_mb_store(struct kobject *kobj,
- LUSTRE_ATTR(ost_conn_uuid, 0444, conn_uuid_show, NULL);
- LUSTRE_RO_ATTR(conn_uuid);
- 
--LUSTRE_RO_ATTR(ping);
-+LUSTRE_RW_ATTR(ping);
- 
- static int osc_cached_mb_seq_show(struct seq_file *m, void *v)
+ int lustre_start_mgc(struct super_block *sb);
+ int lustre_common_put_super(struct super_block *sb);
+diff --git a/fs/lustre/obdclass/obd_mount.c b/fs/lustre/obdclass/obd_mount.c
+index d143112..6c68bc7 100644
+--- a/fs/lustre/obdclass/obd_mount.c
++++ b/fs/lustre/obdclass/obd_mount.c
+@@ -597,8 +597,8 @@ int lustre_put_lsi(struct super_block *sb)
+  *
+  * Returns:	rc < 0  on error
+  */
+-static int server_name2fsname(const char *svname, char *fsname,
+-			      const char **endptr)
++int server_name2fsname(const char *svname, char *fsname,
++		       const char **endptr)
  {
-diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index eb0ecc0..700e109 100644
---- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -1234,6 +1234,7 @@ void ptlrpc_lprocfs_unregister_obd(struct obd_device *obd)
- }
- EXPORT_SYMBOL(ptlrpc_lprocfs_unregister_obd);
+ 	const char *dash;
  
-+/* Kept for older tools */
- ssize_t ping_show(struct kobject *kobj, struct attribute *attr,
- 		  char *buffer)
+@@ -618,6 +618,7 @@ static int server_name2fsname(const char *svname, char *fsname,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(server_name2fsname);
+ 
+ /* Get the index from the obd name.
+  *  rc = server type, or
+diff --git a/fs/lustre/ptlrpc/sec_config.c b/fs/lustre/ptlrpc/sec_config.c
+index 135ce99..e4b1a075 100644
+--- a/fs/lustre/ptlrpc/sec_config.c
++++ b/fs/lustre/ptlrpc/sec_config.c
+@@ -41,6 +41,7 @@
+ #include <obd_class.h>
+ #include <obd_support.h>
+ #include <lustre_import.h>
++#include <lustre_disk.h>
+ #include <uapi/linux/lustre/lustre_param.h>
+ #include <lustre_sec.h>
+ 
+@@ -577,14 +578,45 @@ static int sptlrpc_conf_merge_rule(struct sptlrpc_conf *conf,
+  * find one through the target name in the record inside conf_lock;
+  * otherwise means caller already hold conf_lock.
+  */
+-static int __sptlrpc_process_config(struct lustre_cfg *lcfg,
++static int __sptlrpc_process_config(char *target, const char *fsname,
++				    struct sptlrpc_rule *rule,
+ 				    struct sptlrpc_conf *conf)
  {
-@@ -1260,6 +1261,14 @@ ssize_t ping_show(struct kobject *kobj, struct attribute *attr,
- }
- EXPORT_SYMBOL(ping_show);
- 
-+ssize_t ping_store(struct kobject *kobj, struct attribute *attr,
-+		   const char *buffer, size_t count)
-+{
-+	return ping_show(kobj, attr, (char *)buffer);
+-	char *target, *param;
++	int rc;
++
++	if (!conf) {
++		if (!fsname)
++			return -ENODEV;
++
++		mutex_lock(&sptlrpc_conf_lock);
++		conf = sptlrpc_conf_get(fsname, 0);
++		if (!conf) {
++			CERROR("can't find conf\n");
++			rc = -ENOMEM;
++		} else {
++			rc = sptlrpc_conf_merge_rule(conf, target, rule);
++		}
++		mutex_unlock(&sptlrpc_conf_lock);
++	} else {
++		LASSERT(mutex_is_locked(&sptlrpc_conf_lock));
++		rc = sptlrpc_conf_merge_rule(conf, target, rule);
++	}
++
++	if (!rc)
++		conf->sc_modified++;
++
++	return rc;
 +}
-+EXPORT_SYMBOL(ping_store);
 +
-+
- #undef BUFLEN
++int sptlrpc_process_config(struct lustre_cfg *lcfg)
++{
+ 	char fsname[MTI_NAME_MAXLEN];
+ 	struct sptlrpc_rule rule;
++	char *target, *param;
+ 	int rc;
  
- /* Write the connection UUID to this file to attempt to connect to that node.
++	print_lustre_cfg(lcfg);
++
+ 	target = lustre_cfg_string(lcfg, 1);
+ 	if (!target) {
+ 		CERROR("missing target name\n");
+@@ -597,45 +629,34 @@ static int __sptlrpc_process_config(struct lustre_cfg *lcfg,
+ 		return -EINVAL;
+ 	}
+ 
+-	CDEBUG(D_SEC, "processing rule: %s.%s\n", target, param);
+-
+ 	/* parse rule to make sure the format is correct */
+-	if (strncmp(param, PARAM_SRPC_FLVR, sizeof(PARAM_SRPC_FLVR) - 1) != 0) {
++	if (strncmp(param, PARAM_SRPC_FLVR,
++		    sizeof(PARAM_SRPC_FLVR) - 1) != 0) {
+ 		CERROR("Invalid sptlrpc parameter: %s\n", param);
+ 		return -EINVAL;
+ 	}
+ 	param += sizeof(PARAM_SRPC_FLVR) - 1;
+ 
+-	rc = sptlrpc_parse_rule(param, &rule);
+-	if (rc)
+-		return -EINVAL;
+-
+-	if (!conf) {
+-		target2fsname(target, fsname, sizeof(fsname));
+-
+-		mutex_lock(&sptlrpc_conf_lock);
+-		conf = sptlrpc_conf_get(fsname, 0);
+-		if (!conf) {
+-			CERROR("can't find conf\n");
+-			rc = -ENOMEM;
+-		} else {
+-			rc = sptlrpc_conf_merge_rule(conf, target, &rule);
+-		}
+-		mutex_unlock(&sptlrpc_conf_lock);
+-	} else {
+-		LASSERT(mutex_is_locked(&sptlrpc_conf_lock));
+-		rc = sptlrpc_conf_merge_rule(conf, target, &rule);
+-	}
++	CDEBUG(D_SEC, "processing rule: %s.%s\n", target, param);
+ 
+-	if (rc == 0)
+-		conf->sc_modified++;
++	/*
++	 * Three types of targets exist for sptlrpc using conf_param
++	 * 1.	'_mgs' which targets mgc srpc settings. Treat it as
++	 *	as a special file system name.
++	 * 2.	target is a device which can be fsname-MDTXXXX or
++	 *	fsname-OSTXXXX. This can be verified by the function
++	 *	server_name2fsname.
++	 * 3.	If both above conditions are not meet then the target
++	 *	is a actual filesystem.
++	 */
++	if (server_name2fsname(target, fsname, NULL))
++		strlcpy(fsname, target, sizeof(target));
+ 
+-	return rc;
+-}
++	rc = sptlrpc_parse_rule(param, &rule);
++	if (rc)
++		return rc;
+ 
+-int sptlrpc_process_config(struct lustre_cfg *lcfg)
+-{
+-	return __sptlrpc_process_config(lcfg, NULL);
++	return __sptlrpc_process_config(target, fsname, &rule, NULL);
+ }
+ EXPORT_SYMBOL(sptlrpc_process_config);
+ 
 -- 
 1.8.3.1
