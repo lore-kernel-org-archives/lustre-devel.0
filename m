@@ -1,107 +1,75 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:44 -0500
-Subject: [lustre-devel] [PATCH 056/622] lustre: ptlrpc: Serialize procfs
- access to scp_hist_reqs using mutex
+Date: Thu, 27 Feb 2020 16:08:48 -0500
+Subject: [lustre-devel] [PATCH 060/622] lnet: ko2iblnd: determine gaps
+ correctly
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-57-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-61-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-scp_hist_reqs list can be quite long thus a lot of
-userland processes can waste CPU power in spinlock cycles.
+We're allowed to start at a non-aligned page offset in the first
+fragment and end at a non-aligned page offset in the last fragment.
 
-Cray-bug-id: LUS-5833
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11004
-Lustre-commit: 413a738a37d7 ("LU-11004 ptlrpc: Serialize procfs access to scp_hist_reqs using mutex")
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-by: Alexander Boyko <c17825@cray.com>
-Reviewed-on: https://review.whamcloud.com/32307
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
+When checking the iovec exclude both of the first and last fragments
+from the tx_gaps check.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11064
+Lustre-commit: e40ea6fd4494 ("LU-11064 lnd: determine gaps correctly")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32586
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h  | 2 ++
- fs/lustre/ptlrpc/lproc_ptlrpc.c | 7 +++++++
- fs/lustre/ptlrpc/service.c      | 1 +
- 3 files changed, 10 insertions(+)
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index 674803c..cf13555 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -1543,6 +1543,8 @@ struct ptlrpc_service_part {
- 	 * threads starting & stopping are also protected by this lock.
- 	 */
- 	spinlock_t			scp_lock __cfs_cacheline_aligned;
-+	/* userland serialization */
-+	struct mutex			scp_mutex;
- 	/** total # req buffer descs allocated */
- 	int				scp_nrqbds_total;
- 	/** # posted request buffers for receiving */
-diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index e48a4e8..0efbcfc 100644
---- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -869,10 +869,12 @@ struct ptlrpc_srh_iterator {
- 		if (i > cpt) /* make up the lowest position for this CPT */
- 			*pos = PTLRPC_REQ_CPT2POS(svc, i);
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index c2ce3b9..60706b4 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -737,6 +737,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	struct kib_net *net = ni->ni_data;
+ 	struct scatterlist *sg;
+ 	int fragnob;
++	int max_nkiov;
  
-+		mutex_lock(&svcpt->scp_mutex);
- 		spin_lock(&svcpt->scp_lock);
- 		rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi,
- 				PTLRPC_REQ_POS2SEQ(svc, *pos));
- 		spin_unlock(&svcpt->scp_lock);
-+		mutex_unlock(&svcpt->scp_mutex);
- 		if (rc == 0) {
- 			*pos = PTLRPC_REQ_SEQ2POS(svc, srhi->srhi_seq);
- 			srhi->srhi_idx = i;
-@@ -914,9 +916,11 @@ struct ptlrpc_srh_iterator {
- 			seq = srhi->srhi_seq + (1 << svc->srv_cpt_bits);
- 		}
+ 	CDEBUG(D_NET, "niov %d offset %d nob %d\n", nkiov, offset, nob);
  
-+		mutex_lock(&svcpt->scp_mutex);
- 		spin_lock(&svcpt->scp_lock);
- 		rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi, seq);
- 		spin_unlock(&svcpt->scp_lock);
-+		mutex_unlock(&svcpt->scp_mutex);
- 		if (rc == 0) {
- 			*pos = PTLRPC_REQ_SEQ2POS(svc, srhi->srhi_seq);
- 			srhi->srhi_idx = i;
-@@ -940,6 +944,7 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
- 
- 	svcpt = svc->srv_parts[srhi->srhi_idx];
- 
-+	mutex_lock(&svcpt->scp_mutex);
- 	spin_lock(&svcpt->scp_lock);
- 
- 	rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi, srhi->srhi_seq);
-@@ -980,6 +985,8 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+@@ -751,16 +752,24 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 		LASSERT(nkiov > 0);
  	}
  
- 	spin_unlock(&svcpt->scp_lock);
-+	mutex_unlock(&svcpt->scp_mutex);
++	max_nkiov = nkiov;
 +
- 	return rc;
- }
+ 	sg = tx->tx_frags;
+ 	do {
+ 		LASSERT(nkiov > 0);
  
-diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
-index 8dae21a..cf920ae 100644
---- a/fs/lustre/ptlrpc/service.c
-+++ b/fs/lustre/ptlrpc/service.c
-@@ -471,6 +471,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+ 		fragnob = min((int)(kiov->bv_len - offset), nob);
  
- 	/* rqbd and incoming request queue */
- 	spin_lock_init(&svcpt->scp_lock);
-+	mutex_init(&svcpt->scp_mutex);
- 	INIT_LIST_HEAD(&svcpt->scp_rqbd_idle);
- 	INIT_LIST_HEAD(&svcpt->scp_rqbd_posted);
- 	INIT_LIST_HEAD(&svcpt->scp_req_incoming);
+-		if ((fragnob < (int)(kiov->bv_len - offset)) && nkiov > 1) {
++		/* We're allowed to start at a non-aligned page offset in
++		 * the first fragment and end at a non-aligned page offset
++		 * in the last fragment.
++		 */
++		if ((fragnob < (int)(kiov->bv_len - offset)) &&
++		    nkiov < max_nkiov && nob > fragnob) {
+ 			CDEBUG(D_NET,
+-			       "fragnob %d < available page %d: with remaining %d kiovs\n",
+-			       fragnob, (int)(kiov->bv_len - offset), nkiov);
++			       "fragnob %d < available page %d: with remaining %d kiovs with %d nob left\n",
++			       fragnob, (int)(kiov->bv_len - offset),
++			       nkiov, nob);
+ 			tx->tx_gaps = true;
+ 		}
+ 
 -- 
 1.8.3.1
