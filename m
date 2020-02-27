@@ -1,47 +1,60 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:21 -0500
-Subject: [lustre-devel] [PATCH 453/622] lustre: uapi: fix building fail
- against Power9 little endian
+Date: Thu, 27 Feb 2020 16:15:24 -0500
+Subject: [lustre-devel] [PATCH 456/622] lustre: fld: remove fci_no_shrink
+ field.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-454-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-457-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Gu Zheng <gzheng@ddn.com>
+From: Mr NeilBrown <neilb@suse.com>
 
-We use "%ll[dux]" for __u64 variable as an input/output modifier,
-this may cause building error on some architectures which use "long"
-for 64-bit types, for example, Power9 little endian.
-Here add necessary typecasting (long long/unsigned long long) to
-make the build correct.
+This field is never set, so is always zero.
+Remove it, and the one place where it is tested.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12705
-Lustre-commit: 4eddf36ac360 ("LU-12705 build: fix building fail against Power9 little endian")
-Signed-off-by: Gu Zheng <gzheng@ddn.com>
-Reviewed-on: https://review.whamcloud.com/36007
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: e669586775c6 ("LU-6142 fld: remove fci_no_shrink field.")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/35875
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Li Xi <lixi@ddn.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_user.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/lustre/fld/fld_cache.c    | 3 +--
+ fs/lustre/fld/fld_internal.h | 1 -
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 3016b73..695ceb2 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -512,7 +512,7 @@ struct lu_extent {
+diff --git a/fs/lustre/fld/fld_cache.c b/fs/lustre/fld/fld_cache.c
+index 5267ba2..79b10bb 100644
+--- a/fs/lustre/fld/fld_cache.c
++++ b/fs/lustre/fld/fld_cache.c
+@@ -381,8 +381,7 @@ static int fld_cache_insert_nolock(struct fld_cache *cache,
+ 	 * insertion loop.
+ 	 */
+ 
+-	if (!cache->fci_no_shrink)
+-		fld_cache_shrink(cache);
++	fld_cache_shrink(cache);
+ 
+ 	head = &cache->fci_entries_head;
+ 
+diff --git a/fs/lustre/fld/fld_internal.h b/fs/lustre/fld/fld_internal.h
+index 465c6ccf..53648d2 100644
+--- a/fs/lustre/fld/fld_internal.h
++++ b/fs/lustre/fld/fld_internal.h
+@@ -109,7 +109,6 @@ struct fld_cache {
+ 
+ 	/** Cache name used for debug and messages. */
+ 	char			fci_name[LUSTRE_MDT_MAXNAMELEN];
+-	unsigned int		fci_no_shrink:1;
  };
  
- #define DEXT "[%#llx, %#llx)"
--#define PEXT(ext) (ext)->e_start, (ext)->e_end
-+#define PEXT(ext) (unsigned long long)(ext)->e_start, (unsigned long long)(ext)->e_end
- 
- static inline bool lu_extent_is_overlapped(struct lu_extent *e1,
- 					    struct lu_extent *e2)
+ enum {
 -- 
 1.8.3.1
