@@ -1,91 +1,97 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:32 -0500
-Subject: [lustre-devel] [PATCH 224/622] lustre: llite: Lock inode on tiny
- write if setuid/setgid set
+Date: Thu, 27 Feb 2020 16:11:33 -0500
+Subject: [lustre-devel] [PATCH 225/622] lustre: llite: make sure name pack
+ atomic
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-225-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-226-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Ann Koehler <amk@cray.com>
+From: Wang Shilong <wshilong@ddn.com>
 
-During a write, the setuid/setgid bits must be reset if they are
-enabled and the user does not have the correct permissions. Setting
-any file attributes, including setuid and setgid, requires the inode
-to be locked. Writes became lockless with the introduction of
-LU-1669. Locking the inode in the setuid/setgid case was added to
-vvp_io_write_start() as a special case. The inode locking was not
-included when support for tiny writes was added with LU-9409. This
-mod adds the necessary inode lock/unlock calls to ll_do_tiny_write().
+We are trying to access dentry name directly and pass it
+down without holding @d_lock, this is racy and possibly
+make us trigger assertions:
 
-If the inode is not locked when setuid/setgid are reset, the kernel
-will issue a one time warning and Lustre may hang trying to get the
-inode lock in ll_setattr_raw().
+(mdc_lib.c:137:mdc_pack_name()) ASSERTION( lu_name_is_valid_2(buf, cpy_len) ) failed:
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11944
-Lustre-commit: f39a552922ca ("LU-11944 llite: Lock inode on tiny write if setuid/setgid set")
-Signed-off-by: Ann Koehler <amk@cray.com>
-Reviewed-on: https://review.whamcloud.com/34218
+Fix the problem by allocting memory and copy name with @d_lock
+held.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12020
+Lustre-Commit: f575b6551b2b ("LU-12020 llite: make sure name pack atomic")
+Signed-off-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-on: https://review.whamcloud.com/34330
 Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Gu Zheng <gzheng@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c   | 6 ++++++
- fs/lustre/llite/vvp_io.c | 6 +++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ fs/lustre/llite/file.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
 diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 7078734..a73d11f 100644
+index a73d11f..4560ae0 100644
 --- a/fs/lustre/llite/file.c
 +++ b/fs/lustre/llite/file.c
-@@ -1616,6 +1616,7 @@ static ssize_t ll_do_tiny_write(struct kiocb *iocb, struct iov_iter *iter)
- 	ssize_t count = iov_iter_count(iter);
- 	struct file *file = iocb->ki_filp;
- 	struct inode *inode = file_inode(file);
-+	bool lock_inode = !IS_NOSEC(inode);
- 	ssize_t result = 0;
- 
- 	/* Restrict writes to single page and < PAGE_SIZE.  See comment@top
-@@ -1625,8 +1626,13 @@ static ssize_t ll_do_tiny_write(struct kiocb *iocb, struct iov_iter *iter)
- 	    (iocb->ki_pos & (PAGE_SIZE-1)) + count > PAGE_SIZE)
- 		return 0;
- 
-+	if (unlikely(lock_inode))
-+		inode_lock(inode);
- 	result = __generic_file_write_iter(iocb, iter);
- 
-+	if (unlikely(lock_inode))
-+		inode_unlock(inode);
-+
- 	/* If the page is not already dirty, ll_tiny_write_begin returns
- 	 * -ENODATA.  We continue on to normal write.
+@@ -502,7 +502,7 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 	struct inode *inode = d_inode(de);
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
+ 	struct dentry *parent = de->d_parent;
+-	const char *name = NULL;
++	char *name = NULL;
+ 	struct md_op_data *op_data;
+ 	struct ptlrpc_request *req = NULL;
+ 	int len = 0, rc;
+@@ -514,21 +514,41 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 	 * if server supports open-by-fid, or file name is invalid, don't pack
+ 	 * name in open request
  	 */
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index 85bb3e0..ad4b39e 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -1037,13 +1037,13 @@ static int vvp_io_write_start(const struct lu_env *env,
- 		 * consistency, proper locking to protect against writes,
- 		 * trucates, etc. is handled in the higher layers of lustre.
- 		 */
--		bool lock_node = !IS_NOSEC(inode);
-+		lock_inode = !IS_NOSEC(inode);
+-	if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID) &&
+-	    lu_name_is_valid_2(de->d_name.name, de->d_name.len)) {
+-		name = de->d_name.name;
++	if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID)) {
++retry:
+ 		len = de->d_name.len;
++		name = kmalloc(len, GFP_NOFS);
++		if (!name)
++			return -ENOMEM;
++		/* race here */
++		spin_lock(&de->d_lock);
++		if (len != de->d_name.len) {
++			spin_unlock(&de->d_lock);
++			kfree(name);
++			goto retry;
++		}
++		memcpy(name, de->d_name.name, len);
++		spin_unlock(&de->d_lock);
++
++		if (!lu_name_is_valid_2(name, len)) {
++			kfree(name);
++			name = NULL;
++			len = 0;
++		}
+ 	}
  
--		if (lock_node)
-+		if (unlikely(lock_inode))
- 			inode_lock(inode);
- 		result = __generic_file_write_iter(vio->vui_iocb,
- 						   vio->vui_iter);
--		if (lock_node)
-+		if (unlikely(lock_inode))
- 			inode_unlock(inode);
+ 	op_data  = ll_prep_md_op_data(NULL, d_inode(parent), inode, name, len,
+ 				      O_RDWR, LUSTRE_OPC_ANY, NULL);
+-	if (IS_ERR(op_data))
++	if (IS_ERR(op_data)) {
++		kfree(name);
+ 		return PTR_ERR(op_data);
++	}
+ 	op_data->op_data = lmm;
+ 	op_data->op_data_size = lmmsize;
  
- 		if (result > 0 || result == -EIOCBQUEUED)
+ 	rc = md_intent_lock(sbi->ll_md_exp, op_data, itp, &req,
+ 			    &ll_md_blocking_ast, 0);
++	kfree(name);
+ 	ll_finish_md_op_data(op_data);
+ 	if (rc == -ESTALE) {
+ 		/* reason for keep own exit path - don`t flood log
 -- 
 1.8.3.1
