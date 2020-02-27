@@ -1,61 +1,103 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:24 -0500
-Subject: [lustre-devel] [PATCH 276/622] lustre: llite,
- readahead: fix to call ll_ras_enter() properly
+Date: Thu, 27 Feb 2020 16:12:25 -0500
+Subject: [lustre-devel] [PATCH 277/622] lustre: ptlrpc: ASSERTION
+ (req_transno < next_transno) failed
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-277-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-278-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-ll_ras_enter() is expected to be called per syscall.
-However, with fast read enabled, it will be no longer true that
-We will call vvp_io_read_start() for every syscall.
+An update request is checked for duplicates by xid in
+is_req_replayed_by_update(). However xid is unique per
+client only. It may happen that there are 2 requests
+with the same xid from different clients.
 
-To fix this problem, we should move this to file read handler.
+Perform lookup by transno, it is unique per MDT.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12043
-Lustre-commit: 500edcada7e4 ("LU-12043 llite, readahead: fix to call ll_ras_enter() properly")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/34755
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Cray-bug-id: LUS-6015
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11251
+Lustre-commit: 53764826b95f ("LU-11251 mdt: ASSERTION (req_transno < next_transno) failed")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Vitaly Fertman <c17818@cray.com>
+Reviewed-by: Alexander Boyko <c17825@cray.com>
+Reviewed-on: https://review.whamcloud.com/33001
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c   | 2 ++
- fs/lustre/llite/vvp_io.c | 1 -
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ fs/lustre/include/obd_support.h |  3 ++-
+ fs/lustre/ptlrpc/client.c       | 11 ++++++++---
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 61d53c4..d059ac7 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -1625,6 +1625,8 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
- 	u16 refcheck;
- 	ssize_t rc2;
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 4e956da..837b68d 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -355,7 +355,8 @@
+ #define OBD_FAIL_PTLRPC_DROP_BULK			0x51a
+ #define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK			0x51b
+ #define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK		0x51c
+-#define OBD_FAIL_PTLRPC_BULK_ATTACH      0x521
++#define OBD_FAIL_PTLRPC_BULK_ATTACH			0x521
++#define OBD_FAIL_PTLRPC_ROUND_XID			0x530
+ #define OBD_FAIL_PTLRPC_CONNECT_RACE			0x531
  
-+	ll_ras_enter(iocb->ki_filp);
+ #define OBD_FAIL_OBD_PING_NET				0x600
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index 7c243af..ac16878 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -712,6 +712,8 @@ static inline void ptlrpc_assign_next_xid(struct ptlrpc_request *req)
+ 	spin_unlock(&req->rq_import->imp_lock);
+ }
+ 
++static atomic64_t ptlrpc_last_xid;
 +
- 	result = ll_do_fast_read(iocb, to);
- 	if (result < 0 || iov_iter_count(to) == 0)
- 		goto out;
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index 43f4088..1f82fe6 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -773,7 +773,6 @@ static int vvp_io_read_start(const struct lu_env *env,
- 		vio->vui_ra_valid = true;
- 		vio->vui_ra_start = cl_index(obj, pos);
- 		vio->vui_ra_count = cl_index(obj, tot + PAGE_SIZE - 1);
--		ll_ras_enter(file);
- 	}
+ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 			     u32 version, int opcode, char **bufs,
+ 			     struct ptlrpc_cli_ctx *ctx)
+@@ -761,7 +763,6 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 	ptlrpc_at_set_req_timeout(request);
  
- 	/* BUG: 5972 */
+ 	lustre_msg_set_opc(request->rq_reqmsg, opcode);
+-	ptlrpc_assign_next_xid(request);
+ 
+ 	/* Let's setup deadline for req/reply/bulk unlink for opcode. */
+ 	if (cfs_fail_val == opcode) {
+@@ -776,6 +777,11 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK)) {
+ 			fail_t = &request->rq_reply_deadline;
+ 			fail2_t = &request->rq_bulk_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_ROUND_XID)) {
++			time64_t now = ktime_get_real_seconds();
++
++			atomic64_set(&ptlrpc_last_xid,
++				     ((u64)now >> 4) << 24);
+ 		}
+ 
+ 		if (fail_t) {
+@@ -791,6 +797,7 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 			msleep(4 * MSEC_PER_SEC);
+ 		}
+ 	}
++	ptlrpc_assign_next_xid(request);
+ 
+ 	return 0;
+ 
+@@ -3085,8 +3092,6 @@ void ptlrpc_abort_set(struct ptlrpc_request_set *set)
+ 	}
+ }
+ 
+-static atomic64_t ptlrpc_last_xid;
+-
+ /**
+  * Initialize the XID for the node.  This is common among all requests on
+  * this node, and only requires the property that it is monotonically
 -- 
 1.8.3.1
