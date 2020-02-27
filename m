@@ -1,56 +1,46 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:21 -0500
-Subject: [lustre-devel] [PATCH 213/622] lustre: mdc: don't use ACL at setattr
+Date: Thu, 27 Feb 2020 16:11:39 -0500
+Subject: [lustre-devel] [PATCH 231/622] lustre: mdc: return DOM size on open
+ resend
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-214-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-232-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexander Boyko <c17825@cray.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-For ldiskfs with large_ea, EA max size is equal to 1MB.
-At mdc_setattr ptlrpc reply size is 1.1MB and it is rounded
-to 2MB. So REINT_SETATTR request takes about 2MB of memory at
-client. For a MDS failover case many request stay at reply queue
-and could lead to OOM.
+DOM size is returned along with DOM lock always, but it is
+not true with open resend. Fix was server side but we did update
+a mdc debug message.
 
-The patch changes acl size to zero, cause server doesn't fill
-acl for setattr request.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11934
-Lustre-commit: e7f6f870c356 ("LU-11934 mdc: don't use ACL at setattr")
-Signed-off-by: Alexander Boyko <c17825@cray.com>
-Cray-bug-id: LUS-6938
-Reviewed-on: https://review.whamcloud.com/34194
-Reviewed-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11835
+Lustre-commit: bc3ef43d36b5 ("LU-11835 mdt: return DOM size on open resend")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34044
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_reint.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ fs/lustre/mdc/mdc_locks.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/lustre/mdc/mdc_reint.c b/fs/lustre/mdc/mdc_reint.c
-index 2611fc4..0e5f012 100644
---- a/fs/lustre/mdc/mdc_reint.c
-+++ b/fs/lustre/mdc/mdc_reint.c
-@@ -134,10 +134,8 @@ int mdc_setattr(struct obd_export *exp, struct md_op_data *op_data,
- 		       op_data->op_attr.ia_ctime.tv_sec);
- 	mdc_setattr_pack(req, op_data, ea, ealen);
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index 9898b6a..55de559 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -742,7 +742,7 @@ static int mdc_finish_enqueue(struct obd_export *exp,
  
--	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
--			     min_t(u32,
--				   req->rq_import->imp_connect_data.ocd_max_easize,
--				   XATTR_SIZE_MAX));
-+	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, 0);
-+
- 	ptlrpc_request_set_replen(req);
- 
- 	rc = mdc_reint(req, LUSTRE_IMP_FULL);
+ 		body = req_capsule_server_get(pill, &RMF_MDT_BODY);
+ 		if (!(body->mbo_valid & OBD_MD_DOM_SIZE)) {
+-			LDLM_ERROR(lock, "%s: DoM lock without size.\n",
++			LDLM_ERROR(lock, "%s: DoM lock without size.",
+ 				   exp->exp_obd->obd_name);
+ 			rc = -EPROTO;
+ 			goto out_lock;
 -- 
 1.8.3.1
