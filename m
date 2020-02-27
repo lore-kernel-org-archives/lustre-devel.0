@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:50 -0500
-Subject: [lustre-devel] [PATCH 482/622] lustre: obdclass: align to T10
- sector size when generating guard
+Date: Thu, 27 Feb 2020 16:16:15 -0500
+Subject: [lustre-devel] [PATCH 507/622] lustre: llite: clear flock when
+ using localflock
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-483-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-508-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +13,72 @@ To: lustre-devel@lists.lustre.org
 
 From: Andreas Dilger <adilger@whamcloud.com>
 
-Otherwise the client and server would come up with
-different checksum when the page size is different.
+When mounting a client with "-o localflock" or equivalent option in
+/etc/fstab, it does not clear out the "flock" mount option flag from
+the superblock.  This results in "flock" still being the option used
+and it displays both options in the /proc/mounts output:
 
-Improve test_810 to verify all available checksum types.
+  10.0.0.1 at o2ib:/lfs on /mnt/lfs type lustre (rw,flock,localflock)
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11729
-Lustre-commit: 98ceaf854bb4 ("LU-11729 obdclass: align to T10 sector size when generating guard")
+Mount a client with both "flock,localflock" as mount options and
+verify that the "flock" option is cleared by "localflock", and
+vice versa.  Verify that "noflock" clears both options.
+
+Remove the "remount_client()" helper in conf-sanity.sh, since this
+shadows a helper function of the same name in test-framework.sh and
+is confusing.  Instead, use "mount_client()" now that it can accept
+mount options, and just pass "remount" explicitly in a few places.
+
+Fixes: 083c51418b67 ("lustre: llite: enable flock mount option by default")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12859
+Lustre-commit: 22ee4a1f64ec ("LU-12859 llite: clear flock when using localflock")
 Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Signed-off-by: Li Xi <lixi@ddn.com>
-Signed-off-by: Li Dongyang <dongyangli@ddn.com>
-Reviewed-on: https://review.whamcloud.com/34043
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-on: https://review.whamcloud.com/36452
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/integrity.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ fs/lustre/llite/llite_lib.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/obdclass/integrity.c b/fs/lustre/obdclass/integrity.c
-index 5cb9a25..2d5760d 100644
---- a/fs/lustre/obdclass/integrity.c
-+++ b/fs/lustre/obdclass/integrity.c
-@@ -50,26 +50,26 @@ int obd_page_dif_generate_buffer(const char *obd_name, struct page *page,
- 				 int *used_number, int sector_size,
- 				 obd_dif_csum_fn *fn)
- {
--	unsigned int i;
-+	unsigned int i = offset;
-+	unsigned int end = offset + length;
- 	char *data_buf;
- 	u16 *guard_buf = guard_start;
- 	unsigned int data_size;
- 	int used = 0;
- 
- 	data_buf = kmap(page) + offset;
--	for (i = 0; i < length; i += sector_size) {
-+	while (i < end) {
- 		if (used >= guard_number) {
- 			CERROR("%s: unexpected used guard number of DIF %u/%u, data length %u, sector size %u: rc = %d\n",
- 			       obd_name, used, guard_number, length,
- 			       sector_size, -E2BIG);
- 			return -E2BIG;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 4580be3..49490ee 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -823,12 +823,12 @@ static int ll_options(char *options, struct ll_sb_info *sbi)
  		}
--		data_size = length - i;
--		if (data_size > sector_size)
--			data_size = sector_size;
-+		data_size = min(round_up(i + 1, sector_size), end) - i;
- 		*guard_buf = fn(data_buf, data_size);
- 		guard_buf++;
- 		data_buf += data_size;
-+		i += data_size;
- 		used++;
- 	}
- 	kunmap(page);
+ 		tmp = ll_set_opt("flock", s1, LL_SBI_FLOCK);
+ 		if (tmp) {
+-			*flags |= tmp;
++			*flags = (*flags & ~LL_SBI_LOCALFLOCK) | tmp;
+ 			goto next;
+ 		}
+ 		tmp = ll_set_opt("localflock", s1, LL_SBI_LOCALFLOCK);
+ 		if (tmp) {
+-			*flags |= tmp;
++			*flags = (*flags & ~LL_SBI_FLOCK) | tmp;
+ 			goto next;
+ 		}
+ 		tmp = ll_set_opt("noflock", s1,
+@@ -2672,11 +2672,16 @@ int ll_show_options(struct seq_file *seq, struct dentry *dentry)
+ 	if (sbi->ll_flags & LL_SBI_NOLCK)
+ 		seq_puts(seq, ",nolock");
+ 
++	/* "flock" is the default since 2.13, but it wasn't for many years,
++	 * so it is still useful to print this to show it is enabled.
++	 * Start to print "noflock" so it is now clear when flock is disabled.
++	 */
+ 	if (sbi->ll_flags & LL_SBI_FLOCK)
+ 		seq_puts(seq, ",flock");
+-
+-	if (sbi->ll_flags & LL_SBI_LOCALFLOCK)
++	else if (sbi->ll_flags & LL_SBI_LOCALFLOCK)
+ 		seq_puts(seq, ",localflock");
++	else
++		seq_puts(seq, ",noflock");
+ 
+ 	if (sbi->ll_flags & LL_SBI_USER_XATTR)
+ 		seq_puts(seq, ",user_xattr");
 -- 
 1.8.3.1
