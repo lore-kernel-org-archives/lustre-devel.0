@@ -1,292 +1,108 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:07:57 -0500
-Subject: [lustre-devel] [PATCH 009/622] lustre: llite: reorganize variable
- and data structures
+Date: Thu, 27 Feb 2020 16:08:22 -0500
+Subject: [lustre-devel] [PATCH 034/622] lustre: mgc: remove obsolete IR
+ swabbing workaround
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-35-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-This patch covers the bits missed in the patch series
-"Lustre IO stack simplifications and cleanups" from the OpenSFS
-branch for the LU-5971 work. Details of the original push can
-be viewed at https://lore.kernel.org/patchwork/cover/662900.
-No Fixed is provided since the staging patch series was broken
-up into a much larger patch set.
+The OBD_CONNECT_MNE_SWAB check was added to the MGC for compatibility
+with servers in the 2.2.0-2.2.55 range (in 2012) with big-endian
+clients.  2.2 was not an LTS release and is no longer being used.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-5971
-Lustre-commit: 6eda93c7b5f6 ("LU-5971 llite: reorganize variable and data structures")
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-on: http://review.whamcloud.com/13714
-Reviewed-by: Bobi Jam <bobijam@whamcloud.com>
+Remove the checks on the client for OBD_CONNECT_MNE_SWAB being set,
+and assume that the server does not have this bug.  This will allow
+the removal of the rest of this workaround from the server code once
+there are no more clients depending on the presence of this flag.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-1644
+Lustre-commit: a0c644fde340 ("LU-1644 mgc: remove obsolete IR swabbing workaround")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32087
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c           |  1 +
- fs/lustre/llite/glimpse.c        |  1 +
- fs/lustre/llite/lcommon_cl.c     |  5 ++---
- fs/lustre/llite/lcommon_misc.c   | 24 ++++++++++++------------
- fs/lustre/llite/llite_internal.h |  8 ++++----
- fs/lustre/llite/llite_lib.c      |  4 ++--
- fs/lustre/llite/super25.c        |  1 +
- fs/lustre/llite/vvp_dev.c        |  1 +
- fs/lustre/llite/vvp_internal.h   | 13 +++----------
- fs/lustre/llite/vvp_io.c         |  4 ++--
- 10 files changed, 29 insertions(+), 33 deletions(-)
+ fs/lustre/include/lustre_import.h |  4 ----
+ fs/lustre/mgc/mgc_request.c       |  9 +--------
+ fs/lustre/ptlrpc/import.c         | 21 ---------------------
+ 3 files changed, 1 insertion(+), 33 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index fe4340d..fe965b1 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -49,6 +49,7 @@
- 
- #include <cl_object.h>
- #include "llite_internal.h"
-+#include "vvp_internal.h"
- 
- struct split_param {
- 	struct inode	*sp_inode;
-diff --git a/fs/lustre/llite/glimpse.c b/fs/lustre/llite/glimpse.c
-index de1a31f..3441904 100644
---- a/fs/lustre/llite/glimpse.c
-+++ b/fs/lustre/llite/glimpse.c
-@@ -47,6 +47,7 @@
- 
- #include <cl_object.h>
- #include "llite_internal.h"
-+#include "vvp_internal.h"
- 
- static const struct cl_lock_descr whole_file = {
- 	.cld_start = 0,
-diff --git a/fs/lustre/llite/lcommon_cl.c b/fs/lustre/llite/lcommon_cl.c
-index 988855b..978e05b 100644
---- a/fs/lustre/llite/lcommon_cl.c
-+++ b/fs/lustre/llite/lcommon_cl.c
-@@ -30,8 +30,6 @@
-  * This file is part of Lustre, http://www.lustre.org/
-  * Lustre is a trademark of Sun Microsystems, Inc.
-  *
-- * cl code used by vvp (and other Lustre clients in the future).
-- *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-  */
- 
-@@ -63,6 +61,7 @@
-  * Vvp device and device type functions.
-  *
-  */
-+#include "vvp_internal.h"
- 
- /**
-  * An `emergency' environment used by cl_inode_fini() when cl_env_get()
-@@ -282,7 +281,7 @@ u64 cl_fid_build_ino(const struct lu_fid *fid, bool api32)
- 		return fid_flatten(fid);
- }
- 
--/**
-+/*
-  * build inode generation from passed @fid.  If our FID overflows the 32-bit
-  * inode number then return a non-zero generation to distinguish them.
-  */
-diff --git a/fs/lustre/llite/lcommon_misc.c b/fs/lustre/llite/lcommon_misc.c
-index 29daf5b..48503d6 100644
---- a/fs/lustre/llite/lcommon_misc.c
-+++ b/fs/lustre/llite/lcommon_misc.c
-@@ -46,7 +46,7 @@
-  * maximum-sized (= maximum striped) EA and cookie without having to
-  * calculate this (via a call into the LOV + OSCs) each time we make an RPC.
-  */
--int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
-+static int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
- {
- 	u32 val_size, max_easize, def_easize;
- 	int rc;
-@@ -115,7 +115,7 @@ int cl_ocd_update(struct obd_device *host, struct obd_device *watched,
- #define GROUPLOCK_SCOPE "grouplock"
- 
- int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
--		     struct ll_grouplock *cg)
-+		     struct ll_grouplock *lg)
- {
- 	struct lu_env	  *env;
- 	struct cl_io	   *io;
-@@ -160,22 +160,22 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- 		return rc;
+diff --git a/fs/lustre/include/lustre_import.h b/fs/lustre/include/lustre_import.h
+index 522e5b7..0d7bb0f 100644
+--- a/fs/lustre/include/lustre_import.h
++++ b/fs/lustre/include/lustre_import.h
+@@ -289,10 +289,6 @@ struct obd_import {
+ 					imp_resend_replay:1,
+ 					/* disable normal recovery, for test only. */
+ 					imp_no_pinger_recover:1,
+-#if OBD_OCD_VERSION(3, 0, 53, 0) > LUSTRE_VERSION_CODE
+-					/* need IR MNE swab */
+-					imp_need_mne_swab:1,
+-#endif
+ 					/* import must be reconnected instead of
+ 					 * chosing new connection
+ 					 */
+diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
+index ca4b8a9..c114aa8 100644
+--- a/fs/lustre/mgc/mgc_request.c
++++ b/fs/lustre/mgc/mgc_request.c
+@@ -1436,14 +1436,7 @@ static int mgc_process_recover_log(struct obd_device *obd,
+ 		goto out;
  	}
  
--	cg->lg_env  = env;
--	cg->lg_io   = io;
--	cg->lg_lock = lock;
--	cg->lg_gid  = gid;
-+	lg->lg_env = env;
-+	lg->lg_io = io;
-+	lg->lg_lock = lock;
-+	lg->lg_gid = gid;
+-	mne_swab = !!ptlrpc_rep_need_swab(req);
+-#if OBD_OCD_VERSION(3, 0, 53, 0) > LUSTRE_VERSION_CODE
+-	/* This import flag means the server did an extra swab of IR MNE
+-	 * records (fixed in LU-1252), reverse it here if needed. LU-1644
+-	 */
+-	if (unlikely(req->rq_import->imp_need_mne_swab))
+-		mne_swab = !mne_swab;
+-#endif
++	mne_swab = ptlrpc_rep_need_swab(req);
  
- 	return 0;
- }
+ 	for (i = 0; i < nrpages && ealen > 0; i++) {
+ 		int rc2;
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index dca4aa0..f69b907 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -780,27 +780,6 @@ static int ptlrpc_connect_set_flags(struct obd_import *imp,
+ 		warned = true;
+ 	}
  
--void cl_put_grouplock(struct ll_grouplock *cg)
-+void cl_put_grouplock(struct ll_grouplock *lg)
- {
--	struct lu_env  *env  = cg->lg_env;
--	struct cl_io   *io   = cg->lg_io;
--	struct cl_lock *lock = cg->lg_lock;
-+	struct lu_env *env  = lg->lg_env;
-+	struct cl_io *io   = lg->lg_io;
-+	struct cl_lock *lock = lg->lg_lock;
- 
--	LASSERT(cg->lg_env);
--	LASSERT(cg->lg_gid);
-+	LASSERT(lg->lg_env);
-+	LASSERT(lg->lg_gid);
- 
- 	cl_lock_release(env, lock);
- 	cl_io_fini(env, io);
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 3192340..fbe93a4 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -707,7 +707,6 @@ static inline bool ll_sbi_has_tiny_write(struct ll_sb_info *sbi)
- void ll_ras_enter(struct file *f);
- 
- /* llite/lcommon_misc.c */
--int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp);
- int cl_ocd_update(struct obd_device *host, struct obd_device *watched,
- 		  enum obd_notify_event ev, void *owner);
- int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
-@@ -975,9 +974,9 @@ struct ll_cl_context {
- 
- struct ll_thread_info {
- 	struct iov_iter		lti_iter;
--	struct vvp_io_args   lti_args;
--	struct ra_io_arg     lti_ria;
--	struct ll_cl_context lti_io_ctx;
-+	struct vvp_io_args	lti_args;
-+	struct ra_io_arg	lti_ria;
-+	struct ll_cl_context	lti_io_ctx;
- };
- 
- extern struct lu_context_key ll_thread_key;
-@@ -1165,6 +1164,7 @@ struct ll_statahead_info {
- blkcnt_t dirty_cnt(struct inode *inode);
- 
- int __cl_glimpse_size(struct inode *inode, int agl);
-+
- int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
- 		    struct inode *inode, struct cl_object *clob, int agl);
- 
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index e1932ae..aaa8ad2 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -2542,7 +2542,7 @@ void ll_dirty_page_discard_warn(struct page *page, int ioret)
- {
- 	char *buf, *path = NULL;
- 	struct dentry *dentry = NULL;
--	struct vvp_object *obj = cl_inode2vvp(page->mapping->host);
-+	struct inode *inode = page->mapping->host;
- 
- 	/* this can be called inside spin lock so use GFP_ATOMIC. */
- 	buf = (char *)__get_free_page(GFP_ATOMIC);
-@@ -2556,7 +2556,7 @@ void ll_dirty_page_discard_warn(struct page *page, int ioret)
- 	       "%s: dirty page discard: %s/fid: " DFID "/%s may get corrupted (rc %d)\n",
- 	       ll_get_fsname(page->mapping->host->i_sb, NULL, 0),
- 	       s2lsi(page->mapping->host->i_sb)->lsi_lmd->lmd_dev,
--	       PFID(&obj->vob_header.coh_lu.loh_fid),
-+	       PFID(ll_inode2fid(inode)),
- 	       (path && !IS_ERR(path)) ? path : "", ioret);
- 
- 	if (dentry)
-diff --git a/fs/lustre/llite/super25.c b/fs/lustre/llite/super25.c
-index 2b65e2f..133fe2a 100644
---- a/fs/lustre/llite/super25.c
-+++ b/fs/lustre/llite/super25.c
-@@ -42,6 +42,7 @@
- #include <linux/fs.h>
- #include <lprocfs_status.h>
- #include "llite_internal.h"
-+#include "vvp_internal.h"
- 
- static struct kmem_cache *ll_inode_cachep;
- 
-diff --git a/fs/lustre/llite/vvp_dev.c b/fs/lustre/llite/vvp_dev.c
-index 9f793e9..e1d87f9 100644
---- a/fs/lustre/llite/vvp_dev.c
-+++ b/fs/lustre/llite/vvp_dev.c
-@@ -93,6 +93,7 @@ static void *ll_thread_key_init(const struct lu_context *ctx,
- 	info = kmem_cache_zalloc(ll_thread_kmem, GFP_NOFS);
- 	if (!info)
- 		info = ERR_PTR(-ENOMEM);
-+
- 	return info;
- }
- 
-diff --git a/fs/lustre/llite/vvp_internal.h b/fs/lustre/llite/vvp_internal.h
-index 96f10d2..7a463cb 100644
---- a/fs/lustre/llite/vvp_internal.h
-+++ b/fs/lustre/llite/vvp_internal.h
-@@ -166,7 +166,7 @@ static inline struct cl_io *vvp_env_thread_io(const struct lu_env *env)
- }
- 
- struct vvp_session {
--	struct vvp_io	cs_ios;
-+	struct vvp_io	vs_ios;
- };
- 
- static inline struct vvp_session *vvp_env_session(const struct lu_env *env)
-@@ -181,11 +181,11 @@ static inline struct vvp_session *vvp_env_session(const struct lu_env *env)
- 
- static inline struct vvp_io *vvp_env_io(const struct lu_env *env)
- {
--	return &vvp_env_session(env)->cs_ios;
-+	return &vvp_env_session(env)->vs_ios;
- }
- 
- /**
-- * ccc-private object state.
-+ * VPP-private object state.
-  */
- struct vvp_object {
- 	struct cl_object_header vob_header;
-@@ -246,13 +246,6 @@ struct vvp_device {
- 	struct cl_device	*vdv_next;
- };
- 
--void *ccc_key_init(const struct lu_context *ctx,
--		   struct lu_context_key *key);
--void ccc_key_fini(const struct lu_context *ctx,
--		  struct lu_context_key *key, void *data);
+-#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
+-	/*
+-	 * Check if server has LU-1252 fix applied to not always swab
+-	 * the IR MNE entries. Do this only once per connection.  This
+-	 * fixup is version-limited, because we don't want to carry the
+-	 * OBD_CONNECT_MNE_SWAB flag around forever, just so long as we
+-	 * need interop with unpatched 2.2 servers.  For newer servers,
+-	 * the client will do MNE swabbing only as needed.  LU-1644
+-	 */
+-	if (unlikely((ocd->ocd_connect_flags & OBD_CONNECT_VERSION) &&
+-		     !(ocd->ocd_connect_flags & OBD_CONNECT_MNE_SWAB) &&
+-		     OBD_OCD_VERSION_MAJOR(ocd->ocd_version) == 2 &&
+-		     OBD_OCD_VERSION_MINOR(ocd->ocd_version) == 2 &&
+-		     OBD_OCD_VERSION_PATCH(ocd->ocd_version) < 55 &&
+-		     !strcmp(imp->imp_obd->obd_type->typ_name,
+-			     LUSTRE_MGC_NAME)))
+-		imp->imp_need_mne_swab = 1;
+-	else /* clear if server was upgraded since last connect */
+-		imp->imp_need_mne_swab = 0;
+-#endif
 -
--void ccc_umount(const struct lu_env *env, struct cl_device *dev);
--
- static inline struct lu_device *vvp2lu_dev(struct vvp_device *vdv)
- {
- 	return &vdv->vdv_cl.cd_lu_dev;
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index 6145064..37bf942 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -416,10 +416,10 @@ static enum cl_lock_mode vvp_mode_from_vma(struct vm_area_struct *vma)
- static int vvp_mmap_locks(const struct lu_env *env,
- 			  struct vvp_io *vio, struct cl_io *io)
- {
--	struct vvp_thread_info *cti = vvp_env_info(env);
-+	struct vvp_thread_info *vti = vvp_env_info(env);
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct  *vma;
--	struct cl_lock_descr *descr = &cti->vti_descr;
-+	struct cl_lock_descr *descr = &vti->vti_descr;
- 	union ldlm_policy_data policy;
- 	unsigned long addr;
- 	ssize_t	count;
+ 	if (ocd->ocd_connect_flags & OBD_CONNECT_CKSUM) {
+ 		/*
+ 		 * We sent to the server ocd_cksum_types with bits set
 -- 
 1.8.3.1
