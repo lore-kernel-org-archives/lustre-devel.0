@@ -1,49 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:14 -0500
-Subject: [lustre-devel] [PATCH 026/622] lustre: ptlrpc: fix
- test_req_buffer_pressure behavior
+Date: Thu, 27 Feb 2020 16:08:17 -0500
+Subject: [lustre-devel] [PATCH 029/622] lustre: mdc: resend quotactl if
+ needed
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-27-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-30-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bruno Faccini <bruno.faccini@intel.com>
+From: Hongchao Zhang <hongchao@whamcloud.com>
 
-In 2nd patch for LU-9372, to allow limiting number of rqbd-buffers,
-a wrong and unnecessary test had been added to enhance
-test_req_buffer_pressure feature.
-This patch fixes this issue by removing such test.
+In mdc_quotactl, it is better to resend the quotactl request
+if reconnection or failover is triggered during the process.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10826
-Lustre-commit: 040eca67f8d5 ("LU-10826 ptlrpc: fix test_req_buffer_pressure behavior")
-Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
-Reviewed-on: https://review.whamcloud.com/31690
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-by: Li Dongyang <dongyangli@ddn.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10368
+Lustre-commit: d511918e8eb7 ("LU-10368 mdc: resend quotactl if needed")
+Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/31773
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/service.c | 3 +--
+ fs/lustre/mdc/mdc_request.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
-index 3c61e83..8dae21a 100644
---- a/fs/lustre/ptlrpc/service.c
-+++ b/fs/lustre/ptlrpc/service.c
-@@ -150,8 +150,7 @@
- 		/* NB: another thread might have recycled enough rqbds, we
- 		 * need to make sure it wouldn't over-allocate, see LU-1212.
- 		 */
--		if (test_req_buffer_pressure ||
--		    svcpt->scp_nrqbds_posted >= svc->srv_nbuf_per_group ||
-+		if (svcpt->scp_nrqbds_posted >= svc->srv_nbuf_per_group ||
- 		    (svc->srv_nrqbds_max != 0 &&
- 		     svcpt->scp_nrqbds_total > svc->srv_nrqbds_max))
- 			break;
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index 5718db2..feac374 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -1867,7 +1867,7 @@ static int mdc_ioc_hsm_ct_start(struct obd_export *exp,
+ 				struct lustre_kernelcomm *lk);
+ 
+ static int mdc_quotactl(struct obd_device *unused, struct obd_export *exp,
+-			struct obd_quotactl *oqctl)
++                        struct obd_quotactl *oqctl)
+ {
+ 	struct ptlrpc_request *req;
+ 	struct obd_quotactl *oqc;
+@@ -1884,7 +1884,6 @@ static int mdc_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 
+ 	ptlrpc_request_set_replen(req);
+ 	ptlrpc_at_set_req_timeout(req);
+-	req->rq_no_resend = 1;
+ 
+ 	rc = ptlrpc_queue_wait(req);
+ 	if (rc)
 -- 
 1.8.3.1
