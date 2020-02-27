@@ -1,80 +1,95 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:53 -0500
-Subject: [lustre-devel] [PATCH 545/622] lnet: Wait for single discovery
- attempt of routers
+Date: Thu, 27 Feb 2020 16:12:58 -0500
+Subject: [lustre-devel] [PATCH 310/622] lustre: obdclass: remove unprotected
+ access to lu_object
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-546-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-311-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-Historically, check_routers_before_use would cause LNet
-initialization to pause until all routers had been ping'd once.
+The check of lu_object_is_dying() is done after reference
+drop and without lock, so can access freed object if concurrent
+thread did final put.
 
-This behavior was changed in commit
-fe17e9b8370affe063769b880f02b9190584baaa from LU-11298. Now, LNet
-will wait indefinitely until discovery completes on all routers.
-This is problematic, because if even one router is down then LNet
-will stall forever.
+The patch saves object state right before atomic_dec_and_lock()
+and checks it after check, so object is not being accessed
 
-Introduce a new lnet_peer state to indicate whether a router has
-been discovered (either successfully or not) to restore the historic
-behavior.
-
-Fixes fe17e9b8370a ("LU-11298 lnet: use peer for gateway")
-
-Cray-bug-id: LUS-8184
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13001
-Lustre-commit: d45a032d9a5c ("LU-13001 lnet: Wait for single discovery attempt of routers")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/36820
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11204
+Lustre-commit: 336cf0f2f3a9 ("LU-11204 obdclass: remove unprotected access to lu_object")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34960
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h | 2 ++
- net/lnet/lnet/router.c         | 3 ++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ fs/lustre/obdclass/lu_object.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 51cc9ce..4b110eb 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -732,6 +732,8 @@ struct lnet_peer {
+diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
+index 2f709b0..bafd817 100644
+--- a/fs/lustre/obdclass/lu_object.c
++++ b/fs/lustre/obdclass/lu_object.c
+@@ -128,22 +128,18 @@ enum {
+ void lu_object_put(const struct lu_env *env, struct lu_object *o)
+ {
+ 	struct lu_site_bkt_data *bkt;
+-	struct lu_object_header *top;
+-	struct lu_site *site;
+-	struct lu_object *orig;
++	struct lu_object_header *top = o->lo_header;
++	struct lu_site *site = o->lo_dev->ld_site;
++	struct lu_object *orig = o;
+ 	struct cfs_hash_bd bd;
+-	const struct lu_fid *fid;
+-
+-	top  = o->lo_header;
+-	site = o->lo_dev->ld_site;
+-	orig = o;
++	const struct lu_fid *fid = lu_object_fid(o);
++	bool is_dying;
  
- /* gw undergoing alive discovery */
- #define LNET_PEER_RTR_DISCOVERY	BIT(16)
-+/* gw has undergone discovery (does not indicate success or failure) */
-+#define LNET_PEER_RTR_DISCOVERED BIT(17)
+ 	/*
+ 	 * till we have full fids-on-OST implemented anonymous objects
+ 	 * are possible in OSP. such an object isn't listed in the site
+ 	 * so we should not remove it from the site.
+ 	 */
+-	fid = lu_object_fid(o);
+ 	if (fid_is_zero(fid)) {
+ 		LASSERT(!top->loh_hash.next && !top->loh_hash.pprev);
+ 		LASSERT(list_empty(&top->loh_lru));
+@@ -160,8 +156,14 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
+ 	cfs_hash_bd_get(site->ls_obj_hash, &top->loh_fid, &bd);
+ 	bkt = cfs_hash_bd_extra_get(site->ls_obj_hash, &bd);
  
- struct lnet_peer_net {
- 	/* chain on lp_peer_nets */
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index 41d0eb0..71ba951 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -408,6 +408,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
++	is_dying = lu_object_is_dying(top);
+ 	if (!cfs_hash_bd_dec_and_lock(site->ls_obj_hash, &bd, &top->loh_ref)) {
+-		if (lu_object_is_dying(top)) {
++		/* at this point the object reference is dropped and lock is
++		 * not taken, so lu_object should not be touched because it
++		 * can be freed by concurrent thread. Use local variable for
++		 * check.
++		 */
++		if (is_dying) {
+ 			/*
+ 			 * somebody may be waiting for this, currently only
+ 			 * used for cl_object, see cl_object_put_last().
+@@ -180,6 +182,10 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
+ 			o->lo_ops->loo_object_release(env, o);
+ 	}
  
- 	spin_lock(&lp->lp_lock);
- 	lp->lp_state &= ~LNET_PEER_RTR_DISCOVERY;
-+	lp->lp_state |= LNET_PEER_RTR_DISCOVERED;
- 	spin_unlock(&lp->lp_lock);
- 
- 	/* Router discovery successful? All peer information would've been
-@@ -882,7 +883,7 @@ int lnet_get_rtr_pool_cfg(int cpt, struct lnet_ioctl_pool_cfg *pool_cfg)
- 		list_for_each_entry(rtr, &the_lnet.ln_routers, lp_rtr_list) {
- 			spin_lock(&rtr->lp_lock);
- 
--			if (!(rtr->lp_state & LNET_PEER_DISCOVERED)) {
-+			if (!(rtr->lp_state & LNET_PEER_RTR_DISCOVERED)) {
- 				all_known = 0;
- 				spin_unlock(&rtr->lp_lock);
- 				break;
++	/* don't use local 'is_dying' here because if was taken without lock
++	 * but here we need the latest actual value of it so check lu_object
++	 * directly here.
++	 */
+ 	if (!lu_object_is_dying(top)) {
+ 		LASSERT(list_empty(&top->loh_lru));
+ 		list_add_tail(&top->loh_lru, &bkt->lsb_lru);
 -- 
 1.8.3.1
