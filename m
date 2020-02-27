@@ -1,90 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:25 -0500
-Subject: [lustre-devel] [PATCH 217/622] lustre: ptlrpc: reset generation for
- old requests
+Date: Thu, 27 Feb 2020 16:11:28 -0500
+Subject: [lustre-devel] [PATCH 220/622] lnet: use right address for routing
+ message
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-218-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-221-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alex Zhuravlev <bzzz@whamcloud.com>
+From: Alexey Lyashkov <c17817@cray.com>
 
-All requests generated while the import is changing from
-FULL to IDLE need to be moved to the new generation.
+msg_initiator is real sender address, so use this address as
+hash source to better distribution against CPT on server side.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11951
-Lustre-commit: 42d8cb04637b ("LU-11951 ptlrpc: reset generation for old requests")
-Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34221
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Cray-bug-id: LUS-6841
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11413
+Lustre-commit: ad263e5d6e93 ("LU-11413 lnet: use right address for routing message")
+Signed-off-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-on: https://review.whamcloud.com/34032
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h |  1 +
- fs/lustre/ptlrpc/import.c       | 20 +++++++++++++++++++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ net/lnet/lnet/lib-move.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index d9a0395..5e5cf3a 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -263,6 +263,7 @@
- #define OBD_FAIL_OST_DQACQ_NET				0x230
- #define OBD_FAIL_OST_STATFS_EINPROGRESS			0x231
- #define OBD_FAIL_OST_SET_INFO_NET			0x232
-+#define OBD_FAIL_OST_DISCONNECT_DELAY	 0x245
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 468de06..185c31a 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -3463,7 +3463,7 @@ void lnet_monitor_thr_stop(void)
+ 	info.mi_rlength	= hdr->payload_length;
+ 	info.mi_roffset	= hdr->msg.put.offset;
+ 	info.mi_mbits = hdr->msg.put.match_bits;
+-	info.mi_cpt = lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
++	info.mi_cpt = lnet_cpt_of_nid(msg->msg_initiator, ni);
  
- #define OBD_FAIL_LDLM					0x300
- #define OBD_FAIL_LDLM_NAMESPACE_NEW			0x301
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index df6c459..34a2cb0 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -1593,6 +1593,23 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
- }
- EXPORT_SYMBOL(ptlrpc_disconnect_import);
+ 	msg->msg_rx_ready_delay = !ni->ni_net->net_lnd->lnd_eager_recv;
+ 	ready_delay = msg->msg_rx_ready_delay;
+@@ -3527,7 +3527,7 @@ void lnet_monitor_thr_stop(void)
+ 	info.mi_rlength = hdr->msg.get.sink_length;
+ 	info.mi_roffset = hdr->msg.get.src_offset;
+ 	info.mi_mbits = hdr->msg.get.match_bits;
+-	info.mi_cpt = lnet_cpt_of_nid(msg->msg_rxpeer->lpni_nid, ni);
++	info.mi_cpt = lnet_cpt_of_nid(msg->msg_initiator, ni);
  
-+static void ptlrpc_reset_reqs_generation(struct obd_import *imp)
-+{
-+	struct ptlrpc_request *old, *tmp;
-+
-+	/* tag all resendable requests generated before disconnection
-+	 * notice this code is part of disconnect-at-idle path only
-+	 */
-+	list_for_each_entry_safe(old, tmp, &imp->imp_delayed_list,
-+			rq_list) {
-+		spin_lock(&old->rq_lock);
-+		if (old->rq_import_generation == imp->imp_generation - 1 &&
-+		    !old->rq_no_resend)
-+			old->rq_import_generation = imp->imp_generation;
-+		spin_unlock(&old->rq_lock);
-+	}
-+}
-+
- static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
- 					    struct ptlrpc_request *req,
- 					    void *args, int rc)
-@@ -1600,7 +1617,7 @@ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
- 	struct obd_import *imp = req->rq_import;
- 	int connect = 0;
- 
--	DEBUG_REQ(D_HA, req, "inflight=%d, refcount=%d: rc = %d\n",
-+	DEBUG_REQ(D_HA, req, "inflight=%d, refcount=%d: rc = %d ",
- 		  atomic_read(&imp->imp_inflight),
- 		  atomic_read(&imp->imp_refcount), rc);
- 
-@@ -1620,6 +1637,7 @@ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
- 			imp->imp_generation++;
- 			imp->imp_initiated_at = imp->imp_generation;
- 			IMPORT_SET_STATE_NOLOCK(imp, LUSTRE_IMP_NEW);
-+			ptlrpc_reset_reqs_generation(imp);
- 			connect = 1;
- 		}
- 	}
+ 	rc = lnet_ptl_match_md(&info, msg);
+ 	if (rc == LNET_MATCHMD_DROP) {
 -- 
 1.8.3.1
