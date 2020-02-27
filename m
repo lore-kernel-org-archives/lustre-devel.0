@@ -1,63 +1,212 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:16 -0500
-Subject: [lustre-devel] [PATCH 568/622] lnet: always check return of
- try_module_get()
+Date: Thu, 27 Feb 2020 16:17:21 -0500
+Subject: [lustre-devel] [PATCH 573/622] lustre: rename ops to owner
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-569-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-574-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: NeilBrown <neilb@suse.com>
 
-try_module_get() can fail, so the return value should be checked.
-If we *know* that we already hold a reference, __module_get()
-should be used instead.
+Now that portals_handle_ops contains only a char*,
+it is functioning primarily to identify the owner of each handle.
+So change the name to h_owner, and the type to const char*.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
-Lustre-commit: a1282a0d8a53 ("LU-9679 lnet: always check return of try_module_get()")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/36854
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Chris Horn <hornc@cray.com>
+Note: this h_owner is now quite different from the similar h_owner
+in the server code.  When server code is merged the
+"med" pointer will be stored in the "mfd" and validated separately.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12542
+Lustre-commit: 1a9aafbf6317 ("LU-12542 handle: rename ops to owner")
+Signed-off-by: NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/35798
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c | 4 +++-
- net/lnet/klnds/socklnd/socklnd.c | 3 ++-
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ fs/lustre/include/lustre_handles.h  | 12 +++---------
+ fs/lustre/ldlm/ldlm_lock.c          |  8 +++-----
+ fs/lustre/obdclass/genops.c         | 10 +++-------
+ fs/lustre/obdclass/lustre_handles.c | 15 +++++++--------
+ 4 files changed, 16 insertions(+), 29 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 37d8235..f6db2c7 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2693,7 +2693,9 @@ static int kiblnd_base_startup(struct net *ns)
+diff --git a/fs/lustre/include/lustre_handles.h b/fs/lustre/include/lustre_handles.h
+index 8f733fd..55f9a09 100644
+--- a/fs/lustre/include/lustre_handles.h
++++ b/fs/lustre/include/lustre_handles.h
+@@ -45,11 +45,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
  
- 	LASSERT(kiblnd_data.kib_init == IBLND_INIT_NOTHING);
+-struct portals_handle_ops {
+-	/* hop_type is used for some debugging messages */
+-	char *hop_type;
+-};
+-
+ /* These handles are most easily used by having them appear at the very top of
+  * whatever object that you want to make handles for.  ie:
+  *
+@@ -65,7 +60,7 @@ struct portals_handle_ops {
+ struct portals_handle {
+ 	struct list_head		h_link;
+ 	u64				h_cookie;
+-	const struct portals_handle_ops	*h_ops;
++	const char			*h_owner;
+ 	refcount_t			h_ref;
  
--	try_module_get(THIS_MODULE);
-+	if (!try_module_get(THIS_MODULE))
-+		goto failed;
-+
- 	/* zero pointers, flags etc */
- 	memset(&kiblnd_data, 0, sizeof(kiblnd_data));
+ 	/* newly added fields to handle the RCU issue. -jxiong */
+@@ -77,10 +72,9 @@ struct portals_handle {
+ /* handles.c */
  
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 593c205..9a19a3f 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -2357,7 +2357,8 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+ /* Add a handle to the hash table */
+-void class_handle_hash(struct portals_handle *,
+-		       const struct portals_handle_ops *ops);
++void class_handle_hash(struct portals_handle *, const char *h_owner);
+ void class_handle_unhash(struct portals_handle *);
+-void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
++void *class_handle2object(u64 cookie, const char *h_owner);
+ int class_handle_init(void);
+ void class_handle_cleanup(void);
  
- 	/* flag lists/ptrs/locks initialised */
- 	ksocknal_data.ksnd_init = SOCKNAL_INIT_DATA;
--	try_module_get(THIS_MODULE);
-+	if (!try_module_get(THIS_MODULE))
-+		goto failed;
+diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
+index 61bf028..2c19636 100644
+--- a/fs/lustre/ldlm/ldlm_lock.c
++++ b/fs/lustre/ldlm/ldlm_lock.c
+@@ -365,9 +365,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
+ 	}
+ }
  
- 	/* Create a scheduler block per available CPT */
- 	ksocknal_data.ksnd_schedulers = cfs_percpt_alloc(lnet_cpt_table(),
+-static struct portals_handle_ops lock_handle_ops = {
+-	.hop_type   = "ldlm",
+-};
++static const char lock_handle_owner[] = "ldlm";
+ 
+ /**
+  *
+@@ -407,7 +405,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
+ 	lprocfs_counter_incr(ldlm_res_to_ns(resource)->ns_stats,
+ 			     LDLM_NSS_LOCKS);
+ 	INIT_LIST_HEAD(&lock->l_handle.h_link);
+-	class_handle_hash(&lock->l_handle, &lock_handle_ops);
++	class_handle_hash(&lock->l_handle, lock_handle_owner);
+ 
+ 	lu_ref_init(&lock->l_reference);
+ 	lu_ref_add(&lock->l_reference, "hash", lock);
+@@ -515,7 +513,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
+ 	if (!lustre_handle_is_used(handle))
+ 		return NULL;
+ 
+-	lock = class_handle2object(handle->cookie, &lock_handle_ops);
++	lock = class_handle2object(handle->cookie, lock_handle_owner);
+ 	if (!lock)
+ 		return NULL;
+ 
+diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
+index 15bea0d..0fbe03e 100644
+--- a/fs/lustre/obdclass/genops.c
++++ b/fs/lustre/obdclass/genops.c
+@@ -662,7 +662,7 @@ int obd_init_caches(void)
+ 	return -ENOMEM;
+ }
+ 
+-static struct portals_handle_ops export_handle_ops;
++static const char export_handle_owner[] = "export";
+ 
+ /* map connection to client */
+ struct obd_export *class_conn2export(struct lustre_handle *conn)
+@@ -680,7 +680,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
+ 	}
+ 
+ 	CDEBUG(D_INFO, "looking for export cookie %#llx\n", conn->cookie);
+-	export = class_handle2object(conn->cookie, &export_handle_ops);
++	export = class_handle2object(conn->cookie, export_handle_owner);
+ 	return export;
+ }
+ EXPORT_SYMBOL(class_conn2export);
+@@ -732,10 +732,6 @@ static void class_export_destroy(struct obd_export *exp)
+ 	kfree_rcu(exp, exp_handle.h_rcu);
+ }
+ 
+-static struct portals_handle_ops export_handle_ops = {
+-	.hop_type	= "export",
+-};
+-
+ struct obd_export *class_export_get(struct obd_export *exp)
+ {
+ 	refcount_inc(&exp->exp_handle.h_ref);
+@@ -819,7 +815,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+ 	INIT_LIST_HEAD(&export->exp_req_replay_queue);
+ 	INIT_LIST_HEAD_RCU(&export->exp_handle.h_link);
+ 	INIT_LIST_HEAD(&export->exp_hp_rpcs);
+-	class_handle_hash(&export->exp_handle, &export_handle_ops);
++	class_handle_hash(&export->exp_handle, export_handle_owner);
+ 	spin_lock_init(&export->exp_lock);
+ 	spin_lock_init(&export->exp_rpc_lock);
+ 	spin_lock_init(&export->exp_bl_list_lock);
+diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
+index 99c68fe..6989a60 100644
+--- a/fs/lustre/obdclass/lustre_handles.c
++++ b/fs/lustre/obdclass/lustre_handles.c
+@@ -58,8 +58,7 @@
+  * Generate a unique 64bit cookie (hash) for a handle and insert it into
+  * global (per-node) hash-table.
+  */
+-void class_handle_hash(struct portals_handle *h,
+-		       const struct portals_handle_ops *ops)
++void class_handle_hash(struct portals_handle *h, const char *owner)
+ {
+ 	struct handle_bucket *bucket;
+ 
+@@ -85,7 +84,7 @@ void class_handle_hash(struct portals_handle *h,
+ 	h->h_cookie = handle_base;
+ 	spin_unlock(&handle_base_lock);
+ 
+-	h->h_ops = ops;
++	h->h_owner = owner;
+ 	spin_lock_init(&h->h_lock);
+ 
+ 	bucket = &handle_hash[h->h_cookie & HANDLE_HASH_MASK];
+@@ -132,7 +131,7 @@ void class_handle_unhash(struct portals_handle *h)
+ }
+ EXPORT_SYMBOL(class_handle_unhash);
+ 
+-void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
++void *class_handle2object(u64 cookie, const char *owner)
+ {
+ 	struct handle_bucket *bucket;
+ 	struct portals_handle *h;
+@@ -147,14 +146,14 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
+ 
+ 	rcu_read_lock();
+ 	list_for_each_entry_rcu(h, &bucket->head, h_link) {
+-		if (h->h_cookie != cookie || h->h_ops != ops)
++		if (h->h_cookie != cookie || h->h_owner != owner)
+ 			continue;
+ 
+ 		spin_lock(&h->h_lock);
+ 		if (likely(h->h_in != 0)) {
+ 			refcount_inc(&h->h_ref);
+ 			CDEBUG(D_INFO, "GET %s %p refcount=%d\n",
+-			       h->h_ops->hop_type, h,
++			       h->h_owner, h,
+ 			       refcount_read(&h->h_ref));
+ 			retval = h;
+ 		}
+@@ -201,8 +200,8 @@ static int cleanup_all_handles(void)
+ 
+ 		spin_lock(&handle_hash[i].lock);
+ 		list_for_each_entry_rcu(h, &handle_hash[i].head, h_link) {
+-			CERROR("force clean handle %#llx addr %p ops %p\n",
+-			       h->h_cookie, h, h->h_ops);
++			CERROR("force clean handle %#llx addr %p owner %p\n",
++			       h->h_cookie, h, h->h_owner);
+ 
+ 			class_handle_unhash_nolock(h);
+ 			rc++;
 -- 
 1.8.3.1
