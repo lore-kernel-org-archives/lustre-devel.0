@@ -1,97 +1,167 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:17 -0500
-Subject: [lustre-devel] [PATCH 569/622] lustre: obdclass: don't skip records
- for wrapped catalog
+Date: Thu, 27 Feb 2020 16:17:38 -0500
+Subject: [lustre-devel] [PATCH 590/622] lustre: ldlm: signal vs CP callback
+ race
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-570-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-591-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexander Boyko <c17825@cray.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-osp_sync_thread() uses opd_sync_last_catalog_idx as a start point of
-catalog processing. It is used at llog_cat_process_cb also, to skip
-records from processing. When catalog is wrapped, processing starts
-from second part of catalog and then a first part. So, a first part
-would be skipped at llog_cat_process_cb() base on lpd_startcat.
+In case of interrupted wait for a CP AST
+failed_lock_cleanup() sets LDLM_FL_LOCAL_ONLY, so
+the client wouldn't cancel the lock on CP AST.
 
-osp_sync_thread() restarts a processing loop with a
-opd_sync_last_catalog_idx. For a wrapped it increases last
-index and one more increase do a llog_process_thread. This leads
-to a skipped records at catalog, they would not be processed.
-The patch fixes these issues.
-It also adds sanity test 135 and 136 as regression tests.
+A lock isn't canceled on the server on reception
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13069
-Lustre-commit: cc1092291932 ("LU-13069 obdclass: don't skip records for wrapped catalog")
-Signed-off-by: Alexander Boyko <c17825@cray.com>
-Cray-bug-id: LUS-8053,LUS-8236
-Reviewed-on: https://review.whamcloud.com/36996
-Reviewed-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+Cray-bug-id: LUS-2021
+WC-bug-id: https://jira.whamcloud.com/browse/LU-7791
+Lustre-commit: 7fff052c930d ("LU-7791 ldlm: signal vs CP callback race")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Alexander Boyko <c17825@cray.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-on: https://review.whamcloud.com/19898
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h | 2 ++
- fs/lustre/obdclass/llog.c       | 9 +++++++++
- fs/lustre/obdclass/llog_cat.c   | 1 +
- 3 files changed, 12 insertions(+)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/ldlm/ldlm_lockd.c     | 51 +++++++++++++++++++++++++----------------
+ fs/lustre/ldlm/ldlm_request.c   |  3 +++
+ 3 files changed, 35 insertions(+), 20 deletions(-)
 
 diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 5969b6b..a26ac76 100644
+index a26ac76..7dfef0f 100644
 --- a/fs/lustre/include/obd_support.h
 +++ b/fs/lustre/include/obd_support.h
-@@ -447,6 +447,8 @@
- /* was	OBD_FAIL_LLOG_CATINFO_NET			0x1309 until 2.3 */
- #define OBD_FAIL_MDS_SYNC_CAPA_SL			0x1310
- #define OBD_FAIL_SEQ_ALLOC				0x1311
-+#define OBD_FAIL_PLAIN_RECORDS			    0x1319
-+#define OBD_FAIL_CATALOG_FULL_CHECK		    0x131a
+@@ -302,6 +302,7 @@
+ #define OBD_FAIL_LDLM_CP_CB_WAIT3			0x321
+ #define OBD_FAIL_LDLM_CP_CB_WAIT4			0x322
+ #define OBD_FAIL_LDLM_CP_CB_WAIT5			0x323
++#define OBD_FAIL_LDLM_PAUSE_CANCEL_LOCAL		0x329
  
- #define OBD_FAIL_LLITE					0x1400
- #define OBD_FAIL_LLITE_FAULT_TRUNC_RACE			0x1401
-diff --git a/fs/lustre/obdclass/llog.c b/fs/lustre/obdclass/llog.c
-index 4e9fd17..620ebc6 100644
---- a/fs/lustre/obdclass/llog.c
-+++ b/fs/lustre/obdclass/llog.c
-@@ -453,6 +453,8 @@ int llog_process_or_fork(const struct lu_env *env,
- 			 llog_cb_t cb, void *data, void *catdata, bool fork)
- {
- 	struct llog_process_info *lpi;
-+	struct llog_process_data *d = data;
-+	struct llog_process_cat_data *cd = catdata;
- 	int rc;
+ #define OBD_FAIL_LDLM_GRANT_CHECK			0x32a
+ #define OBD_FAIL_LDLM_LOCAL_CANCEL_PAUSE		0x32c
+diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
+index 32b7be1..b252fef 100644
+--- a/fs/lustre/ldlm/ldlm_lockd.c
++++ b/fs/lustre/ldlm/ldlm_lockd.c
+@@ -187,15 +187,29 @@ void ldlm_handle_bl_callback(struct ldlm_namespace *ns,
+ 	LDLM_LOCK_RELEASE(lock);
+ }
  
- 	lpi = kzalloc(sizeof(*lpi), GFP_KERNEL);
-@@ -463,6 +465,13 @@ int llog_process_or_fork(const struct lu_env *env,
- 	lpi->lpi_cbdata = data;
- 	lpi->lpi_catdata = catdata;
- 
-+	CDEBUG(D_OTHER,
-+	       "Processing " DFID " flags 0x%03x startcat %d startidx %d first_idx %d last_idx %d\n",
-+	       PFID(&loghandle->lgh_id.lgl_oi.oi_fid),
-+	       loghandle->lgh_hdr->llh_flags, d ? d->lpd_startcat : -1,
-+	       d ? d->lpd_startidx : -1, cd ? cd->lpcd_first_idx : -1,
-+	       cd ? cd->lpcd_last_idx : -1);
++static int ldlm_callback_reply(struct ptlrpc_request *req, int rc)
++{
++	if (req->rq_no_reply)
++		return 0;
 +
- 	if (fork) {
- 		struct task_struct *task;
++	req->rq_status = rc;
++	if (!req->rq_packed_final) {
++		rc = lustre_pack_reply(req, 1, NULL, NULL);
++		if (rc)
++			return rc;
++	}
++	return ptlrpc_reply(req);
++}
++
+ /*
+  * Callback handler for receiving incoming completion ASTs.
+  *
+  * This only can happen on client side.
+  */
+-static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+-				    struct ldlm_namespace *ns,
+-				    struct ldlm_request *dlm_req,
+-				    struct ldlm_lock *lock)
++static int ldlm_handle_cp_callback(struct ptlrpc_request *req,
++				   struct ldlm_namespace *ns,
++				   struct ldlm_request *dlm_req,
++				   struct ldlm_lock *lock)
+ {
+ 	int lvb_len;
+ 	LIST_HEAD(ast_list);
+@@ -206,6 +220,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_CANCEL_BL_CB_RACE)) {
+ 		long to = HZ;
  
-diff --git a/fs/lustre/obdclass/llog_cat.c b/fs/lustre/obdclass/llog_cat.c
-index 30b0ac5..75226f4 100644
---- a/fs/lustre/obdclass/llog_cat.c
-+++ b/fs/lustre/obdclass/llog_cat.c
-@@ -244,6 +244,7 @@ static int llog_cat_process_or_fork(const struct lu_env *env,
- 			 * catalog bottom.
- 			 */
- 			startcat = 0;
-+			d.lpd_startcat = 0;
- 			if (rc != 0)
- 				return rc;
- 		}
++		ldlm_callback_reply(req, 0);
++
+ 		while (to > 0) {
+ 			schedule_timeout_interruptible(to);
+ 			if (ldlm_is_granted(lock) ||
+@@ -250,6 +266,12 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 		lock_res_and_lock(lock);
+ 	}
+ 
++	if (ldlm_is_failed(lock)) {
++		unlock_res_and_lock(lock);
++		LDLM_LOCK_RELEASE(lock);
++		return -EINVAL;
++	}
++
+ 	if (ldlm_is_destroyed(lock) ||
+ 	    ldlm_is_granted(lock)) {
+ 		/* bug 11300: the lock has already been granted */
+@@ -321,6 +343,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 		wake_up(&lock->l_waitq);
+ 	}
+ 	LDLM_LOCK_RELEASE(lock);
++
++	return 0;
+ }
+ 
+ /**
+@@ -373,20 +397,6 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
+ 	LDLM_LOCK_RELEASE(lock);
+ }
+ 
+-static int ldlm_callback_reply(struct ptlrpc_request *req, int rc)
+-{
+-	if (req->rq_no_reply)
+-		return 0;
+-
+-	req->rq_status = rc;
+-	if (!req->rq_packed_final) {
+-		rc = lustre_pack_reply(req, 1, NULL, NULL);
+-		if (rc)
+-			return rc;
+-	}
+-	return ptlrpc_reply(req);
+-}
+-
+ static int __ldlm_bl_to_thread(struct ldlm_bl_work_item *blwi,
+ 			       enum ldlm_cancel_flags cancel_flags)
+ {
+@@ -714,8 +724,9 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 	case LDLM_CP_CALLBACK:
+ 		CDEBUG(D_INODE, "completion ast\n");
+ 		req_capsule_extend(&req->rq_pill, &RQF_LDLM_CP_CALLBACK);
+-		ldlm_callback_reply(req, 0);
+-		ldlm_handle_cp_callback(req, ns, dlm_req, lock);
++		rc = ldlm_handle_cp_callback(req, ns, dlm_req, lock);
++		if (!OBD_FAIL_CHECK(OBD_FAIL_LDLM_CANCEL_BL_CB_RACE))
++			ldlm_callback_reply(req, rc);
+ 		break;
+ 	case LDLM_GL_CALLBACK:
+ 		CDEBUG(D_INODE, "glimpse ast\n");
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index 7eba8d2..fcb2af5 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -964,6 +964,9 @@ static u64 ldlm_cli_cancel_local(struct ldlm_lock *lock)
+ 		bool local_only;
+ 
+ 		LDLM_DEBUG(lock, "client-side cancel");
++		OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_PAUSE_CANCEL_LOCAL,
++				 cfs_fail_val);
++
+ 		/* Set this flag to prevent others from getting new references*/
+ 		lock_res_and_lock(lock);
+ 		ldlm_set_cbpending(lock);
 -- 
 1.8.3.1
