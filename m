@@ -1,65 +1,133 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:24 -0500
-Subject: [lustre-devel] [PATCH 036/622] lustre: mds: remove obsolete
- MDS_VTX_BYPASS flag
+Date: Thu, 27 Feb 2020 16:08:25 -0500
+Subject: [lustre-devel] [PATCH 037/622] lustre: ldlm: expose dirty age limit
+ for flush-on-glimpse
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-37-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-38-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Mikhail Pershin <mpershin@whamcloud.com>
 
-The MDS_VTX_BYPASS flag is only set and never checked.  This is true
-since 2.3.53-66-g54fe979 "LU-2216 mdt: remove obsolete DNE code", but
-it was already obsolete for a long time before that.
+Glimpse request may cancel old lock and cause data flush.
+That helps to cache stat results on client locally early.
+The time limit was hardcoded to 10s and is exposed now
+as ns_dirty_age_limit namespace value, it can be set/check
+via /sys/fs/lustre/ldlm/namespaces/<namespace>/dirty_age_limit
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6349
-Lustre-commit: b99344dda425 ("LU-6349 mds: remove obsolete MDS_VTX_BYPASS flag")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/31984
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10413
+Lustre-commit: 69727e45b4c0 ("LU-10413 ldlm: expose dirty age limit for flush-on-glimpse")
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32113
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/wiretest.c            | 2 --
- include/uapi/linux/lustre/lustre_idl.h | 4 ++--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ fs/lustre/include/lustre_dlm.h | 12 +++++++++++-
+ fs/lustre/ldlm/ldlm_lockd.c    |  2 +-
+ fs/lustre/ldlm/ldlm_resource.c | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 46d5e74..c92663b 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1870,8 +1870,6 @@ void lustre_assert_wire_constants(void)
+diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
+index b1a37f0..8dea9ab 100644
+--- a/fs/lustre/include/lustre_dlm.h
++++ b/fs/lustre/include/lustre_dlm.h
+@@ -60,6 +60,10 @@
  
- 	LASSERTF(MDS_CROSS_REF == 0x00000002UL, "found 0x%.8xUL\n",
- 		(unsigned int)MDS_CROSS_REF);
--	LASSERTF(MDS_VTX_BYPASS == 0x00000004UL, "found 0x%.8xUL\n",
--		(unsigned int)MDS_VTX_BYPASS);
- 	LASSERTF(MDS_PERM_BYPASS == 0x00000008UL, "found 0x%.8xUL\n",
- 		(unsigned int)MDS_PERM_BYPASS);
- 	LASSERTF(MDS_QUOTA_IGNORE == 0x00000020UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index e898e67..794e6d6 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1644,11 +1644,11 @@ struct mdt_rec_setattr {
- enum mds_op_bias {
- /*	MDS_CHECK_SPLIT		= 1 << 0, obsolete before 2.3.58 */
- 	MDS_CROSS_REF		= 1 << 1,
--	MDS_VTX_BYPASS		= 1 << 2,
-+/*	MDS_VTX_BYPASS		= 1 << 2, obsolete since 2.3.54 */
- 	MDS_PERM_BYPASS		= 1 << 3,
- /*	MDS_SOM			= 1 << 4, obsolete since 2.8.0 */
- 	MDS_QUOTA_IGNORE	= 1 << 5,
--	MDS_CLOSE_CLEANUP	= 1 << 6,
-+/*	MDS_CLOSE_CLEANUP	= 1 << 6, obsolete since 2.3.51 */
- 	MDS_KEEP_ORPHAN		= 1 << 7,
- 	MDS_RECOV_OPEN		= 1 << 8,
- 	MDS_DATA_MODIFIED	= 1 << 9,
+ #define LDLM_DEFAULT_LRU_SIZE (100 * num_online_cpus())
+ #define LDLM_DEFAULT_MAX_ALIVE (64 * 60)	/* 65 min */
++/* if client lock is unused for that time it can be cancelled if any other
++ * client shows interest in that lock, e.g. glimpse is occurred.
++ */
++#define LDLM_DIRTY_AGE_LIMIT (10)
+ #define LDLM_DEFAULT_PARALLEL_AST_LIMIT 1024
+ 
+ /**
+@@ -412,7 +416,13 @@ struct ldlm_namespace {
+ 
+ 	/** Maximum allowed age (last used time) for locks in the LRU */
+ 	ktime_t			ns_max_age;
+-
++	/**
++	 * Number of seconds since the lock was last used. The client may
++	 * cancel the lock limited by this age and flush related data if
++	 * any other client shows interest in it doing glimpse request.
++	 * This allows to cache stat data locally for such files early.
++	 */
++	time64_t		ns_dirty_age_limit;
+ 	/**
+ 	 * Used to rate-limit ldlm_namespace_dump calls.
+ 	 * \see ldlm_namespace_dump. Increased by 10 seconds every time
+diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
+index 84d73e6..481719b 100644
+--- a/fs/lustre/ldlm/ldlm_lockd.c
++++ b/fs/lustre/ldlm/ldlm_lockd.c
+@@ -305,7 +305,7 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
+ 	    !lock->l_readers && !lock->l_writers &&
+ 	    ktime_after(ktime_get(),
+ 			ktime_add(lock->l_last_used,
+-				  ktime_set(10, 0)))) {
++				  ktime_set(ns->ns_dirty_age_limit, 0)))) {
+ 		unlock_res_and_lock(lock);
+ 		if (ldlm_bl_to_thread_lock(ns, NULL, lock))
+ 			ldlm_handle_bl_callback(ns, NULL, lock);
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 4e3c6e7..5e0dd53 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -327,6 +327,32 @@ static ssize_t early_lock_cancel_store(struct kobject *kobj,
+ }
+ LUSTRE_RW_ATTR(early_lock_cancel);
+ 
++static ssize_t dirty_age_limit_show(struct kobject *kobj,
++				    struct attribute *attr, char *buf)
++{
++	struct ldlm_namespace *ns = container_of(kobj, struct ldlm_namespace,
++						 ns_kobj);
++
++	return sprintf(buf, "%llu\n", ns->ns_dirty_age_limit);
++}
++
++static ssize_t dirty_age_limit_store(struct kobject *kobj,
++				     struct attribute *attr,
++				     const char *buffer, size_t count)
++{
++	struct ldlm_namespace *ns = container_of(kobj, struct ldlm_namespace,
++						 ns_kobj);
++	unsigned long long tmp;
++
++	if (kstrtoull(buffer, 10, &tmp))
++		return -EINVAL;
++
++	ns->ns_dirty_age_limit = tmp;
++
++	return count;
++}
++LUSTRE_RW_ATTR(dirty_age_limit);
++
+ /* These are for namespaces in /sys/fs/lustre/ldlm/namespaces/ */
+ static struct attribute *ldlm_ns_attrs[] = {
+ 	&lustre_attr_resource_count.attr,
+@@ -335,6 +361,7 @@ static ssize_t early_lock_cancel_store(struct kobject *kobj,
+ 	&lustre_attr_lru_size.attr,
+ 	&lustre_attr_lru_max_age.attr,
+ 	&lustre_attr_early_lock_cancel.attr,
++	&lustre_attr_dirty_age_limit.attr,
+ 	NULL,
+ };
+ 
+@@ -653,6 +680,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 	ns->ns_max_age = ktime_set(LDLM_DEFAULT_MAX_ALIVE, 0);
+ 	ns->ns_orig_connect_flags = 0;
+ 	ns->ns_connect_flags = 0;
++	ns->ns_dirty_age_limit = LDLM_DIRTY_AGE_LIMIT;
+ 	ns->ns_stopping = 0;
+ 
+ 	rc = ldlm_namespace_sysfs_register(ns);
 -- 
 1.8.3.1
