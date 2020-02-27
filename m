@@ -1,97 +1,90 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:07 -0500
-Subject: [lustre-devel] [PATCH 199/622] lnet: add fault injection for bulk
- transfers
+Date: Thu, 27 Feb 2020 16:11:25 -0500
+Subject: [lustre-devel] [PATCH 217/622] lustre: ptlrpc: reset generation for
+ old requests
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-200-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-218-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Artem Blagodarenko <artem.blagodarenko@seagate.com>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-An internal test was always passing due to nno fault injecytion
-happening. Add CFS_FAIL_PTLRPC_OST_BULK_CB2 to simulation a bulk
-transfer timeout.
+All requests generated while the import is changing from
+FULL to IDLE need to be moved to the new generation.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7159
-Lustre-commit: 707820692275 ("LU-7159 tests: fix 224c fault injection")
-Signed-off-by: Artem Blagodarenko <artem.blagodarenko@seagate.com>
-Xyratex-bug-id: MRP-2472
-Reviewed-on: https://review.whamcloud.com/16426
-Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11951
+Lustre-commit: 42d8cb04637b ("LU-11951 ptlrpc: reset generation for old requests")
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34221
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h    | 1 +
- include/linux/libcfs/libcfs_fail.h | 6 ++++++
- include/linux/lnet/lib-lnet.h      | 3 +++
- net/lnet/lnet/lib-move.c           | 6 +++++-
- 4 files changed, 15 insertions(+), 1 deletion(-)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/ptlrpc/import.c       | 20 +++++++++++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 5ff270a..d9a0395 100644
+index d9a0395..5e5cf3a 100644
 --- a/fs/lustre/include/obd_support.h
 +++ b/fs/lustre/include/obd_support.h
-@@ -487,6 +487,7 @@
- #define OBD_FAIL_FLR_LV_INC			0x1A02
- #define OBD_FAIL_FLR_RANDOM_PICK_MIRROR	0x1A03
+@@ -263,6 +263,7 @@
+ #define OBD_FAIL_OST_DQACQ_NET				0x230
+ #define OBD_FAIL_OST_STATFS_EINPROGRESS			0x231
+ #define OBD_FAIL_OST_SET_INFO_NET			0x232
++#define OBD_FAIL_OST_DISCONNECT_DELAY	 0x245
  
-+/* LNet is allocated failure locations 0xe000 to 0xffff */
- /* Assign references to moved code to reduce code changes */
- #define OBD_FAIL_PRECHECK(id)			CFS_FAIL_PRECHECK(id)
- #define OBD_FAIL_CHECK(id)			CFS_FAIL_CHECK(id)
-diff --git a/include/linux/libcfs/libcfs_fail.h b/include/linux/libcfs/libcfs_fail.h
-index f52a82a..c341567 100644
---- a/include/linux/libcfs/libcfs_fail.h
-+++ b/include/linux/libcfs/libcfs_fail.h
-@@ -54,6 +54,12 @@ enum {
- 	CFS_FAIL_LOC_VALUE	= 3
- };
+ #define OBD_FAIL_LDLM					0x300
+ #define OBD_FAIL_LDLM_NAMESPACE_NEW			0x301
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index df6c459..34a2cb0 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -1593,6 +1593,23 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ }
+ EXPORT_SYMBOL(ptlrpc_disconnect_import);
  
-+/* Failure ranges
-+ * "0x0100 - 0x3fff" for Lustre
-+ * "0xe000 - 0xefff" for LNet
-+ * "0xf000 - 0xffff" for LNDs
-+ */
++static void ptlrpc_reset_reqs_generation(struct obd_import *imp)
++{
++	struct ptlrpc_request *old, *tmp;
 +
- /* Failure injection control */
- #define CFS_FAIL_MASK_SYS	0x0000FF00
- #define CFS_FAIL_MASK_LOC	(0x000000FF | CFS_FAIL_MASK_SYS)
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index bbb678f..d09fb4c 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -49,6 +49,9 @@
- #include <uapi/linux/lnet/lnetctl.h>
- #include <uapi/linux/lnet/nidstr.h>
- 
-+/* LNET has 0xeXXX */
-+#define CFS_FAIL_PTLRPC_OST_BULK_CB2	0xe000
++	/* tag all resendable requests generated before disconnection
++	 * notice this code is part of disconnect-at-idle path only
++	 */
++	list_for_each_entry_safe(old, tmp, &imp->imp_delayed_list,
++			rq_list) {
++		spin_lock(&old->rq_lock);
++		if (old->rq_import_generation == imp->imp_generation - 1 &&
++		    !old->rq_no_resend)
++			old->rq_import_generation = imp->imp_generation;
++		spin_unlock(&old->rq_lock);
++	}
++}
 +
- extern struct lnet the_lnet;	/* THE network */
+ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
+ 					    struct ptlrpc_request *req,
+ 					    void *args, int rc)
+@@ -1600,7 +1617,7 @@ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
+ 	struct obd_import *imp = req->rq_import;
+ 	int connect = 0;
  
- #if (BITS_PER_LONG == 32)
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 3bcac03..f5548eb 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -4323,7 +4323,11 @@ void lnet_monitor_thr_stop(void)
- 	if (ack == LNET_ACK_REQ)
- 		lnet_attach_rsp_tracker(rspt, cpt, md, mdh);
+-	DEBUG_REQ(D_HA, req, "inflight=%d, refcount=%d: rc = %d\n",
++	DEBUG_REQ(D_HA, req, "inflight=%d, refcount=%d: rc = %d ",
+ 		  atomic_read(&imp->imp_inflight),
+ 		  atomic_read(&imp->imp_refcount), rc);
  
--	rc = lnet_send(self, msg, LNET_NID_ANY);
-+	if (CFS_FAIL_CHECK_ORSET(CFS_FAIL_PTLRPC_OST_BULK_CB2,
-+				 CFS_FAIL_ONCE))
-+		rc = -EIO;
-+	else
-+		rc = lnet_send(self, msg, LNET_NID_ANY);
- 	if (rc) {
- 		CNETERR("Error sending PUT to %s: %d\n",
- 			libcfs_id2str(target), rc);
+@@ -1620,6 +1637,7 @@ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
+ 			imp->imp_generation++;
+ 			imp->imp_initiated_at = imp->imp_generation;
+ 			IMPORT_SET_STATE_NOLOCK(imp, LUSTRE_IMP_NEW);
++			ptlrpc_reset_reqs_generation(imp);
+ 			connect = 1;
+ 		}
+ 	}
 -- 
 1.8.3.1
