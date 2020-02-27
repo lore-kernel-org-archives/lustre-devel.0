@@ -1,95 +1,115 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:02 -0500
-Subject: [lustre-devel] [PATCH 194/622] lustre: ptlrpc: connect vs import
- invalidate race
+Date: Thu, 27 Feb 2020 16:11:11 -0500
+Subject: [lustre-devel] [PATCH 203/622] lustre: mdc: Improve xattr buffer
+ allocations
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-195-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-204-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Connect can't be sent while import invalidate is
-in progress, thus it leaves the import in not
-initialized state.
+Many of the xattr related buffers in the mdc/mdt code are
+allocated at max_easize, but they are used for normal POSIX
+xattrs (primarily ACLs) and so they are guaranteed not to
+exceed XATTR_SIZE_MAX.
 
-Don't allow reconnect in evicted state.
+HSM xattrs should also be less than XATTR_SIZE_MAX.
 
-Cray-bug-id: LUS-6322
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7558
-Lustre-commit: b1827ff1da82 ("LU-7558 ptlrpc: connect vs import invalidate race")
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-by: Alexander Boyko <c17825@cray.com>
-Reviewed-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-on: https://review.whamcloud.com/33718
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reduce allocations to MIN(XATTR_SIZE_MAX, max_easize).
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11868
+Lustre-commit: 4f78164f8748 ("LU-11868 mdc: Improve xattr buffer allocations")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/34059
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Li Dongyang <dongyangli@ddn.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h | 1 +
- fs/lustre/ptlrpc/import.c       | 6 ++++++
- fs/lustre/ptlrpc/recover.c      | 2 ++
- 3 files changed, 9 insertions(+)
+ fs/lustre/mdc/mdc_locks.c   |  9 ++++++---
+ fs/lustre/mdc/mdc_reint.c   |  4 +++-
+ fs/lustre/mdc/mdc_request.c | 14 ++++++++------
+ 3 files changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index c2db38f..5ff270a 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -353,6 +353,7 @@
- #define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK			0x51b
- #define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK		0x51c
- #define OBD_FAIL_PTLRPC_BULK_ATTACH      0x521
-+#define OBD_FAIL_PTLRPC_CONNECT_RACE			0x531
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index f9d66a4..9898b6a 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -810,7 +810,9 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
  
- #define OBD_FAIL_OBD_PING_NET				0x600
- /*	OBD_FAIL_OBD_LOG_CANCEL_NET	0x601 obsolete since 1.5 */
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index 867aff6..df6c459 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -38,6 +38,7 @@
- #define DEBUG_SUBSYSTEM S_RPC
+ 	generation = obddev->u.cli.cl_import->imp_generation;
+ 	if (!it || (it->it_op & (IT_OPEN | IT_CREAT)))
+-		acl_bufsize = imp->imp_connect_data.ocd_max_easize;
++		acl_bufsize = min_t(u32,
++				    imp->imp_connect_data.ocd_max_easize,
++				    XATTR_SIZE_MAX);
+ 	else
+ 		acl_bufsize = LUSTRE_POSIX_ACL_MAX_SIZE_OLD;
  
- #include <linux/kthread.h>
-+#include <linux/delay.h>
- #include <linux/fs_struct.h>
- #include <obd_support.h>
- #include <lustre_ha.h>
-@@ -273,6 +274,10 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 	if (!imp->imp_invalid || imp->imp_obd->obd_no_recov)
- 		ptlrpc_deactivate_import(imp);
+@@ -936,10 +938,11 @@ int mdc_enqueue_base(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
  
-+	if (OBD_FAIL_PRECHECK(OBD_FAIL_PTLRPC_CONNECT_RACE)) {
-+		OBD_RACE(OBD_FAIL_PTLRPC_CONNECT_RACE);
-+		msleep(10 * MSEC_PER_SEC);
-+	}
- 	CFS_FAIL_TIMEOUT(OBD_FAIL_MGS_CONNECT_NET, 3 * cfs_fail_val / 2);
- 	LASSERT(imp->imp_invalid);
+ 	if ((int)lockrep->lock_policy_res2 == -ERANGE &&
+ 	    it->it_op & (IT_OPEN | IT_GETATTR | IT_LOOKUP) &&
+-	    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
++	    acl_bufsize == LUSTRE_POSIX_ACL_MAX_SIZE_OLD) {
+ 		mdc_clear_replay_flag(req, -ERANGE);
+ 		ptlrpc_req_finished(req);
+-		acl_bufsize = imp->imp_connect_data.ocd_max_easize;
++		acl_bufsize = min_t(u32, imp->imp_connect_data.ocd_max_easize,
++				    XATTR_SIZE_MAX);
+ 		goto resend;
+ 	}
  
-@@ -615,6 +620,7 @@ int ptlrpc_connect_import(struct obd_import *imp)
- 		CERROR("already connected\n");
- 		return 0;
- 	} else if (imp->imp_state == LUSTRE_IMP_CONNECTING ||
-+		   imp->imp_state == LUSTRE_IMP_EVICTED ||
- 		   imp->imp_connected) {
- 		spin_unlock(&imp->imp_lock);
- 		CERROR("already connecting\n");
-diff --git a/fs/lustre/ptlrpc/recover.c b/fs/lustre/ptlrpc/recover.c
-index 7c09c4e..ceab288 100644
---- a/fs/lustre/ptlrpc/recover.c
-+++ b/fs/lustre/ptlrpc/recover.c
-@@ -339,6 +339,8 @@ int ptlrpc_recover_import(struct obd_import *imp, char *new_uuid, int async)
- 	if (rc)
- 		goto out;
+diff --git a/fs/lustre/mdc/mdc_reint.c b/fs/lustre/mdc/mdc_reint.c
+index 062685c..2611fc4 100644
+--- a/fs/lustre/mdc/mdc_reint.c
++++ b/fs/lustre/mdc/mdc_reint.c
+@@ -135,7 +135,9 @@ int mdc_setattr(struct obd_export *exp, struct md_op_data *op_data,
+ 	mdc_setattr_pack(req, op_data, ea, ealen);
  
-+	OBD_RACE(OBD_FAIL_PTLRPC_CONNECT_RACE);
-+
- 	rc = ptlrpc_connect_import(imp);
- 	if (rc)
- 		goto out;
+ 	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER,
+-			     req->rq_import->imp_connect_data.ocd_max_easize);
++			     min_t(u32,
++				   req->rq_import->imp_connect_data.ocd_max_easize,
++				   XATTR_SIZE_MAX));
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_reint(req, LUSTRE_IMP_FULL);
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index d702fd1..4711288 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -234,9 +234,10 @@ static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
+ 
+ 	rc = mdc_getattr_common(exp, req);
+ 	if (rc) {
+-		if (rc == -ERANGE &&
+-		    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
+-			acl_bufsize = imp->imp_connect_data.ocd_max_easize;
++		if (rc == -ERANGE) {
++			acl_bufsize = min_t(u32,
++					    imp->imp_connect_data.ocd_max_easize,
++					    XATTR_SIZE_MAX);
+ 			mdc_reset_acl_req(req);
+ 			goto again;
+ 		}
+@@ -289,9 +290,10 @@ static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 
+ 	rc = mdc_getattr_common(exp, req);
+ 	if (rc) {
+-		if (rc == -ERANGE &&
+-		    acl_bufsize != imp->imp_connect_data.ocd_max_easize) {
+-			acl_bufsize = imp->imp_connect_data.ocd_max_easize;
++		if (rc == -ERANGE) {
++			acl_bufsize = min_t(u32,
++					    imp->imp_connect_data.ocd_max_easize,
++					    XATTR_SIZE_MAX);
+ 			mdc_reset_acl_req(req);
+ 			goto again;
+ 		}
 -- 
 1.8.3.1
