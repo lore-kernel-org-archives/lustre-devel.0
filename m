@@ -1,136 +1,85 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:09 -0500
-Subject: [lustre-devel] [PATCH 381/622] lustre: obdclass: generate random
- u64 max correctly
+Date: Thu, 27 Feb 2020 16:14:10 -0500
+Subject: [lustre-devel] [PATCH 382/622] lnet: fix peer ref counting
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-382-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-383-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-Generate random u64 max number correctly, and make it an obdclass
-function lu_prandom_u64_max().
+Exit from the loop after peer ref count has been incremented
+to avoid wrong ref count.
 
-Fixes: bcfa98a507 ("staging: lustre: replace cfs_rand() with prandom_u32_max()")
+The code makes sure that a peer is queued for discovery at most
+once if discovery is disabled. This is done to use discovery
+as a standard ping for gateways which do not have discovery feature
+or discovery is disabled.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12495
-Lustre-commit: 645b72c5c058 ("LU-12495 obdclass: generate random u64 max correctly")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35394
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9971
+Lustre-commit: dbcddb4824f0 ("LU-9971 lnet: fix peer ref counting")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35446
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lu_object.h |  1 +
- fs/lustre/lmv/lmv_qos.c       | 26 +-------------------------
- fs/lustre/obdclass/lu_qos.c   | 36 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 38 insertions(+), 25 deletions(-)
+ net/lnet/lnet/peer.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
-index 0f3e3be..6b1064a 100644
---- a/fs/lustre/include/lu_object.h
-+++ b/fs/lustre/include/lu_object.h
-@@ -1390,6 +1390,7 @@ struct lu_qos {
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index d167a37..e33dc0e 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -2138,6 +2138,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 	DEFINE_WAIT(wait);
+ 	struct lnet_peer *lp;
+ 	int rc = 0;
++	int count = 0;
  
- int lqos_add_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
- int lqos_del_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
-+u64 lu_prandom_u64_max(u64 ep_ro);
- 
- /** @} lu */
- #endif /* __LUSTRE_LU_OBJECT_H */
-diff --git a/fs/lustre/lmv/lmv_qos.c b/fs/lustre/lmv/lmv_qos.c
-index e323398..85053d2e 100644
---- a/fs/lustre/lmv/lmv_qos.c
-+++ b/fs/lustre/lmv/lmv_qos.c
-@@ -370,31 +370,7 @@ struct lu_tgt_desc *lmv_locate_tgt_qos(struct lmv_obd *lmv, u32 *mdt)
- 		total_weight += tgt->ltd_qos.ltq_weight;
- 	}
- 
--	if (total_weight) {
--#if BITS_PER_LONG == 32
--		/*
--		 * If total_weight > 32-bit, first generate the high
--		 * 32 bits of the random number, then add in the low
--		 * 32 bits (truncated to the upper limit, if needed)
--		 */
--		if (total_weight > 0xffffffffULL)
--			rand = (u64)(prandom_u32_max(
--				(unsigned int)(total_weight >> 32)) << 32;
--		else
--			rand = 0;
--
--		if (rand == (total_weight & 0xffffffff00000000ULL))
--			rand |= prandom_u32_max((unsigned int)total_weight);
--		else
--			rand |= prandom_u32();
--
--#else
--		rand = ((u64)prandom_u32() << 32 | prandom_u32()) %
--			total_weight;
--#endif
--	} else {
--		rand = 0;
--	}
-+	rand = lu_prandom_u64_max(total_weight);
- 
- 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
- 		tgt = lmv->tgts[i];
-diff --git a/fs/lustre/obdclass/lu_qos.c b/fs/lustre/obdclass/lu_qos.c
-index 4ee3f59..9fdcbc2 100644
---- a/fs/lustre/obdclass/lu_qos.c
-+++ b/fs/lustre/obdclass/lu_qos.c
-@@ -35,6 +35,7 @@
- 
- #include <linux/module.h>
- #include <linux/list.h>
-+#include <linux/random.h>
- #include <obd_class.h>
- #include <obd_support.h>
- #include <lustre_disk.h>
-@@ -164,3 +165,38 @@ int lqos_del_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd)
- 	return rc;
- }
- EXPORT_SYMBOL(lqos_del_tgt);
-+
-+/**
-+ * lu_prandom_u64_max - returns a pseudo-random u64 number in interval
-+ * [0, ep_ro)
-+ *
-+ * #ep_ro	right open interval endpoint
-+ *
-+ * Return:	a pseudo-random 64-bit number that is in interval [0, ep_ro).
-+ */
-+u64 lu_prandom_u64_max(u64 ep_ro)
-+{
-+	u64 rand = 0;
-+
-+	if (ep_ro) {
-+#if BITS_PER_LONG == 32
-+		/*
-+		 * If ep_ro > 32-bit, first generate the high
-+		 * 32 bits of the random number, then add in the low
-+		 * 32 bits (truncated to the upper limit, if needed)
+ again:
+ 	lnet_net_unlock(cpt);
+@@ -2157,11 +2158,20 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 			break;
+ 		if (the_lnet.ln_dc_state != LNET_DC_STATE_RUNNING)
+ 			break;
++		/* Don't repeat discovery if discovery is disabled. This is
++		 * done to ensure we can use discovery as a standard ping as
++		 * well for backwards compatibility with routers which do not
++		 * have discovery or have discovery disabled
 +		 */
-+		if (ep_ro > 0xffffffffULL)
-+			rand = prandom_u32_max((u32)(ep_ro >> 32)) << 32;
-+
-+		if (rand == (ep_ro & 0xffffffff00000000ULL))
-+			rand |= prandom_u32_max((u32)ep_ro);
-+		else
-+			rand |= prandom_u32();
-+#else
-+		rand = ((u64)prandom_u32() << 32 | prandom_u32()) % ep_ro;
-+#endif
-+	}
-+
-+	return rand;
-+}
-+EXPORT_SYMBOL(lu_prandom_u64_max);
++		if (lnet_is_discovery_disabled(lp) && count > 0)
++			break;
+ 		if (lp->lp_dc_error)
+ 			break;
+ 		if (lnet_peer_is_uptodate(lp))
+ 			break;
+ 		lnet_peer_queue_for_discovery(lp);
++		count++;
++		CDEBUG(D_NET, "Discovery attempt # %d\n", count);
+ 
+ 		/* If caller requested a non-blocking operation then
+ 		 * return immediately. Once discovery is complete any
+@@ -2178,15 +2188,6 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lnet_peer_decref_locked(lp);
+ 		/* Peer may have changed */
+ 		lp = lpni->lpni_peer_net->lpn_peer;
+-
+-		/* Wait for discovery to complete, but don't repeat if
+-		 * discovery is disabled. This is done to ensure we can
+-		 * use discovery as a standard ping as well for backwards
+-		 * compatibility with routers which do not have discovery
+-		 * or have discovery disabled
+-		 */
+-		if (lnet_is_discovery_disabled(lp))
+-			break;
+ 	}
+ 	finish_wait(&lp->lp_dc_waitq, &wait);
+ 
 -- 
 1.8.3.1
