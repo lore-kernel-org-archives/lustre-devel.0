@@ -1,69 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:42 -0500
-Subject: [lustre-devel] [PATCH 054/622] lustre: ptlrpc: add LOCK_CONVERT
- connection flag
+Date: Thu, 27 Feb 2020 16:08:54 -0500
+Subject: [lustre-devel] [PATCH 066/622] lustre: ptlrpc:
+ ASSERTION(!list_empty(imp->imp_replay_cursor))
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-55-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-67-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mikhail Pershin <mpershin@whamcloud.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-Add LOCK_CONVERT connection flag to don't use lock
-convert feature with old servers.
+It's ptlrpc_replay_next() vs close race.
+ll_close_inode_openhandle() calls
+mdc_free_open()->ptlrpc_request_committed->ptlrpc_free_request
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10175
-Lustre-commit: 44a2092f08ca ("LU-10175 ptlrpc: add LOCK_CONVERT connection flag")
-Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32593
+Need to reset imp_replay_cursor while dropping a request from
+replay list.
+
+Cray-bug-id: LUS-2455
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11098
+Lustre-commit: d69d488e1778 ("LU-11098 ptlrpc: ASSERTION(!list_empty(imp->imp_replay_cursor))")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-on: https://review.whamcloud.com/32727
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Vladimir Saveliev <c17830@cray.com>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lprocfs_status.c    | 1 +
- fs/lustre/ptlrpc/wiretest.c            | 2 ++
- include/uapi/linux/lustre/lustre_idl.h | 1 +
- 3 files changed, 4 insertions(+)
+ fs/lustre/ptlrpc/client.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index e2575b4..385359f 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -118,6 +118,7 @@
- 	"unknown",	/* 0x10 */
- 	"flr",		/* 0x20 */
- 	"wbc",		/* 0x40 */
-+	"lock_convert",	/* 0x80 */
- 	NULL
- };
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index d28a9cd..57b08de 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -2613,8 +2613,11 @@ void ptlrpc_request_committed(struct ptlrpc_request *req, int force)
+ 		return;
+ 	}
  
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 01ddbee..202c5ab 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1117,6 +1117,8 @@ void lustre_assert_wire_constants(void)
- 		 OBD_CONNECT2_FLR);
- 	LASSERTF(OBD_CONNECT2_WBC_INTENTS == 0x40ULL, "found 0x%.16llxULL\n",
- 		 OBD_CONNECT2_WBC_INTENTS);
-+	LASSERTF(OBD_CONNECT2_LOCK_CONVERT == 0x80ULL, "found 0x%.16llxULL\n",
-+		 OBD_CONNECT2_LOCK_CONVERT);
- 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
- 		 (unsigned int)OBD_CKSUM_CRC32);
- 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 11df7b4..798aa57 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -799,6 +799,7 @@ struct ptlrpc_body_v2 {
- 						 * under client-held parent
- 						 * locks
- 						 */
-+#define OBD_CONNECT2_LOCK_CONVERT	0x80ULL /* IBITS lock convert support */
+-	if (force || req->rq_transno <= imp->imp_peer_committed_transno)
++	if (force || req->rq_transno <= imp->imp_peer_committed_transno) {
++		if (imp->imp_replay_cursor == &req->rq_replay_list)
++			imp->imp_replay_cursor = req->rq_replay_list.next;
+ 		ptlrpc_free_request(req);
++	}
  
- /* XXX README XXX:
-  * Please DO NOT add flag values here before first ensuring that this same
+ 	spin_unlock(&imp->imp_lock);
+ }
 -- 
 1.8.3.1
