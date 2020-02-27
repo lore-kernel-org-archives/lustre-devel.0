@@ -1,86 +1,73 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:50 -0500
-Subject: [lustre-devel] [PATCH 602/622] lustre: obdclass: convert waiting in
- cl_sync_io_wait().
+Date: Thu, 27 Feb 2020 16:17:51 -0500
+Subject: [lustre-devel] [PATCH 603/622] lnet: modules: use list_move were
+ appropriate.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-603-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-604-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-This function will *always* wait until ->csi_sync_nr reaches zero.
-The effect of the timeout is:
-  1/ to report an error if the count doesn't reach zero in the given
-     time
-  2/ to return -ETIMEDOUt instead of csi_sync_rc if the timeout was
-     exceeded.
+Rather than
+  list_del(&foo);
+  list_add(&foo, &bar);
+use
+  list_move(&foo, &bar);
 
-So we rearrange the code to make that more obvious.
-A small exrta change is that we now call wait_event_idle() again
-even if there was a timeout and the first wait succeeded.
-This will simply test csi_sync_nr again and not actually wait.
-We could protected it with 'rc != 0 || timeout == 0' but there seems
-no point.
+Similarly for list_add_tail and list_move_tail.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10467
-Lustre-commit: d6ce546eb7e2 ("LU-10467 obdclass: convert waiting in cl_sync_io_wait().")
-Signed-off-by: Mr NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/36102
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
+In lnet_attach_rsp_tracker, local_rspt already has a suitably
+initialised ->rspt_on_list, so the new_entry variable can
+be discarded.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
+Lustre-commit: 7525fd36a266 ("LU-9679 modules: use list_move were appropriate.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/36670
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/cl_io.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+ net/lnet/lnet/lib-move.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
-index 3bc9097..e11f9fe 100644
---- a/fs/lustre/obdclass/cl_io.c
-+++ b/fs/lustre/obdclass/cl_io.c
-@@ -1054,27 +1054,24 @@ void cl_sync_io_init_notify(struct cl_sync_io *anchor, int nr,
- int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
- 		    long timeout)
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index ca292a6..47d5389 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -4374,7 +4374,6 @@ void lnet_monitor_thr_stop(void)
+ 			struct lnet_libmd *md, struct lnet_handle_md mdh)
  {
--	int rc = 1;
-+	int rc = 0;
+ 	s64 timeout_ns;
+-	bool new_entry = true;
+ 	struct lnet_rsp_tracker *local_rspt;
  
- 	LASSERT(timeout >= 0);
- 
--	if (timeout == 0)
--		wait_event_idle(anchor->csi_waitq,
--				atomic_read(&anchor->csi_sync_nr) == 0);
--	else
--		rc = wait_event_idle_timeout(anchor->csi_waitq,
--					     atomic_read(&anchor->csi_sync_nr) == 0,
--					     timeout * HZ);
--	if (rc == 0) {
-+	if (timeout > 0 &&
-+	    wait_event_idle_timeout(anchor->csi_waitq,
-+				    atomic_read(&anchor->csi_sync_nr) == 0,
-+				    timeout * HZ) == 0) {
- 		rc = -ETIMEDOUT;
- 		CERROR("IO failed: %d, still wait for %d remaining entries\n",
- 		       rc, atomic_read(&anchor->csi_sync_nr));
-+	}
- 
--		wait_event_idle(anchor->csi_waitq,
--				atomic_read(&anchor->csi_sync_nr) == 0);
--	} else {
-+	wait_event_idle(anchor->csi_waitq,
-+			atomic_read(&anchor->csi_sync_nr) == 0);
-+	if (!rc)
- 		rc = anchor->csi_sync_rc;
--	}
-+
- 	/* We take the lock to ensure that cl_sync_io_note() has finished */
- 	spin_lock(&anchor->csi_waitq.lock);
- 	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
+ 	/* MD has a refcount taken by message so it's not going away.
+@@ -4391,7 +4390,6 @@ void lnet_monitor_thr_stop(void)
+ 		 * update the deadline on that one.
+ 		 */
+ 		lnet_rspt_free(rspt, cpt);
+-		new_entry = false;
+ 	} else {
+ 		/* new md */
+ 		rspt->rspt_mdh = mdh;
+@@ -4406,9 +4404,7 @@ void lnet_monitor_thr_stop(void)
+ 	 * list in order to expire all the older entries first.
+ 	 */
+ 	lnet_net_lock(cpt);
+-	if (!new_entry && !list_empty(&local_rspt->rspt_on_list))
+-		list_del_init(&local_rspt->rspt_on_list);
+-	list_add_tail(&local_rspt->rspt_on_list, the_lnet.ln_mt_rstq[cpt]);
++	list_move_tail(&local_rspt->rspt_on_list, the_lnet.ln_mt_rstq[cpt]);
+ 	lnet_net_unlock(cpt);
+ 	lnet_res_unlock(cpt);
+ }
 -- 
 1.8.3.1
