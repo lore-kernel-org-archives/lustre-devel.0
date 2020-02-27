@@ -1,123 +1,83 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:51 -0500
-Subject: [lustre-devel] [PATCH 243/622] lustre: ptlrpc: manage SELinux
- policy info at connect time
+Date: Thu, 27 Feb 2020 16:12:02 -0500
+Subject: [lustre-devel] [PATCH 254/622] lustre: ldlm: Fix style issues for
+ ptlrpcd.c
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-244-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-255-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Arshad Hussain <arshad.super@gmail.com>
 
-At connect time, compute SELinux policy info on client side, and
-send it over the wire.
-On server side, get SELinux policy info from nodemap and compare
-it with the one received from client.
+This patch fixes issues reported by checkpatch
+for file fs/lustre/ptlrpc/ptlrpcd.c
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8955
-Lustre-commit: dd200e5530fd ("LU-8955 ptlrpc: manage SELinux policy info at connect time")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/24422
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Li Dongyang <dongyangli@ddn.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: f64aeebfceb3 ("LU-6142 ldlm: Fix style issues for ptlrpcd.c")
+Signed-off-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-on: https://review.whamcloud.com/34604
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_req_layout.h |  1 +
- fs/lustre/llite/llite_lib.c           |  4 ++++
- fs/lustre/ptlrpc/import.c             | 16 +++++++++++++++-
- fs/lustre/ptlrpc/layout.c             |  7 ++++++-
- 4 files changed, 26 insertions(+), 2 deletions(-)
+ fs/lustre/ptlrpc/ptlrpcd.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_req_layout.h b/fs/lustre/include/lustre_req_layout.h
-index 36656c6..9b618fe 100644
---- a/fs/lustre/include/lustre_req_layout.h
-+++ b/fs/lustre/include/lustre_req_layout.h
-@@ -269,6 +269,7 @@ void req_capsule_shrink(struct req_capsule *pill,
- extern struct req_msg_field RMF_HSM_STATE_SET;
- extern struct req_msg_field RMF_MDS_HSM_CURRENT_ACTION;
- extern struct req_msg_field RMF_MDS_HSM_REQUEST;
-+extern struct req_msg_field RMF_SELINUX_POL;
- 
- /* seq-mgr fields */
- extern struct req_msg_field RMF_SEQ_OPC;
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 4d41981a..10d9180 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -256,6 +256,10 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
- 
- 	obd_connect_set_secctx(data);
- 
-+#if defined(CONFIG_SECURITY)
-+	data->ocd_connect_flags2 |= OBD_CONNECT2_SELINUX_POLICY;
-+#endif
-+
- 	data->ocd_brw_size = MD_MAX_BRW_SIZE;
- 
- 	err = obd_connect(NULL, &sbi->ll_md_exp, sbi->ll_md_obd,
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index 34a2cb0..39d9e3e 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -606,7 +606,8 @@ int ptlrpc_connect_import(struct obd_import *imp)
- 			 obd2cli_tgt(imp->imp_obd),
- 			 obd->obd_uuid.uuid,
- 			 (char *)&imp->imp_dlm_handle,
--			 (char *)&imp->imp_connect_data };
-+			 (char *)&imp->imp_connect_data,
-+			 NULL };
- 	struct ptlrpc_connect_async_args *aa;
- 	int rc;
- 
-@@ -670,6 +671,19 @@ int ptlrpc_connect_import(struct obd_import *imp)
- 		goto out;
+diff --git a/fs/lustre/ptlrpc/ptlrpcd.c b/fs/lustre/ptlrpc/ptlrpcd.c
+index e9c03ba..bcf1e46 100644
+--- a/fs/lustre/ptlrpc/ptlrpcd.c
++++ b/fs/lustre/ptlrpc/ptlrpcd.c
+@@ -238,7 +238,8 @@ void ptlrpcd_add_req(struct ptlrpc_request *req)
+ 			wait_event_idle(req->rq_set_waitq,
+ 					!req->rq_set);
+ 	} else if (req->rq_set) {
+-		/* If we have a valid "rq_set", just reuse it to avoid double
++		/*
++		 * If we have a valid "rq_set", just reuse it to avoid double
+ 		 * linked.
+ 		 */
+ 		LASSERT(req->rq_phase == RQ_PHASE_NEW);
+@@ -294,7 +295,8 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ 		spin_unlock(&set->set_new_req_lock);
  	}
  
-+	/* get SELinux policy info if any */
-+	rc = sptlrpc_get_sepol(request);
-+	if (rc < 0) {
-+		ptlrpc_request_free(request);
-+		goto out;
-+	}
-+
-+	bufs[5] = request->rq_sepol;
-+
-+	req_capsule_set_size(&request->rq_pill, &RMF_SELINUX_POL, RCL_CLIENT,
-+			     strlen(request->rq_sepol) ?
-+			     strlen(request->rq_sepol) + 1 : 0);
-+
- 	rc = ptlrpc_request_bufs_pack(request, LUSTRE_OBD_VERSION,
- 				      imp->imp_connect_op, bufs, NULL);
- 	if (rc) {
-diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
-index 1dd18b9..f80c627 100644
---- a/fs/lustre/ptlrpc/layout.c
-+++ b/fs/lustre/ptlrpc/layout.c
-@@ -315,7 +315,8 @@
- 	&RMF_TGTUUID,
- 	&RMF_CLUUID,
- 	&RMF_CONN,
--	&RMF_CONNECT_DATA
-+	&RMF_CONNECT_DATA,
-+	&RMF_SELINUX_POL,
- };
+-	/* We should call lu_env_refill() before handling new requests to make
++	/*
++	 * We should call lu_env_refill() before handling new requests to make
+ 	 * sure that env key the requests depending on really exists.
+ 	 */
+ 	rc2 = lu_env_refill(env);
+@@ -316,7 +318,8 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ 	if (atomic_read(&set->set_remaining))
+ 		rc |= ptlrpc_check_set(env, set);
  
- static const struct req_msg_field *obd_connect_server[] = {
-@@ -1039,6 +1040,10 @@ struct req_msg_field RMF_LAYOUT_INTENT =
- 		    NULL);
- EXPORT_SYMBOL(RMF_LAYOUT_INTENT);
+-	/* NB: ptlrpc_check_set has already moved completed request at the
++	/*
++	 * NB: ptlrpc_check_set has already moved completed request at the
+ 	 * head of seq::set_requests
+ 	 */
+ 	list_for_each_entry_safe(req, tmp, &set->set_requests, rq_set_chain) {
+@@ -334,7 +337,8 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ 		 */
+ 		rc = atomic_read(&set->set_new_count);
  
-+struct req_msg_field RMF_SELINUX_POL =
-+	DEFINE_MSGF("selinux_pol", RMF_F_STRING, -1, NULL, NULL);
-+EXPORT_SYMBOL(RMF_SELINUX_POL);
-+
- /*
-  * OST request field.
+-		/* If we have nothing to do, check whether we can take some
++		/*
++		 * If we have nothing to do, check whether we can take some
+ 		 * work from our partner threads.
+ 		 */
+ 		if (rc == 0 && pc->pc_npartners > 0) {
+@@ -379,7 +383,6 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+  * Main ptlrpcd thread.
+  * ptlrpc's code paths like to execute in process context, so we have this
+  * thread which spins on a set which contains the rpcs and sends them.
+- *
   */
+ static int ptlrpcd(void *arg)
+ {
 -- 
 1.8.3.1
