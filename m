@@ -1,57 +1,86 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:42 -0500
-Subject: [lustre-devel] [PATCH 594/622] lustre: lmv: disable statahead for
- remote objects
+Date: Thu, 27 Feb 2020 16:17:50 -0500
+Subject: [lustre-devel] [PATCH 602/622] lustre: obdclass: convert waiting in
+ cl_sync_io_wait().
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-595-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-603-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Vladimir Saveliev <c17830@cray.com>
+From: Mr NeilBrown <neilb@suse.com>
 
-Statahead for remote objects is supposed to be disabled by
-LU-11681 lmv: disable remote file statahead.
+This function will *always* wait until ->csi_sync_nr reaches zero.
+The effect of the timeout is:
+  1/ to report an error if the count doesn't reach zero in the given
+     time
+  2/ to return -ETIMEDOUt instead of csi_sync_rc if the timeout was
+     exceeded.
 
-However due to typo it is not and statahead for remote objects is
-accompanied by warnings like:
-  ll_set_inode()) Can not initialize inode .. without object type..
-  ll_prep_inode()) new_inode -fatal: rc -12
+So we rearrange the code to make that more obvious.
+A small exrta change is that we now call wait_event_idle() again
+even if there was a timeout and the first wait succeeded.
+This will simply test csi_sync_nr again and not actually wait.
+We could protected it with 'rc != 0 || timeout == 0' but there seems
+no point.
 
-Fix the typo.
-
-Test to illustrate the issue is added.
-
-Fixes: 6dd8b9909e79 ("lustre: lmv: disable remote file statahead")
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13099
-Lustre-commit: 68330379b01c ("LU-13099 lmv: disable statahead for remote objects")
-Signed-off-by: Vladimir Saveliev <c17830@cray.com>
-Cray-bug-id: LUS-8262
-Reviewed-on: https://review.whamcloud.com/37089
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10467
+Lustre-commit: d6ce546eb7e2 ("LU-10467 obdclass: convert waiting in cl_sync_io_wait().")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/36102
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lmv/lmv_obd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/lustre/obdclass/cl_io.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index ee52bba..cead3a1 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -3369,7 +3369,7 @@ static int lmv_intent_getattr_async(struct obd_export *exp,
- 	if (IS_ERR(ptgt))
- 		return PTR_ERR(ptgt);
+diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
+index 3bc9097..e11f9fe 100644
+--- a/fs/lustre/obdclass/cl_io.c
++++ b/fs/lustre/obdclass/cl_io.c
+@@ -1054,27 +1054,24 @@ void cl_sync_io_init_notify(struct cl_sync_io *anchor, int nr,
+ int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		    long timeout)
+ {
+-	int rc = 1;
++	int rc = 0;
  
--	ctgt = lmv_fid2tgt(lmv, &op_data->op_fid1);
-+	ctgt = lmv_fid2tgt(lmv, &op_data->op_fid2);
- 	if (IS_ERR(ctgt))
- 		return PTR_ERR(ctgt);
+ 	LASSERT(timeout >= 0);
  
+-	if (timeout == 0)
+-		wait_event_idle(anchor->csi_waitq,
+-				atomic_read(&anchor->csi_sync_nr) == 0);
+-	else
+-		rc = wait_event_idle_timeout(anchor->csi_waitq,
+-					     atomic_read(&anchor->csi_sync_nr) == 0,
+-					     timeout * HZ);
+-	if (rc == 0) {
++	if (timeout > 0 &&
++	    wait_event_idle_timeout(anchor->csi_waitq,
++				    atomic_read(&anchor->csi_sync_nr) == 0,
++				    timeout * HZ) == 0) {
+ 		rc = -ETIMEDOUT;
+ 		CERROR("IO failed: %d, still wait for %d remaining entries\n",
+ 		       rc, atomic_read(&anchor->csi_sync_nr));
++	}
+ 
+-		wait_event_idle(anchor->csi_waitq,
+-				atomic_read(&anchor->csi_sync_nr) == 0);
+-	} else {
++	wait_event_idle(anchor->csi_waitq,
++			atomic_read(&anchor->csi_sync_nr) == 0);
++	if (!rc)
+ 		rc = anchor->csi_sync_rc;
+-	}
++
+ 	/* We take the lock to ensure that cl_sync_io_note() has finished */
+ 	spin_lock(&anchor->csi_waitq.lock);
+ 	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
 -- 
 1.8.3.1
