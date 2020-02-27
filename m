@@ -1,261 +1,140 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:48 -0500
-Subject: [lustre-devel] [PATCH 480/622] lustre: mdc: hold obd while
- processing changelog
+Date: Thu, 27 Feb 2020 16:15:49 -0500
+Subject: [lustre-devel] [PATCH 481/622] lnet: change ln_mt_waitq to a
+ completion.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-481-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-482-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Hongchao Zhang <hongchao@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.com>
 
-During read/write changelog, the corresponding obd_device should
-be held to protect it from being released by umount.
+ln_mt_waitq is only waited on by a call to
+  wait_event_interruptible_timeout(..., false, timeout);
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11626
-Lustre-commit: d7bb6647cd4d ("LU-11626 mdc: hold obd while processing changelog")
-Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35784
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Emoly Liu <emoly@whamcloud.com>
+As 'false' is never 'true', this will always wait for the full
+timeout to expire.  So the waitq is effectively pointless.
+
+To acheive the apparent intent of the waitq, change it to a
+completion.  The completion adds a 'done' flag to a waitq so we can
+wait until a timeout or until a wakeup is requested.
+
+With this, a longer timeout would could be used, but that is left to
+a later patch.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12686
+Lustre-commit: b81bcc6c6f0c ("LU-12686 lnet: change ln_mt_waitq to a completion.")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/35874
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_changelog.c | 121 ++++++++++++++++++++++++------------------
- 1 file changed, 70 insertions(+), 51 deletions(-)
+ include/linux/lnet/lib-types.h |  5 +++--
+ net/lnet/lnet/api-ni.c         |  2 +-
+ net/lnet/lnet/lib-move.c       | 10 +++++++---
+ net/lnet/lnet/lib-msg.c        |  2 +-
+ net/lnet/lnet/router.c         |  4 ++--
+ 5 files changed, 14 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_changelog.c b/fs/lustre/mdc/mdc_changelog.c
-index 9af0541..043549d 100644
---- a/fs/lustre/mdc/mdc_changelog.c
-+++ b/fs/lustre/mdc/mdc_changelog.c
-@@ -69,8 +69,10 @@ struct chlg_registered_dev {
- };
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 22c2bc6..18d4e4e 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -1145,10 +1145,11 @@ struct lnet {
+ 	 */
+ 	bool				ln_nis_from_mod_params;
  
- struct chlg_reader_state {
--	/* Device this state is associated with */
--	struct chlg_registered_dev *crs_dev;
-+	/* Shortcut to the corresponding OBD device */
-+	struct obd_device	*crs_obd;
-+	/* the corresponding chlg_registered_dev */
-+	struct chlg_registered_dev *crs_ced;
- 	/* Producer thread (if any) */
- 	struct task_struct	*crs_prod_task;
- 	/* An error occurred that prevents from reading further */
-@@ -109,6 +111,41 @@ enum {
- };
+-	/* waitq for the monitor thread. The monitor thread takes care of
++	/*
++	 * completion for the monitor thread. The monitor thread takes care of
+ 	 * checking routes, timedout messages and resending messages.
+ 	 */
+-	wait_queue_head_t		ln_mt_waitq;
++	struct completion		ln_mt_wait_complete;
  
- /**
-+ * Deregister a changelog character device whose refcount has reached zero.
-+ */
-+static void chlg_dev_clear(struct kref *kref)
-+{
-+	struct chlg_registered_dev *entry = container_of(kref,
-+						struct chlg_registered_dev,
-+						ced_refs);
-+
-+	list_del(&entry->ced_link);
-+	misc_deregister(&entry->ced_misc);
-+	kfree(entry);
-+}
-+
-+static inline struct obd_device *chlg_obd_get(struct chlg_registered_dev *dev)
-+{
-+	struct obd_device *obd;
-+
-+	mutex_lock(&chlg_registered_dev_lock);
-+	if (list_empty(&dev->ced_obds))
-+		return NULL;
-+
-+	obd = list_first_entry(&dev->ced_obds, struct obd_device,
-+			       u.cli.cl_chg_dev_linkage);
-+	class_incref(obd, "changelog", dev);
-+	mutex_unlock(&chlg_registered_dev_lock);
-+	return obd;
-+}
-+
-+static inline void chlg_obd_put(struct chlg_registered_dev *dev,
-+			 struct obd_device *obd)
-+{
-+	class_decref(obd, "changelog", dev);
-+}
-+
-+/**
-  * ChangeLog catalog processing callback invoked on each record.
-  * If the current record is eligible to userland delivery, push
-  * it into the crs_rec_queue where the consumer code will fetch it.
-@@ -142,7 +179,7 @@ static int chlg_read_cat_process_cb(const struct lu_env *env,
- 	if (rec->cr_hdr.lrh_type != CHANGELOG_REC) {
- 		rc = -EINVAL;
- 		CERROR("%s: not a changelog rec %x/%d in llog : rc = %d\n",
--		       crs->crs_dev->ced_name, rec->cr_hdr.lrh_type,
-+		       crs->crs_obd->obd_name, rec->cr_hdr.lrh_type,
- 		       rec->cr.cr_type, rc);
- 		return rc;
- 	}
-@@ -193,17 +230,6 @@ static void enq_record_delete(struct chlg_rec_entry *rec)
- 	kfree(rec);
+ 	/* per-cpt resend queues */
+ 	struct list_head		**ln_mt_resendqs;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 79deaac..e66d9dc7 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -486,7 +486,7 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
+ 	spin_lock_init(&the_lnet.ln_eq_wait_lock);
+ 	spin_lock_init(&the_lnet.ln_msg_resend_lock);
+ 	init_waitqueue_head(&the_lnet.ln_eq_waitq);
+-	init_waitqueue_head(&the_lnet.ln_mt_waitq);
++	init_completion(&the_lnet.ln_mt_wait_complete);
+ 	mutex_init(&the_lnet.ln_lnd_mutex);
  }
  
--/*
-- * Find any OBD device associated with this reader
-- * chlg_registered_dev_lock is held.
-- */
--static inline struct obd_device *chlg_obd_get(struct chlg_registered_dev *dev)
--{
--	return list_first_entry_or_null(&dev->ced_obds,
--					struct obd_device,
--					u.cli.cl_chg_dev_linkage);
--}
--
- /**
-  * Record prefetch thread entry point. Opens the changelog catalog and starts
-  * reading records.
-@@ -215,27 +241,28 @@ static inline struct obd_device *chlg_obd_get(struct chlg_registered_dev *dev)
- static int chlg_load(void *args)
- {
- 	struct chlg_reader_state *crs = args;
-+	struct chlg_registered_dev *ced = crs->crs_ced;
- 	struct obd_device *obd;
- 	struct llog_ctxt *ctx = NULL;
- 	struct llog_handle *llh = NULL;
- 	int rc;
- 
--	mutex_lock(&chlg_registered_dev_lock);
--	obd = chlg_obd_get(crs->crs_dev);
--	if (!obd) {
--		rc = -ENOENT;
--		goto err_out;
--	}
-+	crs->crs_last_catidx = -1;
-+	crs->crs_last_idx = 0;
-+
-+again:
-+	obd = chlg_obd_get(ced);
-+	if (!obd)
-+		return -ENODEV;
-+
-+	crs->crs_obd = obd;
-+
- 	ctx = llog_get_context(obd, LLOG_CHANGELOG_REPL_CTXT);
- 	if (!ctx) {
- 		rc = -ENOENT;
- 		goto err_out;
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 322998a..2f31f06 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -3276,8 +3276,12 @@ struct lnet_mt_event_info {
+ 			       min((unsigned int)alive_router_check_interval /
+ 					lnet_current_net_count,
+ 				   lnet_transaction_timeout / 2));
+-		wait_event_interruptible_timeout(the_lnet.ln_mt_waitq,
+-						 false, HZ * interval);
++		wait_for_completion_interruptible_timeout(&the_lnet.ln_mt_wait_complete,
++							  interval * HZ);
++		/* Must re-init the completion before testing anything,
++		 * including ln_mt_state.
++		 */
++		reinit_completion(&the_lnet.ln_mt_wait_complete);
  	}
  
--	crs->crs_last_catidx = -1;
--	crs->crs_last_idx = 0;
--
--again:
- 	rc = llog_open(NULL, ctx, &llh, NULL, CHANGELOG_CATALOG,
- 		       LLOG_OPEN_EXISTS);
- 	if (rc) {
-@@ -268,6 +295,8 @@ static int chlg_load(void *args)
- 	}
- 	if (!kthread_should_stop() && crs->crs_poll) {
- 		llog_cat_close(NULL, llh);
-+		llog_ctxt_put(ctx);
-+		class_decref(obd, "changelog", crs);
- 		schedule_timeout_interruptible(HZ);
- 		goto again;
- 	}
-@@ -275,7 +304,6 @@ static int chlg_load(void *args)
- 	crs->crs_eof = true;
+ 	/* Shutting down */
+@@ -3539,7 +3543,7 @@ void lnet_monitor_thr_stop(void)
+ 	lnet_net_unlock(LNET_LOCK_EX);
  
- err_out:
--	mutex_unlock(&chlg_registered_dev_lock);
- 	if (rc < 0)
- 		crs->crs_err = rc;
+ 	/* tell the monitor thread that we're shutting down */
+-	wake_up(&the_lnet.ln_mt_waitq);
++	complete(&the_lnet.ln_mt_wait_complete);
  
-@@ -287,6 +315,8 @@ static int chlg_load(void *args)
- 	if (ctx)
- 		llog_ctxt_put(ctx);
+ 	/* block until monitor thread signals that it's done */
+ 	wait_for_completion(&the_lnet.ln_mt_signal);
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index 5c39ce3..d74ff53 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -640,7 +640,7 @@
  
-+	crs->crs_obd = NULL;
-+	chlg_obd_put(ced, obd);
- 	wait_event_idle(crs->crs_waitq_prod, kthread_should_stop());
+ 	list_add_tail(&msg->msg_list, the_lnet.ln_mt_resendqs[msg->msg_tx_cpt]);
+ 
+-	wake_up(&the_lnet.ln_mt_waitq);
++	complete(&the_lnet.ln_mt_wait_complete);
+ }
+ 
+ int
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index bc9494d..7246eea 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -674,7 +674,7 @@ static void lnet_shuffle_seed(void)
+ 		kfree(rnet);
+ 
+ 	/* kick start the monitor thread to handle the added route */
+-	wake_up(&the_lnet.ln_mt_waitq);
++	complete(&the_lnet.ln_mt_wait_complete);
  
  	return rc;
-@@ -454,19 +484,19 @@ static int chlg_clear(struct chlg_reader_state *crs, u32 reader, u64 record)
- 		.cs_recno = record,
- 		.cs_id    = reader
- 	};
--	int ret;
-+	int rc;
- 
--	mutex_lock(&chlg_registered_dev_lock);
--	obd = chlg_obd_get(crs->crs_dev);
-+	obd = chlg_obd_get(crs->crs_ced);
- 	if (!obd)
--		ret = -ENOENT;
--	else
--		ret = obd_set_info_async(NULL, obd->obd_self_export,
--					 strlen(KEY_CHANGELOG_CLEAR),
--					 KEY_CHANGELOG_CLEAR, sizeof(cs),
--					 &cs, NULL);
--	mutex_unlock(&chlg_registered_dev_lock);
--	return ret;
-+		return -ENODEV;
-+
-+	rc = obd_set_info_async(NULL, obd->obd_self_export,
-+				strlen(KEY_CHANGELOG_CLEAR),
-+				KEY_CHANGELOG_CLEAR, sizeof(cs),
-+				&cs, NULL);
-+	chlg_obd_put(crs->crs_ced, obd);
-+
-+	return rc;
  }
- 
- /** Maximum changelog control command size */
-@@ -540,7 +570,8 @@ static int chlg_open(struct inode *inode, struct file *file)
- 	if (!crs)
- 		return -ENOMEM;
- 
--	crs->crs_dev = dev;
-+	kref_get(&dev->ced_refs);
-+	crs->crs_ced = dev;
- 	crs->crs_err = false;
- 	crs->crs_eof = false;
- 
-@@ -564,6 +595,7 @@ static int chlg_open(struct inode *inode, struct file *file)
+@@ -1419,7 +1419,7 @@ bool lnet_router_checker_active(void)
+ 	lnet_net_lock(LNET_LOCK_EX);
+ 	the_lnet.ln_routing = 1;
+ 	lnet_net_unlock(LNET_LOCK_EX);
+-	wake_up(&the_lnet.ln_mt_waitq);
++	complete(&the_lnet.ln_mt_wait_complete);
  	return 0;
  
- err_crs:
-+	kref_put(&dev->ced_refs, chlg_dev_clear);
- 	kfree(crs);
- 	return rc;
- }
-@@ -589,6 +621,7 @@ static int chlg_release(struct inode *inode, struct file *file)
- 	list_for_each_entry_safe(rec, tmp, &crs->crs_rec_queue, enq_linkage)
- 		enq_record_delete(rec);
- 
-+	kref_put(&crs->crs_ced->ced_refs, chlg_dev_clear);
- 	kfree(crs);
- 	return rc;
- }
-@@ -763,20 +796,6 @@ int mdc_changelog_cdev_init(struct obd_device *obd)
- }
- 
- /**
-- * Deregister a changelog character device whose refcount has reached zero.
-- */
--static void chlg_dev_clear(struct kref *kref)
--{
--	struct chlg_registered_dev *entry = container_of(kref,
--							 struct chlg_registered_dev,
--							 ced_refs);
--	LASSERT(mutex_is_locked(&chlg_registered_dev_lock));
--	list_del(&entry->ced_link);
--	misc_deregister(&entry->ced_misc);
--	kfree(entry);
--}
--
--/**
-  * Release OBD, decrease reference count of the corresponding changelog device.
-  */
- void mdc_changelog_cdev_finish(struct obd_device *obd)
+ failed:
 -- 
 1.8.3.1
