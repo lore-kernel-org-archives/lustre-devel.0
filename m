@@ -1,163 +1,191 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:12 -0500
-Subject: [lustre-devel] [PATCH 504/622] lustre: flr: avoid reading unhealthy
- mirror
+Date: Thu, 27 Feb 2020 16:11:30 -0500
+Subject: [lustre-devel] [PATCH 222/622] lustre: obd: use ldo_process_config
+ for mdc and osc layer
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-505-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-223-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Bobi Jam <bobijam@whamcloud.com>
+Both the mdc and osc layer use the lu_device infrastructure but
+we don't use ldo_process_config() which is preferred over the
+currently used obd_process_config() handling. Migrate to the
+lu_device ldo_process_config() for both mdc and osc layer.
 
-* Fix an error in lov_io_mirror_init() which would wait unnecessarily
-  if we're retrying the last mirror of the file.
-
-* In osc_io_iter_init() we'd check its OSC import status so that the
-  read path can quickly switch another mirror.
-  sanity-flr test_33b is added to test this case.
-
-* And with all mirrors have been tried, we'd turn off the quick switch
-  so that when all mirrors contain bad OSTs, the read will still try
-  its best to get partial data from a component before trying another
-  mirror.
-  sanity-flr test_33c is added to test this case.
-
-Fixes: 4b102da53ad ("lustre: ptlrpc: idle connections can disconnect")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12328
-Lustre-commit: 39da3c06275e ("LU-12328 flr: avoid reading unhealthy mirror")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34952
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9855
+Lustre-commit: d12959c69fd4 ("LU-9855 obd: use ldo_process_config for mdc and osc layer")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/34106
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h |  8 +++++++-
- fs/lustre/lov/lov_io.c        | 25 ++++++++++++++++---------
- fs/lustre/osc/osc_io.c        | 16 +++++++++++++++-
- 3 files changed, 38 insertions(+), 11 deletions(-)
+ fs/lustre/mdc/mdc_dev.c      | 11 +++++++----
+ fs/lustre/mdc/mdc_internal.h |  1 -
+ fs/lustre/mdc/mdc_request.c  | 11 -----------
+ fs/lustre/osc/osc_dev.c      | 11 +++++++----
+ fs/lustre/osc/osc_request.c  | 14 --------------
+ 5 files changed, 14 insertions(+), 34 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index 75ece62..c3376a4 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -1906,7 +1906,13 @@ struct cl_io {
- 	/**
- 	 * Set if IO is triggered by async workqueue readahead.
- 	 */
--				ci_async_readahead:1;
-+				ci_async_readahead:1,
-+	/**
-+	 * Set if we've tried all mirrors for this read IO, if it's not set,
-+	 * the read IO will check to-be-read OSCs' status, and make fast-switch
-+	 * another mirror if some of the OSTs are not healthy.
-+	 */
-+				ci_tried_all_mirrors:1;
- 	/**
- 	 * How many times the read has retried before this one.
- 	 * Set by the top level and consumed by the LOV.
-diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
-index 56e4a982..971f9ba 100644
---- a/fs/lustre/lov/lov_io.c
-+++ b/fs/lustre/lov/lov_io.c
-@@ -140,6 +140,7 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
- 	sub_io->ci_lock_no_expand = io->ci_lock_no_expand;
- 	sub_io->ci_ndelay = io->ci_ndelay;
- 	sub_io->ci_layout_version = io->ci_layout_version;
-+	sub_io->ci_tried_all_mirrors = io->ci_tried_all_mirrors;
+diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
+index 306b917..f23f6cf 100644
+--- a/fs/lustre/mdc/mdc_dev.c
++++ b/fs/lustre/mdc/mdc_dev.c
+@@ -35,6 +35,7 @@
  
- 	rc = cl_io_sub_init(sub->sub_env, sub_io, io->ci_type, sub_obj);
- 	if (rc < 0)
-@@ -395,13 +396,13 @@ static int lov_io_mirror_init(struct lov_io *lio, struct lov_object *obj,
- 				found = true;
- 				break;
- 			}
--		}
--
-+		} /* each component of the mirror */
- 		if (found) {
- 			index = (index + i) % comp->lo_mirror_count;
- 			break;
- 		}
--	}
-+	} /* each mirror */
-+
- 	if (i == comp->lo_mirror_count) {
- 		CERROR(DFID ": failed to find a component covering I/O region at %llu\n",
- 		       PFID(lu_object_fid(lov2lu(obj))), lio->lis_pos);
-@@ -423,16 +424,21 @@ static int lov_io_mirror_init(struct lov_io *lio, struct lov_object *obj,
- 	 * of this client has been partitioned. We should relinquish CPU for
- 	 * a while before trying again.
- 	 */
--	++io->ci_ndelay_tried;
--	if (io->ci_ndelay && io->ci_ndelay_tried >= comp->lo_mirror_count) {
--		set_current_state(TASK_INTERRUPTIBLE);
--		schedule_timeout(msecs_to_jiffies(MSEC_PER_SEC)); /* 10ms */
-+	if (io->ci_ndelay && io->ci_ndelay_tried > 0 &&
-+	    (io->ci_ndelay_tried % comp->lo_mirror_count == 0)) {
-+		schedule_timeout_interruptible(HZ / 100 + 1); /* 10ms */
- 		if (signal_pending(current))
- 			return -EINTR;
+ #include <obd_class.h>
+ #include <lustre_osc.h>
++#include <uapi/linux/lustre/lustre_param.h>
  
--		/* reset retry counter */
--		io->ci_ndelay_tried = 1;
-+		/**
-+		 * we'd set ci_tried_all_mirrors to turn off fast mirror
-+		 * switching for read after we've tried all mirrors several
-+		 * rounds.
-+		 */
-+		io->ci_tried_all_mirrors = io->ci_ndelay_tried %
-+					   (comp->lo_mirror_count * 4) == 0;
- 	}
-+	++io->ci_ndelay_tried;
+ #include "mdc_internal.h"
  
- 	CDEBUG(D_VFSTRACE, "use %sdelayed RPC state for this IO\n",
- 	       io->ci_ndelay ? "non-" : "");
-@@ -668,6 +674,7 @@ static void lov_io_sub_inherit(struct lov_io_sub *sub, struct lov_io *lio,
- 	case CIT_READ:
- 	case CIT_WRITE: {
- 		io->u.ci_wr.wr_sync = cl_io_is_sync_write(parent);
-+		io->ci_tried_all_mirrors = parent->ci_tried_all_mirrors;
- 		if (cl_io_is_append(parent)) {
- 			io->u.ci_wr.wr_append = 1;
- 		} else {
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index f340266..1ff2df2 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -368,6 +368,13 @@ int osc_io_commit_async(const struct lu_env *env,
+@@ -1422,15 +1423,17 @@ struct lu_object *mdc_object_alloc(const struct lu_env *env,
+ 	return obj;
  }
- EXPORT_SYMBOL(osc_io_commit_async);
  
-+static bool osc_import_not_healthy(struct obd_import *imp)
-+{
-+	return imp->imp_invalid || imp->imp_deactive ||
-+	       !(imp->imp_state == LUSTRE_IMP_FULL ||
-+		 imp->imp_state == LUSTRE_IMP_IDLE);
-+}
-+
- int osc_io_iter_init(const struct lu_env *env, const struct cl_io_slice *ios)
+-static int mdc_cl_process_config(const struct lu_env *env,
+-				 struct lu_device *d, struct lustre_cfg *cfg)
++static int mdc_process_config(const struct lu_env *env, struct lu_device *d,
++			      struct lustre_cfg *cfg)
  {
- 	struct osc_object *osc = cl2osc(ios->cis_obj);
-@@ -376,7 +383,14 @@ int osc_io_iter_init(const struct lu_env *env, const struct cl_io_slice *ios)
- 	int rc = -EIO;
+-	return mdc_process_config(d->ld_obd, 0, cfg);
++	size_t count  = class_modify_config(cfg, PARAM_MDC,
++					    &d->ld_obd->obd_kset.kobj);
++	return count > 0 ? 0 : count;
+ }
  
- 	spin_lock(&imp->imp_lock);
--	if (likely(!imp->imp_invalid)) {
-+	/**
-+	 * check whether this OSC device is available for non-delay read,
-+	 * fast switching mirror if we haven't tried all mirrors.
-+	 */
-+	if (ios->cis_io->ci_type == CIT_READ && ios->cis_io->ci_ndelay &&
-+	    !ios->cis_io->ci_tried_all_mirrors && osc_import_not_healthy(imp)) {
-+		rc = -EWOULDBLOCK;
-+	} else if (likely(!imp->imp_invalid)) {
- 		atomic_inc(&osc->oo_nr_ios);
- 		oio->oi_is_active = 1;
- 		rc = 0;
+ const struct lu_device_operations mdc_lu_ops = {
+ 	.ldo_object_alloc	= mdc_object_alloc,
+-	.ldo_process_config	= mdc_cl_process_config,
++	.ldo_process_config	= mdc_process_config,
+ 	.ldo_recovery_complete	= NULL,
+ };
+ 
+diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
+index 7a6ec81..a5fe164 100644
+--- a/fs/lustre/mdc/mdc_internal.h
++++ b/fs/lustre/mdc/mdc_internal.h
+@@ -93,7 +93,6 @@ int mdc_resource_get_unused(struct obd_export *exp, const struct lu_fid *fid,
+ int mdc_fid_alloc(const struct lu_env *env, struct obd_export *exp,
+ 		  struct lu_fid *fid, struct md_op_data *op_data);
+ int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg);
+-int mdc_process_config(struct obd_device *obd, u32 len, void *buf);
+ 
+ struct obd_client_handle;
+ 
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index 4711288..c08a6ee 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -51,7 +51,6 @@
+ #include <lustre_kernelcomm.h>
+ #include <lustre_lmv.h>
+ #include <lustre_log.h>
+-#include <uapi/linux/lustre/lustre_param.h>
+ #include <lustre_swab.h>
+ #include <obd_class.h>
+ #include <lustre_osc.h>
+@@ -2743,15 +2742,6 @@ static int mdc_cleanup(struct obd_device *obd)
+ 	return osc_cleanup_common(obd);
+ }
+ 
+-int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
+-{
+-	struct lustre_cfg *lcfg = buf;
+-	size_t count  = class_modify_config(lcfg, PARAM_MDC,
+-					    &obd->obd_kset.kobj);
+-
+-	return count > 0 ? 0 : count;
+-}
+-
+ static const struct obd_ops mdc_obd_ops = {
+ 	.owner			= THIS_MODULE,
+ 	.setup			= mdc_setup,
+@@ -2770,7 +2760,6 @@ int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
+ 	.fid_alloc		= mdc_fid_alloc,
+ 	.import_event		= mdc_import_event,
+ 	.get_info		= mdc_get_info,
+-	.process_config		= mdc_process_config,
+ 	.get_uuid		= mdc_get_uuid,
+ 	.quotactl		= mdc_quotactl,
+ };
+diff --git a/fs/lustre/osc/osc_dev.c b/fs/lustre/osc/osc_dev.c
+index b8bf75a..6469973 100644
+--- a/fs/lustre/osc/osc_dev.c
++++ b/fs/lustre/osc/osc_dev.c
+@@ -40,6 +40,7 @@
+ /* class_name2obd() */
+ #include <obd_class.h>
+ #include <lustre_osc.h>
++#include <uapi/linux/lustre/lustre_param.h>
+ 
+ #include "osc_internal.h"
+ 
+@@ -161,15 +162,17 @@ struct lu_context_key osc_session_key = {
+ /* type constructor/destructor: osc_type_{init,fini,start,stop}(). */
+ LU_TYPE_INIT_FINI(osc, &osc_key, &osc_session_key);
+ 
+-static int osc_cl_process_config(const struct lu_env *env,
+-				 struct lu_device *d, struct lustre_cfg *cfg)
++static int osc_process_config(const struct lu_env *env, struct lu_device *d,
++			      struct lustre_cfg *cfg)
+ {
+-	return osc_process_config_base(d->ld_obd, cfg);
++	ssize_t count  = class_modify_config(cfg, PARAM_OSC,
++					     &d->ld_obd->obd_kset.kobj);
++	return count > 0 ? 0 : count;
+ }
+ 
+ static const struct lu_device_operations osc_lu_ops = {
+ 	.ldo_object_alloc	= osc_object_alloc,
+-	.ldo_process_config	= osc_cl_process_config,
++	.ldo_process_config	= osc_process_config,
+ 	.ldo_recovery_complete	= NULL
+ };
+ 
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 6ce22c3..c55d5a9 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -47,7 +47,6 @@
+ #include <lprocfs_status.h>
+ #include <uapi/linux/lustre/lustre_ioctl.h>
+ #include <lustre_obdo.h>
+-#include <uapi/linux/lustre/lustre_param.h>
+ #include <lustre_fid.h>
+ #include <obd_class.h>
+ #include <obd.h>
+@@ -3348,18 +3347,6 @@ int osc_cleanup_common(struct obd_device *obd)
+ }
+ EXPORT_SYMBOL(osc_cleanup_common);
+ 
+-int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg)
+-{
+-	ssize_t count  = class_modify_config(lcfg, PARAM_OSC,
+-					     &obd->obd_kset.kobj);
+-	return count > 0 ? 0 : count;
+-}
+-
+-static int osc_process_config(struct obd_device *obd, u32 len, void *buf)
+-{
+-	return osc_process_config_base(obd, buf);
+-}
+-
+ static const struct obd_ops osc_obd_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.setup		= osc_setup,
+@@ -3379,7 +3366,6 @@ static int osc_process_config(struct obd_device *obd, u32 len, void *buf)
+ 	.iocontrol	= osc_iocontrol,
+ 	.set_info_async	= osc_set_info_async,
+ 	.import_event	= osc_import_event,
+-	.process_config	= osc_process_config,
+ 	.quotactl	= osc_quotactl,
+ };
+ 
 -- 
 1.8.3.1
