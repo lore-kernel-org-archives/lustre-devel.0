@@ -1,199 +1,164 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:05 -0500
-Subject: [lustre-devel] [PATCH 137/622] lustre: ptlrpc: Make CPU binding
- switchable
+Date: Thu, 27 Feb 2020 16:10:16 -0500
+Subject: [lustre-devel] [PATCH 148/622] lustre: llite: optimize read on open
+ pages
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-138-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-149-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: Jinshan Xiong <jinshan.xiong@uber.com>
 
-LU-6325 added CPT binding to the ptlrpc worker threads on
-the servers.  This is often desirable, especially where
-NUMA latencies are high, but it is not always beneficial.
+Current read-on-open implementation does allocate cl_page after data
+are piggied back by open request, which is expensive and not
+necessary.
 
-If NUMA latencies are low, there is little benefit, and
-sometimes it can be quite costly:
+This patch improves the case by just adding the pages into page cache.
+As long as those pages will be discarded at lock revocation, there
+should be no concerns.
 
-In particular, if NID-CPT hashing with routers leads to an
-unbalanced workload by CPT, it is easy to end up in a
-situation where the CPUs in one CPT are maxed out but
-others are idle.
-
-To this end, we add module parameters to allow disabling
-the strict binding behavior, allowing threads to use all
-CPUs.
-
-This is complicated a bit because we still want separate
-service partitions - The existing "no affinity" behavior
-places all service threads in a single service partition,
-which gives only one queue for service wakeups.
-
-So we separate binding behavior from CPT association,
-allowing us to keep multiple service partitions where
-desired.
-
-Module parameters are added to ldlm, mdt, and ost, of the
-form "servicename_cpu_bind", such as "mds_rdpg_cpu_bind".
-
-Setting them to "0" will disable the strict CPU binding
-behavior for the threads in that service.
-
-Parameters were not added for certain minor services which
-do not have any CPT affinity/binding behavior today.  (This
-appears to be because they are not expected to be
-performance sensitive.)
-
-cray-bug-id: LUS-6518
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11454
-Lustre-commit: 3eb7a1dfc3e7 ("LU-11454 ptlrpc: Make CPU binding switchable")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33262
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11427
+Lustre-commit: 02e766f5ed95 ("LU-11427 llite: optimize read on open pages")
+Signed-off-by: Jinshan Xiong <jinshan.xiong@uber.com>
+Reviewed-on: https://review.whamcloud.com/33234
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Chris Horn <hornc@cray.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h | 12 ++++++++----
- fs/lustre/ldlm/ldlm_lockd.c    |  8 +++++++-
- fs/lustre/ptlrpc/service.c     | 25 +++++++++++++++----------
- 3 files changed, 30 insertions(+), 15 deletions(-)
+ fs/lustre/llite/file.c  | 58 +++++--------------------------------------------
+ fs/lustre/llite/namei.c |  7 +++++-
+ 2 files changed, 11 insertions(+), 54 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index cbd524c..81a6ac9 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -1480,14 +1480,16 @@ struct ptlrpc_service {
- 	int				srv_watchdog_factor;
- 	/** under unregister_service */
- 	unsigned			srv_is_stopping:1;
-+	/** Whether or not to restrict service threads to CPUs in this CPT */
-+	unsigned			srv_cpt_bind:1;
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index a46f5d3..2fd906f 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -420,14 +420,10 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 	struct page *vmpage;
+ 	struct niobuf_remote *rnb;
+ 	char *data;
+-	struct lu_env *env;
+-	struct cl_io *io;
+-	u16 refcheck;
+ 	struct lustre_handle lockh;
+ 	struct ldlm_lock *lock;
+ 	unsigned long index, start;
+ 	struct niobuf_local lnb;
+-	int rc;
+ 	bool dom_lock = false;
  
- 	/** max # request buffers */
- 	int				srv_nrqbds_max;
- 	/** max # request buffers in history per partition */
- 	int				srv_hist_nrqbds_cpt_max;
--	/** number of CPTs this service bound on */
-+	/** number of CPTs this service associated with */
- 	int				srv_ncpts;
--	/** CPTs array this service bound on */
-+	/** CPTs array this service associated with */
- 	u32				*srv_cpts;
- 	/** 2^srv_cptab_bits >= cfs_cpt_numbert(srv_cptable) */
- 	int				srv_cpt_bits;
-@@ -1934,8 +1936,8 @@ struct ptlrpc_service_thr_conf {
- 	 * other members of this structure.
- 	 */
- 	unsigned int			tc_nthrs_user;
--	/* set NUMA node affinity for service threads */
--	unsigned int			tc_cpu_affinity;
-+	/* bind service threads to only CPUs in their associated CPT */
-+	unsigned int			tc_cpu_bind;
- 	/* Tags for lu_context associated with service thread */
- 	u32				tc_ctx_tags;
- };
-@@ -1944,6 +1946,8 @@ struct ptlrpc_service_cpt_conf {
- 	struct cfs_cpt_table		*cc_cptable;
- 	/* string pattern to describe CPTs for a service */
- 	char				*cc_pattern;
-+	/* whether or not to have per-CPT service partitions */
-+	bool				cc_affinity;
- };
- 
- struct ptlrpc_service_conf {
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index b50a3f7..204b11b 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -49,6 +49,11 @@
- module_param(ldlm_num_threads, int, 0444);
- MODULE_PARM_DESC(ldlm_num_threads, "number of DLM service threads to start");
- 
-+static unsigned int ldlm_cpu_bind = 1;
-+module_param(ldlm_cpu_bind, uint, 0444);
-+MODULE_PARM_DESC(ldlm_cpu_bind,
-+		 "bind DLM service threads to particular CPU partitions");
-+
- static char *ldlm_cpts;
- module_param(ldlm_cpts, charp, 0444);
- MODULE_PARM_DESC(ldlm_cpts, "CPU partitions ldlm threads should run on");
-@@ -1006,11 +1011,12 @@ static int ldlm_setup(void)
- 			.tc_nthrs_base		= LDLM_NTHRS_BASE,
- 			.tc_nthrs_max		= LDLM_NTHRS_MAX,
- 			.tc_nthrs_user		= ldlm_num_threads,
--			.tc_cpu_affinity	= 1,
-+			.tc_cpu_bind		= ldlm_cpu_bind,
- 			.tc_ctx_tags		= LCT_MD_THREAD | LCT_DT_THREAD,
- 		},
- 		.psc_cpt		= {
- 			.cc_pattern		= ldlm_cpts,
-+			.cc_affinity		= true,
- 		},
- 		.psc_ops		= {
- 			.so_req_handler		= ldlm_callback_handler,
-diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
-index a9155b2..b94ed6a 100644
---- a/fs/lustre/ptlrpc/service.c
-+++ b/fs/lustre/ptlrpc/service.c
-@@ -573,7 +573,13 @@ struct ptlrpc_service *
- 	if (!cptable)
- 		cptable = cfs_cpt_tab;
- 
--	if (!conf->psc_thr.tc_cpu_affinity) {
-+	if (conf->psc_thr.tc_cpu_bind > 1) {
-+		CERROR("%s: Invalid cpu bind value %d, only 1 or 0 allowed\n",
-+		       conf->psc_name, conf->psc_thr.tc_cpu_bind);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (!cconf->cc_affinity) {
- 		ncpts = 1;
- 	} else {
- 		ncpts = cfs_cpt_number(cptable);
-@@ -611,6 +617,7 @@ struct ptlrpc_service *
- 	service->srv_cptable = cptable;
- 	service->srv_cpts = cpts;
- 	service->srv_ncpts = ncpts;
-+	service->srv_cpt_bind = conf->psc_thr.tc_cpu_bind;
- 
- 	service->srv_cpt_bits = 0; /* it's zero already, easy to read... */
- 	while ((1 << service->srv_cpt_bits) < cfs_cpt_number(cptable))
-@@ -646,7 +653,7 @@ struct ptlrpc_service *
- 	service->srv_ops = conf->psc_ops;
- 
- 	for (i = 0; i < ncpts; i++) {
--		if (!conf->psc_thr.tc_cpu_affinity)
-+		if (!cconf->cc_affinity)
- 			cpt = CFS_CPT_ANY;
- 		else
- 			cpt = cpts ? cpts[i] : i;
-@@ -2105,14 +2112,12 @@ static int ptlrpc_main(void *arg)
- 	thread->t_pid = current->pid;
- 	unshare_fs_struct();
- 
--	/* NB: we will call cfs_cpt_bind() for all threads, because we
--	 * might want to run lustre server only on a subset of system CPUs,
--	 * in that case ->scp_cpt is CFS_CPT_ANY
--	 */
--	rc = cfs_cpt_bind(svc->srv_cptable, svcpt->scp_cpt);
--	if (rc != 0) {
--		CWARN("%s: failed to bind %s on CPT %d\n",
--		      svc->srv_name, thread->t_name, svcpt->scp_cpt);
-+	if (svc->srv_cpt_bind) {
-+		rc = cfs_cpt_bind(svc->srv_cptable, svcpt->scp_cpt);
-+		if (rc != 0) {
-+			CWARN("%s: failed to bind %s on CPT %d\n",
-+			      svc->srv_name, thread->t_name, svcpt->scp_cpt);
-+		}
+ 	if (!obj)
+@@ -440,37 +436,21 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 			dom_lock = ldlm_has_dom(lock);
+ 		LDLM_LOCK_PUT(lock);
  	}
+-
+ 	if (!dom_lock)
+ 		return;
  
- 	ginfo = groups_alloc(0);
+-	env = cl_env_get(&refcheck);
+-	if (IS_ERR(env))
+-		return;
+-
+ 	if (!req_capsule_has_field(&req->rq_pill, &RMF_NIOBUF_INLINE,
+-				   RCL_SERVER)) {
+-		rc = -ENODATA;
+-		goto out_env;
+-	}
++				   RCL_SERVER))
++		return;
+ 
+ 	rnb = req_capsule_server_get(&req->rq_pill, &RMF_NIOBUF_INLINE);
+-	data = (char *)rnb + sizeof(*rnb);
+-
+-	if (!rnb || rnb->rnb_len == 0) {
+-		rc = 0;
+-		goto out_env;
+-	}
++	if (!rnb || rnb->rnb_len == 0)
++		return;
+ 
+ 	CDEBUG(D_INFO, "Get data buffer along with open, len %i, i_size %llu\n",
+ 	       rnb->rnb_len, i_size_read(inode));
+ 
+-	io = vvp_env_thread_io(env);
+-	io->ci_obj = obj;
+-	io->ci_ignore_layout = 1;
+-	rc = cl_io_init(env, io, CIT_MISC, obj);
+-	if (rc)
+-		goto out_io;
++	data = (char *)rnb + sizeof(*rnb);
+ 
+ 	lnb.lnb_file_offset = rnb->rnb_offset;
+ 	start = lnb.lnb_file_offset / PAGE_SIZE;
+@@ -478,8 +458,6 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 	LASSERT(lnb.lnb_file_offset % PAGE_SIZE == 0);
+ 	lnb.lnb_page_offset = 0;
+ 	do {
+-		struct cl_page *clp;
+-
+ 		lnb.lnb_data = data + (index << PAGE_SHIFT);
+ 		lnb.lnb_len = rnb->rnb_len - (index << PAGE_SHIFT);
+ 		if (lnb.lnb_len > PAGE_SIZE)
+@@ -495,35 +473,9 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 			      PTR_ERR(vmpage));
+ 			break;
+ 		}
+-		lock_page(vmpage);
+-		if (!vmpage->mapping) {
+-			unlock_page(vmpage);
+-			put_page(vmpage);
+-			/* page was truncated */
+-			rc = -ENODATA;
+-			goto out_io;
+-		}
+-		clp = cl_page_find(env, obj, vmpage->index, vmpage,
+-				   CPT_CACHEABLE);
+-		if (IS_ERR(clp)) {
+-			unlock_page(vmpage);
+-			put_page(vmpage);
+-			rc = PTR_ERR(clp);
+-			goto out_io;
+-		}
+-
+-		/* export page */
+-		cl_page_export(env, clp, 1);
+-		cl_page_put(env, clp);
+-		unlock_page(vmpage);
+ 		put_page(vmpage);
+ 		index++;
+ 	} while (rnb->rnb_len > (index << PAGE_SHIFT));
+-	rc = 0;
+-out_io:
+-	cl_io_fini(env, io);
+-out_env:
+-	cl_env_put(env, &refcheck);
+ }
+ 
+ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 4ac62b2..530c2df 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -185,8 +185,13 @@ int ll_dom_lock_cancel(struct inode *inode, struct ldlm_lock *lock)
+ 	int rc;
+ 	u16 refcheck;
+ 
+-	if (!lli->lli_clob)
++	if (!lli->lli_clob) {
++		/* Due to DoM read on open, there may exist pages for Lustre
++		 * regular file even though cl_object is not set up yet.
++		 */
++		truncate_inode_pages(inode->i_mapping, 0);
+ 		return 0;
++	}
+ 
+ 	env = cl_env_get(&refcheck);
+ 	if (IS_ERR(env))
 -- 
 1.8.3.1
