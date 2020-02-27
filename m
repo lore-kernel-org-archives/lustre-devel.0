@@ -1,55 +1,54 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:56 -0500
-Subject: [lustre-devel] [PATCH 308/622] lnet: libcfs: crashes with certain
- cpu part numbers
+Date: Thu, 27 Feb 2020 16:14:46 -0500
+Subject: [lustre-devel] [PATCH 418/622] lnet: Detach rspt when md_threshold
+ is infinite
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-309-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-419-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andrew Perepechko <c17827@cray.com>
+From: Chris Horn <hornc@cray.com>
 
-Due to a bug in the code, libcfs will crash if the
-number of online cpus does not divide by the number
-of cpu partitions.
+MDs for pings use the infinite threshold on MD operations.
+As such they aren't normally unlinkable as determined by
+lnet_md_unlinkable(). We can cover this case by checking whether the
+refcount is zero and threshold is LNET_MD_THRESH_INF.
 
-Based on the checks in cfs_cpt_table_create(), it
-appears that the original intent was to push the
-remaining cpus into the initial partitions.
-
-So let's do that properly.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12352
-Lustre-commit: e33e3da58972 ("LU-12352 libcfs: crashes with certain cpu part numbers")
-Signed-off-by: Andrew Perepechko <c17827@cray.com>
-Reviewed-by: Alexander Boyko <c17825@cray.com>
-Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
-Cray-bug-id: LUS-6455
-Reviewed-on: https://review.whamcloud.com/34991
-Reviewed-by: Gu Zheng <gzheng@ddn.com>
+Cray-bug-id: LUS-7366
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12441
+Lustre-commit: ebbf909a1c2d ("LU-12441 lnet: Detach rspt when md_threshold is infinite")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/35452
 Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/libcfs/libcfs_cpu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ net/lnet/lnet/lib-msg.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/net/lnet/libcfs/libcfs_cpu.c b/net/lnet/libcfs/libcfs_cpu.c
-index 80533c2..20ca15a 100644
---- a/net/lnet/libcfs/libcfs_cpu.c
-+++ b/net/lnet/libcfs/libcfs_cpu.c
-@@ -913,7 +913,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 			int ncpu = cpumask_weight(part->cpt_cpumask);
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index b70a6c9..805d5b9 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -825,10 +825,12 @@
+ 		lnet_eq_enqueue_event(md->md_eq, &msg->msg_ev);
+ 	}
  
- 			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask,
--						  num - ncpu);
-+						  (rem > 0) + num - ncpu);
- 			if (rc < 0) {
- 				rc = -EINVAL;
- 				goto failed_mask;
+-	if (unlink) {
++	if (unlink || (md->md_refcount == 0 &&
++		       md->md_threshold == LNET_MD_THRESH_INF))
+ 		lnet_detach_rsp_tracker(md, cpt);
++
++	if (unlink)
+ 		lnet_md_unlink(md);
+-	}
+ 
+ 	msg->msg_md = NULL;
+ }
 -- 
 1.8.3.1
