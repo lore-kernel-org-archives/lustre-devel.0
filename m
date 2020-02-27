@@ -1,124 +1,133 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:04 -0500
-Subject: [lustre-devel] [PATCH 136/622] lustre: osc: clarify short_io_bytes
- is maximum value
+Date: Thu, 27 Feb 2020 16:10:29 -0500
+Subject: [lustre-devel] [PATCH 161/622] lustre: obd: remove portals handle
+ from OBD import
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-137-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-162-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-Clarify in the code that the "osc.*.short_io_bytes" parameter is
-the maximum IO size to pack into request/reply not the minimum.
+OBD imports are never looked up using the portals handle (imp_handle)
+they contain, so remove it. Also remove the unused functions
+class_conn2obd() and class_conn2cliimp().
 
-Allow short_io to be disabled completely if it is set to zero.
-
-It would be nice to also change the name of the /sysfs functions
-in a similar manner but that also changes the /sysfs tunable name
-(via LUSTRE_RW_ATTR() macro) and has compatibility implications
-for sites that may have changed this value.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1757
-Lustre-commit: b90812a674f6 ("LU-1757 osc: clarify short_io_bytes is maximum value")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33173
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11445
+Lustre-commit: 59729e4c0867 ("LU-11445 obd: remove portals handle from OBD import")
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33250
 Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd.h             | 2 +-
- fs/lustre/ldlm/ldlm_lib.c           | 2 ++
- fs/lustre/obdclass/lprocfs_status.c | 6 +++---
- fs/lustre/osc/osc_request.c         | 7 +++----
- 4 files changed, 9 insertions(+), 8 deletions(-)
+ fs/lustre/include/lustre_import.h | 10 +++++++---
+ fs/lustre/obdclass/genops.c       | 21 +++------------------
+ 2 files changed, 10 insertions(+), 21 deletions(-)
 
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index 7cf9745..2587136 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -252,7 +252,7 @@ struct client_obd {
- 	atomic_t		cl_pending_r_pages;
- 	u32			cl_max_pages_per_rpc;
- 	u32			cl_max_rpcs_in_flight;
--	u32			cl_short_io_bytes;
-+	u32			cl_max_short_io_bytes;
- 	struct obd_histogram    cl_read_rpc_hist;
- 	struct obd_histogram    cl_write_rpc_hist;
- 	struct obd_histogram    cl_read_page_hist;
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index 838ddb3..5fe5711 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -374,6 +374,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	 */
- 	cli->cl_max_pages_per_rpc = PTLRPC_MAX_BRW_PAGES;
+diff --git a/fs/lustre/include/lustre_import.h b/fs/lustre/include/lustre_import.h
+index 1fd6246..f16d621 100644
+--- a/fs/lustre/include/lustre_import.h
++++ b/fs/lustre/include/lustre_import.h
+@@ -43,9 +43,15 @@
+  *
+  * @{
+  */
++#include <linux/atomic.h>
++#include <linux/list.h>
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
++#include <linux/time.h>
++#include <linux/types.h>
++#include <linux/workqueue.h>
  
-+	cli->cl_max_short_io_bytes = OBD_MAX_SHORT_IO_BYTES;
-+
- 	/*
- 	 * set cl_chunkbits default value to PAGE_CACHE_SHIFT,
- 	 * it will be updated at OSC connection time.
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 747baff..b3dbe85 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -1896,7 +1896,7 @@ ssize_t short_io_bytes_show(struct kobject *kobj, struct attribute *attr,
- 	int rc;
+ #include <linux/libcfs/libcfs.h>
+-#include <lustre_handles.h>
+ #include <uapi/linux/lustre/lustre_idl.h>
  
- 	spin_lock(&cli->cl_loi_list_lock);
--	rc = sprintf(buf, "%d\n", cli->cl_short_io_bytes);
-+	rc = sprintf(buf, "%d\n", cli->cl_max_short_io_bytes);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 	return rc;
+ /**
+@@ -154,8 +160,6 @@ struct import_state_hist {
+  * Imports are representing client-side view to remote target.
+  */
+ struct obd_import {
+-	/** Local handle (== id) for this import. */
+-	struct portals_handle		imp_handle;
+ 	/** Reference counter */
+ 	atomic_t			imp_refcount;
+ 	struct lustre_handle		imp_dlm_handle; /* client's ldlm export */
+diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
+index 4465dd9..2254943 100644
+--- a/fs/lustre/obdclass/genops.c
++++ b/fs/lustre/obdclass/genops.c
+@@ -863,7 +863,6 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
+ 
+ exit_unlock:
+ 	spin_unlock(&obd->obd_dev_lock);
+-	class_handle_unhash(&export->exp_handle);
+ 	obd_destroy_export(export);
+ 	kfree(export);
+ 	return ERR_PTR(rc);
+@@ -903,7 +902,7 @@ void class_unlink_export(struct obd_export *exp)
  }
-@@ -1922,7 +1922,7 @@ ssize_t short_io_bytes_store(struct kobject *kobj, struct attribute *attr,
- 	if (rc)
- 		goto out;
  
--	if (val > OBD_MAX_SHORT_IO_BYTES || val < MIN_SHORT_IO_BYTES) {
-+	if (val && (val < MIN_SHORT_IO_BYTES || val > OBD_MAX_SHORT_IO_BYTES)) {
- 		rc = -ERANGE;
- 		goto out;
- 	}
-@@ -1933,7 +1933,7 @@ ssize_t short_io_bytes_store(struct kobject *kobj, struct attribute *attr,
- 	if (val > (cli->cl_max_pages_per_rpc << PAGE_SHIFT))
- 		rc = -ERANGE;
- 	else
--		cli->cl_short_io_bytes = val;
-+		cli->cl_max_short_io_bytes = val;
- 	spin_unlock(&cli->cl_loi_list_lock);
+ /* Import management functions */
+-static void class_import_destroy(struct obd_import *imp)
++static void obd_zombie_import_free(struct obd_import *imp)
+ {
+ 	struct obd_import_conn *imp_conn;
  
- out:
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index e968360..4524a98 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -1321,9 +1321,9 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 	for (i = 0; i < page_count; i++)
- 		short_io_size += pga[i]->count;
+@@ -924,19 +923,9 @@ static void class_import_destroy(struct obd_import *imp)
  
--	/* Check if we can do a short io. */
--	if (!(short_io_size <= cli->cl_short_io_bytes && niocount == 1 &&
--	    imp_connect_shortio(cli->cl_import)))
-+	/* Check if read/write is small enough to be a short io. */
-+	if (short_io_size > cli->cl_max_short_io_bytes || niocount > 1 ||
-+	    !imp_connect_shortio(cli->cl_import))
- 		short_io_size = 0;
+ 	LASSERT(!imp->imp_sec);
+ 	class_decref(imp->imp_obd, "import", imp);
+-	OBD_FREE_RCU(imp, sizeof(*imp), &imp->imp_handle);
++	kfree(imp);
+ }
  
- 	req_capsule_set_size(pill, &RMF_SHORT_IO, RCL_CLIENT,
-@@ -1762,7 +1762,6 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 			CERROR("Unexpected +ve rc %d\n", rc);
- 			return -EPROTO;
- 		}
--		LASSERT(req->rq_bulk->bd_nob == aa->aa_requested_nob);
+-static void import_handle_addref(void *import)
+-{
+-	class_import_get(import);
+-}
+-
+-static struct portals_handle_ops import_handle_ops = {
+-	.hop_addref	= import_handle_addref,
+-	.hop_free	= NULL,
+-};
+-
+ struct obd_import *class_import_get(struct obd_import *import)
+ {
+ 	atomic_inc(&import->imp_refcount);
+@@ -985,7 +974,7 @@ static void obd_zombie_imp_cull(struct work_struct *ws)
+ 	struct obd_import *import = container_of(ws, struct obd_import,
+ 						 imp_zombie_work);
  
- 		if (req->rq_bulk &&
- 		    sptlrpc_cli_unwrap_bulk_write(req, req->rq_bulk))
+-	class_import_destroy(import);
++	obd_zombie_import_free(import);
+ }
+ 
+ struct obd_import *class_new_import(struct obd_device *obd)
+@@ -1018,8 +1007,6 @@ struct obd_import *class_new_import(struct obd_device *obd)
+ 	atomic_set(&imp->imp_replay_inflight, 0);
+ 	atomic_set(&imp->imp_inval_count, 0);
+ 	INIT_LIST_HEAD(&imp->imp_conn_list);
+-	INIT_LIST_HEAD_RCU(&imp->imp_handle.h_link);
+-	class_handle_hash(&imp->imp_handle, &import_handle_ops);
+ 	init_imp_at(&imp->imp_at);
+ 
+ 	/* the default magic is V2, will be used in connect RPC, and
+@@ -1036,8 +1023,6 @@ void class_destroy_import(struct obd_import *import)
+ 	LASSERT(import);
+ 	LASSERT(import != LP_POISON);
+ 
+-	class_handle_unhash(&import->imp_handle);
+-
+ 	spin_lock(&import->imp_lock);
+ 	import->imp_generation++;
+ 	spin_unlock(&import->imp_lock);
 -- 
 1.8.3.1
