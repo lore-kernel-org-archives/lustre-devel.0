@@ -1,92 +1,80 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:36 -0500
-Subject: [lustre-devel] [PATCH 048/622] lustre: ldlm: fix for l_lru usage
+Date: Thu, 27 Feb 2020 16:08:37 -0500
+Subject: [lustre-devel] [PATCH 049/622] lustre: lov: Move lov_tgts_kobj init
+ to lov_setup
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-49-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-50-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Yang Sheng <ys@whamcloud.com>
+From: Oleg Drokin <green@whamcloud.com>
 
-Fixes for lock convert code to prevent false assertion and
-busy locks in LRU:
-- ensure no l_readers and l_writers when add lock to LRU after
-  convert.
-- don't verify l_lru without ns_lock.
+and free it in lov_cleanup.
+This looks like a more robust solution vs doint it in lov_putref
+esp. since we know refcount there crosses 0 repeatedly, confusing
+things.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11003
-Lustre-commit: 2a77dd3bee76 ("LU-11003 ldlm: fix for l_lru usage")
-Signed-off-by: Yang Sheng <ys@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32309
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Mikhal Pershin <mpershin@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11015
+Lustre-commit: 313ac16698db ("LU-11015 lov: Move lov_tgts_kobj init to lov_setup")
+Signed-off-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32367
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_inodebits.c |  1 -
- fs/lustre/ldlm/ldlm_request.c   | 19 +++++++++++--------
- 2 files changed, 11 insertions(+), 9 deletions(-)
+ fs/lustre/lov/lov_obd.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_inodebits.c b/fs/lustre/ldlm/ldlm_inodebits.c
-index e74928e..ddbf8d4 100644
---- a/fs/lustre/ldlm/ldlm_inodebits.c
-+++ b/fs/lustre/ldlm/ldlm_inodebits.c
-@@ -171,7 +171,6 @@ int ldlm_cli_dropbits(struct ldlm_lock *lock, u64 drop_bits)
- 		ldlm_set_cbpending(lock);
- 		ldlm_set_bl_ast(lock);
- 		unlock_res_and_lock(lock);
--		LASSERT(list_empty(&lock->l_lru));
- 		goto exit;
- 	}
- 
-diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
-index 67c23fc..5833f59 100644
---- a/fs/lustre/ldlm/ldlm_request.c
-+++ b/fs/lustre/ldlm/ldlm_request.c
-@@ -881,21 +881,25 @@ static int lock_convert_interpret(const struct lu_env *env,
- 	} else {
- 		ldlm_clear_converting(lock);
- 
--		/* Concurrent BL AST has arrived, it may cause another convert
--		 * or cancel so just exit here.
-+		/* Concurrent BL AST may arrive and cause another convert
-+		 * or cancel so just do nothing here if bl_ast is set,
-+		 * finish with convert otherwise.
- 		 */
- 		if (!ldlm_is_bl_ast(lock)) {
- 			struct ldlm_namespace *ns = ldlm_lock_to_ns(lock);
- 
- 			/* Drop cancel_bits since there are no more converts
--			 * and put lock into LRU if it is not there yet.
-+			 * and put lock into LRU if it is still not used and
-+			 * is not there yet.
- 			 */
- 			lock->l_policy_data.l_inodebits.cancel_bits = 0;
--			spin_lock(&ns->ns_lock);
--			if (!list_empty(&lock->l_lru))
-+			if (!lock->l_readers && !lock->l_writers) {
-+				spin_lock(&ns->ns_lock);
-+				/* there is check for list_empty() inside */
- 				ldlm_lock_remove_from_lru_nolock(lock);
--			ldlm_lock_add_to_lru_nolock(lock);
--			spin_unlock(&ns->ns_lock);
-+				ldlm_lock_add_to_lru_nolock(lock);
-+				spin_unlock(&ns->ns_lock);
-+			}
+diff --git a/fs/lustre/lov/lov_obd.c b/fs/lustre/lov/lov_obd.c
+index 26637bc..9449aa9 100644
+--- a/fs/lustre/lov/lov_obd.c
++++ b/fs/lustre/lov/lov_obd.c
+@@ -110,10 +110,6 @@ void lov_tgts_putref(struct obd_device *obd)
+ 			/* Disconnect */
+ 			__lov_del_obd(obd, tgt);
  		}
+-
+-		if (lov->lov_tgts_kobj)
+-			kobject_put(lov->lov_tgts_kobj);
+-
+ 	} else {
+ 		mutex_unlock(&lov->lov_lock);
  	}
- 	unlock_res_and_lock(lock);
-@@ -903,7 +907,6 @@ static int lock_convert_interpret(const struct lu_env *env,
- 	if (rc) {
- 		lock_res_and_lock(lock);
- 		if (ldlm_is_converting(lock)) {
--			LASSERT(list_empty(&lock->l_lru));
- 			ldlm_clear_converting(lock);
- 			ldlm_set_cbpending(lock);
- 			ldlm_set_bl_ast(lock);
+@@ -235,9 +231,6 @@ static int lov_connect(const struct lu_env *env,
+ 
+ 	lov_tgts_getref(obd);
+ 
+-	lov->lov_tgts_kobj = kobject_create_and_add("target_obds",
+-						    &obd->obd_kset.kobj);
+-
+ 	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+ 		tgt = lov->lov_tgts[i];
+ 		if (!tgt || obd_uuid_empty(&tgt->ltd_uuid))
+@@ -784,6 +777,9 @@ int lov_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	if (rc)
+ 		goto out_tunables;
+ 
++	lov->lov_tgts_kobj = kobject_create_and_add("target_obds",
++						    &obd->obd_kset.kobj);
++
+ 	return 0;
+ 
+ out_tunables:
+@@ -799,6 +795,11 @@ static int lov_cleanup(struct obd_device *obd)
+ 	struct lov_obd *lov = &obd->u.lov;
+ 	struct pool_desc *pool, *tmp;
+ 
++	if (lov->lov_tgts_kobj) {
++		kobject_put(lov->lov_tgts_kobj);
++		lov->lov_tgts_kobj = NULL;
++	}
++
+ 	list_for_each_entry_safe(pool, tmp, &lov->lov_pool_list, pool_list) {
+ 		/* free pool structs */
+ 		CDEBUG(D_INFO, "delete pool %p\n", pool);
 -- 
 1.8.3.1
