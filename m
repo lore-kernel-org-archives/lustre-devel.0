@@ -1,197 +1,258 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:57 -0500
-Subject: [lustre-devel] [PATCH 069/622] lustre: mdt: Lazy size on MDT
+Date: Thu, 27 Feb 2020 16:09:19 -0500
+Subject: [lustre-devel] [PATCH 091/622] lnet: Add ioctl to get health stats
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-70-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-92-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Qian Yingjin <qian@ddn.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-The design of Lazy size on MDT (LSOM) does not guarantee the
-accuracy. A file that is being opened for a long time might
-cause inaccurate LSOM for a very long time. And also eviction or
-crash of client might cause incomplete process of closing a file,
-thus might cause inaccurate LSOM. A precise LSOM could only be read
-from MDT when 1) all possible corruption and inconsistency caused
-by client eviction or client/server crash have all been fixed by
-LFSCK and 2) the file is not being opened for write.
-In the first step of implementing LSOM, LSOM will not be accessible
-from client. Instead, LSOM values can only be accessed on MDT. Thus,
-no interface or logic codes will be added on client side to enabled
-the access of LSOM from client side.
-The LSOM will be saved as an EA value on MDT.
-LSOM includes both the apparent size and also the disk usage of
-the file.
-Whenever a file is being truncated, the LSOM of the file on MDT
-will be updated.
-Whenever a client is closing a file, ll_prepare_close() will send
-the size and blocks to the MDS. The MDS will update the LSOM of
-the file if the file size or block size is being increased.
+At the time of this patch the sysfs statistics features is
+still in development. Therefore, using ioctl to get the stats
+from LNet.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9538
-Lustre-commit: f1ebf88aef21 ("LU-9538 mdt: Lazy size on MDT")
-Signed-off-by: Qian Yingjin <qian@ddn.com>
-Reviewed-on: https://review.whamcloud.com/29960
-Reviewed-by: Vitaly Fertman <c17818@cray.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9120
+Lustre-commit: 10958cac798d ("LU-9120 lnet: Add ioctl to get health stats")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32776
+Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd.h                 |  4 +++-
- fs/lustre/llite/file.c                  |  5 +++++
- fs/lustre/mdc/mdc_lib.c                 |  4 ++++
- fs/lustre/ptlrpc/wiretest.c             | 24 ++++++++++++++++++++++++
- include/uapi/linux/lustre/lustre_idl.h  |  2 ++
- include/uapi/linux/lustre/lustre_user.h | 17 +++++++++++++++--
- 6 files changed, 53 insertions(+), 3 deletions(-)
+ include/linux/lnet/lib-lnet.h          |  1 +
+ include/uapi/linux/lnet/libcfs_ioctl.h |  3 ++-
+ include/uapi/linux/lnet/lnet-dlc.h     | 31 ++++++++++++++++-----
+ net/lnet/lnet/api-ni.c                 | 49 ++++++++++++++++++++++++++++++++++
+ net/lnet/lnet/peer.c                   | 29 ++++++++++++++++----
+ 5 files changed, 101 insertions(+), 12 deletions(-)
 
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index 5656eb0..c712979 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -204,7 +204,7 @@ struct client_obd {
- 	long			cl_reserved_grant;
- 	wait_queue_head_t	cl_cache_waiters;	/* waiting for cache/grant */
- 	time64_t		cl_next_shrink_grant;	/* seconds */
--	struct list_head	cl_grant_shrink_list;	/* Timeout event list */
-+	struct list_head	cl_grant_chain;
- 	time64_t		cl_grant_shrink_interval; /* seconds */
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index bd6ea90..ba237df 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -823,6 +823,7 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
+ 			  u32 *ni_peer_tx_credits, u32 *peer_tx_credits,
+ 			  u32 *peer_rtr_credits, u32 *peer_min_rtr_credtis,
+ 			  u32 *peer_tx_qnob);
++int lnet_get_peer_ni_hstats(struct lnet_ioctl_peer_ni_hstats *stats);
  
- 	/* A chunk is an optimal size used by osc_extent to determine
-@@ -670,6 +670,8 @@ enum op_xvalid {
- 	OP_XVALID_OWNEROVERRIDE	= BIT(2),	/* 0x0004 */
- 	OP_XVALID_FLAGS		= BIT(3),	/* 0x0008 */
- 	OP_XVALID_PROJID	= BIT(4),	/* 0x0010 */
-+	OP_XVALID_LAZYSIZE	= BIT(5),	/* 0x0020 */
-+	OP_XVALID_LAZYBLOCKS	= BIT(6),	/* 0x0040 */
+ static inline bool
+ lnet_is_peer_ni_healthy_locked(struct lnet_peer_ni *lpni)
+diff --git a/include/uapi/linux/lnet/libcfs_ioctl.h b/include/uapi/linux/lnet/libcfs_ioctl.h
+index 458a634..683d508 100644
+--- a/include/uapi/linux/lnet/libcfs_ioctl.h
++++ b/include/uapi/linux/lnet/libcfs_ioctl.h
+@@ -149,6 +149,7 @@ struct libcfs_debug_ioctl_data {
+ #define IOC_LIBCFS_GET_PEER_LIST	_IOWR(IOC_LIBCFS_TYPE, 100, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_GET_LOCAL_NI_MSG_STATS  _IOWR(IOC_LIBCFS_TYPE, 101, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_SET_HEALHV		_IOWR(IOC_LIBCFS_TYPE, 102, IOCTL_CONFIG_SIZE)
+-#define IOC_LIBCFS_MAX_NR		102
++#define IOC_LIBCFS_GET_LOCAL_HSTATS	_IOWR(IOC_LIBCFS_TYPE, 103, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_MAX_NR		103
+ 
+ #endif /* __LIBCFS_IOCTL_H__ */
+diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
+index 2d3aad8..8e9850c 100644
+--- a/include/uapi/linux/lnet/lnet-dlc.h
++++ b/include/uapi/linux/lnet/lnet-dlc.h
+@@ -163,6 +163,31 @@ struct lnet_ioctl_element_stats {
+ 	__u32 iel_drop_count;
  };
  
- struct lu_context;
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index c3fb104b..837add1 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -207,6 +207,11 @@ static int ll_close_inode_openhandle(struct inode *inode,
- 		break;
- 	}
- 
-+	if (!(op_data->op_attr.ia_valid & ATTR_SIZE))
-+		op_data->op_xvalid |= OP_XVALID_LAZYSIZE;
-+	if (!(op_data->op_xvalid & OP_XVALID_BLOCKS))
-+		op_data->op_xvalid |= OP_XVALID_LAZYBLOCKS;
++enum lnet_health_type {
++	LNET_HEALTH_TYPE_LOCAL_NI = 0,
++	LNET_HEALTH_TYPE_PEER_NI,
++};
 +
- 	rc = md_close(md_exp, op_data, och->och_mod, &req);
- 	if (rc && rc != -EINTR) {
- 		CERROR("%s: inode " DFID " mdc close failed: rc = %d\n",
-diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
-index 467503c..e2f1a49 100644
---- a/fs/lustre/mdc/mdc_lib.c
-+++ b/fs/lustre/mdc/mdc_lib.c
-@@ -317,6 +317,10 @@ static inline u64 attr_pack(unsigned int ia_valid, enum op_xvalid ia_xvalid)
- 		sa_valid |= MDS_OPEN_OWNEROVERRIDE;
- 	if (ia_xvalid & OP_XVALID_PROJID)
- 		sa_valid |= MDS_ATTR_PROJID;
-+	if (ia_xvalid & OP_XVALID_LAZYSIZE)
-+		sa_valid |= MDS_ATTR_LSIZE;
-+	if (ia_xvalid & OP_XVALID_LAZYBLOCKS)
-+		sa_valid |= MDS_ATTR_LBLOCKS;
- 	return sa_valid;
++struct lnet_ioctl_local_ni_hstats {
++	struct libcfs_ioctl_hdr hlni_hdr;
++	lnet_nid_t hlni_nid;
++	__u32 hlni_local_interrupt;
++	__u32 hlni_local_dropped;
++	__u32 hlni_local_aborted;
++	__u32 hlni_local_no_route;
++	__u32 hlni_local_timeout;
++	__u32 hlni_local_error;
++	__s32 hlni_health_value;
++};
++
++struct lnet_ioctl_peer_ni_hstats {
++	__u32 hlpni_remote_dropped;
++	__u32 hlpni_remote_timeout;
++	__u32 hlpni_remote_error;
++	__u32 hlpni_network_timeout;
++	__s32 hlpni_health_value;
++};
++
+ struct lnet_ioctl_element_msg_stats {
+ 	struct libcfs_ioctl_hdr im_hdr;
+ 	__u32 im_idx;
+@@ -230,12 +255,6 @@ struct lnet_ioctl_peer_cfg {
+ 	void __user *prcfg_bulk;
+ };
+ 
+-
+-enum lnet_health_type {
+-	LNET_HEALTH_TYPE_LOCAL_NI = 0,
+-	LNET_HEALTH_TYPE_PEER_NI,
+-};
+-
+ struct lnet_ioctl_reset_health_cfg {
+ 	struct libcfs_ioctl_hdr rh_hdr;
+ 	enum lnet_health_type rh_type;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 0cadb2a..14a8f2c 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -3192,6 +3192,42 @@ u32 lnet_get_dlc_seq_locked(void)
+ 	lnet_net_unlock(LNET_LOCK_EX);
  }
  
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 7b6ea86..b4bb30d 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -258,6 +258,10 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF(MDS_ATTR_PROJID == 0x0000000000010000ULL, "found 0x%.16llxULL\n",
- 		 (long long)MDS_ATTR_PROJID);
- 
-+	LASSERTF(MDS_ATTR_LSIZE == 0x0000000000020000ULL, "found 0x%.16llxULL\n",
-+		 (long long)MDS_ATTR_LSIZE);
-+	LASSERTF(MDS_ATTR_LBLOCKS == 0x0000000000040000ULL, "found 0x%.16llxULL\n",
-+		 (long long)MDS_ATTR_LBLOCKS);
- 	LASSERTF(FLD_QUERY == 900, "found %lld\n",
- 		 (long long)FLD_QUERY);
- 	LASSERTF(FLD_FIRST_OPC == 900, "found %lld\n",
-@@ -390,6 +394,26 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF(LU_SEQ_RANGE_OST == 1, "found %lld\n",
- 		 (long long)LU_SEQ_RANGE_OST);
- 
-+	/* Checks for struct lustre_som_attrs */
-+	LASSERTF((int)sizeof(struct lustre_som_attrs) == 24, "found %lld\n",
-+		 (long long)(int)sizeof(struct lustre_som_attrs));
-+	LASSERTF((int)offsetof(struct lustre_som_attrs, lsa_valid) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct lustre_som_attrs, lsa_valid));
-+	LASSERTF((int)sizeof(((struct lustre_som_attrs *)0)->lsa_valid) == 2, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lustre_som_attrs *)0)->lsa_valid));
-+	LASSERTF((int)offsetof(struct lustre_som_attrs, lsa_reserved) == 2, "found %lld\n",
-+		 (long long)(int)offsetof(struct lustre_som_attrs, lsa_reserved));
-+	LASSERTF((int)sizeof(((struct lustre_som_attrs *)0)->lsa_reserved) == 6, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lustre_som_attrs *)0)->lsa_reserved));
-+	LASSERTF((int)offsetof(struct lustre_som_attrs, lsa_size) == 8, "found %lld\n",
-+		 (long long)(int)offsetof(struct lustre_som_attrs, lsa_size));
-+	LASSERTF((int)sizeof(((struct lustre_som_attrs *)0)->lsa_size) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lustre_som_attrs *)0)->lsa_size));
-+	LASSERTF((int)offsetof(struct lustre_som_attrs, lsa_blocks) == 16, "found %lld\n",
-+		 (long long)(int)offsetof(struct lustre_som_attrs, lsa_blocks));
-+	LASSERTF((int)sizeof(((struct lustre_som_attrs *)0)->lsa_blocks) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct lustre_som_attrs *)0)->lsa_blocks));
++static int
++lnet_get_local_ni_hstats(struct lnet_ioctl_local_ni_hstats *stats)
++{
++	int cpt, rc = 0;
++	struct lnet_ni *ni;
++	lnet_nid_t nid = stats->hlni_nid;
 +
- 	/* Checks for struct lustre_mdt_attrs */
- 	LASSERTF((int)sizeof(struct lustre_mdt_attrs) == 24, "found %lld\n",
- 		 (long long)(int)sizeof(struct lustre_mdt_attrs));
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 5db742f..9f8d65d 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1676,6 +1676,8 @@ struct mdt_rec_setattr {
- 					   */
- #define MDS_ATTR_BLOCKS		0x8000ULL  /* = 32768 */
- #define MDS_ATTR_PROJID		0x10000ULL /* = 65536 */
-+#define MDS_ATTR_LSIZE		0x20000ULL /* = 131072 */
-+#define MDS_ATTR_LBLOCKS	0x40000ULL /* = 262144 */
++	cpt = lnet_net_lock_current();
++	ni = lnet_nid2ni_locked(nid, cpt);
++
++	if (!ni) {
++		rc = -ENOENT;
++		goto unlock;
++	}
++
++	stats->hlni_local_interrupt =
++		atomic_read(&ni->ni_hstats.hlt_local_interrupt);
++	stats->hlni_local_dropped =
++		atomic_read(&ni->ni_hstats.hlt_local_dropped);
++	stats->hlni_local_aborted =
++		atomic_read(&ni->ni_hstats.hlt_local_aborted);
++	stats->hlni_local_no_route =
++		atomic_read(&ni->ni_hstats.hlt_local_no_route);
++	stats->hlni_local_timeout =
++		atomic_read(&ni->ni_hstats.hlt_local_timeout);
++	stats->hlni_local_error =
++		atomic_read(&ni->ni_hstats.hlt_local_error);
++	stats->hlni_health_value =
++		atomic_read(&ni->ni_healthv);
++
++unlock:
++	lnet_net_unlock(cpt);
++
++	return rc;
++}
++
+ /**
+  * LNet ioctl handler.
+  *
+@@ -3399,6 +3435,19 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		return rc;
+ 	}
  
- enum mds_op_bias {
- /*	MDS_CHECK_SPLIT		= 1 << 0, obsolete before 2.3.58 */
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 5956f33..b2f5b57 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -202,8 +202,19 @@ struct lustre_mdt_attrs {
-  */
- #define LMA_OLD_SIZE (sizeof(struct lustre_mdt_attrs) + 5 * sizeof(__u64))
++	case IOC_LIBCFS_GET_LOCAL_HSTATS: {
++		struct lnet_ioctl_local_ni_hstats *stats = arg;
++
++		if (stats->hlni_hdr.ioc_len < sizeof(*stats))
++			return -EINVAL;
++
++		mutex_lock(&the_lnet.ln_api_mutex);
++		rc = lnet_get_local_ni_hstats(stats);
++		mutex_unlock(&the_lnet.ln_api_mutex);
++
++		return rc;
++	}
++
+ 	case IOC_LIBCFS_ADD_PEER_NI: {
+ 		struct lnet_ioctl_peer_cfg *cfg = arg;
  
--enum {
--	LSOM_FL_VALID = 1 << 0,
-+enum lustre_som_flags {
-+	/* Unknown or no SoM data, must get size from OSTs. */
-+	SOM_FL_UNKNOWN	= 0x0000,
-+	/* Known strictly correct, FLR or DoM file (SoM guaranteed). */
-+	SOM_FL_STRICT	= 0x0001,
-+	/* Known stale - was right@some point in the past, but it is
-+	 * known (or likely) to be incorrect now (e.g. opened for write).
-+	 */
-+	SOM_FL_STALE	= 0x0002,
-+	/* Approximate, may never have been strictly correct,
-+	 * need to sync SOM data to achieve eventual consistency.
-+	 */
-+	SOM_FL_LAZY	= 0x0004,
- };
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 9dbb3bd4..4a38ca6 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -3339,6 +3339,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ {
+ 	struct lnet_ioctl_element_stats *lpni_stats;
+ 	struct lnet_ioctl_element_msg_stats *lpni_msg_stats;
++	struct lnet_ioctl_peer_ni_hstats *lpni_hstats;
+ 	struct lnet_peer_ni_credit_info *lpni_info;
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_peer *lp;
+@@ -3354,7 +3355,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 	}
  
- struct lustre_som_attrs {
-@@ -882,6 +893,8 @@ enum la_valid {
- 	LA_KILL_SGID	= 1 << 14,
- 	LA_PROJID	= 1 << 15,
- 	LA_LAYOUT_VERSION = 1 << 16,
-+	LA_LSIZE	= 1 << 17,
-+	LA_LBLOCKS	= 1 << 18,
- 	/**
- 	 * Attributes must be transmitted to OST objects
- 	 */
+ 	size = sizeof(nid) + sizeof(*lpni_info) + sizeof(*lpni_stats) +
+-	       sizeof(*lpni_msg_stats);
++	       sizeof(*lpni_msg_stats) + sizeof(*lpni_hstats);
+ 	size *= lp->lp_nnis;
+ 	if (size > cfg->prcfg_size) {
+ 		cfg->prcfg_size = size;
+@@ -3380,6 +3381,9 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 	lpni_msg_stats = kzalloc(sizeof(*lpni_msg_stats), GFP_KERNEL);
+ 	if (!lpni_msg_stats)
+ 		goto out_free_stats;
++	lpni_hstats = kzalloc(sizeof(*lpni_hstats), GFP_NOFS);
++	if (!lpni_hstats)
++		goto out_free_msg_stats;
+ 
+ 
+ 	lpni = NULL;
+@@ -3387,7 +3391,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 	while ((lpni = lnet_get_next_peer_ni_locked(lp, NULL, lpni)) != NULL) {
+ 		nid = lpni->lpni_nid;
+ 		if (copy_to_user(bulk, &nid, sizeof(nid)))
+-			goto out_free_msg_stats;
++			goto out_free_hstats;
+ 		bulk += sizeof(nid);
+ 
+ 		memset(lpni_info, 0, sizeof(*lpni_info));
+@@ -3406,7 +3410,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 		lpni_info->cr_peer_min_tx_credits = lpni->lpni_mintxcredits;
+ 		lpni_info->cr_peer_tx_qnob = lpni->lpni_txqnob;
+ 		if (copy_to_user(bulk, lpni_info, sizeof(*lpni_info)))
+-			goto out_free_msg_stats;
++			goto out_free_hstats;
+ 		bulk += sizeof(*lpni_info);
+ 
+ 		memset(lpni_stats, 0, sizeof(*lpni_stats));
+@@ -3417,15 +3421,30 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 		lpni_stats->iel_drop_count =
+ 			lnet_sum_stats(&lpni->lpni_stats, LNET_STATS_TYPE_DROP);
+ 		if (copy_to_user(bulk, lpni_stats, sizeof(*lpni_stats)))
+-			goto out_free_msg_stats;
++			goto out_free_hstats;
+ 		bulk += sizeof(*lpni_stats);
+ 		lnet_usr_translate_stats(lpni_msg_stats, &lpni->lpni_stats);
+ 		if (copy_to_user(bulk, lpni_msg_stats, sizeof(*lpni_msg_stats)))
+-			goto out_free_msg_stats;
++			goto out_free_hstats;
+ 		bulk += sizeof(*lpni_msg_stats);
++		lpni_hstats->hlpni_network_timeout =
++			atomic_read(&lpni->lpni_hstats.hlt_network_timeout);
++		lpni_hstats->hlpni_remote_dropped =
++			atomic_read(&lpni->lpni_hstats.hlt_remote_dropped);
++		lpni_hstats->hlpni_remote_timeout =
++			atomic_read(&lpni->lpni_hstats.hlt_remote_timeout);
++		lpni_hstats->hlpni_remote_error =
++			atomic_read(&lpni->lpni_hstats.hlt_remote_error);
++		lpni_hstats->hlpni_health_value =
++			atomic_read(&lpni->lpni_healthv);
++		if (copy_to_user(bulk, lpni_hstats, sizeof(*lpni_hstats)))
++			goto out_free_hstats;
++		bulk += sizeof(*lpni_hstats);
+ 	}
+ 	rc = 0;
+ 
++out_free_hstats:
++	kfree(lpni_hstats);
+ out_free_msg_stats:
+ 	kfree(lpni_msg_stats);
+ out_free_stats:
 -- 
 1.8.3.1
