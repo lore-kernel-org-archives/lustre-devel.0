@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:02 -0500
-Subject: [lustre-devel] [PATCH 554/622] lnet: change ksocknal_create_peer()
- to return pointer
+Date: Thu, 27 Feb 2020 16:17:08 -0500
+Subject: [lustre-devel] [PATCH 560/622] lustre: all: prefer sizeof(*var) for
+ alloc
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-555-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-561-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,100 +13,201 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.de>
 
-ksocknal_create_peer() currently returns an error status, and if that
-is 0, a pointer is stored in a by-reference argument.  The preferred
-pattern in the kernel is to return the pointer, or the error code
-encoded with ERR_PTR().
+The construct
+   var = kzalloc(sizeof(*var, GFP...)
+is more obviously correct than
+   var = kzalloc(sizeof(struct something), GFP...);
+and is preferred
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
-Lustre-commit: 049683bc0fc0 ("LU-12678 lnet: change ksocknal_create_peer() to return pointer")
+So convert allocations and frees that use sizeof(struct..)
+to use one of the simpler constructs.
+
+For cfs_percpt_alloc() allocations, we are allocating
+a array of pointers. so sizeof(*var[0]) is best.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
+Lustre-commit: 11f2c86650fd ("LU-9679 all: prefer sizeof(*var) for ALLOC/FREE")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/36833
-Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/36661
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/socklnd/socklnd.c | 25 ++++++++++++-------------
- 1 file changed, 12 insertions(+), 13 deletions(-)
+ fs/lustre/obdclass/lprocfs_status.c | 2 +-
+ fs/lustre/obdecho/echo_client.c     | 2 +-
+ net/lnet/klnds/o2iblnd/o2iblnd.c    | 9 +++++----
+ net/lnet/libcfs/libcfs_lock.c       | 2 +-
+ net/lnet/lnet/api-ni.c              | 7 +++----
+ net/lnet/lnet/lib-eq.c              | 2 +-
+ net/lnet/lnet/lib-ptl.c             | 2 +-
+ net/lnet/lnet/router.c              | 2 +-
+ net/lnet/selftest/rpc.c             | 2 +-
+ 9 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 79068f3..3e69d9c 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -98,9 +98,8 @@
- 	kfree(route);
- }
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 9772194..4fc35c5 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -1137,7 +1137,7 @@ struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
  
--static int
--ksocknal_create_peer(struct ksock_peer_ni **peerp, struct lnet_ni *ni,
--		     struct lnet_process_id id)
-+static struct ksock_peer_ni *
-+ksocknal_create_peer(struct lnet_ni *ni, struct lnet_process_id id)
- {
- 	int cpt = lnet_cpt_of_nid(id.nid, ni);
- 	struct ksock_net *net = ni->ni_data;
-@@ -112,7 +111,7 @@
+ 	/* alloc num of counter headers */
+ 	stats->ls_cnt_header = kvmalloc_array(stats->ls_num,
+-					      sizeof(struct lprocfs_counter_header),
++					      sizeof(*stats->ls_cnt_header),
+ 					      GFP_KERNEL | __GFP_ZERO);
+ 	if (!stats->ls_cnt_header)
+ 		goto fail;
+diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
+index c473f547..84dea56 100644
+--- a/fs/lustre/obdecho/echo_client.c
++++ b/fs/lustre/obdecho/echo_client.c
+@@ -1367,7 +1367,7 @@ static int echo_client_prep_commit(const struct lu_env *env,
+ 	npages = batch >> PAGE_SHIFT;
+ 	tot_pages = count >> PAGE_SHIFT;
  
- 	peer_ni = kzalloc_cpt(sizeof(*peer_ni), GFP_NOFS, cpt);
- 	if (!peer_ni)
--		return -ENOMEM;
-+		return ERR_PTR(-ENOMEM);
+-	lnb = kvmalloc_array(npages, sizeof(struct niobuf_local),
++	lnb = kvmalloc_array(npages, sizeof(*lnb),
+ 			     GFP_NOFS | __GFP_ZERO);
+ 	if (!lnb) {
+ 		ret = -ENOMEM;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index 1cc5358..04e121b 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -852,7 +852,8 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
  
- 	peer_ni->ksnp_ni = ni;
- 	peer_ni->ksnp_id = id;
-@@ -136,15 +135,14 @@
+ 	kfree(init_qp_attr);
  
- 		kfree(peer_ni);
- 		CERROR("Can't create peer_ni: network shutdown\n");
--		return -ESHUTDOWN;
-+		return ERR_PTR(-ESHUTDOWN);
+-	conn->ibc_rxs = kzalloc_cpt(IBLND_RX_MSGS(conn) * sizeof(struct kib_rx),
++	conn->ibc_rxs = kzalloc_cpt(IBLND_RX_MSGS(conn) *
++				    sizeof(*conn->ibc_rxs),
+ 				    GFP_NOFS, cpt);
+ 	if (!conn->ibc_rxs) {
+ 		CERROR("Cannot allocate RX buffers\n");
+@@ -2119,7 +2120,7 @@ static int kiblnd_create_tx_pool(struct kib_poolset *ps, int size,
+ 		return -ENOMEM;
  	}
  
- 	net->ksnn_npeers++;
+-	tpo->tpo_tx_descs = kzalloc_cpt(size * sizeof(struct kib_tx),
++	tpo->tpo_tx_descs = kzalloc_cpt(size * sizeof(*tpo->tpo_tx_descs),
+ 					GFP_NOFS, ps->ps_cpt);
+ 	if (!tpo->tpo_tx_descs) {
+ 		CERROR("Can't allocate %d tx descriptors\n", size);
+@@ -2251,7 +2252,7 @@ static int kiblnd_net_init_pools(struct kib_net *net, struct lnet_ni *ni,
+ 	 * number of CPTs that exist, i.e net->ibn_fmr_ps[cpt].
+ 	 */
+ 	net->ibn_fmr_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					   sizeof(struct kib_fmr_poolset));
++					   sizeof(*net->ibn_fmr_ps[0]));
+ 	if (!net->ibn_fmr_ps) {
+ 		CERROR("Failed to allocate FMR pool array\n");
+ 		rc = -ENOMEM;
+@@ -2278,7 +2279,7 @@ static int kiblnd_net_init_pools(struct kib_net *net, struct lnet_ni *ni,
+ 	 * number of CPTs that exist, i.e net->ibn_tx_ps[cpt].
+ 	 */
+ 	net->ibn_tx_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					  sizeof(struct kib_tx_poolset));
++					  sizeof(*net->ibn_tx_ps[0]));
+ 	if (!net->ibn_tx_ps) {
+ 		CERROR("Failed to allocate tx pool array\n");
+ 		rc = -ENOMEM;
+diff --git a/net/lnet/libcfs/libcfs_lock.c b/net/lnet/libcfs/libcfs_lock.c
+index 3d5157f..313aa95 100644
+--- a/net/lnet/libcfs/libcfs_lock.c
++++ b/net/lnet/libcfs/libcfs_lock.c
+@@ -66,7 +66,7 @@ struct cfs_percpt_lock *
+ 		return NULL;
  
- 	spin_unlock_bh(&net->ksnn_lock);
+ 	pcl->pcl_cptab = cptab;
+-	pcl->pcl_locks = cfs_percpt_alloc(cptab, sizeof(*lock));
++	pcl->pcl_locks = cfs_percpt_alloc(cptab, sizeof(*pcl->pcl_locks[0]));
+ 	if (!pcl->pcl_locks) {
+ 		kfree(pcl);
+ 		return NULL;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 6c913b5..0020ffd 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -970,7 +970,7 @@ static void lnet_assert_wire_constants(void)
+ 	int rc;
+ 	int i;
  
--	*peerp = peer_ni;
--	return 0;
-+	return peer_ni;
- }
+-	recs = cfs_percpt_alloc(lnet_cpt_table(), sizeof(*rec));
++	recs = cfs_percpt_alloc(lnet_cpt_table(), sizeof(*recs[0]));
+ 	if (!recs) {
+ 		CERROR("Failed to allocate %s resource containers\n",
+ 		       lnet_res_type2str(type));
+@@ -1033,8 +1033,7 @@ struct list_head **
+ 	struct list_head *q;
+ 	int i;
  
- void
-@@ -447,16 +445,15 @@ struct ksock_peer_ni *
- 	struct ksock_peer_ni *peer2;
- 	struct ksock_route *route;
- 	struct ksock_route *route2;
--	int rc;
+-	qs = cfs_percpt_alloc(lnet_cpt_table(),
+-			      sizeof(struct list_head));
++	qs = cfs_percpt_alloc(lnet_cpt_table(), sizeof(*qs[0]));
+ 	if (!qs) {
+ 		CERROR("Failed to allocate queues\n");
+ 		return NULL;
+@@ -1096,7 +1095,7 @@ struct list_head **
+ 	the_lnet.ln_interface_cookie = ktime_get_real_ns();
  
- 	if (id.nid == LNET_NID_ANY ||
- 	    id.pid == LNET_PID_ANY)
- 		return -EINVAL;
+ 	the_lnet.ln_counters = cfs_percpt_alloc(lnet_cpt_table(),
+-						sizeof(struct lnet_counters));
++						sizeof(*the_lnet.ln_counters[0]));
+ 	if (!the_lnet.ln_counters) {
+ 		CERROR("Failed to allocate counters for LNet\n");
+ 		rc = -ENOMEM;
+diff --git a/net/lnet/lnet/lib-eq.c b/net/lnet/lnet/lib-eq.c
+index 01b8ee3..25af2bd 100644
+--- a/net/lnet/lnet/lib-eq.c
++++ b/net/lnet/lnet/lib-eq.c
+@@ -95,7 +95,7 @@
+ 		return -ENOMEM;
  
- 	/* Have a brand new peer_ni ready... */
--	rc = ksocknal_create_peer(&peer_ni, ni, id);
--	if (rc)
--		return rc;
-+	peer_ni = ksocknal_create_peer(ni, id);
-+	if (IS_ERR(peer_ni))
-+		return PTR_ERR(peer_ni);
+ 	if (count) {
+-		eq->eq_events = kvmalloc_array(count, sizeof(struct lnet_event),
++		eq->eq_events = kvmalloc_array(count, sizeof(*eq->eq_events),
+ 					       GFP_KERNEL | __GFP_ZERO);
+ 		if (!eq->eq_events)
+ 			goto failed;
+diff --git a/net/lnet/lnet/lib-ptl.c b/net/lnet/lnet/lib-ptl.c
+index bb92f37..ae38bc3 100644
+--- a/net/lnet/lnet/lib-ptl.c
++++ b/net/lnet/lnet/lib-ptl.c
+@@ -793,7 +793,7 @@ struct list_head *
+ 	int j;
  
- 	route = ksocknal_create_route(ipaddr, port);
- 	if (!route) {
-@@ -1114,9 +1111,11 @@ struct ksock_peer_ni *
- 		ksocknal_peer_addref(peer_ni);
- 		write_lock_bh(global_lock);
- 	} else {
--		rc = ksocknal_create_peer(&peer_ni, ni, peerid);
--		if (rc)
-+		peer_ni = ksocknal_create_peer(ni, peerid);
-+		if (IS_ERR(peer_ni)) {
-+			rc = PTR_ERR(peer_ni);
- 			goto failed_1;
-+		}
+ 	ptl->ptl_mtables = cfs_percpt_alloc(lnet_cpt_table(),
+-					    sizeof(struct lnet_match_table));
++					    sizeof(*ptl->ptl_mtables[0]));
+ 	if (!ptl->ptl_mtables) {
+ 		CERROR("Failed to create match table for portal %d\n", index);
+ 		return -ENOMEM;
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index 71ba951..b8f7aba0 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -1386,7 +1386,7 @@ bool lnet_router_checker_active(void)
  
- 		write_lock_bh(global_lock);
+ 	the_lnet.ln_rtrpools = cfs_percpt_alloc(lnet_cpt_table(),
+ 						LNET_NRBPOOLS *
+-						sizeof(struct lnet_rtrbufpool));
++						sizeof(*the_lnet.ln_rtrpools[0]));
+ 	if (!the_lnet.ln_rtrpools) {
+ 		LCONSOLE_ERROR_MSG(0x10c,
+ 				   "Failed to initialize router buffe pool\n");
+diff --git a/net/lnet/selftest/rpc.c b/net/lnet/selftest/rpc.c
+index 4645f04..7a8226c 100644
+--- a/net/lnet/selftest/rpc.c
++++ b/net/lnet/selftest/rpc.c
+@@ -256,7 +256,7 @@ struct srpc_bulk *
+ 	svc->sv_shuttingdown = 0;
+ 
+ 	svc->sv_cpt_data = cfs_percpt_alloc(lnet_cpt_table(),
+-					    sizeof(**svc->sv_cpt_data));
++					    sizeof(*svc->sv_cpt_data[0]));
+ 	if (!svc->sv_cpt_data)
+ 		return -ENOMEM;
  
 -- 
 1.8.3.1
