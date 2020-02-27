@@ -1,439 +1,216 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:02 -0500
-Subject: [lustre-devel] [PATCH 434/622] lnet: handle recursion in resend
+Date: Thu, 27 Feb 2020 16:15:07 -0500
+Subject: [lustre-devel] [PATCH 439/622] lustre: llite: swab LOV EA data in
+ ll_getxattr_lov()
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-435-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-440-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Jian Yu <yujian@whamcloud.com>
 
-When we're resending a message we have to decommit it first. This
-could potentially result in another message being picked up from the
-queue and sent, which could fail immediately and be finalized, causing
-recursion. This problem was observed when a router was being shutdown.
+On PPC client, the LOV EA data returned by getfattr from x86_64 server
+was not swabbed to the host endian. While running setfattr, the data was
+swabbed in ll_lov_setstripe_ea_info(), which caused magic mis-match in
+ll_lov_user_md_size() and then ll_setstripe_ea() returned -ERANGE.
 
-This patch uses the same mechanism used in lnet_finalize() to limit
-recursion. If a thread is already finalizing a message and it gets
-into path where it starts finalizing a second, then that message
-is queued and handled later.
+This patch fixed the above issue by swabbing LOV EA data in
+ll_getxattr_lov().
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12402
-Lustre-commit: ad9243693c9a ("LU-12402 lnet: handle recursion in resend")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/35431
-Reviewed-by: Chris Horn <hornc@cray.com>
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12589
+Lustre-commit: 5590f5aa94a5 ("LU-12589 llite: swab LOV EA data in ll_getxattr_lov()")
+Signed-off-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35626
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h |   4 +
- net/lnet/lnet/lib-msg.c        | 292 +++++++++++++++++++++++++++--------------
- 2 files changed, 194 insertions(+), 102 deletions(-)
+ fs/lustre/include/lustre_swab.h |  2 +-
+ fs/lustre/llite/dir.c           |  4 ++--
+ fs/lustre/llite/file.c          |  4 ++--
+ fs/lustre/llite/xattr.c         | 16 ++++++++--------
+ fs/lustre/ptlrpc/pack_generic.c | 40 ++++++++++++++++++++++++++++++++++------
+ 5 files changed, 47 insertions(+), 19 deletions(-)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 904ef7a..3f81928 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -985,9 +985,13 @@ struct lnet_msg_container {
- 	int			  msc_nfinalizers;
- 	/* msgs waiting to complete finalizing */
- 	struct list_head	  msc_finalizing;
-+	/* msgs waiting to be resent */
-+	struct list_head	  msc_resending;
- 	struct list_head	  msc_active;	/* active message list */
- 	/* threads doing finalization */
- 	void			**msc_finalizers;
-+	/* threads doing resends */
-+	void			**msc_resenders;
- };
- 
- /* Peer Discovery states */
-diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
-index 0d6c363..5c39ce3 100644
---- a/net/lnet/lnet/lib-msg.c
-+++ b/net/lnet/lnet/lib-msg.c
-@@ -597,6 +597,168 @@
- 	}
- }
- 
-+static void
-+lnet_resend_msg_locked(struct lnet_msg *msg)
-+{
-+	msg->msg_retry_count++;
-+
-+	/* remove message from the active list and reset it to prepare
-+	 * for a resend. Two exceptions to this
-+	 *
-+	 * 1. the router case. When a message is being routed it is
-+	 * committed for rx when received and committed for tx when
-+	 * forwarded. We don't want to remove it from the active list, since
-+	 * code which handles receiving expects it to remain on the active
-+	 * list.
-+	 *
-+	 * 2. The REPLY case. Reply messages use the same message
-+	 * structure for the GET that was received.
-+	 */
-+	if (!msg->msg_routing && msg->msg_type != LNET_MSG_REPLY) {
-+		list_del_init(&msg->msg_activelist);
-+		msg->msg_onactivelist = 0;
-+	}
-+
-+	/* The msg_target.nid which was originally set
-+	 * when calling LNetGet() or LNetPut() might've
-+	 * been overwritten if we're routing this message.
-+	 * Call lnet_msg_decommit_tx() to return the credit
-+	 * this message consumed. The message will
-+	 * consume another credit when it gets resent.
-+	 */
-+	msg->msg_target.nid = msg->msg_hdr.dest_nid;
-+	lnet_msg_decommit_tx(msg, -EAGAIN);
-+	msg->msg_sending = 0;
-+	msg->msg_receiving = 0;
-+	msg->msg_target_is_router = 0;
-+
-+	CDEBUG(D_NET, "%s->%s:%s:%s - queuing msg (%p) for resend\n",
-+	       libcfs_nid2str(msg->msg_hdr.src_nid),
-+	       libcfs_nid2str(msg->msg_hdr.dest_nid),
-+	       lnet_msgtyp2str(msg->msg_type),
-+	       lnet_health_error2str(msg->msg_health_status), msg);
-+
-+	list_add_tail(&msg->msg_list, the_lnet.ln_mt_resendqs[msg->msg_tx_cpt]);
-+
-+	wake_up(&the_lnet.ln_mt_waitq);
-+}
-+
-+int
-+lnet_check_finalize_recursion_locked(struct lnet_msg *msg,
-+				     struct list_head *containerq,
-+				     int nworkers, void **workers)
-+{
-+	int my_slot = -1;
-+	int i;
-+
-+	list_add_tail(&msg->msg_list, containerq);
-+
-+	for (i = 0; i < nworkers; i++) {
-+		if (workers[i] == current)
-+			break;
-+
-+		if (my_slot < 0 && !workers[i])
-+			my_slot = i;
-+	}
-+
-+	if (i < nworkers || my_slot < 0)
-+		return -1;
-+
-+	workers[my_slot] = current;
-+
-+	return my_slot;
-+}
-+
-+int
-+lnet_attempt_msg_resend(struct lnet_msg *msg)
-+{
-+	struct lnet_msg_container *container;
-+	int my_slot;
-+	int cpt;
-+
-+	/* we can only resend tx_committed messages */
-+	LASSERT(msg->msg_tx_committed);
-+
-+	/* don't resend recovery messages */
-+	if (msg->msg_recovery) {
-+		CDEBUG(D_NET, "msg %s->%s is a recovery ping. retry# %d\n",
-+		       libcfs_nid2str(msg->msg_from),
-+		       libcfs_nid2str(msg->msg_target.nid),
-+		       msg->msg_retry_count);
-+		return -ENOTRECOVERABLE;
-+	}
-+
-+	/* if we explicitly indicated we don't want to resend then just
-+	 * return
-+	 */
-+	if (msg->msg_no_resend) {
-+		CDEBUG(D_NET, "msg %s->%s requested no resend. retry# %d\n",
-+		       libcfs_nid2str(msg->msg_from),
-+		       libcfs_nid2str(msg->msg_target.nid),
-+		       msg->msg_retry_count);
-+		return -ENOTRECOVERABLE;
-+	}
-+
-+	/* check if the message has exceeded the number of retries */
-+	if (msg->msg_retry_count >= lnet_retry_count) {
-+		CNETERR("msg %s->%s exceeded retry count %d\n",
-+			libcfs_nid2str(msg->msg_from),
-+			libcfs_nid2str(msg->msg_target.nid),
-+			msg->msg_retry_count);
-+		return -ENOTRECOVERABLE;
-+	}
-+
-+	cpt = msg->msg_tx_cpt;
-+	lnet_net_lock(cpt);
-+
-+	/* check again under lock */
-+	if (the_lnet.ln_mt_state != LNET_MT_STATE_RUNNING) {
-+		lnet_net_unlock(cpt);
-+		return -ESHUTDOWN;
-+	}
-+
-+	container = the_lnet.ln_msg_containers[cpt];
-+	my_slot = lnet_check_finalize_recursion_locked(msg,
-+						       &container->msc_resending,
-+						       container->msc_nfinalizers,
-+						       container->msc_resenders);
-+	/* enough threads are resending */
-+	if (my_slot == -1) {
-+		lnet_net_unlock(cpt);
-+		return 0;
-+	}
-+
-+	while (!list_empty(&container->msc_resending)) {
-+		msg = list_entry(container->msc_resending.next,
-+				 struct lnet_msg, msg_list);
-+		list_del(&msg->msg_list);
-+
-+		/* resending the message will require us to call
-+		 * lnet_msg_decommit_tx() which will return the credit
-+		 * which this message holds. This could trigger another
-+		 * queued message to be sent. If that message fails and
-+		 * requires a resend we will recurse.
-+		 * But since at this point the slot is taken, the message
-+		 * will be queued in the container and dealt with
-+		 * later. This breaks the recursion.
-+		 */
-+		lnet_resend_msg_locked(msg);
-+	}
-+
-+	/* msc_resenders is an array of process pointers. Each entry holds
-+	 * a pointer to the current process operating on the message. An
-+	 * array entry is created per CPT. If the array slot is already
-+	 * set, then it means that there is a thread on the CPT currently
-+	 * resending a message.
-+	 * Once the thread finishes clear the slot to enable the thread to
-+	 * take on more resend work.
-+	 */
-+	container->msc_resenders[my_slot] = NULL;
-+	lnet_net_unlock(cpt);
-+
-+	return 0;
-+}
-+
- /* Do a health check on the message:
-  * return -1 if we're not going to handle the error or
-  *   if we've reached the maximum number of retries.
-@@ -607,9 +769,9 @@
- lnet_health_check(struct lnet_msg *msg)
- {
- 	enum lnet_msg_hstatus hstatus = msg->msg_health_status;
--	bool lo = false;
--	struct lnet_ni *ni;
- 	struct lnet_peer_ni *lpni;
-+	struct lnet_ni *ni;
-+	bool lo = false;
- 
- 	/* if we're shutting down no point in handling health. */
- 	if (the_lnet.ln_mt_state != LNET_MT_STATE_RUNNING)
-@@ -697,7 +859,7 @@
- 		lnet_handle_local_failure(ni);
- 		if (msg->msg_tx_committed)
- 			/* add to the re-send queue */
--			goto resend;
-+			return lnet_attempt_msg_resend(msg);
- 		break;
- 
- 	/* These errors will not trigger a resend so simply
-@@ -713,7 +875,7 @@
- 	case LNET_MSG_STATUS_REMOTE_DROPPED:
- 		lnet_handle_remote_failure(lpni);
- 		if (msg->msg_tx_committed)
--			goto resend;
-+			return lnet_attempt_msg_resend(msg);
- 		break;
- 
- 	case LNET_MSG_STATUS_REMOTE_ERROR:
-@@ -725,87 +887,8 @@
- 		LBUG();
- 	}
- 
--resend:
--	/* we can only resend tx_committed messages */
--	LASSERT(msg->msg_tx_committed);
--
--	/* don't resend recovery messages */
--	if (msg->msg_recovery) {
--		CDEBUG(D_NET, "msg %s->%s is a recovery ping. retry# %d\n",
--		       libcfs_nid2str(msg->msg_from),
--		       libcfs_nid2str(msg->msg_target.nid),
--		       msg->msg_retry_count);
--		return -1;
--	}
--
--	/* if we explicitly indicated we don't want to resend then just
--	 * return
--	 */
--	if (msg->msg_no_resend) {
--		CDEBUG(D_NET, "msg %s->%s requested no resend. retry# %d\n",
--		       libcfs_nid2str(msg->msg_from),
--		       libcfs_nid2str(msg->msg_target.nid),
--		       msg->msg_retry_count);
--		return -1;
--	}
--
--	/* check if the message has exceeded the number of retries */
--	if (msg->msg_retry_count >= lnet_retry_count) {
--		CNETERR("msg %s->%s exceeded retry count %d\n",
--			libcfs_nid2str(msg->msg_from),
--			libcfs_nid2str(msg->msg_target.nid),
--			msg->msg_retry_count);
--		return -1;
--	}
--	msg->msg_retry_count++;
--
--	lnet_net_lock(msg->msg_tx_cpt);
--
--	/* check again under lock */
--	if (the_lnet.ln_mt_state != LNET_MT_STATE_RUNNING) {
--		lnet_net_unlock(msg->msg_tx_cpt);
--		return -1;
--	}
--
--	/* remove message from the active list and reset it in preparation
--	 * for a resend. Two exception to this
--	 *
--	 * 1. the router case, when a message is committed for rx when
--	 * received, then tx when it is sent. When committed to both tx and
--	 * rx we don't want to remove it from the active list.
--	 *
--	 * 2. The REPLY case since it uses the same msg block for the GET
--	 * that was received.
--	 */
--	if (!msg->msg_routing && msg->msg_type != LNET_MSG_REPLY) {
--		list_del_init(&msg->msg_activelist);
--		msg->msg_onactivelist = 0;
--	}
--
--	/* The msg_target.nid which was originally set
--	 * when calling LNetGet() or LNetPut() might've
--	 * been overwritten if we're routing this message.
--	 * Call lnet_return_tx_credits_locked() to return
--	 * the credit this message consumed. The message will
--	 * consume another credit when it gets resent.
--	 */
--	msg->msg_target.nid = msg->msg_hdr.dest_nid;
--	lnet_msg_decommit_tx(msg, -EAGAIN);
--	msg->msg_sending = 0;
--	msg->msg_receiving = 0;
--	msg->msg_target_is_router = 0;
--
--	CDEBUG(D_NET, "%s->%s:%s:%s - queuing for resend\n",
--	       libcfs_nid2str(msg->msg_hdr.src_nid),
--	       libcfs_nid2str(msg->msg_hdr.dest_nid),
--	       lnet_msgtyp2str(msg->msg_type),
--	       lnet_health_error2str(hstatus));
--
--	list_add_tail(&msg->msg_list, the_lnet.ln_mt_resendqs[msg->msg_tx_cpt]);
--	lnet_net_unlock(msg->msg_tx_cpt);
--
--	wake_up(&the_lnet.ln_mt_waitq);
--	return 0;
-+	/* no resend is needed */
-+	return -1;
- }
- 
- static void
-@@ -945,7 +1028,6 @@
- 	int my_slot;
- 	int cpt;
- 	int rc;
--	int i;
- 
- 	LASSERT(!in_interrupt());
- 
-@@ -967,7 +1049,6 @@
- 		 * put on the resend queue.
+diff --git a/fs/lustre/include/lustre_swab.h b/fs/lustre/include/lustre_swab.h
+index e99e16d..dd3c50c 100644
+--- a/fs/lustre/include/lustre_swab.h
++++ b/fs/lustre/include/lustre_swab.h
+@@ -86,7 +86,7 @@
+ void lustre_swab_lov_comp_md_v1(struct lov_comp_md_v1 *lum);
+ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
+ 				     int stripe_count);
+-void lustre_swab_lov_user_md(struct lov_user_md *lum);
++void lustre_swab_lov_user_md(struct lov_user_md *lum, size_t size);
+ void lustre_swab_lov_mds_md(struct lov_mds_md *lmm);
+ void lustre_swab_lustre_capa(struct lustre_capa *c);
+ void lustre_swab_lustre_capa_key(struct lustre_capa_key *k);
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index 3540c18..812f535 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -564,7 +564,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
  		 */
- 		if (!lnet_health_check(msg))
--			/* Message is queued for resend */
- 			return;
+ 		if ((__swab32(lump->lmm_magic) & le32_to_cpu(LOV_MAGIC_MASK)) ==
+ 		    le32_to_cpu(LOV_MAGIC_MAGIC))
+-			lustre_swab_lov_user_md(lump);
++			lustre_swab_lov_user_md(lump, 0);
+ 	} else {
+ 		lum_size = sizeof(struct lov_user_md_v1);
+ 	}
+@@ -696,7 +696,7 @@ int ll_dir_getstripe(struct inode *inode, void **plmm, int *plmm_size,
+ 	case LOV_MAGIC_COMP_V1:
+ 	case LOV_USER_MAGIC_SPECIFIC:
+ 		if (cpu_to_le32(LOV_MAGIC) != LOV_MAGIC)
+-			lustre_swab_lov_user_md((struct lov_user_md *)lmm);
++			lustre_swab_lov_user_md((struct lov_user_md *)lmm, 0);
+ 		break;
+ 	case LMV_MAGIC_V1:
+ 		if (cpu_to_le32(LMV_MAGIC) != LMV_MAGIC)
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index fa61b09..6c5b9eb 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -1873,7 +1873,7 @@ int ll_lov_setstripe_ea_info(struct inode *inode, struct dentry *dentry,
+ 	if ((__swab32(lum->lmm_magic) & le32_to_cpu(LOV_MAGIC_MASK)) ==
+ 	    le32_to_cpu(LOV_MAGIC_MAGIC)) {
+ 		/* this code will only exist for big-endian systems */
+-		lustre_swab_lov_user_md(lum);
++		lustre_swab_lov_user_md(lum, 0);
  	}
  
-@@ -998,28 +1079,20 @@
- 	lnet_net_lock(cpt);
+ 	ll_inode_size_lock(inode);
+@@ -1956,7 +1956,7 @@ int ll_lov_getstripe_ea_info(struct inode *inode, const char *filename,
+ 				stripe_count = 0;
+ 		}
  
- 	container = the_lnet.ln_msg_containers[cpt];
--	list_add_tail(&msg->msg_list, &container->msc_finalizing);
+-		lustre_swab_lov_user_md((struct lov_user_md *)lmm);
++		lustre_swab_lov_user_md((struct lov_user_md *)lmm, 0);
  
--	/*
--	 * Recursion breaker.  Don't complete the message here if I am (or
-+	/* Recursion breaker.  Don't complete the message here if I am (or
- 	 * enough other threads are) already completing messages
- 	 */
--	my_slot = -1;
--	for (i = 0; i < container->msc_nfinalizers; i++) {
--		if (container->msc_finalizers[i] == current)
--			break;
--
--		if (my_slot < 0 && !container->msc_finalizers[i])
--			my_slot = i;
--	}
--
--	if (i < container->msc_nfinalizers || my_slot < 0) {
-+	my_slot = lnet_check_finalize_recursion_locked(msg,
-+						       &container->msc_finalizing,
-+						       container->msc_nfinalizers,
-+						       container->msc_finalizers);
-+	/* enough threads are resending */
-+	if (my_slot == -1) {
- 		lnet_net_unlock(cpt);
- 		return;
- 	}
+ 		/* if function called for directory - we should
+ 		 * avoid swab not existent lsm objects
+diff --git a/fs/lustre/llite/xattr.c b/fs/lustre/llite/xattr.c
+index cf1cfd2..4e1ce34 100644
+--- a/fs/lustre/llite/xattr.c
++++ b/fs/lustre/llite/xattr.c
+@@ -320,7 +320,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
+ 	if (strncmp(name, "lov.", 4) == 0 &&
+ 	    (__swab32(((struct lov_user_md *)value)->lmm_magic) &
+ 	    le32_to_cpu(LOV_MAGIC_MASK)) == le32_to_cpu(LOV_MAGIC_MAGIC))
+-		lustre_swab_lov_user_md((struct lov_user_md *)value);
++		lustre_swab_lov_user_md((struct lov_user_md *)value, 0);
  
--	container->msc_finalizers[my_slot] = current;
--
- 	rc = 0;
- 	while ((msg = list_first_entry_or_null(&container->msc_finalizing,
- 					       struct lnet_msg,
-@@ -1073,6 +1146,10 @@
+ 	return ll_xattr_set_common(handler, dentry, inode, name, value, size,
+ 				   flags);
+@@ -459,7 +459,6 @@ static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
+ 		};
+ 		struct lu_env *env;
+ 		u16 refcheck;
+-		u32 magic;
  
- 	kvfree(container->msc_finalizers);
- 	container->msc_finalizers = NULL;
-+
-+	kfree(container->msc_resenders);
-+	container->msc_resenders = NULL;
-+
- 	container->msc_init = 0;
+ 		if (!obj)
+ 			return -ENODATA;
+@@ -490,12 +489,12 @@ static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
+ 		 * recognizing layout gen as stripe offset when the
+ 		 * file is restored. See LU-2809.
+ 		 */
+-		magic = ((struct lov_mds_md *)buf)->lmm_magic;
+-		if ((magic & __swab32(LOV_MAGIC_MAGIC)) ==
+-		    __swab32(LOV_MAGIC_MAGIC))
+-			magic = __swab32(magic);
++		if ((((struct lov_mds_md *)buf)->lmm_magic &
++		    __swab32(LOV_MAGIC_MAGIC)) == __swab32(LOV_MAGIC_MAGIC))
++			lustre_swab_lov_user_md((struct lov_user_md *)buf,
++						cl.cl_size);
+ 
+-		switch (magic) {
++		switch (((struct lov_mds_md *)buf)->lmm_magic) {
+ 		case LOV_MAGIC_V1:
+ 		case LOV_MAGIC_V3:
+ 		case LOV_MAGIC_SPECIFIC:
+@@ -505,7 +504,8 @@ static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
+ 		case LOV_MAGIC_FOREIGN:
+ 			goto out_env;
+ 		default:
+-			CERROR("Invalid LOV magic %08x\n", magic);
++			CERROR("Invalid LOV magic %08x\n",
++			       ((struct lov_mds_md *)buf)->lmm_magic);
+ 			rc = -EINVAL;
+ 			goto out_env;
+ 		}
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index b066113..6a4ea7a 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -2147,23 +2147,51 @@ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
  }
+ EXPORT_SYMBOL(lustre_swab_lov_user_md_objects);
  
-@@ -1083,6 +1160,7 @@
- 
- 	INIT_LIST_HEAD(&container->msc_active);
- 	INIT_LIST_HEAD(&container->msc_finalizing);
-+	INIT_LIST_HEAD(&container->msc_resending);
- 
- 	/* number of CPUs */
- 	container->msc_nfinalizers = cfs_cpt_weight(lnet_cpt_table(), cpt);
-@@ -1099,6 +1177,16 @@
- 		return -ENOMEM;
- 	}
- 
-+	container->msc_resenders = kzalloc_cpt(container->msc_nfinalizers *
-+					       sizeof(*container->msc_resenders),
-+					       GFP_KERNEL, cpt);
+-void lustre_swab_lov_user_md(struct lov_user_md *lum)
++void lustre_swab_lov_user_md(struct lov_user_md *lum, size_t size)
+ {
++	struct lov_user_md_v1 *v1;
++	struct lov_user_md_v3 *v3;
++	struct lov_foreign_md *lfm;
++	u16 stripe_count;
 +
-+	if (!container->msc_resenders) {
-+		CERROR("Failed to allocate message resenders\n");
-+		lnet_msg_container_cleanup(container);
-+		return -ENOMEM;
+ 	CDEBUG(D_IOCTL, "swabbing lov_user_md\n");
+ 	switch (lum->lmm_magic) {
+ 	case __swab32(LOV_MAGIC_V1):
+ 	case LOV_USER_MAGIC_V1:
+-		lustre_swab_lov_user_md_v1((struct lov_user_md_v1 *)lum);
++	{
++		v1 = (struct lov_user_md_v1 *)lum;
++		stripe_count = v1->lmm_stripe_count;
++
++		if (lum->lmm_magic != LOV_USER_MAGIC_V1)
++			__swab16s(&stripe_count);
++
++		lustre_swab_lov_user_md_v1(v1);
++		if (size > sizeof(*v1))
++			lustre_swab_lov_user_md_objects(v1->lmm_objects,
++							stripe_count);
++
+ 		break;
 +	}
+ 	case __swab32(LOV_MAGIC_V3):
+ 	case LOV_USER_MAGIC_V3:
+-		lustre_swab_lov_user_md_v3((struct lov_user_md_v3 *)lum);
++	{
++		v3 = (struct lov_user_md_v3 *)lum;
++		stripe_count = v3->lmm_stripe_count;
 +
- 	return 0;
- }
++		if (lum->lmm_magic != LOV_USER_MAGIC_V3)
++			__swab16s(&stripe_count);
++
++		lustre_swab_lov_user_md_v3(v3);
++		if (size > sizeof(*v3))
++			lustre_swab_lov_user_md_objects(v3->lmm_objects,
++							stripe_count);
+ 		break;
++	}
+ 	case __swab32(LOV_USER_MAGIC_SPECIFIC):
+ 	case LOV_USER_MAGIC_SPECIFIC:
+ 	{
+-		struct lov_user_md_v3 *v3 = (struct lov_user_md_v3 *)lum;
+-		u16 stripe_count = v3->lmm_stripe_count;
++		v3 = (struct lov_user_md_v3 *)lum;
++		stripe_count = v3->lmm_stripe_count;
  
+ 		if (lum->lmm_magic != LOV_USER_MAGIC_SPECIFIC)
+ 			__swab16s(&stripe_count);
+@@ -2179,7 +2207,7 @@ void lustre_swab_lov_user_md(struct lov_user_md *lum)
+ 	case __swab32(LOV_MAGIC_FOREIGN):
+ 	case LOV_USER_MAGIC_FOREIGN:
+ 	{
+-		struct lov_foreign_md *lfm = (struct lov_foreign_md *)lum;
++		lfm = (struct lov_foreign_md *)lum;
+ 
+ 		__swab32s(&lfm->lfm_magic);
+ 		__swab32s(&lfm->lfm_length);
 -- 
 1.8.3.1
