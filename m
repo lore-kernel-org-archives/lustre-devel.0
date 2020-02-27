@@ -1,156 +1,74 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:43 -0500
-Subject: [lustre-devel] [PATCH 535/622] lustre: osc: allow increasing
- osc.*.short_io_bytes
+Date: Thu, 27 Feb 2020 16:16:45 -0500
+Subject: [lustre-devel] [PATCH 537/622] lnet: Optimize check for routing
+ feature flag
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-536-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-538-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Chris Horn <hornc@cray.com>
 
-The osc.*.short_io_bytes parameter was mixing up the default and
-maximum parameter values, and did not allow increasing the parameter
-beyond the default.
+Check the routing feature flag outside of the loop.
 
-Allow it to be increased to the maximum value, which depends on the
-client PAGE_SIZE, and the amount of free space in the maximally-sized
-OST RPC.  Since the maximum size is system dependent, allow some
-grace when setting the parameter, so that a single tunable parameter
-can work on a variety of different systems.
-
-However, if it is larger than the maximum RDMA size (which is already
-too large) return an error, as it means something is wrong.
-
-Add a test case to exercise the osc.*.short_io_bytes parameter.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12910
-Lustre-commit: cedc7f361a6e ("LU-12910 osc: allow increasing osc.*.short_io_bytes")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/36587
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
+Cray-bug-id: LUS-7862
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12942
+Lustre-commit: 7a99dc0b2f27 ("LU-12942 lnet: Optimize check for routing feature flag")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/36679
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h      | 25 ++++++++++++++-----------
- fs/lustre/ldlm/ldlm_lib.c           |  2 +-
- fs/lustre/obdclass/lprocfs_status.c | 20 ++++++++++++--------
- 3 files changed, 27 insertions(+), 20 deletions(-)
+ net/lnet/lnet/router.c | 21 ++++++++-------------
+ 1 file changed, 8 insertions(+), 13 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index 40c1ae8..87e1d60 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -306,17 +306,19 @@
-  *	DT_MAX_BRW_PAGES * niobuf_remote
-  *
-  * - single object with 16 pages is 512 bytes
-- * - OST_IO_MAXREQSIZE must be at least 1 page of cookies plus some spillover
-+ * - OST_IO_MAXREQSIZE must be at least 1 niobuf per page of data
-  * - Must be a multiple of 1024
-+ * - should allow a reasonably large SHORT_IO_BYTES size (64KB)
-  */
- #define _OST_MAXREQSIZE_BASE ((unsigned long)(sizeof(struct lustre_msg) + \
--				 sizeof(struct ptlrpc_body) + \
--				 sizeof(struct obdo) + \
--				 sizeof(struct obd_ioobj) + \
--				 sizeof(struct niobuf_remote)))
--#define _OST_MAXREQSIZE_SUM ((unsigned long)(_OST_MAXREQSIZE_BASE + \
--				 sizeof(struct niobuf_remote) * \
--				 (DT_MAX_BRW_PAGES - 1)))
-+			     /* lm_buflens */ sizeof(u32) * 4 +		  \
-+					      sizeof(struct ptlrpc_body) +\
-+					      sizeof(struct obdo) +	  \
-+					      sizeof(struct obd_ioobj) +  \
-+					      sizeof(struct niobuf_remote)))
-+#define _OST_MAXREQSIZE_SUM ((unsigned long)(_OST_MAXREQSIZE_BASE +	    \
-+					     sizeof(struct niobuf_remote) * \
-+					     DT_MAX_BRW_PAGES))
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index 447706d..41d0eb0 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -325,12 +325,14 @@ bool lnet_is_route_alive(struct lnet_route *route)
  
- /**
-  * MDS incoming request with LOV EA
-@@ -335,14 +337,15 @@
- /* Safe estimate of free space in standard RPC, provides upper limit for # of
-  * bytes of i/o to pack in RPC (skipping bulk transfer).
-  */
--#define OST_SHORT_IO_SPACE	(OST_IO_MAXREQSIZE - _OST_MAXREQSIZE_BASE)
-+#define OST_MAX_SHORT_IO_BYTES	((OST_IO_MAXREQSIZE - _OST_MAXREQSIZE_BASE) & \
-+				 PAGE_MASK)
+ 	spin_unlock(&lp->lp_lock);
  
- /* Actual size used for short i/o buffer.  Calculation means this:
-  * At least one page (for large PAGE_SIZE), or 16 KiB, but not more
-  * than the available space aligned to a page boundary.
-  */
--#define OBD_MAX_SHORT_IO_BYTES	(min(max(PAGE_SIZE, 16UL * 1024UL), \
--					 OST_SHORT_IO_SPACE & PAGE_MASK))
-+#define OBD_DEF_SHORT_IO_BYTES	min(max(PAGE_SIZE, 16UL * 1024UL), \
-+					OST_MAX_SHORT_IO_BYTES)
+-	if (lp_state & LNET_PEER_PING_FAILED) {
+-		CDEBUG(D_NET,
+-		       "Ping failed with %d. Set routes down for gw %s\n",
+-		       lp->lp_ping_error, libcfs_nid2str(lp->lp_primary_nid));
+-		/* If the ping failed then mark the routes served by this
+-		 * peer down
++	if (lp_state & LNET_PEER_PING_FAILED ||
++	    pbuf->pb_info.pi_features & LNET_PING_FEAT_RTE_DISABLED) {
++		CDEBUG(D_NET, "Set routes down for gw %s because %s %d\n",
++		       libcfs_nid2str(lp->lp_primary_nid),
++		       lp_state & LNET_PEER_PING_FAILED ? "ping failed" :
++		       "route feature is disabled", lp->lp_ping_error);
++		/* If the ping failed or the peer has routing disabled then
++		 * mark the routes served by this peer down
+ 		 */
+ 		list_for_each_entry(route, &lp->lp_routes, lr_gwlist)
+ 			lnet_set_route_aliveness(route, false);
+@@ -359,13 +361,6 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 			    route->lr_gateway->lp_primary_nid)
+ 				continue;
  
- /* Macro to hide a typecast and BUILD_BUG. */
- #define ptlrpc_req_async_args(_var, req) ({				\
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index 127ed32..58919d3 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -381,7 +381,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	 */
- 	cli->cl_max_pages_per_rpc = PTLRPC_MAX_BRW_PAGES;
- 
--	cli->cl_max_short_io_bytes = OBD_MAX_SHORT_IO_BYTES;
-+	cli->cl_max_short_io_bytes = OBD_DEF_SHORT_IO_BYTES;
- 
- 	/*
- 	 * set cl_chunkbits default value to PAGE_CACHE_SHIFT,
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 98d1e3b..806d6517 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -1894,18 +1894,24 @@ ssize_t short_io_bytes_store(struct kobject *kobj, struct attribute *attr,
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kset.kobj);
- 	struct client_obd *cli = &dev->u.cli;
--	u32 val;
-+	unsigned long long val;
-+	char *endp;
- 	int rc;
- 
- 	rc = lprocfs_climp_check(dev);
- 	if (rc)
- 		return rc;
- 
--	rc = kstrtouint(buffer, 0, &val);
--	if (rc)
-+	val = memparse(buffer, &endp);
-+	if (*endp) {
-+		rc = -EINVAL;
- 		goto out;
-+	}
-+
-+	if (val == -1)
-+		val = OBD_DEF_SHORT_IO_BYTES;
- 
--	if (val && (val < MIN_SHORT_IO_BYTES || val > OBD_MAX_SHORT_IO_BYTES)) {
-+	if (val && (val < MIN_SHORT_IO_BYTES || val > LNET_MTU)) {
- 		rc = -ERANGE;
- 		goto out;
- 	}
-@@ -1913,10 +1919,8 @@ ssize_t short_io_bytes_store(struct kobject *kobj, struct attribute *attr,
- 	rc = count;
- 
- 	spin_lock(&cli->cl_loi_list_lock);
--	if (val > (cli->cl_max_pages_per_rpc << PAGE_SHIFT))
--		rc = -ERANGE;
--	else
--		cli->cl_max_short_io_bytes = val;
-+	cli->cl_max_short_io_bytes = min_t(unsigned long long,
-+					   val, OST_MAX_SHORT_IO_BYTES);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
- out:
+-			/* gateway has the routing feature disabled */
+-			if (pbuf->pb_info.pi_features &
+-			      LNET_PING_FEAT_RTE_DISABLED) {
+-				lnet_set_route_aliveness(route, false);
+-				continue;
+-			}
+-
+ 			llpn = lnet_peer_get_net_locked(lp, route->lr_lnet);
+ 			if (!llpn) {
+ 				lnet_set_route_aliveness(route, false);
 -- 
 1.8.3.1
