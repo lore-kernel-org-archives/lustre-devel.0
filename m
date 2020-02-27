@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:13 -0500
-Subject: [lustre-devel] [PATCH 205/622] lustre: llog: add startcat for
- wrapped catalog
+Date: Thu, 27 Feb 2020 16:11:14 -0500
+Subject: [lustre-devel] [PATCH 206/622] lustre: llog: add synchronization
+ for the last record
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-206-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-207-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,100 +13,142 @@ To: lustre-devel@lists.lustre.org
 
 From: Alexander Boyko <c17825@cray.com>
 
-The osp_sync_thread loop for a llog_cat_process has a mistake.
-When llog_cat_process has reached a bottom of catalog, the processing
-restarts with 0. Which means a default processing. In this case a
-catalog is wrapped and processing starts from a llh_cat_idx. But
-records at the bottom were processed already, and were not cancelled
-yet. The next message appears at log.
-osp_sync_interpret()) reply req ffff8800123e3600/1, rc -2, transno 0
+The initial problem was a race between llog_process_thread
+and llog_osd_write_rec for a last record with lgh_last_idx.
+The catalog should be wrapped for the problem. The lgh_last_idx
+could be increased with a modification of llog bitmap, and a writing
+record happen a bit later. When llog_process_thread processing
+lgh_last_idx after modification and before a write it operates
+with old record data.
 
-llog_cat_process support startcat index for processing catalog.
-In this case the processing starts from startcat index. But if
-catalog is wrapped startcat index is ignored.
+The lustre client is only a consumer of llog records but we still
+need the changes to better handle consumption of the llog records.
 
-The patch adds supporting of startcat index for wrapped catalog.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10913
-Cray-bug-id: LUS-6765
-Lustre-commit: 8109c9e1718d ("LU-10913 llog: add startcat for wrapped catalog")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11591
+Lustre-commit: ec4194e4e78c ("LU-11591 llog: add synchronization for the last record")
 Signed-off-by: Alexander Boyko <c17825@cray.com>
-Reviewed-on: https://review.whamcloud.com/33749
-Reviewed-by: Sergey Cheremencev <c17829@cray.com>
+Cray-bug-id: LUS-6683
+Reviewed-on: https://review.whamcloud.com/33683
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/llog_cat.c          | 33 ++++++++++++++++++++++++---------
- include/uapi/linux/lustre/lustre_idl.h |  5 +++++
- 2 files changed, 29 insertions(+), 9 deletions(-)
+ fs/lustre/obdclass/llog.c | 68 ++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 50 insertions(+), 18 deletions(-)
 
-diff --git a/fs/lustre/obdclass/llog_cat.c b/fs/lustre/obdclass/llog_cat.c
-index ca97e08..30b0ac5 100644
---- a/fs/lustre/obdclass/llog_cat.c
-+++ b/fs/lustre/obdclass/llog_cat.c
-@@ -222,7 +222,7 @@ static int llog_cat_process_or_fork(const struct lu_env *env,
- 	LASSERT(llh->llh_flags & LLOG_F_IS_CAT);
- 	d.lpd_data = data;
- 	d.lpd_cb = cb;
--	d.lpd_startcat = startcat;
-+	d.lpd_startcat = (startcat == LLOG_CAT_FIRST ? 0 : startcat);
- 	d.lpd_startidx = startidx;
+diff --git a/fs/lustre/obdclass/llog.c b/fs/lustre/obdclass/llog.c
+index 65384ded..4e9fd17 100644
+--- a/fs/lustre/obdclass/llog.c
++++ b/fs/lustre/obdclass/llog.c
+@@ -230,10 +230,11 @@ static int llog_process_thread(void *arg)
+ 	struct llog_process_cat_data *cd  = lpi->lpi_catdata;
+ 	char *buf;
+ 	u64 cur_offset, tmp_offset;
+-	int chunk_size;
++	size_t chunk_size;
+ 	int rc = 0, index = 1, last_index;
+ 	int saved_index = 0;
+ 	int last_called_index = 0;
++	bool repeated = false;
  
- 	if (llh->llh_cat_idx > cat_llh->lgh_last_idx) {
-@@ -231,14 +231,29 @@ static int llog_cat_process_or_fork(const struct lu_env *env,
- 		CWARN("%s: catlog " DFID " crosses index zero\n",
- 		      cat_llh->lgh_ctxt->loc_obd->obd_name,
- 		      PFID(&cat_llh->lgh_id.lgl_oi.oi_fid));
--
--		cd.lpcd_first_idx = llh->llh_cat_idx;
--		cd.lpcd_last_idx = 0;
--		rc = llog_process_or_fork(env, cat_llh, cat_cb, &d, &cd, fork);
--		if (rc != 0)
--			return rc;
--
--		cd.lpcd_first_idx = 0;
-+		/*startcat = 0 is default value for general processing */
-+		if ((startcat != LLOG_CAT_FIRST &&
-+		    startcat >= llh->llh_cat_idx) || !startcat) {
-+			/* processing the catalog part at the end */
-+			cd.lpcd_first_idx = (startcat ? startcat :
-+					     llh->llh_cat_idx);
-+			cd.lpcd_last_idx = 0;
-+			rc = llog_process_or_fork(env, cat_llh, cat_cb,
-+						  &d, &cd, fork);
-+			/* Reset the startcat because it has already reached
-+			 * catalog bottom.
-+			 */
-+			startcat = 0;
-+			if (rc != 0)
-+				return rc;
-+		}
-+		/* processing the catalog part at the beginning */
-+		cd.lpcd_first_idx = (startcat == LLOG_CAT_FIRST) ? 0 : startcat;
-+		/* Note, the processing will stop at the lgh_last_idx value,
-+		 * and it could be increased during processing. So records
-+		 * between current lgh_last_idx and lgh_last_idx in future
-+		 * would left unprocessed.
+ 	if (!llh)
+ 		return -EINVAL;
+@@ -261,8 +262,10 @@ static int llog_process_thread(void *arg)
+ 	while (rc == 0) {
+ 		unsigned int buf_offset = 0;
+ 		struct llog_rec_hdr *rec;
++		off_t chunk_offset = 0;
+ 		bool partial_chunk;
+-		off_t chunk_offset;
++		int synced_idx = 0;
++		int lh_last_idx;
+ 
+ 		/* skip records not set in bitmap */
+ 		while (index <= last_index &&
+@@ -277,8 +280,23 @@ static int llog_process_thread(void *arg)
+ repeat:
+ 		/* get the buf with our target record; avoid old garbage */
+ 		memset(buf, 0, chunk_size);
++		/* the record index for outdated chunk data */
++		/* it is safe to process buffer until saved lgh_last_idx */
++		lh_last_idx = LLOG_HDR_TAIL(llh)->lrt_index;
+ 		rc = llog_next_block(lpi->lpi_env, loghandle, &saved_index,
+ 				     index, &cur_offset, buf, chunk_size);
++		if (repeated && rc)
++			CDEBUG(D_OTHER,
++			       "cur_offset %llu, chunk_offset %llu, buf_offset %u, rc = %d\n",
++			       cur_offset, (u64)chunk_offset, buf_offset, rc);
++		/* we`ve tried to reread the chunk, but there is no
++		 * new records
 +		 */
- 		cd.lpcd_last_idx = cat_llh->lgh_last_idx;
- 		rc = llog_process_or_fork(env, cat_llh, cat_cb, &d, &cd, fork);
- 	} else {
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 77b9539..76068ee 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -2618,6 +2618,11 @@ enum llog_flag {
- 			  LLOG_F_EXT_X_OMODE | LLOG_F_EXT_X_XATTR,
- };
++		if (rc == -EIO && repeated && (chunk_offset + buf_offset) ==
++		    cur_offset) {
++			rc = 0;
++			goto out;
++		}
+ 		if (rc)
+ 			goto out;
  
-+/* means first record of catalog */
-+enum {
-+	LLOG_CAT_FIRST = -1,
-+};
+@@ -313,29 +331,43 @@ static int llog_process_thread(void *arg)
+ 			CDEBUG(D_OTHER, "after swabbing, type=%#x idx=%d\n",
+ 			       rec->lrh_type, rec->lrh_index);
+ 
+-			/*
+-			 * for partial chunk the end of it is zeroed, check
+-			 * for index 0 to distinguish it.
++			if (index == (synced_idx + 1) &&
++			    synced_idx == LLOG_HDR_TAIL(llh)->lrt_index) {
++				rc = 0;
++				goto out;
++			}
 +
- /* On-disk header structure of each log object, stored in little endian order */
- #define LLOG_MIN_CHUNK_SIZE	8192
- #define LLOG_HEADER_SIZE	(96)	/* sizeof (llog_log_hdr) +
++			/* the bitmap could be changed during processing
++			 * records from the chunk. For wrapped catalog
++			 * it means we can read deleted record and try to
++			 * process it. Check this case and reread the chunk.
++			 * It is safe to process to lh_last_idx, including
++			 * lh_last_idx if it was synced. We can not do <=
++			 * comparison, cause for wrapped catalog lgh_last_idx
++			 * could be less than index. So we detect last index
++			 * for processing as index == lh_last_idx+1. But when
++			 * catalog is wrapped and full lgh_last_idx=llh_cat_idx,
++			 * the first processing index is llh_cat_idx+1.
+ 			 */
+-			if (partial_chunk && !rec->lrh_index) {
+-				/* concurrent llog_add() might add new records
+-				 * while llog_processing, check this is not
+-				 * the case and re-read the current chunk
+-				 * otherwise.
+-				 */
+-				if (index > loghandle->lgh_last_idx) {
+-					rc = 0;
+-					goto out;
+-				}
+-				CDEBUG(D_OTHER,
+-				       "Re-read last llog buffer for new records, index %u, last %u\n",
+-				       index, loghandle->lgh_last_idx);
++			if ((index == lh_last_idx && synced_idx != index) ||
++			    (index == (lh_last_idx + 1) &&
++			     !(index == (llh->llh_cat_idx + 1) &&
++			       (llh->llh_flags & LLOG_F_IS_CAT))) ||
++			     (rec->lrh_index == 0 && !repeated)) {
+ 				/* save offset inside buffer for the re-read */
+ 				buf_offset = (char *)rec - (char *)buf;
+ 				cur_offset = chunk_offset;
++				repeated = true;
++				/* We need to be sure lgh_last_idx
++				 * record was saved to disk
++				 */
++				synced_idx = LLOG_HDR_TAIL(llh)->lrt_index;
++				CDEBUG(D_OTHER, "synced_idx: %d\n", synced_idx);
+ 				goto repeat;
+ 			}
+ 
++			repeated = false;
++
+ 			if (!rec->lrh_len || rec->lrh_len > chunk_size) {
+ 				CWARN("invalid length %d in llog record for index %d/%d\n",
+ 				      rec->lrh_len,
 -- 
 1.8.3.1
