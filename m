@@ -1,167 +1,104 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:32 -0500
-Subject: [lustre-devel] [PATCH 524/622] lustre: lov: check all entries in
- lov_flush_composite
+Date: Thu, 27 Feb 2020 16:14:48 -0500
+Subject: [lustre-devel] [PATCH 420/622] lustre: ptlrpc: Don't get jobid in
+ body_v2
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-525-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-421-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Vladimir Saveliev <c17830@cray.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Check all layout entries for DOM layout and exit with
--ENODATA if no one exists. Caller consider that as valid
-case due to layout change.
+Some Lustre messages are still sent with ptlrpc_body_v2,
+which does not have space for the jobid.
 
-Define llo_flush methods for all layouts as required
-by lov_dispatch().
+This results in errors like this when getting the jobid
+from these messages, which we do now that the jobid is in
+all RPC debug:
+LustreError: 6817:0:(pack_generic.c:425:lustre_msg_buf_v2()) msg
+000000005c83b7a2 buffer[0] size 152 too small (required 184, opc=-1)
 
-Patch cleans up also cl_dom_size field in cl_layout which
-was used in previous ll_dom_lock_cancel() implementation
+While we should stop sending ptlrpc_body_v2 messages, we
+we still have to support these messages from older servers.
+So put a check in lustre_msg_get_jobid so it won't try to
+get the jobid if it's the old, smaller RPC body.
 
-Run lov_flush_composite under down_read lov->lo_type_guard to avoid
-race with layout change.
-
-Fixes: 865a95df36 ("lustre: llite: improve ll_dom_lock_cancel")
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12704
-Lustre-commit: 44460570fd21 ("LU-12704 lov: check all entries in lov_flush_composite")
-Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
-Signed-off-by: Vladimir Saveliev <c17830@cray.com>
-Reviewed-on: https://review.whamcloud.com/36368
+Fixes: 9eabc4eaba47 ("lustre: ptlrpc: Add jobid to rpctrace debug messages")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12523
+Lustre-commit: 544701a782fb ("LU-12523 ptlrpc: Don't get jobid in body_v2")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35584
+Reviewed-by: Ann Koehler <amk@cray.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h |  2 --
- fs/lustre/llite/namei.c       |  6 ++++++
- fs/lustre/lov/lov_object.c    | 42 +++++++++++++++++++++++-------------------
- 3 files changed, 29 insertions(+), 21 deletions(-)
+ fs/lustre/ptlrpc/client.c       | 4 ++--
+ fs/lustre/ptlrpc/pack_generic.c | 3 ++-
+ fs/lustre/ptlrpc/service.c      | 4 ++--
+ 3 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index c3376a4..67731b0 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -287,8 +287,6 @@ struct cl_layout {
- 	struct lu_buf		cl_buf;
- 	/** size of layout in lov_mds_md format. */
- 	size_t			cl_size;
--	/** size of DoM component if exists or zero otherwise */
--	u64			cl_dom_comp_size;
- 	/** Layout generation. */
- 	u32			cl_layout_gen;
- 	/** whether layout is a composite one */
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 5b9f3a7..c87653d 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -198,6 +198,12 @@ static int ll_dom_lock_cancel(struct inode *inode, struct ldlm_lock *lock)
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index bd641cc..9920a95 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -1644,7 +1644,7 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
+ 	       imp->imp_obd->obd_uuid.uuid,
+ 	       lustre_msg_get_status(req->rq_reqmsg), req->rq_xid,
+ 	       obd_import_nid2str(imp), lustre_msg_get_opc(req->rq_reqmsg),
+-	       lustre_msg_get_jobid(req->rq_reqmsg));
++	       lustre_msg_get_jobid(req->rq_reqmsg) ?: "");
  
- 	/* reach MDC layer to flush data under  the DoM ldlm lock */
- 	rc = cl_object_flush(env, lli->lli_clob, lock);
-+	if (rc == -ENODATA) {
-+		CDEBUG(D_INODE, "inode "DFID" layout has no DoM stripe\n",
-+		       PFID(ll_inode2fid(inode)));
-+		/* most likely result of layout change, do nothing */
-+		rc = 0;
-+	}
+ 	rc = ptl_send_rpc(req, 0);
+ 	if (rc == -ENOMEM) {
+@@ -2065,7 +2065,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 			       req->rq_xid,
+ 			       obd_import_nid2str(imp),
+ 			       lustre_msg_get_opc(req->rq_reqmsg),
+-			       lustre_msg_get_jobid(req->rq_reqmsg));
++			       lustre_msg_get_jobid(req->rq_reqmsg) ?: "");
  
- 	cl_env_put(env, &refcheck);
- 	return rc;
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index 5c4d8f9..f2c7bc2 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -1048,13 +1048,23 @@ static int lov_flush_composite(const struct lu_env *env,
- 			       struct ldlm_lock *lock)
- {
- 	struct lov_object *lov = cl2lov(obj);
--	struct lovsub_object *lovsub;
-+	struct lov_layout_entry *lle;
-+	int rc = -ENODATA;
- 
--	if (!lsme_is_dom(lov->lo_lsm->lsm_entries[0]))
--		return -EINVAL;
-+	lov_foreach_layout_entry(lov, lle) {
-+		if (!lsme_is_dom(lle->lle_lsme))
-+			continue;
-+		rc = cl_object_flush(env, lovsub2cl(lle->lle_dom.lo_dom), lock);
-+		break;
-+	}
-+
-+	return rc;
-+}
- 
--	lovsub = lov->u.composite.lo_entries[0].lle_dom.lo_dom;
--	return cl_object_flush(env, lovsub2cl(lovsub), lock);
-+static int lov_flush_empty(const struct lu_env *env, struct cl_object *obj,
-+			   struct ldlm_lock *lock)
-+{
-+	return 0;
+ 		spin_lock(&imp->imp_lock);
+ 		/*
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 7acb4a8..b066113 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -2429,7 +2429,8 @@ void _debug_req(struct ptlrpc_request *req,
+ 			 DEBUG_REQ_FLAGS(req),
+ 			 req_ok ? lustre_msg_get_flags(req->rq_reqmsg) : -1,
+ 			 rep_flags, req->rq_status, rep_status,
+-			 req_ok ? lustre_msg_get_jobid(req->rq_reqmsg) : "");
++			 req_ok ? lustre_msg_get_jobid(req->rq_reqmsg) ?: ""
++				: "");
+ 	va_end(args);
  }
+ EXPORT_SYMBOL(_debug_req);
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index 3132a1e..f40cb8d 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -1765,7 +1765,7 @@ static int ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       lustre_msg_get_status(request->rq_reqmsg), request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
+ 	       lustre_msg_get_opc(request->rq_reqmsg),
+-	       lustre_msg_get_jobid(request->rq_reqmsg));
++	       lustre_msg_get_jobid(request->rq_reqmsg) ?: "");
  
- const static struct lov_layout_operations lov_dispatch[] = {
-@@ -1066,7 +1076,8 @@ static int lov_flush_composite(const struct lu_env *env,
- 		.llo_page_init	= lov_page_init_empty,
- 		.llo_lock_init	= lov_lock_init_empty,
- 		.llo_io_init	= lov_io_init_empty,
--		.llo_getattr	= lov_attr_get_empty
-+		.llo_getattr	= lov_attr_get_empty,
-+		.llo_flush	= lov_flush_empty,
- 	},
- 	[LLT_RELEASED] = {
- 		.llo_init	= lov_init_released,
-@@ -1076,7 +1087,8 @@ static int lov_flush_composite(const struct lu_env *env,
- 		.llo_page_init	= lov_page_init_empty,
- 		.llo_lock_init	= lov_lock_init_empty,
- 		.llo_io_init	= lov_io_init_released,
--		.llo_getattr	= lov_attr_get_empty
-+		.llo_getattr	= lov_attr_get_empty,
-+		.llo_flush	= lov_flush_empty,
- 	},
- 	[LLT_COMP] = {
- 		.llo_init	= lov_init_composite,
-@@ -1098,6 +1110,7 @@ static int lov_flush_composite(const struct lu_env *env,
- 		.llo_lock_init = lov_lock_init_empty,
- 		.llo_io_init   = lov_io_init_empty,
- 		.llo_getattr   = lov_attr_get_empty,
-+		.llo_flush	= lov_flush_empty,
- 	},
- };
- 
-@@ -2085,18 +2098,8 @@ static int lov_object_layout_get(const struct lu_env *env,
- 
- 	cl->cl_size = lov_comp_md_size(lsm);
- 	cl->cl_layout_gen = lsm->lsm_layout_gen;
--	cl->cl_dom_comp_size = 0;
- 	cl->cl_is_released = lsm->lsm_is_released;
--	if (lsm_is_composite(lsm->lsm_magic)) {
--		struct lov_stripe_md_entry *lsme = lsm->lsm_entries[0];
--
--		cl->cl_is_composite = true;
--
--		if (lsme_is_dom(lsme))
--			cl->cl_dom_comp_size = lsme->lsme_extent.e_end;
--	} else {
--		cl->cl_is_composite = false;
--	}
-+	cl->cl_is_composite = lsm_is_composite(lsm->lsm_magic);
- 
- 	rc = lov_lsm_pack(lsm, buf->lb_buf, buf->lb_len);
- 	lov_lsm_put(lsm);
-@@ -2123,7 +2126,8 @@ static loff_t lov_object_maxbytes(struct cl_object *obj)
- static int lov_object_flush(const struct lu_env *env, struct cl_object *obj,
- 			    struct ldlm_lock *lock)
- {
--	return LOV_2DISPATCH_NOLOCK(cl2lov(obj), llo_flush, env, obj, lock);
-+	return LOV_2DISPATCH_MAYLOCK(cl2lov(obj), llo_flush, true, env, obj,
-+				     lock);
- }
- 
- static const struct cl_object_operations lov_ops = {
+ 	if (lustre_msg_get_opc(request->rq_reqmsg) != OBD_PING)
+ 		CFS_FAIL_TIMEOUT_MS(OBD_FAIL_PTLRPC_PAUSE_REQ, cfs_fail_val);
+@@ -1807,7 +1807,7 @@ static int ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
+ 	       request->rq_xid,
+ 	       libcfs_id2str(request->rq_peer),
+ 	       lustre_msg_get_opc(request->rq_reqmsg),
+-	       lustre_msg_get_jobid(request->rq_reqmsg),
++	       lustre_msg_get_jobid(request->rq_reqmsg) ?: "",
+ 	       timediff_usecs,
+ 	       arrived_usecs,
+ 	       (request->rq_repmsg ?
 -- 
 1.8.3.1
