@@ -1,130 +1,107 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:36 -0500
-Subject: [lustre-devel] [PATCH 228/622] lustre: llite: limit statfs ffree if
- less than OST ffree
+Date: Thu, 27 Feb 2020 16:08:44 -0500
+Subject: [lustre-devel] [PATCH 056/622] lustre: ptlrpc: Serialize procfs
+ access to scp_hist_reqs using mutex
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-229-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-57-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-If the OSTs report fewer total free objects than the MDTs, then
-use the free files count reported by the OSTs, since it represents
-the minimum number of files that can be created in the filesystem
-(creating more may be possible, but this depends on other factors).
-This has always been what ll_statfs_internal() reports, but the
-statfs aggregation via the MDT missed this step in lod_statfs().
+scp_hist_reqs list can be quite long thus a lot of
+userland processes can waste CPU power in spinlock cycles.
 
-Fix a minor defect in sanity test_418() that would let it loop
-forever until the test was killed due to timeout if the "df -i"
-and "lfs df -i" output did not converge.
-
-Fixes: 41a201a04c0f ("lustre: protocol: MDT as a statfs proxy")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11721
-Lustre-commit: a829595add80 ("LU-11721 lod: limit statfs ffree if less than OST ffree")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34167
-Reviewed-by: Jian Yu <yujian@whamcloud.com>
-Reviewed-by: Nikitas Angelinas <nangelinas@cray.com>
+Cray-bug-id: LUS-5833
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11004
+Lustre-commit: 413a738a37d7 ("LU-11004 ptlrpc: Serialize procfs access to scp_hist_reqs using mutex")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-by: Alexander Boyko <c17825@cray.com>
+Reviewed-on: https://review.whamcloud.com/32307
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_class.h |  5 +++--
- fs/lustre/llite/llite_lib.c   | 22 +++++++++++-----------
- fs/lustre/lmv/lmv_obd.c       |  4 ++--
- 3 files changed, 16 insertions(+), 15 deletions(-)
+ fs/lustre/include/lustre_net.h  | 2 ++
+ fs/lustre/ptlrpc/lproc_ptlrpc.c | 7 +++++++
+ fs/lustre/ptlrpc/service.c      | 1 +
+ 3 files changed, 10 insertions(+)
 
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index 434bb79..6a4b6a5 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -898,8 +898,9 @@ static inline int obd_statfs_async(struct obd_export *exp,
- 
- 	obd = exp->exp_obd;
- 	if (!obd->obd_type || !obd->obd_type->typ_dt_ops->statfs) {
--		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
--		return -EOPNOTSUPP;
-+		rc = -EOPNOTSUPP;
-+		CERROR("%s: no statfs operation: rc = %d\n", obd->obd_name, rc);
-+		return rc;
- 	}
- 
- 	CDEBUG(D_SUPER, "%s: age %lld, max_age %lld\n",
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 84fc54d..4d41981a 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -1723,17 +1723,15 @@ int ll_setattr(struct dentry *de, struct iattr *attr)
- int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
- 		       u32 flags)
- {
--	struct obd_statfs obd_osfs;
-+	struct obd_statfs obd_osfs = { 0 };
- 	time64_t max_age;
- 	int rc;
- 
- 	max_age = ktime_get_seconds() - OBD_STATFS_CACHE_SECONDS;
- 
- 	rc = obd_statfs(NULL, sbi->ll_md_exp, osfs, max_age, flags);
--	if (rc) {
--		CERROR("md_statfs fails: rc = %d\n", rc);
-+	if (rc)
- 		return rc;
--	}
- 
- 	osfs->os_type = LL_SUPER_MAGIC;
- 
-@@ -1749,8 +1747,9 @@ int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
- 
- 	rc = obd_statfs(NULL, sbi->ll_dt_exp, &obd_osfs, max_age, flags);
- 	if (rc) {
--		CERROR("obd_statfs fails: rc = %d\n", rc);
--		return rc;
-+		/* Possibly a filesystem with no OSTs.  Report MDT totals. */
-+		rc = 0;
-+		goto out;
- 	}
- 
- 	CDEBUG(D_SUPER, "OSC blocks %llu/%llu objects %llu/%llu\n",
-@@ -1762,13 +1761,14 @@ int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
- 	osfs->os_bfree = obd_osfs.os_bfree;
- 	osfs->os_bavail = obd_osfs.os_bavail;
- 
--	/* If we don't have as many objects free on the OST as inodes
--	 * on the MDS, we reduce the total number of inodes to
--	 * compensate, so that the "inodes in use" number is correct.
-+	/* If we have _some_ OSTs, but don't have as many free objects on the
-+	 * OSTs as inodes on the MDTs, reduce the reported number of inodes
-+	 * to compensate, so that the "inodes in use" number is correct.
-+	 * This should be kept in sync with lod_statfs() behaviour.
+diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
+index 674803c..cf13555 100644
+--- a/fs/lustre/include/lustre_net.h
++++ b/fs/lustre/include/lustre_net.h
+@@ -1543,6 +1543,8 @@ struct ptlrpc_service_part {
+ 	 * threads starting & stopping are also protected by this lock.
  	 */
--	if (obd_osfs.os_ffree < osfs->os_ffree) {
-+	if (obd_osfs.os_files && obd_osfs.os_ffree < osfs->os_ffree) {
- 		osfs->os_files = (osfs->os_files - osfs->os_ffree) +
--			obd_osfs.os_ffree;
-+				 obd_osfs.os_ffree;
- 		osfs->os_ffree = obd_osfs.os_ffree;
+ 	spinlock_t			scp_lock __cfs_cacheline_aligned;
++	/* userland serialization */
++	struct mutex			scp_mutex;
+ 	/** total # req buffer descs allocated */
+ 	int				scp_nrqbds_total;
+ 	/** # posted request buffers for receiving */
+diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+index e48a4e8..0efbcfc 100644
+--- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -869,10 +869,12 @@ struct ptlrpc_srh_iterator {
+ 		if (i > cpt) /* make up the lowest position for this CPT */
+ 			*pos = PTLRPC_REQ_CPT2POS(svc, i);
+ 
++		mutex_lock(&svcpt->scp_mutex);
+ 		spin_lock(&svcpt->scp_lock);
+ 		rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi,
+ 				PTLRPC_REQ_POS2SEQ(svc, *pos));
+ 		spin_unlock(&svcpt->scp_lock);
++		mutex_unlock(&svcpt->scp_mutex);
+ 		if (rc == 0) {
+ 			*pos = PTLRPC_REQ_SEQ2POS(svc, srhi->srhi_seq);
+ 			srhi->srhi_idx = i;
+@@ -914,9 +916,11 @@ struct ptlrpc_srh_iterator {
+ 			seq = srhi->srhi_seq + (1 << svc->srv_cpt_bits);
+ 		}
+ 
++		mutex_lock(&svcpt->scp_mutex);
+ 		spin_lock(&svcpt->scp_lock);
+ 		rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi, seq);
+ 		spin_unlock(&svcpt->scp_lock);
++		mutex_unlock(&svcpt->scp_mutex);
+ 		if (rc == 0) {
+ 			*pos = PTLRPC_REQ_SEQ2POS(svc, srhi->srhi_seq);
+ 			srhi->srhi_idx = i;
+@@ -940,6 +944,7 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+ 
+ 	svcpt = svc->srv_parts[srhi->srhi_idx];
+ 
++	mutex_lock(&svcpt->scp_mutex);
+ 	spin_lock(&svcpt->scp_lock);
+ 
+ 	rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi, srhi->srhi_seq);
+@@ -980,6 +985,8 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
  	}
  
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 0685925..6ad100c 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -1402,8 +1402,8 @@ static int lmv_statfs(const struct lu_env *env, struct obd_export *exp,
- 		rc = obd_statfs(env, lmv->tgts[idx]->ltd_exp, temp,
- 				max_age, flags);
- 		if (rc) {
--			CERROR("can't stat MDS #%d (%s), error %d\n", i,
--			       lmv->tgts[idx]->ltd_exp->exp_obd->obd_name,
-+			CERROR("%s: can't stat MDS #%d: rc = %d\n",
-+			       lmv->tgts[idx]->ltd_exp->exp_obd->obd_name, i,
- 			       rc);
- 			goto out_free_temp;
- 		}
+ 	spin_unlock(&svcpt->scp_lock);
++	mutex_unlock(&svcpt->scp_mutex);
++
+ 	return rc;
+ }
+ 
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index 8dae21a..cf920ae 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -471,6 +471,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+ 
+ 	/* rqbd and incoming request queue */
+ 	spin_lock_init(&svcpt->scp_lock);
++	mutex_init(&svcpt->scp_mutex);
+ 	INIT_LIST_HEAD(&svcpt->scp_rqbd_idle);
+ 	INIT_LIST_HEAD(&svcpt->scp_rqbd_posted);
+ 	INIT_LIST_HEAD(&svcpt->scp_req_incoming);
 -- 
 1.8.3.1
