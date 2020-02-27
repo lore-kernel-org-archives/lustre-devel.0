@@ -1,97 +1,109 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:18 -0500
-Subject: [lustre-devel] [PATCH 570/622] lnet: Refactor
- lnet_find_best_lpni_on_net
+Date: Thu, 27 Feb 2020 16:12:19 -0500
+Subject: [lustre-devel] [PATCH 271/622] lustre: llite: improve max_readahead
+ console messages
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-571-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-272-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-Replace lnet_send_data argument.
+Improve the max_readahead_mb, max_readahead_per_file_mb, and
+max_read_ahead_whole_mb console error messages to print the
+parameters properly in MB instead of PAGE_SIZE units, and include
+the filesystem name and bad parameters in the output.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12756
-Lustre-commit: 80edb2ad72ba ("LU-12756 lnet: Refactor lnet_find_best_lpni_on_net")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/36534
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-1095
+Lustre-commit: 48a0697d7910 ("LU-1095 llite: improve max_readahead console messages")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: http://review.whamcloud.com/12399
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-by: Oleg Drokin green at whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ fs/lustre/llite/lproc_llite.c | 28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 73f9d20..c8266f0 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -1247,8 +1247,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+index 197c09c..cc9f80e 100644
+--- a/fs/lustre/llite/lproc_llite.c
++++ b/fs/lustre/llite/lproc_llite.c
+@@ -346,16 +346,19 @@ static ssize_t max_read_ahead_mb_store(struct kobject *kobj,
+ 					      ll_kset.kobj);
+ 	int rc;
+ 	unsigned long pages_number;
++	int pages_shift;
  
- /* Prerequisite: the best_ni should already be set in the sd */
- static inline struct lnet_peer_ni *
--lnet_find_best_lpni_on_net(struct lnet_send_data *sd, struct lnet_peer *peer,
--			   u32 net_id)
-+lnet_find_best_lpni_on_net(struct lnet_ni *lni, lnet_nid_t dst_nid,
-+			   struct lnet_peer *peer, u32 net_id)
- {
- 	struct lnet_peer_net *peer_net;
++	pages_shift = 20 - PAGE_SHIFT;
+ 	rc = kstrtoul(buffer, 10, &pages_number);
+ 	if (rc)
+ 		return rc;
  
-@@ -1264,8 +1264,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		return NULL;
+-	pages_number *= 1 << (20 - PAGE_SHIFT); /* MB -> pages */
++	pages_number <<= pages_shift; /* MB -> pages */
+ 
+ 	if (pages_number > totalram_pages() / 2) {
+-		CERROR("can't set file readahead more than %lu MB\n",
+-		       totalram_pages() >> (20 - PAGE_SHIFT + 1)); /*1/2 of RAM*/
++		CERROR("%s: can't set max_readahead_mb=%lu > %luMB\n",
++		       sbi->ll_fsname, pages_number >> pages_shift,
++		       totalram_pages() >> (pages_shift + 1)); /*1/2 of RAM*/
+ 		return -ERANGE;
  	}
  
--	return lnet_select_peer_ni(sd->sd_best_ni, sd->sd_dst_nid,
--				   peer, peer_net);
-+	return lnet_select_peer_ni(lni, dst_nid, peer, peer_net);
- }
- 
- static int
-@@ -1278,13 +1277,12 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	struct lnet_peer *lp2 = r2->lr_gateway;
- 	struct lnet_peer_ni *lpni1;
- 	struct lnet_peer_ni *lpni2;
--	struct lnet_send_data sd;
+@@ -393,14 +396,20 @@ static ssize_t max_read_ahead_per_file_mb_store(struct kobject *kobj,
+ 					      ll_kset.kobj);
  	int rc;
+ 	unsigned long pages_number;
++	int pages_shift;
  
--	sd.sd_best_ni = NULL;
--	sd.sd_dst_nid = LNET_NID_ANY;
--	lpni1 = lnet_find_best_lpni_on_net(&sd, lp1, r1->lr_lnet);
--	lpni2 = lnet_find_best_lpni_on_net(&sd, lp2, r2->lr_lnet);
-+	lpni1 = lnet_find_best_lpni_on_net(NULL, LNET_NID_ANY, lp1,
-+					   r1->lr_lnet);
-+	lpni2 = lnet_find_best_lpni_on_net(NULL, LNET_NID_ANY, lp2,
-+					   r2->lr_lnet);
- 	LASSERT(lpni1 && lpni2);
++	pages_shift = 20 - PAGE_SHIFT;
+ 	rc = kstrtoul(buffer, 10, &pages_number);
+ 	if (rc)
+ 		return rc;
  
- 	if (r1->lr_priority < r2->lr_priority) {
-@@ -1878,7 +1876,9 @@ struct lnet_ni *
- 			return -EHOSTUNREACH;
- 		}
++	pages_number <<= pages_shift; /* MB -> pages */
++
+ 	if (pages_number > sbi->ll_ra_info.ra_max_pages) {
+-		CERROR("can't set file readahead more than max_read_ahead_mb %lu MB\n",
+-		       sbi->ll_ra_info.ra_max_pages);
++		CERROR("%s: can't set max_readahead_per_file_mb=%lu > max_read_ahead_mb=%lu\n",
++		       sbi->ll_fsname,
++		       pages_number >> pages_shift,
++		       sbi->ll_ra_info.ra_max_pages >> pages_shift);
+ 		return -ERANGE;
+ 	}
  
--		sd->sd_best_lpni = lnet_find_best_lpni_on_net(sd, lp,
-+		sd->sd_best_lpni = lnet_find_best_lpni_on_net(sd->sd_best_ni,
-+							      sd->sd_dst_nid,
-+							      lp,
- 							      best_lpn->lpn_net_id);
- 		if (!sd->sd_best_lpni) {
- 			CERROR("peer %s down\n",
-@@ -2191,7 +2191,8 @@ struct lnet_ni *
- 					lnet_msg_discovery(sd->sd_msg));
- 	if (sd->sd_best_ni) {
- 		sd->sd_best_lpni =
--		  lnet_find_best_lpni_on_net(sd, sd->sd_peer,
-+		  lnet_find_best_lpni_on_net(sd->sd_best_ni, sd->sd_dst_nid,
-+					     sd->sd_peer,
- 					     sd->sd_best_ni->ni_net->net_id);
+@@ -438,17 +447,22 @@ static ssize_t max_read_ahead_whole_mb_store(struct kobject *kobj,
+ 					      ll_kset.kobj);
+ 	int rc;
+ 	unsigned long pages_number;
++	int pages_shift;
  
- 		/* if we're successful in selecting a peer_ni on the local
++	pages_shift = 20 - PAGE_SHIFT;
+ 	rc = kstrtoul(buffer, 10, &pages_number);
+ 	if (rc)
+ 		return rc;
++	pages_number <<= pages_shift; /* MB -> pages */
+ 
+ 	/* Cap this at the current max readahead window size, the readahead
+ 	 * algorithm does this anyway so it's pointless to set it larger.
+ 	 */
+ 	if (pages_number > sbi->ll_ra_info.ra_max_pages_per_file) {
+-		CERROR("can't set max_read_ahead_whole_mb more than max_read_ahead_per_file_mb: %lu\n",
+-		       sbi->ll_ra_info.ra_max_pages_per_file >> (20 - PAGE_SHIFT));
++		CERROR("%s: can't set max_read_ahead_whole_mb=%lu > max_read_ahead_per_file_mb=%lu\n",
++		       sbi->ll_fsname,
++		       pages_number >> pages_shift,
++		       sbi->ll_ra_info.ra_max_pages_per_file >> pages_shift);
+ 		return -ERANGE;
+ 	}
+ 
 -- 
 1.8.3.1
