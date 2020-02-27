@@ -1,137 +1,98 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:12:17 -0500
-Subject: [lustre-devel] [PATCH 269/622] lnet: o2iblnd: kib_conn leak
+Date: Thu, 27 Feb 2020 16:12:21 -0500
+Subject: [lustre-devel] [PATCH 273/622] lustre: obd: update udev event
+ handling
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-270-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-274-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+Add a timestamp that users have requested so it can be recorded
+then a sysfs lustre file changed. Second the PARAM field only
+was created with the kobject source and parent name but the
+sysfs file could be deeper in the lustre sysfs tree. Add handling
+for deeper sysfs tree paths.
 
-A new tx can be queued while kiblnd_finalise_conn()
-aborts txs. Thus a reference from new tx will
-prevent connection from moving into kib_connd_zombies.
-
-Insert new tx after IBLND_CONN_DISCONNECTED into
-ibc_zombie_txs list and abort it during
-kiblnd_destroy_conn().
-
-Cray-bug-id: LUS-6412
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11756
-Lustre-commit: a155c3fca38d ("LU-11756 o2iblnd: kib_conn leak")
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-Reviewed-on: https://review.whamcloud.com/33828
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Chris Horn <hornc@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
+Lustre-commit: b0d162390ad6 ("LU-8066 obd: update udev event handling")
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/34624
+Reviewed-by: Emoly Liu <emoly@whamcloud.com>
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c    |  4 ++++
- net/lnet/klnds/o2iblnd/o2iblnd.h    |  5 ++++-
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 21 ++++++++++++++++++---
- 3 files changed, 26 insertions(+), 4 deletions(-)
+ fs/lustre/obdclass/obd_config.c | 30 ++++++++++++++++++++++--------
+ 1 file changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 0e207ef..bb7590f 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -744,6 +744,7 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
- 	INIT_LIST_HEAD(&conn->ibc_tx_queue_rsrvd);
- 	INIT_LIST_HEAD(&conn->ibc_tx_queue_nocred);
- 	INIT_LIST_HEAD(&conn->ibc_active_txs);
-+	INIT_LIST_HEAD(&conn->ibc_zombie_txs);
- 	spin_lock_init(&conn->ibc_lock);
+diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
+index 4b1848f..97cb8c1 100644
+--- a/fs/lustre/obdclass/obd_config.c
++++ b/fs/lustre/obdclass/obd_config.c
+@@ -773,7 +773,7 @@ static int process_param2_config(struct lustre_cfg *lcfg)
+ 	char *param = lustre_cfg_string(lcfg, 1);
+ 	struct kobject *kobj = NULL;
+ 	const char *subsys = param;
+-	char *envp[3];
++	char *envp[4];
+ 	char *value;
+ 	size_t len;
+ 	int rc;
+@@ -802,7 +802,9 @@ static int process_param2_config(struct lustre_cfg *lcfg)
+ 	param = strsep(&value, "=");
+ 	envp[0] = kasprintf(GFP_KERNEL, "PARAM=%s", param);
+ 	envp[1] = kasprintf(GFP_KERNEL, "SETTING=%s", value);
+-	envp[2] = NULL;
++	envp[2] = kasprintf(GFP_KERNEL, "TIME=%lld",
++			    ktime_get_real_seconds());
++	envp[3] = NULL;
  
- 	conn->ibc_connvars = kzalloc_cpt(sizeof(*conn->ibc_connvars), GFP_NOFS, cpt);
-@@ -951,6 +952,9 @@ void kiblnd_destroy_conn(struct kib_conn *conn)
- 	if (conn->ibc_cq)
- 		ib_destroy_cq(conn->ibc_cq);
+ 	rc = kobject_uevent_env(kobj, KOBJ_CHANGE, envp);
+ 	for (i = 0; i < ARRAY_SIZE(envp); i++)
+@@ -1128,14 +1130,25 @@ ssize_t class_modify_config(struct lustre_cfg *lcfg, const char *prefix,
+ 		}
  
-+	kiblnd_txlist_done(&conn->ibc_zombie_txs, -ECONNABORTED,
-+			   LNET_MSG_STATUS_OK);
+ 		if (!attr) {
+-			char *envp[3];
++			char *envp[4], *param, *path;
+ 
+-			envp[0] = kasprintf(GFP_KERNEL, "PARAM=%s.%s.%.*s",
+-					    kobject_name(kobj->parent),
+-					    kobject_name(kobj),
+-					    (int)keylen, key);
++			path = kobject_get_path(kobj, GFP_KERNEL);
++			if (!path)
++				return -EINVAL;
 +
- 	if (conn->ibc_rx_pages)
- 		kiblnd_unmap_rx_descs(conn);
- 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index baf1006..eb80d5e 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -581,7 +581,9 @@ struct kib_conn {
- 	struct list_head	ibc_tx_queue_rsrvd;   /* sends that need to */
- 						      /* reserve an ACK/DONE msg */
- 	struct list_head	ibc_active_txs;	/* active tx awaiting completion */
--	spinlock_t		ibc_lock;	/* serialise */
-+	spinlock_t		ibc_lock;	/* zombie tx awaiting done */
-+	struct list_head	ibc_zombie_txs;
-+	/* serialise */
- 	struct kib_rx		*ibc_rxs;	/* the rx descs */
- 	struct kib_pages	*ibc_rx_pages;	/* premapped rx msg pages */
- 
-@@ -1005,6 +1007,7 @@ static inline unsigned int kiblnd_sg_dma_len(struct ib_device *dev,
- #define KIBLND_CONN_PARAM(e)		((e)->param.conn.private_data)
- #define KIBLND_CONN_PARAM_LEN(e)	((e)->param.conn.private_data_len)
- 
-+void kiblnd_abort_txs(struct kib_conn *conn, struct list_head *txs);
- void kiblnd_map_rx_descs(struct kib_conn *conn);
- void kiblnd_unmap_rx_descs(struct kib_conn *conn);
- void kiblnd_pool_free_node(struct kib_pool *pool, struct list_head *node);
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index fa5c93a..a3abbb6 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1211,6 +1211,21 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	LASSERT(!tx->tx_queued);	/* not queued for sending already */
- 	LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
- 
-+	if (conn->ibc_state >= IBLND_CONN_DISCONNECTED) {
-+		tx->tx_status = -ECONNABORTED;
-+		tx->tx_waiting = 0;
-+		if (tx->tx_conn) {
-+			/* PUT_DONE first attached to conn as a PUT_REQ */
-+			LASSERT(tx->tx_conn == conn);
-+			LASSERT(tx->tx_msg->ibm_type == IBLND_MSG_PUT_DONE);
-+			tx->tx_conn = NULL;
-+			kiblnd_conn_decref(conn);
-+		}
-+		list_add(&tx->tx_list, &conn->ibc_zombie_txs);
++			/* convert sysfs path to uevent format */
++			param = path;
++			while ((param = strchr(param, '/')) != NULL)
++				*param = '.';
 +
-+		return;
-+	}
++			param = strstr(path, "fs.lustre.") + 10;
 +
- 	timeout_ns = lnet_get_lnd_timeout() * NSEC_PER_SEC;
- 	tx->tx_queued = 1;
- 	tx->tx_deadline = ktime_add_ns(ktime_get(), timeout_ns);
-@@ -2056,7 +2071,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- }
++			envp[0] = kasprintf(GFP_KERNEL, "PARAM=%s.%.*s",
++					    param, (int)keylen, key);
+ 			envp[1] = kasprintf(GFP_KERNEL, "SETTING=%s", value);
+-			envp[2] = NULL;
++			envp[2] = kasprintf(GFP_KERNEL, "TIME=%lld",
++					    ktime_get_real_seconds());
++			envp[3] = NULL;
  
--static void
-+void
- kiblnd_abort_txs(struct kib_conn *conn, struct list_head *txs)
- {
- 	LIST_HEAD(zombies);
-@@ -2123,8 +2138,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	LASSERT(!in_interrupt());
- 	LASSERT(conn->ibc_state > IBLND_CONN_INIT);
+ 			if (kobject_uevent_env(kobj, KOBJ_CHANGE, envp)) {
+ 				CERROR("%s: failed to send uevent %s\n",
+@@ -1144,6 +1157,7 @@ ssize_t class_modify_config(struct lustre_cfg *lcfg, const char *prefix,
  
--	kiblnd_set_conn_state(conn, IBLND_CONN_DISCONNECTED);
--
- 	/*
- 	 * abort_receives moves QP state to IB_QPS_ERR.  This is only required
- 	 * for connections that didn't get as far as being connected, because
-@@ -2132,6 +2145,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	 */
- 	kiblnd_abort_receives(conn);
- 
-+	kiblnd_set_conn_state(conn, IBLND_CONN_DISCONNECTED);
-+
- 	/*
- 	 * Complete all tx descs not waiting for sends to complete.
- 	 * NB we should be safe from RDMA now that the QP has changed state
+ 			for (i = 0; i < ARRAY_SIZE(envp); i++)
+ 				kfree(envp[i]);
++			kfree(path);
+ 		} else {
+ 			count += lustre_attr_store(kobj, attr, value,
+ 						   strlen(value));
 -- 
 1.8.3.1
