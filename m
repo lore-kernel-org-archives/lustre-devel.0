@@ -1,114 +1,50 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:30 -0500
-Subject: [lustre-devel] [PATCH 162/622] lustre: mgc: restore mgc binding for
- sptlrpc
+Date: Thu, 27 Feb 2020 16:10:31 -0500
+Subject: [lustre-devel] [PATCH 163/622] lnet: peer deletion code may hide
+ error
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-163-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-164-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The work for LU-9034 mapped config logs to separate mgc devices.
-This change prevented the ability to configure sptlrpc. A later
-work around was introduced in LU-9567. Recently it was reported
-that the work around introduced can now cause a MGC failover
-panic. This patch is the proper fix in that the sptlrpc is
-properly bound to an mgc device.
+From: Sonia Sharma <sharmaso@whamcloud.com>
 
-The sptlrpc config record expects 2 pieces of data:
+lnet_peer_ni_del_locked might return -EBUSY if the
+NID to be deleted is a gateway.
 
-  *  [0]: fs_name/target_name,
-  *  [1]: rule string
+Check for the return value of lnet_peer_ni_del_locked
+in lnet_peer_del_nid.
 
-What was happening is that when you set cfg_instance it was used
-to create a new instance name of the form fsname-%p. For sptlrpc
-it expects it to only be fsname. The solution is to test if the
-config record is for sptlrpc and in that can keep the first
-record field as is. With this change we can drop cfg_obdname
-which only sptlrpc used.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10937
-Lustre-commit: ca9300e53dc2 ("LU-10937 mgc: restore mgc binding for sptlrpc")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/33311
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10876
+Lustre-commit: a3b6109705dc ("LU-10876 lnet: peer deletion code may hide error")
+Signed-off-by: Sonia Sharma <sharmaso@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/31861
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_class.h   | 1 -
- fs/lustre/mgc/mgc_request.c     | 7 +------
- fs/lustre/obdclass/obd_config.c | 5 ++++-
- 3 files changed, 5 insertions(+), 8 deletions(-)
+ net/lnet/lnet/peer.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index 742e92a..434bb79 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -166,7 +166,6 @@ int class_config_llog_handler(const struct lu_env *env,
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 2fc5dfc..24a5cd3 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -494,7 +494,9 @@ void lnet_peer_uninit(void)
+ 	}
  
- /* Passed as data param to class_config_parse_llog */
- struct config_llog_instance {
--	char		       *cfg_obdname;
- 	void		       *cfg_instance;
- 	struct super_block     *cfg_sb;
- 	struct obd_uuid		cfg_uuid;
-diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
-index 785461b..5bfa1b7 100644
---- a/fs/lustre/mgc/mgc_request.c
-+++ b/fs/lustre/mgc/mgc_request.c
-@@ -224,10 +224,8 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 	/* Keep the mgc around until we are done */
- 	cld->cld_mgcexp = class_export_get(obd->obd_self_export);
- 
--	if (cld_is_sptlrpc(cld)) {
-+	if (cld_is_sptlrpc(cld))
- 		sptlrpc_conf_log_start(logname);
--		cld->cld_cfg.cfg_obdname = obd->obd_name;
--	}
- 
- 	spin_lock(&config_list_lock);
- 	list_add(&cld->cld_list_chain, &config_llog_list);
-@@ -273,9 +271,6 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 
- 	lcfg.cfg_instance = sb ? (void *)sb : (void *)obd;
- 
--	if (type == CONFIG_T_SPTLRPC)
--		lcfg.cfg_instance = NULL;
--
- 	cld = config_log_find(logname, &lcfg);
- 	if (unlikely(cld))
- 		return cld;
-diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
-index 550cee0..398f888 100644
---- a/fs/lustre/obdclass/obd_config.c
-+++ b/fs/lustre/obdclass/obd_config.c
-@@ -1357,6 +1357,7 @@ int class_config_llog_handler(const struct lu_env *env,
- 		lustre_cfg_bufs_init(&bufs, lcfg);
- 
- 		if (clli && clli->cfg_instance &&
-+		    lcfg->lcfg_command != LCFG_SPTLRPC_CONF &&
- 		    LUSTRE_CFG_BUFLEN(lcfg, 0) > 0) {
- 			inst_len = LUSTRE_CFG_BUFLEN(lcfg, 0) +
- 				   sizeof(clli->cfg_instance) * 2 + 4;
-@@ -1389,12 +1390,14 @@ int class_config_llog_handler(const struct lu_env *env,
- 		 */
- 		if (clli && !clli->cfg_instance &&
- 		    lcfg->lcfg_command == LCFG_SPTLRPC_CONF) {
-+			struct obd_device *obd = clli->cfg_instance;
+ 	lnet_net_lock(LNET_LOCK_EX);
+-	lnet_peer_ni_del_locked(lpni);
 +
- 			lustre_cfg_bufs_set(&bufs, 2, bufs.lcfg_buf[1],
- 					    bufs.lcfg_buflen[1]);
- 			lustre_cfg_bufs_set(&bufs, 1, bufs.lcfg_buf[0],
- 					    bufs.lcfg_buflen[0]);
- 			lustre_cfg_bufs_set_string(&bufs, 0,
--						   clli->cfg_obdname);
-+						   obd->obd_name);
- 		}
++	rc = lnet_peer_ni_del_locked(lpni);
++
+ 	lnet_net_unlock(LNET_LOCK_EX);
  
- 		/* Add net info to setup command
+ out:
 -- 
 1.8.3.1
