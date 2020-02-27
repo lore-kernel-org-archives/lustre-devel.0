@@ -1,218 +1,153 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:28 -0500
-Subject: [lustre-devel] [PATCH 160/622] lustre: mdc: move empty xattr
- handling to mdc layer
+Date: Thu, 27 Feb 2020 16:11:17 -0500
+Subject: [lustre-devel] [PATCH 209/622] lustre: lmv: avoid gratuitous 64-bit
+ modulus
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-161-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-210-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-Extract duplicated logic around empty xattr handling from several
-places in llite and consolidate it in mdc_getxattr().
+Fix the pct() calculation to use unsigned long arguments, since this
+is what callers use.  Remove duplicate pct() definition in lproc_mdc.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11380
-Lustre-commit: 0f42b388432c ("LU-11380 mdc: move empty xattr handling to mdc layer")
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33198
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Emoly Liu <emoly@whamcloud.com>
+Don't do a 64-bit modulus of the LNet NID to find the starting MDT
+index when this isn't really needed.
+
+Similarly, don't compute the FLD cache usage percentage for a debug
+message that is never used.
+
+Fixes: fed15ee3b3f2 ("lustre: headers: define pct(a,b) once")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10171
+Lustre-commit: e1b63fd21177 ("LU-10171 lmv: avoid gratuitous 64-bit modulus")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33922
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c      | 16 +++++--------
- fs/lustre/llite/xattr.c     | 44 ++++------------------------------
- fs/lustre/mdc/mdc_request.c | 57 ++++++++++++++++++++++++++++++++++++++++++---
- 3 files changed, 65 insertions(+), 52 deletions(-)
+ fs/lustre/fld/fld_cache.c          | 4 +---
+ fs/lustre/include/lprocfs_status.h | 2 +-
+ fs/lustre/include/obd.h            | 3 +--
+ fs/lustre/lmv/lmv_obd.c            | 5 ++++-
+ fs/lustre/mdc/lproc_mdc.c          | 8 +++-----
+ 5 files changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index e1fba1c..246d5de 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -4391,7 +4391,6 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
+diff --git a/fs/lustre/fld/fld_cache.c b/fs/lustre/fld/fld_cache.c
+index 96be544..5267ba2 100644
+--- a/fs/lustre/fld/fld_cache.c
++++ b/fs/lustre/fld/fld_cache.c
+@@ -98,10 +98,8 @@ void fld_cache_fini(struct fld_cache *cache)
+ 	fld_cache_flush(cache);
+ 
+ 	CDEBUG(D_INFO, "FLD cache statistics (%s):\n", cache->fci_name);
+-	CDEBUG(D_INFO, "  Total reqs: %llu\n", cache->fci_stat.fst_count);
+ 	CDEBUG(D_INFO, "  Cache reqs: %llu\n", cache->fci_stat.fst_cache);
+-	CDEBUG(D_INFO, "  Cache hits: %u%%\n",
+-	       pct(cache->fci_stat.fst_cache, cache->fci_stat.fst_count));
++	CDEBUG(D_INFO, "  Total reqs: %llu\n", cache->fci_stat.fst_count);
+ 
+ 	kfree(cache);
+ }
+diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
+index c1079f1..8d74822 100644
+--- a/fs/lustre/include/lprocfs_status.h
++++ b/fs/lustre/include/lprocfs_status.h
+@@ -58,7 +58,7 @@ struct lprocfs_vars {
+ 	umode_t				proc_mode;
+ };
+ 
+-static inline u32 pct(s64 a, s64 b)
++static inline unsigned int pct(unsigned long a, unsigned long b)
  {
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct ptlrpc_request *req;
--	struct mdt_body *body;
- 	void *lvbdata;
- 	void *lmm;
- 	int lmmsize;
-@@ -4411,19 +4410,16 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
- 	 * completion AST because it doesn't have a large enough buffer
- 	 */
- 	rc = ll_get_default_mdsize(sbi, &lmmsize);
--	if (rc == 0)
--		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode),
--				 OBD_MD_FLXATTR, XATTR_NAME_LOV, lmmsize, &req);
- 	if (rc < 0)
- 		return rc;
+ 	return b ? a * 100 / b : 0;
+ }
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 4829e11..bf0bf97 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -437,11 +437,10 @@ struct lmv_obd {
+ 	int			connected;
+ 	int			max_easize;
+ 	int			max_def_easize;
++	u32			lmv_statfs_start;
  
--	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
--	if (!body) {
--		rc = -EPROTO;
--		goto out;
--	}
-+	rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode), OBD_MD_FLXATTR,
-+			 XATTR_NAME_LOV, lmmsize, &req);
-+	if (rc < 0)
-+		return rc;
- 
--	lmmsize = body->mbo_eadatasize;
-+	lmmsize = rc;
-+	rc = 0;
- 	if (lmmsize == 0) /* empty layout */ {
- 		rc = 0;
- 		goto out;
-diff --git a/fs/lustre/llite/xattr.c b/fs/lustre/llite/xattr.c
-index 636334e..948aaf6 100644
---- a/fs/lustre/llite/xattr.c
-+++ b/fs/lustre/llite/xattr.c
-@@ -326,7 +326,6 @@ int ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
- 	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct ptlrpc_request *req = NULL;
--	struct mdt_body *body;
- 	void *xdata;
- 	int rc;
- 
-@@ -358,57 +357,24 @@ int ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
- 		if (rc < 0)
- 			goto out_xattr;
- 
--		body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
--		LASSERT(body);
+ 	u32			tgts_size; /* size of tgts array */
+ 	struct lmv_tgt_desc	**tgts;
+-	int			lmv_statfs_start;
 -
- 		/* only detect the xattr size */
--		if (size == 0) {
--			/* LU-11109: Older MDTs do not distinguish
--			 * between nonexistent xattrs and zero length
--			 * values in this case. Newer MDTs will return
--			 * -ENODATA or set OBD_MD_FLXATTR.
--			 */
--			rc = body->mbo_eadatasize;
-+		if (size == 0)
- 			goto out;
--		}
+ 	struct obd_connect_data	conn_data;
+ 	struct kobject		*lmv_tgts_kobj;
+ };
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 9f9abd3..0685925 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -1366,8 +1366,11 @@ static int lmv_select_statfs_mdt(struct lmv_obd *lmv, u32 flags)
+ 			break;
  
--		if (size < body->mbo_eadatasize) {
--			CERROR("server bug: replied size %u > %u\n",
--			       body->mbo_eadatasize, (int)size);
-+		if (size < rc) {
- 			rc = -ERANGE;
- 			goto out;
+ 		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
++			/* We dont need a full 64-bit modulus, just enough
++			 * to distribute the requests across MDTs evenly.
++			 */
+ 			lmv->lmv_statfs_start =
+-				lnet_id.nid % lmv->desc.ld_tgt_count;
++				(u32)lnet_id.nid % lmv->desc.ld_tgt_count;
+ 			break;
  		}
- 
--		if (body->mbo_eadatasize == 0) {
--			/* LU-11109: Newer MDTs set OBD_MD_FLXATTR on
--			 * success so that we can distinguish between
--			 * zero length value and nonexistent xattr.
--			 *
--			 * If OBD_MD_FLXATTR is not set then we keep
--			 * the old behavior and return -ENODATA for
--			 * getxattr() when mbo_eadatasize is 0. But
--			 * -ENODATA only makes sense for getxattr()
--			 * and not for listxattr().
--			 */
--			if (body->mbo_valid & OBD_MD_FLXATTR)
--				rc = 0;
--			else if (valid == OBD_MD_FLXATTR)
--				rc = -ENODATA;
--			else
--				rc = 0;
--			goto out;
--		}
--
- 		/* do not need swab xattr data */
- 		xdata = req_capsule_server_sized_get(&req->rq_pill, &RMF_EADATA,
--						     body->mbo_eadatasize);
-+						     rc);
- 		if (!xdata) {
--			rc = -EFAULT;
-+			rc = -EPROTO;
- 			goto out;
- 		}
- 
--		memcpy(buffer, xdata, body->mbo_eadatasize);
--		rc = body->mbo_eadatasize;
-+		memcpy(buffer, xdata, rc);
  	}
- 
- out_xattr:
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index 5cc1e1f..6934e57 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -432,12 +432,63 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 			u64 obd_md_valid, const char *name, size_t buf_size,
- 			struct ptlrpc_request **req)
- {
-+	struct mdt_body *body;
-+	int rc;
-+
- 	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
- 		obd_md_valid == OBD_MD_FLXATTRLS);
- 
--	return mdc_xattr_common(exp, &RQF_MDS_GETXATTR, fid, MDS_GETXATTR,
--				obd_md_valid, name, NULL, 0, buf_size, 0, -1,
--				req);
-+	rc = mdc_xattr_common(exp, &RQF_MDS_GETXATTR, fid, MDS_GETXATTR,
-+			      obd_md_valid, name, NULL, 0, buf_size, 0, -1,
-+			      req);
-+	if (rc < 0)
-+		goto out;
-+
-+	body = req_capsule_server_get(&(*req)->rq_pill, &RMF_MDT_BODY);
-+	if (!body) {
-+		rc = -EPROTO;
-+		goto out;
-+	}
-+
-+	/* only detect the xattr size */
-+	if (buf_size == 0) {
-+		/* LU-11109: Older MDTs do not distinguish
-+		 * between nonexistent xattrs and zero length
-+		 * values in this case. Newer MDTs will return
-+		 * -ENODATA or set OBD_MD_FLXATTR.
-+		 */
-+		rc = body->mbo_eadatasize;
-+		goto out;
-+	}
-+
-+	if (body->mbo_eadatasize == 0) {
-+		/* LU-11109: Newer MDTs set OBD_MD_FLXATTR on
-+		 * success so that we can distinguish between
-+		 * zero length value and nonexistent xattr.
-+		 *
-+		 * If OBD_MD_FLXATTR is not set then we keep
-+		 * the old behavior and return -ENODATA for
-+		 * getxattr() when mbo_eadatasize is 0. But
-+		 * -ENODATA only makes sense for getxattr()
-+		 * and not for listxattr().
-+		 */
-+		if (body->mbo_valid & OBD_MD_FLXATTR)
-+			rc = 0;
-+		else if (obd_md_valid == OBD_MD_FLXATTR)
-+			rc = -ENODATA;
-+		else
-+			rc = 0;
-+		goto out;
-+	}
-+
-+	rc = body->mbo_eadatasize;
-+out:
-+	if (rc < 0) {
-+		ptlrpc_req_finished(*req);
-+		*req = NULL;
-+	}
-+
-+	return rc;
+diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
+index 70c9eaf..81167bbd 100644
+--- a/fs/lustre/mdc/lproc_mdc.c
++++ b/fs/lustre/mdc/lproc_mdc.c
+@@ -328,7 +328,6 @@ static ssize_t mdc_rpc_stats_seq_write(struct file *file,
+ 	return len;
  }
  
- #ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+-#define pct(a, b) (b ? a * 100 / b : 0)
+ static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+ {
+ 	struct obd_device *dev = seq->private;
+@@ -364,7 +363,7 @@ static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+ 
+ 		read_cum += r;
+ 		write_cum += w;
+-		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu   | %10lu %3lu %3lu\n",
++		seq_printf(seq, "%d:\t\t%10lu %3u %3u   | %10lu %3u %3u\n",
+ 			   1 << i, r, pct(r, read_tot),
+ 			   pct(read_cum, read_tot), w,
+ 			   pct(w, write_tot),
+@@ -388,7 +387,7 @@ static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+ 
+ 		read_cum += r;
+ 		write_cum += w;
+-		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu   | %10lu %3lu %3lu\n",
++		seq_printf(seq, "%d:\t\t%10lu %3u %3u   | %10lu %3u %3u\n",
+ 			   i, r, pct(r, read_tot), pct(read_cum, read_tot), w,
+ 			   pct(w, write_tot), pct(write_cum, write_tot));
+ 		if (read_cum == read_tot && write_cum == write_tot)
+@@ -410,7 +409,7 @@ static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+ 
+ 		read_cum += r;
+ 		write_cum += w;
+-		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu   | %10lu %3lu %3lu\n",
++		seq_printf(seq, "%d:\t\t%10lu %3u %3u   | %10lu %3u %3u\n",
+ 			   (i == 0) ? 0 : 1 << (i - 1),
+ 			   r, pct(r, read_tot), pct(read_cum, read_tot),
+ 			   w, pct(w, write_tot), pct(write_cum, write_tot));
+@@ -421,7 +420,6 @@ static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+ 
+ 	return 0;
+ }
+-#undef pct
+ LPROC_SEQ_FOPS(mdc_rpc_stats);
+ 
+ static int mdc_stats_seq_show(struct seq_file *seq, void *v)
 -- 
 1.8.3.1
