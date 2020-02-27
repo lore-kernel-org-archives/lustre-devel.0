@@ -1,120 +1,81 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:15:11 -0500
-Subject: [lustre-devel] [PATCH 443/622] lnet: Fix style issues for
- selftest/rpc.c
+Date: Thu, 27 Feb 2020 16:15:15 -0500
+Subject: [lustre-devel] [PATCH 447/622] lustre: lmv: disable remote file
+ statahead
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-444-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-448-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Shaun Tancheff <stancheff@cray.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-This patch fixes issues reported by checkpatch for the file
-selftest/rpc.c.
-Linux 5.3 enforces the use of 'fallthrough' which is also
-suggested by checkpatch
+Remote file statahead is not supported, because such file needs
+two RPCs to fetch both LOOKUP and GETATTR lock, on LOOKUP success
+we only know file FID, thus can't prepare an inode correctly.
 
-Cray-bug-id: LUS-7690
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12635
-Lustre-commit: 4bfe21d09c39 ("LU-12635 lnet: Fix style issues for selftest/rpc.c")
-Signed-off-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-on: https://review.whamcloud.com/35800
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Disable this to avoid noise messages and confusion.
+
+Update sanity.sh test_60g.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11681
+Lustre-commit: 02b5a407081c ("LU-11681 lmv: disable remote file statahead")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33930
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/selftest/rpc.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ fs/lustre/lmv/lmv_obd.c | 25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
-diff --git a/net/lnet/selftest/rpc.c b/net/lnet/selftest/rpc.c
-index a5941e4..4645f04 100644
---- a/net/lnet/selftest/rpc.c
-+++ b/net/lnet/selftest/rpc.c
-@@ -141,7 +141,8 @@ struct srpc_bulk *
- 		struct page *pg;
- 		int nob;
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index d323250..26021bb 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -3416,25 +3416,28 @@ static int lmv_intent_getattr_async(struct obd_export *exp,
+ 	struct md_op_data *op_data = &minfo->mi_data;
+ 	struct obd_device *obd = exp->exp_obd;
+ 	struct lmv_obd *lmv = &obd->u.lmv;
+-	struct lmv_tgt_desc *tgt = NULL;
++	struct lmv_tgt_desc *ptgt = NULL;
++	struct lmv_tgt_desc *ctgt;
  
--		pg = alloc_pages_node(cfs_cpt_spread_node(lnet_cpt_table(), cpt),
-+		pg = alloc_pages_node(cfs_cpt_spread_node(lnet_cpt_table(),
-+							  cpt),
- 				      GFP_KERNEL, 0);
- 		if (!pg) {
- 			CERROR("Can't allocate page %d of %d\n", i, bulk_npg);
-@@ -386,7 +387,8 @@ struct srpc_bulk *
- 		return -ENOMEM;
- 	}
+ 	if (!fid_is_sane(&op_data->op_fid2))
+ 		return -EINVAL;
  
--	CDEBUG(D_NET, "Posted passive RDMA: peer %s, portal %d, matchbits %#llx\n",
-+	CDEBUG(D_NET,
-+	       "Posted passive RDMA: peer %s, portal %d, matchbits %#llx\n",
- 	       libcfs_id2str(peer), portal, matchbits);
- 	return 0;
- }
-@@ -440,7 +442,8 @@ struct srpc_bulk *
- 		rc = LNetMDUnlink(*mdh);
- 		LASSERT(!rc);
- 	} else {
--		CDEBUG(D_NET, "Posted active RDMA: peer %s, portal %u, matchbits %#llx\n",
-+		CDEBUG(D_NET,
-+		       "Posted active RDMA: peer %s, portal %u, matchbits %#llx\n",
- 		       libcfs_id2str(peer), portal, matchbits);
- 	}
- 	return 0;
-@@ -515,7 +518,8 @@ struct srpc_bulk *
- void
- srpc_add_buffer(struct swi_workitem *wi)
- {
--	struct srpc_service_cd *scd = container_of(wi, struct srpc_service_cd, scd_buf_wi);
-+	struct srpc_service_cd *scd = container_of(wi, struct srpc_service_cd,
-+						   scd_buf_wi);
- 	struct srpc_buffer *buf;
- 	int rc = 0;
+-	tgt = lmv_find_target(lmv, &op_data->op_fid1);
+-	if (IS_ERR(tgt))
+-		return PTR_ERR(tgt);
++	ptgt = lmv_locate_tgt(lmv, op_data);
++	if (IS_ERR(ptgt))
++		return PTR_ERR(ptgt);
++
++	ctgt = lmv_find_target(lmv, &op_data->op_fid2);
++	if (IS_ERR(ctgt))
++		return PTR_ERR(ctgt);
  
-@@ -662,7 +666,8 @@ struct srpc_bulk *
- 		spin_lock(&scd->scd_lock);
+ 	/*
+-	 * no special handle for remote dir, which needs to fetch both LOOKUP
+-	 * lock on parent, and then UPDATE lock on child MDT, which makes all
+-	 * complicated because this is done async. So only LOOKUP lock is
+-	 * fetched for remote dir, but considering remote dir is rare case,
+-	 * and not supporting it in statahead won't cause any issue, just leave
+-	 * it as is.
++	 * remote object needs two RPCs to lookup and getattr, considering the
++	 * complexity don't support statahead for now.
+ 	 */
++	if (ctgt != ptgt)
++		return -EREMOTE;
  
- 		if (scd->scd_buf_nposted > 0) {
--			CDEBUG(D_NET, "waiting for %d posted buffers to unlink\n",
-+			CDEBUG(D_NET,
-+			       "waiting for %d posted buffers to unlink\n",
- 			       scd->scd_buf_nposted);
- 			spin_unlock(&scd->scd_lock);
- 			return 0;
-@@ -960,7 +965,8 @@ struct srpc_bulk *
- void
- srpc_handle_rpc(struct swi_workitem *wi)
- {
--	struct srpc_server_rpc *rpc = container_of(wi, struct srpc_server_rpc, srpc_wi);
-+	struct srpc_server_rpc *rpc = container_of(wi, struct srpc_server_rpc,
-+						   srpc_wi);
- 	struct srpc_service_cd *scd = rpc->srpc_scd;
- 	struct srpc_service *sv = scd->scd_svc;
- 	struct srpc_event *ev = &rpc->srpc_ev;
-@@ -1398,7 +1404,9 @@ struct srpc_client_rpc *
- 	return rc;
+-	return md_intent_getattr_async(tgt->ltd_exp, minfo);
++	return md_intent_getattr_async(ptgt->ltd_exp, minfo);
  }
  
--/* when in kernel always called with lnet_net_lock() held, and in thread context */
-+/* when in kernel always called with lnet_net_lock() held,
-+ * and in thread context
-+ */
- static void
- srpc_lnet_ev_handler(struct lnet_event *ev)
- {
-@@ -1451,7 +1459,8 @@ struct srpc_client_rpc *
- 			       rpcev, crpc, &crpc->crpc_reqstev,
- 			       &crpc->crpc_replyev, &crpc->crpc_bulkev);
- 			CERROR("Bad event: status %d, type %d, lnet %d\n",
--			       rpcev->ev_status, rpcev->ev_type, rpcev->ev_lnet);
-+			       rpcev->ev_status, rpcev->ev_type,
-+			       rpcev->ev_lnet);
- 			LBUG();
- 		}
- 
+ static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
 -- 
 1.8.3.1
