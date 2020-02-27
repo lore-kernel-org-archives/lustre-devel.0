@@ -1,174 +1,101 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:23 -0500
-Subject: [lustre-devel] [PATCH 575/622] lnet: prepare to make lnet_lnd const.
+Date: Thu, 27 Feb 2020 16:17:25 -0500
+Subject: [lustre-devel] [PATCH 577/622] lnet: Avoid extra lnet_remotenet
+ lookup
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-576-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-578-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.com>
+From: Chris Horn <hornc@cray.com>
 
-Preferred practice is for structs containing function
-pointers to be 'const'.  Such structs are generally tempting
-attack vectors, and making them const allows linux to place
-them in read-only memory, thus reducing the attack surface.
+We can keep track of the lnet_remotenet object associated with the
+"best" lnet_peer_net, and pass that lnet_remotenet directly to
+lnet_find_route_locked().
 
-'struct lnet_lnd' is mostly function pointers, but contains
-one writable field - a list_head.
-
-Rather than keeping registered lnds in a linked-list, we can place
-them in an array indexed by type - type numbers are at most 15 so
-this is not a burden.
-
-With these changes, no part of an lnet_lnd is ever modified.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
-Lustre-commit: 87a6bd0766da ("LU-12678 lnet: prepare to make lnet_lnd const.")
-Signed-off-by: Mr NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/36830
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12756
+Lustre-commit: 3812c54b9ca3 ("LU-12756 lnet: Avoid extra lnet_remotenet lookup")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/36536
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h   |  6 ++----
- include/uapi/linux/lnet/nidstr.h |  2 ++
- net/lnet/lnet/api-ni.c           | 29 +++++++++++++++--------------
- net/lnet/lnet/lo.c               |  1 -
- 4 files changed, 19 insertions(+), 19 deletions(-)
+ net/lnet/lnet/lib-move.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 02ac5df..99ed87a 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -46,6 +46,7 @@
- #include <uapi/linux/lnet/lnet-types.h>
- #include <uapi/linux/lnet/lnetctl.h>
- #include <uapi/linux/lnet/lnet-dlc.h>
-+#include <uapi/linux/lnet/nidstr.h>
- 
- /* Max payload size */
- #define LNET_MAX_PAYLOAD	LNET_MTU
-@@ -244,9 +245,6 @@ struct lnet_test_peer {
- struct lnet_ni;			/* forward ref */
- 
- struct lnet_lnd {
--	/* fields managed by portals */
--	struct list_head	lnd_list;	/* stash in the LND table */
--
- 	/* fields initialised by the LND */
- 	u32			lnd_type;
- 
-@@ -1133,7 +1131,7 @@ struct lnet {
- 	/* uniquely identifies this ni in this epoch */
- 	u64				ln_interface_cookie;
- 	/* registered LNDs */
--	struct list_head		ln_lnds;
-+	struct lnet_lnd			*ln_lnds[NUM_LNDS];
- 
- 	/* test protocol compatibility flags */
- 	int				ln_testprotocompat;
-diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
-index 43ec232..958ca8d 100644
---- a/include/uapi/linux/lnet/nidstr.h
-+++ b/include/uapi/linux/lnet/nidstr.h
-@@ -53,6 +53,8 @@ enum {
- 	/*MXLND		= 12, removed v2_7_50_0-34-g8be9e41	*/
- 	GNILND		= 13,
- 	GNIIPLND	= 14,
-+
-+	NUM_LNDS
- };
- 
- struct list_head;
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index 0020ffd..cd95bdd 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -734,12 +734,12 @@ static void lnet_assert_wire_constants(void)
- 	struct lnet_lnd *lnd;
- 
- 	/* holding lnd mutex */
--	list_for_each_entry(lnd, &the_lnet.ln_lnds, lnd_list) {
--		if (lnd->lnd_type == type)
--			return lnd;
--	}
-+	if (type >= NUM_LNDS)
-+		return NULL;
-+	lnd = the_lnet.ln_lnds[type];
-+	LASSERT(!lnd || lnd->lnd_type == type);
- 
--	return NULL;
-+	return lnd;
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 45975d6..03d629d 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -1324,23 +1324,18 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
  }
  
- unsigned int
-@@ -757,7 +757,7 @@ static void lnet_assert_wire_constants(void)
- 	LASSERT(libcfs_isknown_lnd(lnd->lnd_type));
- 	LASSERT(!lnet_find_lnd_by_type(lnd->lnd_type));
- 
--	list_add_tail(&lnd->lnd_list, &the_lnet.ln_lnds);
-+	the_lnet.ln_lnds[lnd->lnd_type] = lnd;
- 
- 	CDEBUG(D_NET, "%s LND registered\n", libcfs_lnd2str(lnd->lnd_type));
- 
-@@ -772,7 +772,7 @@ static void lnet_assert_wire_constants(void)
- 
- 	LASSERT(lnet_find_lnd_by_type(lnd->lnd_type) == lnd);
- 
--	list_del(&lnd->lnd_list);
-+	the_lnet.ln_lnds[lnd->lnd_type] = NULL;
- 	CDEBUG(D_NET, "%s LND unregistered\n", libcfs_lnd2str(lnd->lnd_type));
- 
- 	mutex_unlock(&the_lnet.ln_lnd_mutex);
-@@ -2429,7 +2429,6 @@ int lnet_lib_init(void)
- 	}
- 
- 	the_lnet.ln_refcount = 0;
--	INIT_LIST_HEAD(&the_lnet.ln_lnds);
- 	INIT_LIST_HEAD(&the_lnet.ln_net_zombie);
- 	INIT_LIST_HEAD(&the_lnet.ln_msg_resend);
- 
-@@ -2459,16 +2458,18 @@ int lnet_lib_init(void)
-  *
-  * \pre lnet_lib_init() called with success.
-  * \pre All LNet users called LNetNIFini() for matching LNetNIInit() calls.
-+ *
-+ * As this happens at module-unload, all lnds must already be unloaded,
-+ * so they must already be unregistered.
-  */
- void lnet_lib_exit(void)
+ static struct lnet_route *
+-lnet_find_route_locked(struct lnet_net *net, u32 remote_net,
++lnet_find_route_locked(struct lnet_remotenet *rnet,
+ 		       struct lnet_route **prev_route,
+ 		       struct lnet_peer_ni **gwni)
  {
--	struct lnet_lnd *lnd;
--	LASSERT(!the_lnet.ln_refcount);
-+	int i;
+ 	struct lnet_peer_ni *best_gw_ni = NULL;
+ 	struct lnet_route *best_route;
+ 	struct lnet_route *last_route;
+-	struct lnet_remotenet *rnet;
+ 	struct lnet_peer *lp_best;
+ 	struct lnet_route *route;
+ 	struct lnet_peer *lp;
+ 	int rc;
  
--	while ((lnd = list_first_entry_or_null(&the_lnet.ln_lnds,
--					       struct lnet_lnd,
--					       lnd_list)) != NULL)
--		lnet_unregister_lnd(lnd);
-+	LASSERT(!the_lnet.ln_refcount);
-+	lnet_unregister_lnd(&the_lolnd);
-+	for (i = 0; i < NUM_LNDS; i++)
-+		LASSERT(!the_lnet.ln_lnds[i]);
- 	lnet_destroy_locks();
- }
+-	rnet = lnet_find_rnet_locked(remote_net);
+-	if (!rnet)
+-		return NULL;
+-
+ 	lp_best = NULL;
+ 	best_route = NULL;
+ 	last_route = NULL;
+@@ -1832,7 +1827,7 @@ struct lnet_ni *
+ 	struct lnet_peer *lp;
+ 	struct lnet_peer_net *lpn;
+ 	struct lnet_peer_net *best_lpn = NULL;
+-	struct lnet_remotenet *rnet;
++	struct lnet_remotenet *rnet, *best_rnet = NULL;
+ 	struct lnet_route *best_route = NULL;
+ 	struct lnet_route *last_route = NULL;
+ 	struct lnet_peer_ni *lpni = NULL;
+@@ -1867,13 +1862,16 @@ struct lnet_ni *
+ 			if (!rnet)
+ 				continue;
  
-diff --git a/net/lnet/lnet/lo.c b/net/lnet/lnet/lo.c
-index 350495f..c19a5b5 100644
---- a/net/lnet/lnet/lo.c
-+++ b/net/lnet/lnet/lo.c
-@@ -93,7 +93,6 @@
- }
+-			if (!best_lpn)
++			if (!best_lpn) {
+ 				best_lpn = lpn;
++				best_rnet = rnet;
++			}
  
- struct lnet_lnd the_lolnd = {
--	.lnd_list	= LIST_HEAD_INIT(the_lolnd.lnd_list),
- 	.lnd_type	= LOLND,
- 	.lnd_startup	= lolnd_startup,
- 	.lnd_shutdown	= lolnd_shutdown,
+ 			if (best_lpn->lpn_seq <= lpn->lpn_seq)
+ 				continue;
+ 
+ 			best_lpn = lpn;
++			best_rnet = rnet;
+ 		}
+ 
+ 		if (!best_lpn) {
+@@ -1892,8 +1890,8 @@ struct lnet_ni *
+ 			return -EHOSTUNREACH;
+ 		}
+ 
+-		best_route = lnet_find_route_locked(NULL, best_lpn->lpn_net_id,
+-						    &last_route, &gwni);
++		best_route = lnet_find_route_locked(best_rnet, &last_route,
++						    &gwni);
+ 		if (!best_route) {
+ 			CERROR("no route to %s from %s\n",
+ 			       libcfs_nid2str(dst_nid),
 -- 
 1.8.3.1
