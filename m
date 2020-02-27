@@ -1,91 +1,62 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:09:27 -0500
-Subject: [lustre-devel] [PATCH 099/622] lustre: osc: serialize access to
- idle_timeout vs cleanup
+Date: Thu, 27 Feb 2020 16:09:32 -0500
+Subject: [lustre-devel] [PATCH 104/622] lustre: ldlm: correct logic in
+ ldlm_prepare_lru_list()
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-100-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-105-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alex Zhuravlev <bzzz@whamcloud.com>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-use lprocfs_climp_check() and up_read() as cl_import
-can disappear due to umount.
+In ldlm_prepare_lru_list() fix an (x != a || x != b) type error and
+correct a use after free.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11175
-Lustre-commit: 5874da0b670b ("LU-11175 osc: serialize access to idle_timeout vs cleanup")
-Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/32883
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11075
+Lustre-commit: aecafb57d5b6 ("LU-11075 ldlm: correct logic in ldlm_prepare_lru_list()")
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/32660
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/osc/lproc_osc.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ fs/lustre/ldlm/ldlm_request.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index 0a12079..efb4998 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -604,8 +604,15 @@ static ssize_t idle_timeout_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_device *obd = container_of(kobj, struct obd_device,
- 					      obd_kset.kobj);
- 	struct client_obd *cli = &obd->u.cli;
-+	int ret;
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index bc441f0..f045d30 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -1643,7 +1643,7 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 			/* No locks which got blocking requests. */
+ 			LASSERT(!ldlm_is_bl_ast(lock));
  
--	return sprintf(buf, "%u\n", cli->cl_import->imp_idle_timeout);
-+	ret = lprocfs_climp_check(obd);
-+	if (ret)
-+		return ret;
-+	ret = sprintf(buf, "%u\n", cli->cl_import->imp_idle_timeout);
-+	up_read(&obd->u.cli.cl_sem);
+-			if (!ldlm_is_canceling(lock) ||
++			if (!ldlm_is_canceling(lock) &&
+ 			    !ldlm_is_converting(lock))
+ 				break;
+ 
+@@ -1686,7 +1686,6 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 
+ 		if (result == LDLM_POLICY_SKIP_LOCK) {
+ 			lu_ref_del(&lock->l_reference, __func__, current);
+-			LDLM_LOCK_RELEASE(lock);
+ 			if (no_wait) {
+ 				spin_lock(&ns->ns_lock);
+ 				if (!list_empty(&lock->l_lru) &&
+@@ -1694,6 +1693,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 					ns->ns_last_pos = &lock->l_lru;
+ 				spin_unlock(&ns->ns_lock);
+ 			}
 +
-+	return ret;
- }
++			LDLM_LOCK_RELEASE(lock);
+ 			continue;
+ 		}
  
- static ssize_t idle_timeout_store(struct kobject *kobj, struct attribute *attr,
-@@ -625,6 +632,10 @@ static ssize_t idle_timeout_store(struct kobject *kobj, struct attribute *attr,
- 	if (val > CONNECTION_SWITCH_MAX)
- 		return -ERANGE;
- 
-+	rc = lprocfs_climp_check(obd);
-+	if (rc)
-+		return rc;
-+
- 	cli->cl_import->imp_idle_timeout = val;
- 
- 	/* to initiate the connection if it's in IDLE state */
-@@ -633,6 +644,7 @@ static ssize_t idle_timeout_store(struct kobject *kobj, struct attribute *attr,
- 		if (req)
- 			ptlrpc_req_finished(req);
- 	}
-+	up_read(&obd->u.cli.cl_sem);
- 
- 	return count;
- }
-@@ -645,12 +657,18 @@ static ssize_t idle_connect_store(struct kobject *kobj, struct attribute *attr,
- 					      obd_kset.kobj);
- 	struct client_obd *cli = &dev->u.cli;
- 	struct ptlrpc_request *req;
-+	int rc;
-+
-+	rc = lprocfs_climp_check(dev);
-+	if (rc)
-+		return rc;
- 
- 	/* to initiate the connection if it's in IDLE state */
- 	req = ptlrpc_request_alloc(cli->cl_import, &RQF_OST_STATFS);
- 	if (req)
- 		ptlrpc_req_finished(req);
- 	ptlrpc_pinger_force(cli->cl_import);
-+	up_read(&dev->u.cli.cl_sem);
- 
- 	return count;
- }
 -- 
 1.8.3.1
