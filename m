@@ -1,97 +1,67 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:33 -0500
-Subject: [lustre-devel] [PATCH 225/622] lustre: llite: make sure name pack
- atomic
+Date: Thu, 27 Feb 2020 16:11:38 -0500
+Subject: [lustre-devel] [PATCH 230/622] lustre: dne: performance improvement
+ for file creation
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-226-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-231-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Jinshan Xiong <jinshan.xiong@gmail.com>
 
-We are trying to access dentry name directly and pass it
-down without holding @d_lock, this is racy and possibly
-make us trigger assertions:
+This is to remove an obsoleted code where it causes drastic
+performance degradation. This code is written before PERM lock
+is introduced, and it requests UPDATE lock at path walk for
+remote directory, which will be cancelled at later file creation.
 
-(mdc_lib.c:137:mdc_pack_name()) ASSERTION( lu_name_is_valid_2(buf, cpy_len) ) failed:
+Tests result before and after this patch is applied:
 
-Fix the problem by allocting memory and copy name with @d_lock
-held.
+Test case:
+rm -rf /mnt/lustre_purple/testdir
+lfs mkdir -i 0 /mnt/lustre_purple/testdir
+lfs mkdir -i 2 /mnt/lustre_purple/testdir/dir2
+./lustre-release/lustre/tests/createmany -o \
+        /mnt/lustre_purple/testdir/dir2/f 10000
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12020
-Lustre-Commit: f575b6551b2b ("LU-12020 llite: make sure name pack atomic")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/34330
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Gu Zheng <gzheng@ddn.com>
+Before the patch is applied:
+total: 10000 open/close in 12.82 seconds: 780.22 ops/second
+
+After the patch is applied:
+total: 10000 open/close in 4.89 seconds: 2044.75 ops/second
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11999
+Lustre-commit: bfbd062e6b17 ("LU-11999 dne: performance improvement for file creation")
+Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-on: https://review.whamcloud.com/34291
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c | 30 +++++++++++++++++++++++++-----
- 1 file changed, 25 insertions(+), 5 deletions(-)
+ fs/lustre/lmv/lmv_intent.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index a73d11f..4560ae0 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -502,7 +502,7 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
- 	struct inode *inode = d_inode(de);
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct dentry *parent = de->d_parent;
--	const char *name = NULL;
-+	char *name = NULL;
- 	struct md_op_data *op_data;
- 	struct ptlrpc_request *req = NULL;
- 	int len = 0, rc;
-@@ -514,21 +514,41 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
- 	 * if server supports open-by-fid, or file name is invalid, don't pack
- 	 * name in open request
+diff --git a/fs/lustre/lmv/lmv_intent.c b/fs/lustre/lmv/lmv_intent.c
+index 3f51032..6933f7d 100644
+--- a/fs/lustre/lmv/lmv_intent.c
++++ b/fs/lustre/lmv/lmv_intent.c
+@@ -71,13 +71,6 @@ static int lmv_intent_remote(struct obd_export *exp, struct lookup_intent *it,
+ 	LASSERT((body->mbo_valid & OBD_MD_MDS));
+ 
+ 	/*
+-	 * Unfortunately, we have to lie to MDC/MDS to retrieve
+-	 * attributes llite needs and provideproper locking.
+-	 */
+-	if (it->it_op & IT_LOOKUP)
+-		it->it_op = IT_GETATTR;
+-
+-	/*
+ 	 * We got LOOKUP lock, but we really need attrs.
  	 */
--	if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID) &&
--	    lu_name_is_valid_2(de->d_name.name, de->d_name.len)) {
--		name = de->d_name.name;
-+	if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_OPEN_BY_FID)) {
-+retry:
- 		len = de->d_name.len;
-+		name = kmalloc(len, GFP_NOFS);
-+		if (!name)
-+			return -ENOMEM;
-+		/* race here */
-+		spin_lock(&de->d_lock);
-+		if (len != de->d_name.len) {
-+			spin_unlock(&de->d_lock);
-+			kfree(name);
-+			goto retry;
-+		}
-+		memcpy(name, de->d_name.name, len);
-+		spin_unlock(&de->d_lock);
-+
-+		if (!lu_name_is_valid_2(name, len)) {
-+			kfree(name);
-+			name = NULL;
-+			len = 0;
-+		}
- 	}
- 
- 	op_data  = ll_prep_md_op_data(NULL, d_inode(parent), inode, name, len,
- 				      O_RDWR, LUSTRE_OPC_ANY, NULL);
--	if (IS_ERR(op_data))
-+	if (IS_ERR(op_data)) {
-+		kfree(name);
- 		return PTR_ERR(op_data);
-+	}
- 	op_data->op_data = lmm;
- 	op_data->op_data_size = lmmsize;
- 
- 	rc = md_intent_lock(sbi->ll_md_exp, op_data, itp, &req,
- 			    &ll_md_blocking_ast, 0);
-+	kfree(name);
- 	ll_finish_md_op_data(op_data);
- 	if (rc == -ESTALE) {
- 		/* reason for keep own exit path - don`t flood log
+ 	pmode = it->it_lock_mode;
 -- 
 1.8.3.1
