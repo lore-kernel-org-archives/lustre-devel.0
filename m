@@ -1,90 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:44 -0500
-Subject: [lustre-devel] [PATCH 176/622] lustre: uapi: fix warnings when
- lustre_user.h included
+Date: Thu, 27 Feb 2020 16:10:48 -0500
+Subject: [lustre-devel] [PATCH 180/622] lustre: osc: speed up page cache
+ cleanup during blocking ASTs
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-177-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-181-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Andrew Perepechko <c17827@cray.com>
 
-Checking for lustre/lustre_user.h in a configure script
-generates a warning because of the included <sys/quota.h>
+While we are cleaning a write lock, we don't need to check if
+page cache pages under this lock are covered by another lock.
 
-  checking lustre/lustre_user.h usability... no
-  checking lustre/lustre_user.h presence... yes
-  WARNING: present but cannot be compiled
-  WARNING: check for missing prerequisite headers?
-  WARNING: see the Autoconf documentation
-  WARNING: section "Present But Cannot Be Compiled"
-  WARNING: proceeding with the preprocessor's result
-  WARNING: in the future, the compiler will take precedence
+If a client needs to give up its lock, cleaning gigabytes of
+page cache can take quite a long time.
 
-Looking into config.log it shows:
-
-  In file included from /usr/include/lustre/lustre_user.h:59,
-                   from conftest.c:91:
-  /usr/include/sys/quota.h:221: error: expected declaration
-    specifiers or '...' before 'caddr_t'
-
-Since we don't really need much from the <sys/quota.h> header,
-just use the default linux UAPI quota header.
-
-Fix an unused variable warning in ll_dir_ioctl().
-
-Lustre-commit: db0592145574 ("LU-11783 utils: fix warnings when lustre_user.h included")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33876
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11296
+Lustre-commit: b9ebb17277c7 ("LU-11296 osc: speed up page cache cleanup during blocking ASTs")
+Signed-off-by: Andrew Perepechko <c17827@cray.com>
+Cray-bug-id: LUS-6352
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+Reviewed-on: https://review.whamcloud.com/33090
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/dir.c                   | 2 +-
- include/uapi/linux/lustre/lustre_user.h | 3 +--
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ fs/lustre/osc/osc_lock.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index f54987a..ef4fa36 100644
---- a/fs/lustre/llite/dir.c
-+++ b/fs/lustre/llite/dir.c
-@@ -1356,7 +1356,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		struct lov_user_md_v1 *lumv1_ptr = &lumv1;
- 		struct lov_user_md_v1 __user *lumv1p = (void __user *)arg;
- 		struct lov_user_md_v3 __user *lumv3p = (void __user *)arg;
--		int lum_size;
-+		int lum_size = 0;
+diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
+index 1a2b0bd..eccea37 100644
+--- a/fs/lustre/osc/osc_lock.c
++++ b/fs/lustre/osc/osc_lock.c
+@@ -372,7 +372,12 @@ static int osc_lock_flush(struct osc_object *obj, pgoff_t start, pgoff_t end,
+ 			rc = 0;
+ 	}
  
- 		int set_default = 0;
+-	rc2 = osc_lock_discard_pages(env, obj, start, end, discard);
++	/*
++	 * Do not try to match other locks with CLM_WRITE since we already
++	 * know there're none
++	 */
++	rc2 = osc_lock_discard_pages(env, obj, start, end,
++				     mode == CLM_WRITE || discard);
+ 	if (rc == 0 && rc2 < 0)
+ 		rc = rc2;
  
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 3bd6fc7..649aeeb 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -44,10 +44,10 @@
- 
- #include <linux/kernel.h>
- #include <linux/types.h>
-+#include <linux/quota.h>
- 
- #ifdef __KERNEL__
- # include <linux/fs.h>
--# include <linux/quota.h>
- # include <linux/sched/signal.h>
- # include <linux/string.h> /* snprintf() */
- # include <linux/version.h>
-@@ -57,7 +57,6 @@
- # include <stdbool.h>
- # include <stdio.h> /* snprintf() */
- # include <string.h>
--# include <sys/quota.h>
- # include <sys/stat.h>
- #endif /* __KERNEL__ */
- #include <uapi/linux/lustre/lustre_fiemap.h>
 -- 
 1.8.3.1
