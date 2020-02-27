@@ -1,60 +1,86 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:08:07 -0500
-Subject: [lustre-devel] [PATCH 019/622] lustre: hsm: ignore compound_id
+Date: Thu, 27 Feb 2020 16:08:09 -0500
+Subject: [lustre-devel] [PATCH 021/622] lustre: ptlrpc:
+ ptlrpc_register_bulk() LBUG on ENOMEM
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-22-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-Ignore request compound ids in the HSM coordinator. Compound ids
-prevent batching of CDT to CT requests and degrade HSM
-performance. Use CT/archive id compatabiliy when deciding which HSM
-actions to put in a request.
+Assertion fails on !desc->bd_registered during
+retry after ENOMEM.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10383
-Lustre-commit: 9ee81f920bb3 ("LU-10383 hsm: ignore compound_id")
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/30949
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Faccini Bruno <bruno.faccini@intel.com>
+Drop bd_registered flag and exit via cleanup_bulk
+to ensure that bulk is fully unregistered.
+
+Cray-bug-id: MRP-4733
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10643
+Lustre-commit: 4a81be263079 ("LU-10643 ptlrpc: ptlrpc_register_bulk() LBUG on ENOMEM")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-on: https://review.whamcloud.com/31228
+Reviewed-by: Alexandr Boyko <c17825@cray.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_idl.h  | 2 +-
- include/uapi/linux/lustre/lustre_user.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/ptlrpc/niobuf.c       | 12 +++++++++---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 4e1605a2..307feb3 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -2508,7 +2508,7 @@ struct llog_agent_req_rec {
- 						 */
- 	__u32			arr_archive_id;	/**< backend archive number */
- 	__u64			arr_flags;	/**< req flags */
--	__u64			arr_compound_id;/**< compound cookie */
-+	__u64			arr_compound_id;/**< compound cookie, ignored */
- 	__u64			arr_req_create;	/**< req. creation time */
- 	__u64			arr_req_change;	/**< req. status change time */
- 	struct hsm_action_item	arr_hai;	/**< req. to the agent */
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 27501a2..5405e1b 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -1729,7 +1729,7 @@ static inline char *hai_dump_data_field(struct hsm_action_item *hai,
- struct hsm_action_list {
- 	__u32 hal_version;
- 	__u32 hal_count;	/* number of hai's to follow */
--	__u64 hal_compound_id;	/* returned by coordinator */
-+	__u64 hal_compound_id;	/* returned by coordinator, ignored */
- 	__u64 hal_flags;
- 	__u32 hal_archive_id;	/* which archive backend */
- 	__u32 padding1;
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index 653a456..67500b5 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -349,6 +349,7 @@
+ #define OBD_FAIL_PTLRPC_DROP_BULK			0x51a
+ #define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK			0x51b
+ #define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK		0x51c
++#define OBD_FAIL_PTLRPC_BULK_ATTACH      0x521
+ 
+ #define OBD_FAIL_OBD_PING_NET				0x600
+ #define OBD_FAIL_OBD_LOG_CANCEL_NET			0x601
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index 02ed373..2e866fe 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -179,8 +179,13 @@ static int ptlrpc_register_bulk(struct ptlrpc_request *req)
+ 			      LNET_MD_OP_GET : LNET_MD_OP_PUT);
+ 		ptlrpc_fill_bulk_md(&md, desc, posted_md);
+ 
+-		rc = LNetMEAttach(desc->bd_portal, peer, mbits, 0,
+-				  LNET_UNLINK, LNET_INS_AFTER, &me_h);
++		if (posted_md > 0 && posted_md + 1 == total_md &&
++		    OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_BULK_ATTACH)) {
++			rc = -ENOMEM;
++		} else {
++			rc = LNetMEAttach(desc->bd_portal, peer, mbits, 0,
++					  LNET_UNLINK, LNET_INS_AFTER, &me_h);
++		}
+ 		if (rc != 0) {
+ 			CERROR("%s: LNetMEAttach failed x%llu/%d: rc = %d\n",
+ 			       desc->bd_import->imp_obd->obd_name, mbits,
+@@ -209,6 +214,7 @@ static int ptlrpc_register_bulk(struct ptlrpc_request *req)
+ 		LASSERT(desc->bd_md_count >= 0);
+ 		mdunlink_iterate_helper(desc->bd_mds, desc->bd_md_max_brw);
+ 		req->rq_status = -ENOMEM;
++		desc->bd_registered = 0;
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -585,7 +591,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	if (request->rq_bulk) {
+ 		rc = ptlrpc_register_bulk(request);
+ 		if (rc != 0)
+-			goto out;
++			goto cleanup_bulk;
+ 		/*
+ 		 * All the mds in the request will have the same cpt
+ 		 * encoded in the cookie. So we can just get the first
 -- 
 1.8.3.1
