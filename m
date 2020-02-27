@@ -1,49 +1,44 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:48 -0500
-Subject: [lustre-devel] [PATCH 240/622] lnet: lnd: increase CQ entries
+Date: Thu, 27 Feb 2020 16:12:16 -0500
+Subject: [lustre-devel] [PATCH 268/622] lustre: lov: Remove unnecessary
+ assert
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-241-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-269-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Patrick Farrell <pfarrell@whamcloud.com>
 
-Several sites have reported RDMA timeouts. Most of the timeouts
-are occurring for transmits on the active_tx queue. Transmits are
-placed on the active_tx queue until a completion is received. If
-there isn't enough CQ entries available, it's possible for a
-completions events to be delayed, causing these timeouts.
+This is asserting on network data from the server, and
+additionally, the LU-9846 (overstriping) work shows this
+condition is not a problem if it does somehow occur.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12065
-Lustre-commit: bf3fc7f1a7bf ("LU-12065 lnd: increase CQ entries")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/34473
-Reviewed-by: Chris Horn <hornc@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11796
+Lustre-commit: 1d7104485119 ("LU-11796 lov: Remove unnecessary assert")
+Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/33882
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ fs/lustre/lov/lov_object.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 999b58d..44f1d84 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -136,8 +136,7 @@ struct kib_tunables {
- /* WRs and CQEs (per connection) */
- #define IBLND_RECV_WRS(c)	IBLND_RX_MSGS(c)
+diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
+index c6324f4..c04b2ae 100644
+--- a/fs/lustre/lov/lov_object.c
++++ b/fs/lustre/lov/lov_object.c
+@@ -210,7 +210,6 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
  
--#define IBLND_CQ_ENTRIES(c)	\
--	(IBLND_RECV_WRS(c) + 2 * c->ibc_queue_depth)
-+#define IBLND_CQ_ENTRIES(c)	(IBLND_RECV_WRS(c) + kiblnd_send_wrs(c))
+ 	spin_lock_init(&r0->lo_sub_lock);
+ 	r0->lo_nr = lse->lsme_stripe_count;
+-	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
  
- struct kib_hca_dev;
- 
+ 	r0->lo_sub = kcalloc(r0->lo_nr, sizeof(r0->lo_sub[0]),
+ 			     GFP_KERNEL);
 -- 
 1.8.3.1
