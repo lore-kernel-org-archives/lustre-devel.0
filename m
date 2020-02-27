@@ -1,54 +1,50 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:10:06 -0500
-Subject: [lustre-devel] [PATCH 138/622] lustre: misc: quiet console messages
- at startup
+Date: Thu, 27 Feb 2020 16:10:09 -0500
+Subject: [lustre-devel] [PATCH 141/622] lustre: uapi: add new changerec_type
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-139-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-142-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Qian Yingjin <qian@ddn.com>
 
-Some modules print less-than-useful messages on every load.
-Turn these into internal debug messages to reduce noise.
+The Lazy Size on MDT is causing the trusted.som xattr to be logged
+in the changelog whenever a file is needed to update this xattr
+data casued by file open/close or truncate operations.
 
-The message in gss_init_svc_upcall() should also be quieted,
-but it exposes that this function is waiting 1.5s on each module
-load for lsvcgssd to start.  This should be fixed separately.
+The original patch landed to the OpenSFS branch fixes this problem
+to avoid logging this xattr for every file. This introduces a new
+changelog_rec_type that the mdc changelog code needs to be aware
+of.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1095
-Lustre-commit: ed0c19d250f6 ("LU-1095 misc: quiet console messages at startup")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33281
-Reviewed-by: Nathaniel Clark <nclark@whamcloud.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11450
+Lustre-commit: faf6f514c172 ("LU-11450 mdd: avoid logging trusted.som xattr in changelogs")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/33323
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lmv/lmv_obd.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ include/uapi/linux/lustre/lustre_user.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 0da9269..81b86a0 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -257,10 +257,12 @@ static int lmv_init_ea_size(struct obd_export *exp, u32 easize, u32 def_easize)
- 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
- 		struct lmv_tgt_desc *tgt = lmv->tgts[i];
- 
--		if (!tgt || !tgt->ltd_exp || !tgt->ltd_active) {
-+		if (!tgt || !tgt->ltd_exp) {
- 			CWARN("%s: NULL export for %d\n", obd->obd_name, i);
- 			continue;
- 		}
-+		if (!tgt->ltd_active)
-+			continue;
- 
- 		rc = md_init_ea_size(tgt->ltd_exp, easize, def_easize);
- 		if (rc) {
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index bff6f76..844e50e 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -966,6 +966,7 @@ enum la_valid {
+ /********* Changelogs **********/
+ /** Changelog record types */
+ enum changelog_rec_type {
++	CL_NONE		= -1,
+ 	CL_MARK		= 0,
+ 	CL_CREATE	= 1,  /* namespace */
+ 	CL_MKDIR	= 2,  /* namespace */
 -- 
 1.8.3.1
