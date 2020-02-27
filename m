@@ -1,71 +1,129 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:26 -0500
-Subject: [lustre-devel] [PATCH 578/622] lnet: Remove unused vars in
- lnet_find_route_locked
+Date: Thu, 27 Feb 2020 16:17:34 -0500
+Subject: [lustre-devel] [PATCH 586/622] lnet: remove locking protection
+ ln_testprotocompat
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-579-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-587-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-The lp and lp_best variables are not needed in
-lnet_find_route_locked().
+lnet_net_lock(LNET_LOCK_EX) is a heavy-weight lock that is not
+necessary here.  The bits in this field are only set rarely - via an
+ioctl - and the pattern for reading and clearing them exactly
+matches test_and_clear_bit().  So change the field to "unsigned
+long" (so test_and_clear_bit() can be used), and use
+test_and_clear_bit(), discarding all other locking.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12756
-Lustre-commit: b129f7b1f76a ("LU-12756 lnet: Remove unused vars in lnet_find_route_locked")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/36620
-Reviewed-by: Alexandr Boyko <c17825@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 624364420970 ("LU-12678 lnet: remove locking protection ln_testprotocompat")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/36856
 Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ include/linux/lnet/lib-types.h         |  2 +-
+ net/lnet/klnds/socklnd/socklnd_proto.c | 17 ++++-------------
+ net/lnet/lnet/acceptor.c               | 11 +++--------
+ net/lnet/lnet/api-ni.c                 |  2 --
+ 4 files changed, 8 insertions(+), 24 deletions(-)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 03d629d..b7990c9 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -1331,24 +1331,18 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	struct lnet_peer_ni *best_gw_ni = NULL;
- 	struct lnet_route *best_route;
- 	struct lnet_route *last_route;
--	struct lnet_peer *lp_best;
- 	struct lnet_route *route;
--	struct lnet_peer *lp;
- 	int rc;
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 99ed87a..9055da9 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -1134,7 +1134,7 @@ struct lnet {
+ 	struct lnet_lnd			*ln_lnds[NUM_LNDS];
  
--	lp_best = NULL;
- 	best_route = NULL;
- 	last_route = NULL;
- 	list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
--		lp = route->lr_gateway;
--
- 		if (!lnet_is_route_alive(route))
- 			continue;
+ 	/* test protocol compatibility flags */
+-	int				ln_testprotocompat;
++	unsigned long			ln_testprotocompat;
  
--		if (!lp_best) {
-+		if (!best_route) {
- 			best_route = route;
- 			last_route = route;
--			lp_best = lp;
- 			best_gw_ni = lnet_find_best_lpni_on_net(NULL,
- 								LNET_NID_ANY,
- 								route->lr_gateway,
-@@ -1366,7 +1360,6 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 			continue;
+ 	/*
+ 	 * 0 - load the NIs from the mod params
+diff --git a/net/lnet/klnds/socklnd/socklnd_proto.c b/net/lnet/klnds/socklnd/socklnd_proto.c
+index 887ed2d..195c44f 100644
+--- a/net/lnet/klnds/socklnd/socklnd_proto.c
++++ b/net/lnet/klnds/socklnd/socklnd_proto.c
+@@ -484,16 +484,11 @@
  
- 		best_route = route;
--		lp_best = lp;
+ 	if (the_lnet.ln_testprotocompat) {
+ 		/* single-shot proto check */
+-		lnet_net_lock(LNET_LOCK_EX);
+-		if (the_lnet.ln_testprotocompat & 1) {
++		if (test_and_clear_bit(0, &the_lnet.ln_testprotocompat))
+ 			hmv->version_major++;   /* just different! */
+-			the_lnet.ln_testprotocompat &= ~1;
+-		}
+-		if (the_lnet.ln_testprotocompat & 2) {
++
++		if (test_and_clear_bit(1, &the_lnet.ln_testprotocompat))
+ 			hmv->magic = LNET_PROTO_MAGIC;
+-			the_lnet.ln_testprotocompat &= ~2;
+-		}
+-		lnet_net_unlock(LNET_LOCK_EX);
  	}
  
- 	*prev_route = last_route;
+ 	hdr->src_nid = cpu_to_le64(hello->kshm_src_nid);
+@@ -541,12 +536,8 @@
+ 
+ 	if (the_lnet.ln_testprotocompat) {
+ 		/* single-shot proto check */
+-		lnet_net_lock(LNET_LOCK_EX);
+-		if (the_lnet.ln_testprotocompat & 1) {
++		if (test_and_clear_bit(0, &the_lnet.ln_testprotocompat))
+ 			hello->kshm_version++;   /* just different! */
+-			the_lnet.ln_testprotocompat &= ~1;
+-		}
+-		lnet_net_unlock(LNET_LOCK_EX);
+ 	}
+ 
+ 	rc = lnet_sock_write(sock, hello, offsetof(struct ksock_hello_msg, kshm_ips),
+diff --git a/net/lnet/lnet/acceptor.c b/net/lnet/lnet/acceptor.c
+index acd1d75..c6a1835 100644
+--- a/net/lnet/lnet/acceptor.c
++++ b/net/lnet/lnet/acceptor.c
+@@ -174,16 +174,11 @@
+ 
+ 		if (the_lnet.ln_testprotocompat) {
+ 			/* single-shot proto check */
+-			lnet_net_lock(LNET_LOCK_EX);
+-			if (the_lnet.ln_testprotocompat & 4) {
++			if (test_and_clear_bit(2, &the_lnet.ln_testprotocompat))
+ 				cr.acr_version++;
+-				the_lnet.ln_testprotocompat &= ~4;
+-			}
+-			if (the_lnet.ln_testprotocompat & 8) {
++
++			if (test_and_clear_bit(3, &the_lnet.ln_testprotocompat))
+ 				cr.acr_magic = LNET_PROTO_MAGIC;
+-				the_lnet.ln_testprotocompat &= ~8;
+-			}
+-			lnet_net_unlock(LNET_LOCK_EX);
+ 		}
+ 
+ 		rc = lnet_sock_write(sock, &cr, sizeof(cr), accept_timeout);
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index cd95bdd..0ca8bef 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -3842,9 +3842,7 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		return 0;
+ 
+ 	case IOC_LIBCFS_TESTPROTOCOMPAT:
+-		lnet_net_lock(LNET_LOCK_EX);
+ 		the_lnet.ln_testprotocompat = data->ioc_flags;
+-		lnet_net_unlock(LNET_LOCK_EX);
+ 		return 0;
+ 
+ 	case IOC_LIBCFS_LNET_FAULT:
 -- 
 1.8.3.1
