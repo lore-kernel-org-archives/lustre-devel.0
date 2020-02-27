@@ -1,84 +1,51 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:44 -0500
-Subject: [lustre-devel] [PATCH 416/622] lustre: llite: don't check vmpage
- refcount in ll_releasepage()
+Date: Thu, 27 Feb 2020 16:14:47 -0500
+Subject: [lustre-devel] [PATCH 419/622] lnet: Return EHOSTUNREACH for
+ unreachable gateway
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-417-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-420-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Chris Horn <hornc@cray.com>
 
-We could not use vmpage refcount to check whether page could be
-released because it break invalidate_complete_page2():
+Commit f1d0660a5bbe ("lnet: Do not allow gateways on remote nets")
+contains a flaw in that it shouldn't be a fatal error to
+encounter an unreachable gateway when parsing routes.  Parsing should
+continue in case there are any valid, reachable routes that are being
+added.  Returning EINAL here will cause a failure to load the LNet
+module.  lnet_parse_route() explicitly allows for lnet_add_route() to
+return EHOSTUNREACH for just this purpose.
 
-See comments:
-/*
- * This is like invalidate_complete_page(), except it ignores the page's
- * refcount.  We do this because invalidate_inode_pages2() needs stronger
- * invalidation guarantees, and cannot afford to leave pages behind because
- * shrink_page_list() has a temp ref on them, or because they're transiently
- * sitting in the lru_cache_add() pagevecs.
- */
-
-So checking refcount > 3 might be wrong here, one common
-case is page might be transiently in lru_cache_add().
-
-Since we have checked whether vmpage is used by cl_page later in the
-function, and vmpage will be locked before called, it should be safe
-to remove vmpage refcount check.
-
-One of problem currently is following DIO will mostly
-fall back to Buffer IO:
-
- $ dd if=/dev/zero of=data bs=1M count=1
- $ dd if=/dev/zero of=data bs=1M count=1 oflag=direct conv=notrunc
-
-Which is because DIO will firstly try to writeback and invalidate
-clean page which fail because vmpage refcount could be 4 here.
-
-Function calls come from:
-
-|->generic_file_direct_write()
-  |->filemap_write_and_wait_range()
-    |->invalidate_inode_pages2_range()
-          |->invalidate_complete_page2() If a page can not be invalidated,
-                                         return 0 to fall back to buffered write.
-                |->try_to_release_page()
-                  |->ll_releasepage()
-                        return 0 because of vmpage count is 4 > 3
-   |->generic_file_buffered_write
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12587
-Lustre-commit: e59f0c9a245f ("LU-12587 llite: don't check vmpage refcount in ll_releasepage()")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/35610
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Li Dongyang <dongyangli@ddn.com>
+Fixes: f1d0660a5bbe ("lnet: Do not allow gateways on remote nets")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12595
+Lustre-commit: 7c12c24c8a10 ("LU-12595 lnet: Return EHOSTUNREACH for unreachable gateway")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/35630
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/rw26.c | 4 ----
- 1 file changed, 4 deletions(-)
+ net/lnet/lnet/router.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
-index f5c1479..75348bf 100644
---- a/fs/lustre/llite/rw26.c
-+++ b/fs/lustre/llite/rw26.c
-@@ -119,10 +119,6 @@ static int ll_releasepage(struct page *vmpage, gfp_t gfp_mask)
- 	if (!obj)
- 		return 1;
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index 892164b..4ab587d 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -448,7 +448,7 @@ static void lnet_shuffle_seed(void)
+ 		CERROR("Cannot add route with gateway %s. There is no local interface configured on LNet %s\n",
+ 		       libcfs_nid2str(gateway),
+ 		       libcfs_net2str(LNET_NIDNET(gateway)));
+-		return -EINVAL;
++		return -EHOSTUNREACH;
+ 	}
  
--	/* 1 for caller, 1 for cl_page and 1 for page cache */
--	if (page_count(vmpage) > 3)
--		return 0;
--
- 	page = cl_vmpage_page(vmpage, obj);
- 	if (!page)
- 		return 1;
+ 	/* Assume net, route, all new */
 -- 
 1.8.3.1
