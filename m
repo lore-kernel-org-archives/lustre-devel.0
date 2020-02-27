@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:35 -0500
-Subject: [lustre-devel] [PATCH 407/622] lustre: clio: support custom
- csi_end_io handler
+Date: Thu, 27 Feb 2020 16:15:12 -0500
+Subject: [lustre-devel] [PATCH 444/622] lnet: Fix style issues for module.c
+ conctl.c
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-408-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-445-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,116 +13,60 @@ To: lustre-devel@lists.lustre.org
 
 From: Shaun Tancheff <stancheff@cray.com>
 
-Provide an initialize that supports a custom end_io handler.
+This patch fixes issues reported by checkpatch for the file
+selftest/module.c and selftest/conctl.c.
+Linux 5.3 enforces the use of 'fallthrough' which is also
+suggested by checkpatch
 
-Cray-bug-id: LUS-7330
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12431
-Lustre-commit: 6ee742fd5c56 ("LU-12431 clio: remove default csi_end_io handler")
+Cray-bug-id: LUS-7690
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12635
+Lustre-commit: ebff8aba3392 ("LU-12635 lnet: Fix style issues for module.c conctl.c")
 Signed-off-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-on: https://review.whamcloud.com/35400
-Reviewed-by: Neil Brown <neilb@suse.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/35802
+Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h | 24 ++++++++++++++++++------
- fs/lustre/obdclass/cl_io.c    | 19 ++++++++++++++++---
- 2 files changed, 34 insertions(+), 9 deletions(-)
+ net/lnet/selftest/conctl.c | 4 ++--
+ net/lnet/selftest/module.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index 7ac0dd2..71ca283 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -2457,6 +2457,22 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_object *obj,
-  * @{
-  */
+diff --git a/net/lnet/selftest/conctl.c b/net/lnet/selftest/conctl.c
+index 906d82d..ed9eab9 100644
+--- a/net/lnet/selftest/conctl.c
++++ b/net/lnet/selftest/conctl.c
+@@ -121,7 +121,6 @@
+ 		return -EINVAL;
  
-+struct cl_sync_io;
-+
-+typedef void (cl_sync_io_end_t)(const struct lu_env *, struct cl_sync_io *);
-+
-+void cl_sync_io_init_notify(struct cl_sync_io *anchor, int nr,
-+			    cl_sync_io_end_t *end);
-+
-+int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
-+		    long timeout);
-+void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
-+		     int ioret);
-+static inline void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
-+{
-+	cl_sync_io_init_notify(anchor, nr, NULL);
-+}
-+
- /**
-  * Anchor for synchronous transfer. This is allocated on a stack by thread
-  * doing synchronous transfer, and a pointer to this structure is set up in
-@@ -2470,14 +2486,10 @@ struct cl_sync_io {
- 	int			csi_sync_rc;
- 	/** completion to be signaled when transfer is complete. */
- 	wait_queue_head_t	csi_waitq;
-+	/** callback to invoke when this IO is finished */
-+	cl_sync_io_end_t	*csi_end_io;
- };
- 
--void cl_sync_io_init(struct cl_sync_io *anchor, int nr);
--int  cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
--		     long timeout);
--void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
--		     int ioret);
+ 	if (args->lstio_dbg_namep) {
 -
- /** @} cl_sync_io */
+ 		if (copy_from_user(name, args->lstio_dbg_namep,
+ 				   args->lstio_dbg_nmlen))
+ 			return -EFAULT;
+@@ -727,7 +726,8 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
+ 		goto out;
+ 	}
  
- /** \defgroup cl_env cl_env
-diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
-index 4278bc0..14849ed 100644
---- a/fs/lustre/obdclass/cl_io.c
-+++ b/fs/lustre/obdclass/cl_io.c
-@@ -1024,16 +1024,26 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_object *obj,
- EXPORT_SYMBOL(cl_req_attr_set);
+-	memset(&console_session.ses_trans_stat, 0, sizeof(struct lstcon_trans_stat));
++	memset(&console_session.ses_trans_stat,
++	       0, sizeof(struct lstcon_trans_stat));
  
- /**
-- * Initialize synchronous io wait anchor
-+ * Initialize synchronous io wait @anchor for @nr pages with optional
-+ * @end handler.
-+ *
-+ * @anchor	owned by caller, initialzied here.
-+ * @nr		number of pages initally pending in sync.
-+ * @end		optional callback sync_io completion, can be used to
-+ *		trigger erasure coding, integrity, dedupe, or similar
-+ *		operation. @end is called with a spinlock on
-+ *		anchor->csi_waitq.lock
-  */
--void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
-+void cl_sync_io_init_notify(struct cl_sync_io *anchor, int nr,
-+			    cl_sync_io_end_t *end)
- {
- 	memset(anchor, 0, sizeof(*anchor));
- 	init_waitqueue_head(&anchor->csi_waitq);
- 	atomic_set(&anchor->csi_sync_nr, nr);
- 	anchor->csi_sync_rc = 0;
-+	anchor->csi_end_io = end;
- }
--EXPORT_SYMBOL(cl_sync_io_init);
-+EXPORT_SYMBOL(cl_sync_io_init_notify);
+ 	switch (opc) {
+ 	case LSTIO_SESSION_NEW:
+diff --git a/net/lnet/selftest/module.c b/net/lnet/selftest/module.c
+index 9ba6532..2de2b59 100644
+--- a/net/lnet/selftest/module.c
++++ b/net/lnet/selftest/module.c
+@@ -105,7 +105,7 @@ enum {
  
- /**
-  * Wait until all IO completes. Transfer completion routine has to call
-@@ -1088,6 +1098,7 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
- 	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
- 	if (atomic_dec_and_lock(&anchor->csi_sync_nr,
- 				&anchor->csi_waitq.lock)) {
-+		cl_sync_io_end_t *end_io = anchor->csi_end_io;
- 
- 		/*
- 		 * Holding the lock across both the decrement and
-@@ -1095,6 +1106,8 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
- 		 * before the wakeup completes.
- 		 */
- 		wake_up_all_locked(&anchor->csi_waitq);
-+		if (end_io)
-+			end_io(env, anchor);
- 		spin_unlock(&anchor->csi_waitq.lock);
- 
- 		/* Can't access anchor any more */
+ 	nscheds = cfs_cpt_number(lnet_cpt_table());
+ 	lst_test_wq = kvmalloc_array(nscheds, sizeof(lst_test_wq[0]),
+-					GFP_KERNEL | __GFP_ZERO);
++				     GFP_KERNEL | __GFP_ZERO);
+ 	if (!lst_test_wq) {
+ 		rc = -ENOMEM;
+ 		goto error;
 -- 
 1.8.3.1
