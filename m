@@ -1,212 +1,174 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:21 -0500
-Subject: [lustre-devel] [PATCH 573/622] lustre: rename ops to owner
+Date: Thu, 27 Feb 2020 16:17:23 -0500
+Subject: [lustre-devel] [PATCH 575/622] lnet: prepare to make lnet_lnd const.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-574-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-576-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+From: Mr NeilBrown <neilb@suse.com>
 
-Now that portals_handle_ops contains only a char*,
-it is functioning primarily to identify the owner of each handle.
-So change the name to h_owner, and the type to const char*.
+Preferred practice is for structs containing function
+pointers to be 'const'.  Such structs are generally tempting
+attack vectors, and making them const allows linux to place
+them in read-only memory, thus reducing the attack surface.
 
-Note: this h_owner is now quite different from the similar h_owner
-in the server code.  When server code is merged the
-"med" pointer will be stored in the "mfd" and validated separately.
+'struct lnet_lnd' is mostly function pointers, but contains
+one writable field - a list_head.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12542
-Lustre-commit: 1a9aafbf6317 ("LU-12542 handle: rename ops to owner")
-Signed-off-by: NeilBrown <neilb@suse.com>
-Reviewed-on: https://review.whamcloud.com/35798
-Reviewed-by: Shaun Tancheff <stancheff@cray.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
+Rather than keeping registered lnds in a linked-list, we can place
+them in an array indexed by type - type numbers are at most 15 so
+this is not a burden.
+
+With these changes, no part of an lnet_lnd is ever modified.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 87a6bd0766da ("LU-12678 lnet: prepare to make lnet_lnd const.")
+Signed-off-by: Mr NeilBrown <neilb@suse.com>
+Reviewed-on: https://review.whamcloud.com/36830
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_handles.h  | 12 +++---------
- fs/lustre/ldlm/ldlm_lock.c          |  8 +++-----
- fs/lustre/obdclass/genops.c         | 10 +++-------
- fs/lustre/obdclass/lustre_handles.c | 15 +++++++--------
- 4 files changed, 16 insertions(+), 29 deletions(-)
+ include/linux/lnet/lib-types.h   |  6 ++----
+ include/uapi/linux/lnet/nidstr.h |  2 ++
+ net/lnet/lnet/api-ni.c           | 29 +++++++++++++++--------------
+ net/lnet/lnet/lo.c               |  1 -
+ 4 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_handles.h b/fs/lustre/include/lustre_handles.h
-index 8f733fd..55f9a09 100644
---- a/fs/lustre/include/lustre_handles.h
-+++ b/fs/lustre/include/lustre_handles.h
-@@ -45,11 +45,6 @@
- #include <linux/spinlock.h>
- #include <linux/types.h>
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 02ac5df..99ed87a 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -46,6 +46,7 @@
+ #include <uapi/linux/lnet/lnet-types.h>
+ #include <uapi/linux/lnet/lnetctl.h>
+ #include <uapi/linux/lnet/lnet-dlc.h>
++#include <uapi/linux/lnet/nidstr.h>
  
--struct portals_handle_ops {
--	/* hop_type is used for some debugging messages */
--	char *hop_type;
--};
+ /* Max payload size */
+ #define LNET_MAX_PAYLOAD	LNET_MTU
+@@ -244,9 +245,6 @@ struct lnet_test_peer {
+ struct lnet_ni;			/* forward ref */
+ 
+ struct lnet_lnd {
+-	/* fields managed by portals */
+-	struct list_head	lnd_list;	/* stash in the LND table */
 -
- /* These handles are most easily used by having them appear at the very top of
-  * whatever object that you want to make handles for.  ie:
-  *
-@@ -65,7 +60,7 @@ struct portals_handle_ops {
- struct portals_handle {
- 	struct list_head		h_link;
- 	u64				h_cookie;
--	const struct portals_handle_ops	*h_ops;
-+	const char			*h_owner;
- 	refcount_t			h_ref;
+ 	/* fields initialised by the LND */
+ 	u32			lnd_type;
  
- 	/* newly added fields to handle the RCU issue. -jxiong */
-@@ -77,10 +72,9 @@ struct portals_handle {
- /* handles.c */
+@@ -1133,7 +1131,7 @@ struct lnet {
+ 	/* uniquely identifies this ni in this epoch */
+ 	u64				ln_interface_cookie;
+ 	/* registered LNDs */
+-	struct list_head		ln_lnds;
++	struct lnet_lnd			*ln_lnds[NUM_LNDS];
  
- /* Add a handle to the hash table */
--void class_handle_hash(struct portals_handle *,
--		       const struct portals_handle_ops *ops);
-+void class_handle_hash(struct portals_handle *, const char *h_owner);
- void class_handle_unhash(struct portals_handle *);
--void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops);
-+void *class_handle2object(u64 cookie, const char *h_owner);
- int class_handle_init(void);
- void class_handle_cleanup(void);
+ 	/* test protocol compatibility flags */
+ 	int				ln_testprotocompat;
+diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
+index 43ec232..958ca8d 100644
+--- a/include/uapi/linux/lnet/nidstr.h
++++ b/include/uapi/linux/lnet/nidstr.h
+@@ -53,6 +53,8 @@ enum {
+ 	/*MXLND		= 12, removed v2_7_50_0-34-g8be9e41	*/
+ 	GNILND		= 13,
+ 	GNIIPLND	= 14,
++
++	NUM_LNDS
+ };
  
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index 61bf028..2c19636 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -365,9 +365,7 @@ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock)
- 	}
+ struct list_head;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 0020ffd..cd95bdd 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -734,12 +734,12 @@ static void lnet_assert_wire_constants(void)
+ 	struct lnet_lnd *lnd;
+ 
+ 	/* holding lnd mutex */
+-	list_for_each_entry(lnd, &the_lnet.ln_lnds, lnd_list) {
+-		if (lnd->lnd_type == type)
+-			return lnd;
+-	}
++	if (type >= NUM_LNDS)
++		return NULL;
++	lnd = the_lnet.ln_lnds[type];
++	LASSERT(!lnd || lnd->lnd_type == type);
+ 
+-	return NULL;
++	return lnd;
  }
  
--static struct portals_handle_ops lock_handle_ops = {
--	.hop_type   = "ldlm",
--};
-+static const char lock_handle_owner[] = "ldlm";
+ unsigned int
+@@ -757,7 +757,7 @@ static void lnet_assert_wire_constants(void)
+ 	LASSERT(libcfs_isknown_lnd(lnd->lnd_type));
+ 	LASSERT(!lnet_find_lnd_by_type(lnd->lnd_type));
  
- /**
-  *
-@@ -407,7 +405,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- 	lprocfs_counter_incr(ldlm_res_to_ns(resource)->ns_stats,
- 			     LDLM_NSS_LOCKS);
- 	INIT_LIST_HEAD(&lock->l_handle.h_link);
--	class_handle_hash(&lock->l_handle, &lock_handle_ops);
-+	class_handle_hash(&lock->l_handle, lock_handle_owner);
+-	list_add_tail(&lnd->lnd_list, &the_lnet.ln_lnds);
++	the_lnet.ln_lnds[lnd->lnd_type] = lnd;
  
- 	lu_ref_init(&lock->l_reference);
- 	lu_ref_add(&lock->l_reference, "hash", lock);
-@@ -515,7 +513,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
- 	if (!lustre_handle_is_used(handle))
- 		return NULL;
+ 	CDEBUG(D_NET, "%s LND registered\n", libcfs_lnd2str(lnd->lnd_type));
  
--	lock = class_handle2object(handle->cookie, &lock_handle_ops);
-+	lock = class_handle2object(handle->cookie, lock_handle_owner);
- 	if (!lock)
- 		return NULL;
+@@ -772,7 +772,7 @@ static void lnet_assert_wire_constants(void)
  
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index 15bea0d..0fbe03e 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -662,7 +662,7 @@ int obd_init_caches(void)
- 	return -ENOMEM;
- }
+ 	LASSERT(lnet_find_lnd_by_type(lnd->lnd_type) == lnd);
  
--static struct portals_handle_ops export_handle_ops;
-+static const char export_handle_owner[] = "export";
+-	list_del(&lnd->lnd_list);
++	the_lnet.ln_lnds[lnd->lnd_type] = NULL;
+ 	CDEBUG(D_NET, "%s LND unregistered\n", libcfs_lnd2str(lnd->lnd_type));
  
- /* map connection to client */
- struct obd_export *class_conn2export(struct lustre_handle *conn)
-@@ -680,7 +680,7 @@ struct obd_export *class_conn2export(struct lustre_handle *conn)
+ 	mutex_unlock(&the_lnet.ln_lnd_mutex);
+@@ -2429,7 +2429,6 @@ int lnet_lib_init(void)
  	}
  
- 	CDEBUG(D_INFO, "looking for export cookie %#llx\n", conn->cookie);
--	export = class_handle2object(conn->cookie, &export_handle_ops);
-+	export = class_handle2object(conn->cookie, export_handle_owner);
- 	return export;
- }
- EXPORT_SYMBOL(class_conn2export);
-@@ -732,10 +732,6 @@ static void class_export_destroy(struct obd_export *exp)
- 	kfree_rcu(exp, exp_handle.h_rcu);
- }
+ 	the_lnet.ln_refcount = 0;
+-	INIT_LIST_HEAD(&the_lnet.ln_lnds);
+ 	INIT_LIST_HEAD(&the_lnet.ln_net_zombie);
+ 	INIT_LIST_HEAD(&the_lnet.ln_msg_resend);
  
--static struct portals_handle_ops export_handle_ops = {
--	.hop_type	= "export",
--};
--
- struct obd_export *class_export_get(struct obd_export *exp)
- {
- 	refcount_inc(&exp->exp_handle.h_ref);
-@@ -819,7 +815,7 @@ static struct obd_export *__class_new_export(struct obd_device *obd,
- 	INIT_LIST_HEAD(&export->exp_req_replay_queue);
- 	INIT_LIST_HEAD_RCU(&export->exp_handle.h_link);
- 	INIT_LIST_HEAD(&export->exp_hp_rpcs);
--	class_handle_hash(&export->exp_handle, &export_handle_ops);
-+	class_handle_hash(&export->exp_handle, export_handle_owner);
- 	spin_lock_init(&export->exp_lock);
- 	spin_lock_init(&export->exp_rpc_lock);
- 	spin_lock_init(&export->exp_bl_list_lock);
-diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
-index 99c68fe..6989a60 100644
---- a/fs/lustre/obdclass/lustre_handles.c
-+++ b/fs/lustre/obdclass/lustre_handles.c
-@@ -58,8 +58,7 @@
-  * Generate a unique 64bit cookie (hash) for a handle and insert it into
-  * global (per-node) hash-table.
+@@ -2459,16 +2458,18 @@ int lnet_lib_init(void)
+  *
+  * \pre lnet_lib_init() called with success.
+  * \pre All LNet users called LNetNIFini() for matching LNetNIInit() calls.
++ *
++ * As this happens at module-unload, all lnds must already be unloaded,
++ * so they must already be unregistered.
   */
--void class_handle_hash(struct portals_handle *h,
--		       const struct portals_handle_ops *ops)
-+void class_handle_hash(struct portals_handle *h, const char *owner)
+ void lnet_lib_exit(void)
  {
- 	struct handle_bucket *bucket;
+-	struct lnet_lnd *lnd;
+-	LASSERT(!the_lnet.ln_refcount);
++	int i;
  
-@@ -85,7 +84,7 @@ void class_handle_hash(struct portals_handle *h,
- 	h->h_cookie = handle_base;
- 	spin_unlock(&handle_base_lock);
- 
--	h->h_ops = ops;
-+	h->h_owner = owner;
- 	spin_lock_init(&h->h_lock);
- 
- 	bucket = &handle_hash[h->h_cookie & HANDLE_HASH_MASK];
-@@ -132,7 +131,7 @@ void class_handle_unhash(struct portals_handle *h)
+-	while ((lnd = list_first_entry_or_null(&the_lnet.ln_lnds,
+-					       struct lnet_lnd,
+-					       lnd_list)) != NULL)
+-		lnet_unregister_lnd(lnd);
++	LASSERT(!the_lnet.ln_refcount);
++	lnet_unregister_lnd(&the_lolnd);
++	for (i = 0; i < NUM_LNDS; i++)
++		LASSERT(!the_lnet.ln_lnds[i]);
+ 	lnet_destroy_locks();
  }
- EXPORT_SYMBOL(class_handle_unhash);
  
--void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
-+void *class_handle2object(u64 cookie, const char *owner)
- {
- 	struct handle_bucket *bucket;
- 	struct portals_handle *h;
-@@ -147,14 +146,14 @@ void *class_handle2object(u64 cookie, const struct portals_handle_ops *ops)
+diff --git a/net/lnet/lnet/lo.c b/net/lnet/lnet/lo.c
+index 350495f..c19a5b5 100644
+--- a/net/lnet/lnet/lo.c
++++ b/net/lnet/lnet/lo.c
+@@ -93,7 +93,6 @@
+ }
  
- 	rcu_read_lock();
- 	list_for_each_entry_rcu(h, &bucket->head, h_link) {
--		if (h->h_cookie != cookie || h->h_ops != ops)
-+		if (h->h_cookie != cookie || h->h_owner != owner)
- 			continue;
- 
- 		spin_lock(&h->h_lock);
- 		if (likely(h->h_in != 0)) {
- 			refcount_inc(&h->h_ref);
- 			CDEBUG(D_INFO, "GET %s %p refcount=%d\n",
--			       h->h_ops->hop_type, h,
-+			       h->h_owner, h,
- 			       refcount_read(&h->h_ref));
- 			retval = h;
- 		}
-@@ -201,8 +200,8 @@ static int cleanup_all_handles(void)
- 
- 		spin_lock(&handle_hash[i].lock);
- 		list_for_each_entry_rcu(h, &handle_hash[i].head, h_link) {
--			CERROR("force clean handle %#llx addr %p ops %p\n",
--			       h->h_cookie, h, h->h_ops);
-+			CERROR("force clean handle %#llx addr %p owner %p\n",
-+			       h->h_cookie, h, h->h_owner);
- 
- 			class_handle_unhash_nolock(h);
- 			rc++;
+ struct lnet_lnd the_lolnd = {
+-	.lnd_list	= LIST_HEAD_INIT(the_lolnd.lnd_list),
+ 	.lnd_type	= LOLND,
+ 	.lnd_startup	= lolnd_startup,
+ 	.lnd_shutdown	= lolnd_shutdown,
 -- 
 1.8.3.1
