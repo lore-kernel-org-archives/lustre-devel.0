@@ -1,71 +1,64 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:48 -0500
-Subject: [lustre-devel] [PATCH 600/622] lustre: handle: remove locking from
- class_handle2object()
+Date: Thu, 27 Feb 2020 16:17:55 -0500
+Subject: [lustre-devel] [PATCH 607/622] lustre: uapi: remove unused
+ LUSTRE_DIRECTIO_FL
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-601-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-608-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-There is limited value in this locking and test on h_in.
+The LUSTRE_DIRECTIO_FL was added based on the upstream FS_DIRECTIO_FL
+flag in the hopes that it might be useful, but it has since been
+removed from the upstream in kernel commit v4.4-rc4-22-g68ce7bfcd995
+and replaced by FS_VERITY_FL using the same value in kernel commit
+v5.3-rc2-4-gfe9918d3b228, which we are much more likely to use.
 
-If the lookup could have run in parallel with
-class_handle_unhash_nolock() and seen "h_in == 0", then it could
-equally well have run moments earlier and not seen it - no locking
-would prevent that, so the caller much be prepared to have
-an object returned which has already been unhashed by the time it
-sees the object.
+Since LUSTRE_DIRECTIO_FL was unused, there is no risk to remove it.
 
-In other words, any interlock between unhash and lookup must be
-provided at a higher level than where this code is trying
-to handle it.
-
-The locking *does* prevent the refcount from being incremented if the
-object has already been removed from the list.  As the final reference
-is always dropped after that removal, it indirectly stops the refcount
-from being incremented after the final reference is dropped.
-This can be more directly achieved by using refcount_inc_not_zero().
-
-So remove the locking, and replace it with refcount_inc_not_zero().
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12542
-Lustre-commit: e2458a94a6a2 ("LU-12542 handle: remove locking from class_handle2object()")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/35861
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Petros Koutoupis <pkoutoupis@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13164
+Lustre-commit: ff168481a1b2 ("LU-13164 uapi: remove unused LUSTRE_DIRECTIO_FL")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/37295
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lustre_handles.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ fs/lustre/ptlrpc/wiretest.c            | 2 --
+ include/uapi/linux/lustre/lustre_idl.h | 1 -
+ 2 files changed, 3 deletions(-)
 
-diff --git a/fs/lustre/obdclass/lustre_handles.c b/fs/lustre/obdclass/lustre_handles.c
-index 6989a60..acee2db 100644
---- a/fs/lustre/obdclass/lustre_handles.c
-+++ b/fs/lustre/obdclass/lustre_handles.c
-@@ -149,15 +149,12 @@ void *class_handle2object(u64 cookie, const char *owner)
- 		if (h->h_cookie != cookie || h->h_owner != owner)
- 			continue;
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 6c66815..96f327f 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -2176,8 +2176,6 @@ void lustre_assert_wire_constants(void)
+ 		 LUSTRE_DIRSYNC_FL);
+ 	LASSERTF(LUSTRE_TOPDIR_FL == 0x00020000, "found 0x%.8x\n",
+ 		 LUSTRE_TOPDIR_FL);
+-	LASSERTF(LUSTRE_DIRECTIO_FL == 0x00100000, "found 0x%.8x\n",
+-		 LUSTRE_DIRECTIO_FL);
+ 	LASSERTF(LUSTRE_INLINE_DATA_FL == 0x10000000, "found 0x%.8x\n",
+ 		 LUSTRE_INLINE_DATA_FL);
+ 	LASSERTF(MDS_INODELOCK_LOOKUP == 0x00000001UL, "found 0x%.8x\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 19ac0cb..df2e34b 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1543,7 +1543,6 @@ enum {
+ #define LUSTRE_INDEX_FL		0x00001000 /* hash-indexed directory */
+ #define LUSTRE_DIRSYNC_FL	0x00010000 /* dirsync behaviour (dir only) */
+ #define LUSTRE_TOPDIR_FL	0x00020000 /* Top of directory hierarchies*/
+-#define LUSTRE_DIRECTIO_FL	0x00100000 /* Use direct i/o */
+ #define LUSTRE_INLINE_DATA_FL	0x10000000 /* Inode has inline data. */
+ #define LUSTRE_PROJINHERIT_FL	0x20000000 /* Create with parents projid */
  
--		spin_lock(&h->h_lock);
--		if (likely(h->h_in != 0)) {
--			refcount_inc(&h->h_ref);
-+		if (refcount_inc_not_zero(&h->h_ref)) {
- 			CDEBUG(D_INFO, "GET %s %p refcount=%d\n",
- 			       h->h_owner, h,
- 			       refcount_read(&h->h_ref));
- 			retval = h;
- 		}
--		spin_unlock(&h->h_lock);
- 		break;
- 	}
- 	rcu_read_unlock();
 -- 
 1.8.3.1
