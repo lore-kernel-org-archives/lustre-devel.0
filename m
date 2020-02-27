@@ -1,51 +1,78 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:50 -0500
-Subject: [lustre-devel] [PATCH 542/622] lustre: ptlrpc: do lu_env_refill for
- any new request
+Date: Thu, 27 Feb 2020 16:16:59 -0500
+Subject: [lustre-devel] [PATCH 551/622] lustre: llite: don't cache
+ MDS_OPEN_LOCK for volatile files
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-543-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-552-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mikhail Pershin <mpershin@whamcloud.com>
+The kernels knfsd constantly opens and closes files for each
+access which can result in a continuous stream of open+close RPCs
+being send to the MDS. To avoid this Lustre created a special
+flag, ll_nfs_dentry, which enables caching of the MDS_OPEN_LOCK
+on the client. The fhandles API also uses the same exportfs layer
+as NFS which indirectly ends up caching the MDS_OPEN_LOCK as well.
+This is okay for normal files except for Lustre's special volatile
+files that are used for HSM restore. It is expected on the last
+close of a Lustre volatile file that it is no longer accessable.
+To ensure this behavior is kept don't cache MDS_OPEN_LOCK for
+volatile files.
 
-Perform lu_env_refill() prior any new request handling. That was
-done already server side by tgt_request_handle() and is moved now
-to ptlrpc_main() to work for any handler as well,
-e.g. ldlm_cancel_handler()
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12741
-Lustre-commit: 3f304b75d24a ("LU-12741 ptlrpc: do lu_env_refill for new request")
-Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/36714
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8585
+Lustre-commit: 6a3a842add0e ("LU-8585 llite: don't cache MDS_OPEN_LOCK for volatile files")
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/36641
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Shaun Tancheff <stancheff@cray.com>
+Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/service.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ fs/lustre/llite/file.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
-index c874487..f65d5c5 100644
---- a/fs/lustre/ptlrpc/service.c
-+++ b/fs/lustre/ptlrpc/service.c
-@@ -2281,6 +2281,12 @@ static int ptlrpc_main(void *arg)
- 			ptlrpc_start_thread(svcpt, 0);
- 		}
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index d196da8..a3c36a7 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -798,6 +798,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 	} else {
+ 		LASSERT(*och_usecount == 0);
+ 		if (!it->it_disposition) {
++			struct dentry *dentry = file_dentry(file);
+ 			struct ll_dentry_data *ldd;
  
-+		/* reset le_ses to initial state */
-+		env->le_ses = NULL;
-+		/* Refill the context before execution to make sure
-+		 * all thread keys are allocated
-+		 */
-+		lu_env_refill(env);
- 		/* Process all incoming reqs before handling any */
- 		if (ptlrpc_server_request_incoming(svcpt)) {
- 			lu_context_enter(&env->le_ctx);
+ 			/* We cannot just request lock handle now, new ELC code
+@@ -822,10 +823,13 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 			 * lookup path only, since ll_iget_for_nfs always calls
+ 			 * ll_d_init().
+ 			 */
+-			ldd = ll_d2d(file->f_path.dentry);
++			ldd = ll_d2d(dentry);
+ 			if (ldd && ldd->lld_nfs_dentry) {
+ 				ldd->lld_nfs_dentry = 0;
+-				it->it_flags |= MDS_OPEN_LOCK;
++				if (!filename_is_volatile(dentry->d_name.name,
++							  dentry->d_name.len,
++							  NULL))
++					it->it_flags |= MDS_OPEN_LOCK;
+ 			}
+ 
+ 			/*
+@@ -833,8 +837,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 			 * to get file with different fid.
+ 			 */
+ 			it->it_flags |= MDS_OPEN_BY_FID;
+-			rc = ll_intent_file_open(file->f_path.dentry,
+-						 NULL, 0, it);
++			rc = ll_intent_file_open(dentry, NULL, 0, it);
+ 			if (rc)
+ 				goto out_openerr;
+ 
 -- 
 1.8.3.1
