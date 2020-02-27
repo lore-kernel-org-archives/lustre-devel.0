@@ -1,199 +1,358 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:11:04 -0500
-Subject: [lustre-devel] [PATCH 196/622] lustre: sptlrpc: split
- sptlrpc_process_config()
+Date: Thu, 27 Feb 2020 16:11:08 -0500
+Subject: [lustre-devel] [PATCH 200/622] lnet: remove .nf_min_max handling
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-197-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-201-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Make sptlrpc_process_config() more than a single line wapper
-exporting function. Instead migrate the lcfg parsing out of
-__sptlrpc_process_config() so that we can use this function
-for both LCFG_PARAM and LCFG_SET_PARAM handling.
+From: Kit Westneat <kit.westneat@gmail.com>
 
-The first field parsed from struct lustre_cfg *lcfg is the
-target. This can be "_mgs", file system name, or an obd target
-i.e fsname-MDT0000. We can move to extracting the file system
-name out of the target string using server_name2fsname().
+The .nf_min_max handling was only used for server side debugging.
+This has been removed in the OpenSFS tree as well so lets remove
+it here since the code related to nf_min_max handling is not
+used.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10937
-Lustre-commit: 0ff7d548eb7b ("LU-10937 sptlrpc: split sptlrpc_process_config()")
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-on: https://review.whamcloud.com/33760
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8939
+Lustre-commit: a9b830da51bd ("LU-8939 nodemap: remove deprecated lproc files")
+Signed-off-by: Kit Westneat <kit.westneat@gmail.com>
+Reviewed-on: https://review.whamcloud.com/24352
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_disk.h |  1 +
- fs/lustre/obdclass/obd_mount.c  |  5 ++-
- fs/lustre/ptlrpc/sec_config.c   | 85 +++++++++++++++++++++++++----------------
- 3 files changed, 57 insertions(+), 34 deletions(-)
+ net/lnet/lnet/nidstrings.c | 278 ++-------------------------------------------
+ 1 file changed, 10 insertions(+), 268 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_disk.h b/fs/lustre/include/lustre_disk.h
-index 92618e8..b6b693f 100644
---- a/fs/lustre/include/lustre_disk.h
-+++ b/fs/lustre/include/lustre_disk.h
-@@ -145,6 +145,7 @@ struct lustre_sb_info {
- /****************** prototypes *********************/
- 
- /* obd_mount.c */
-+int server_name2fsname(const char *svname, char *fsname, const char **endptr);
- 
- int lustre_start_mgc(struct super_block *sb);
- int lustre_common_put_super(struct super_block *sb);
-diff --git a/fs/lustre/obdclass/obd_mount.c b/fs/lustre/obdclass/obd_mount.c
-index d143112..6c68bc7 100644
---- a/fs/lustre/obdclass/obd_mount.c
-+++ b/fs/lustre/obdclass/obd_mount.c
-@@ -597,8 +597,8 @@ int lustre_put_lsi(struct super_block *sb)
-  *
-  * Returns:	rc < 0  on error
-  */
--static int server_name2fsname(const char *svname, char *fsname,
--			      const char **endptr)
-+int server_name2fsname(const char *svname, char *fsname,
-+		       const char **endptr)
- {
- 	const char *dash;
- 
-@@ -618,6 +618,7 @@ static int server_name2fsname(const char *svname, char *fsname,
- 
- 	return 0;
+diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
+index 13338d0..eca5092 100644
+--- a/net/lnet/lnet/nidstrings.c
++++ b/net/lnet/lnet/nidstrings.c
+@@ -451,264 +451,6 @@ int cfs_print_nidlist(char *buffer, int count, struct list_head *nidlist)
  }
-+EXPORT_SYMBOL(server_name2fsname);
+ EXPORT_SYMBOL(cfs_print_nidlist);
  
- /* Get the index from the obd name.
-  *  rc = server type, or
-diff --git a/fs/lustre/ptlrpc/sec_config.c b/fs/lustre/ptlrpc/sec_config.c
-index 135ce99..e4b1a075 100644
---- a/fs/lustre/ptlrpc/sec_config.c
-+++ b/fs/lustre/ptlrpc/sec_config.c
-@@ -41,6 +41,7 @@
- #include <obd_class.h>
- #include <obd_support.h>
- #include <lustre_import.h>
-+#include <lustre_disk.h>
- #include <uapi/linux/lustre/lustre_param.h>
- #include <lustre_sec.h>
- 
-@@ -577,14 +578,45 @@ static int sptlrpc_conf_merge_rule(struct sptlrpc_conf *conf,
-  * find one through the target name in the record inside conf_lock;
-  * otherwise means caller already hold conf_lock.
-  */
--static int __sptlrpc_process_config(struct lustre_cfg *lcfg,
-+static int __sptlrpc_process_config(char *target, const char *fsname,
-+				    struct sptlrpc_rule *rule,
- 				    struct sptlrpc_conf *conf)
- {
--	char *target, *param;
-+	int rc;
-+
-+	if (!conf) {
-+		if (!fsname)
-+			return -ENODEV;
-+
-+		mutex_lock(&sptlrpc_conf_lock);
-+		conf = sptlrpc_conf_get(fsname, 0);
-+		if (!conf) {
-+			CERROR("can't find conf\n");
-+			rc = -ENOMEM;
-+		} else {
-+			rc = sptlrpc_conf_merge_rule(conf, target, rule);
-+		}
-+		mutex_unlock(&sptlrpc_conf_lock);
-+	} else {
-+		LASSERT(mutex_is_locked(&sptlrpc_conf_lock));
-+		rc = sptlrpc_conf_merge_rule(conf, target, rule);
-+	}
-+
-+	if (!rc)
-+		conf->sc_modified++;
-+
-+	return rc;
-+}
-+
-+int sptlrpc_process_config(struct lustre_cfg *lcfg)
-+{
- 	char fsname[MTI_NAME_MAXLEN];
- 	struct sptlrpc_rule rule;
-+	char *target, *param;
- 	int rc;
- 
-+	print_lustre_cfg(lcfg);
-+
- 	target = lustre_cfg_string(lcfg, 1);
- 	if (!target) {
- 		CERROR("missing target name\n");
-@@ -597,45 +629,34 @@ static int __sptlrpc_process_config(struct lustre_cfg *lcfg,
- 		return -EINVAL;
- 	}
- 
--	CDEBUG(D_SEC, "processing rule: %s.%s\n", target, param);
--
- 	/* parse rule to make sure the format is correct */
--	if (strncmp(param, PARAM_SRPC_FLVR, sizeof(PARAM_SRPC_FLVR) - 1) != 0) {
-+	if (strncmp(param, PARAM_SRPC_FLVR,
-+		    sizeof(PARAM_SRPC_FLVR) - 1) != 0) {
- 		CERROR("Invalid sptlrpc parameter: %s\n", param);
- 		return -EINVAL;
- 	}
- 	param += sizeof(PARAM_SRPC_FLVR) - 1;
- 
--	rc = sptlrpc_parse_rule(param, &rule);
--	if (rc)
--		return -EINVAL;
--
--	if (!conf) {
--		target2fsname(target, fsname, sizeof(fsname));
--
--		mutex_lock(&sptlrpc_conf_lock);
--		conf = sptlrpc_conf_get(fsname, 0);
--		if (!conf) {
--			CERROR("can't find conf\n");
--			rc = -ENOMEM;
--		} else {
--			rc = sptlrpc_conf_merge_rule(conf, target, &rule);
--		}
--		mutex_unlock(&sptlrpc_conf_lock);
--	} else {
--		LASSERT(mutex_is_locked(&sptlrpc_conf_lock));
--		rc = sptlrpc_conf_merge_rule(conf, target, &rule);
--	}
-+	CDEBUG(D_SEC, "processing rule: %s.%s\n", target, param);
- 
--	if (rc == 0)
--		conf->sc_modified++;
-+	/*
-+	 * Three types of targets exist for sptlrpc using conf_param
-+	 * 1.	'_mgs' which targets mgc srpc settings. Treat it as
-+	 *	as a special file system name.
-+	 * 2.	target is a device which can be fsname-MDTXXXX or
-+	 *	fsname-OSTXXXX. This can be verified by the function
-+	 *	server_name2fsname.
-+	 * 3.	If both above conditions are not meet then the target
-+	 *	is a actual filesystem.
-+	 */
-+	if (server_name2fsname(target, fsname, NULL))
-+		strlcpy(fsname, target, sizeof(target));
- 
--	return rc;
--}
-+	rc = sptlrpc_parse_rule(param, &rule);
-+	if (rc)
-+		return rc;
- 
--int sptlrpc_process_config(struct lustre_cfg *lcfg)
+-/**
+- * Determines minimum and maximum addresses for a single
+- * numeric address range
+- *
+- * @ar
+- * @min_nid	*min_nid __u32 representation of min NID
+- * @max_nid	*max_nid __u32 representation of max NID
+- *
+- * Return:	-EINVAL unsupported LNET range
+- *		-ERANGE non-contiguous LNET range
+- */
+-static int cfs_ip_ar_min_max(struct addrrange *ar, u32 *min_nid,
+-			     u32 *max_nid)
 -{
--	return __sptlrpc_process_config(lcfg, NULL);
-+	return __sptlrpc_process_config(target, fsname, &rule, NULL);
- }
- EXPORT_SYMBOL(sptlrpc_process_config);
+-	struct cfs_expr_list *expr_list;
+-	struct cfs_range_expr *range;
+-	unsigned int min_ip[4] = { 0 };
+-	unsigned int max_ip[4] = { 0 };
+-	int cur_octet = 0;
+-	bool expect_full_octet = false;
+-
+-	list_for_each_entry(expr_list, &ar->ar_numaddr_ranges, el_link) {
+-		int re_count = 0;
+-
+-		list_for_each_entry(range, &expr_list->el_exprs, re_link) {
+-		/* XXX: add support for multiple & non-contig. re's */
+-			if (re_count > 0)
+-				return -EINVAL;
+-
+-			/* if a previous octet was ranged, then all remaining
+-			 * octets must be full for contiguous range
+-			 */
+-			if (expect_full_octet && (range->re_lo != 0 ||
+-						  range->re_hi != 255))
+-				return -ERANGE;
+-
+-			if (range->re_stride != 1)
+-				return -ERANGE;
+-
+-			if (range->re_lo > range->re_hi)
+-				return -EINVAL;
+-
+-			if (range->re_lo != range->re_hi)
+-				expect_full_octet = true;
+-
+-			min_ip[cur_octet] = range->re_lo;
+-			max_ip[cur_octet] = range->re_hi;
+-
+-			re_count++;
+-		}
+-
+-		cur_octet++;
+-	}
+-
+-	if (min_nid)
+-		*min_nid = ((min_ip[0] << 24) | (min_ip[1] << 16) |
+-			    (min_ip[2] << 8) | min_ip[3]);
+-
+-	if (max_nid)
+-		*max_nid = ((max_ip[0] << 24) | (max_ip[1] << 16) |
+-			    (max_ip[2] << 8) | max_ip[3]);
+-
+-	return 0;
+-}
+-
+-/**
+- * Determines minimum and maximum addresses for a single
+- * numeric address range
+- *
+- * @ar
+- * @min_nid	*min_nid __u32 representation of min NID
+- * @max_nid	*max_nid __u32 representation of max NID
+- *
+- * Return:	-EINVAL unsupported LNET range
+- */
+-static int cfs_num_ar_min_max(struct addrrange *ar, u32 *min_nid,
+-			      u32 *max_nid)
+-{
+-	struct cfs_expr_list *el;
+-	struct cfs_range_expr *re;
+-	unsigned int min_addr = 0;
+-	unsigned int max_addr = 0;
+-
+-	list_for_each_entry(el, &ar->ar_numaddr_ranges, el_link) {
+-		int re_count = 0;
+-
+-		list_for_each_entry(re, &el->el_exprs, re_link) {
+-			if (re_count > 0)
+-				return -EINVAL;
+-			if (re->re_lo > re->re_hi)
+-				return -EINVAL;
+-
+-			if (re->re_lo < min_addr || !min_addr)
+-				min_addr = re->re_lo;
+-			if (re->re_hi > max_addr)
+-				max_addr = re->re_hi;
+-
+-			re_count++;
+-		}
+-	}
+-
+-	if (min_nid)
+-		*min_nid = min_addr;
+-	if (max_nid)
+-		*max_nid = max_addr;
+-
+-	return 0;
+-}
+-
+-/**
+- * Takes a linked list of nidrange expressions, determines the minimum
+- * and maximum nid and creates appropriate nid structures
+- *
+- * @nidlist
+- * @min_nid	*min_nid string representation of min NID
+- * @max_nid	*max_nid string representation of max NID
+- *
+- * Return:	-EINVAL unsupported LNET range
+- *		-ERANGE non-contiguous LNET range
+- */
+-int cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
+-			      char *max_nid, size_t nidstr_length)
+-{
+-	struct nidrange *first_nidrange;
+-	int netnum;
+-	struct netstrfns *nf;
+-	char *lndname;
+-	u32 min_addr;
+-	u32 max_addr;
+-	char min_addr_str[IPSTRING_LENGTH];
+-	char max_addr_str[IPSTRING_LENGTH];
+-	int rc;
+-
+-	first_nidrange = list_entry(nidlist->next, struct nidrange, nr_link);
+-
+-	netnum = first_nidrange->nr_netnum;
+-	nf = first_nidrange->nr_netstrfns;
+-	lndname = nf->nf_name;
+-
+-	rc = nf->nf_min_max(nidlist, &min_addr, &max_addr);
+-	if (rc < 0)
+-		return rc;
+-
+-	nf->nf_addr2str(min_addr, min_addr_str, sizeof(min_addr_str));
+-	nf->nf_addr2str(max_addr, max_addr_str, sizeof(max_addr_str));
+-
+-	snprintf(min_nid, nidstr_length, "%s@%s%d", min_addr_str, lndname,
+-		 netnum);
+-	snprintf(max_nid, nidstr_length, "%s@%s%d", max_addr_str, lndname,
+-		 netnum);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(cfs_nidrange_find_min_max);
+-
+-/**
+- * Determines the min and max NID values for num LNDs
+- *
+- * @nidlist
+- * @min_nid	*min_nid if provided, returns string representation of min NID
+- * @max_nid	*max_nid if provided, returns string representation of max NID
+- *
+- * Return:	-EINVAL unsupported LNET range
+- *		-ERANGE non-contiguous LNET range
+- */
+-static int cfs_num_min_max(struct list_head *nidlist, u32 *min_nid,
+-			   u32 *max_nid)
+-{
+-	struct nidrange	*nr;
+-	struct addrrange *ar;
+-	unsigned int tmp_min_addr = 0;
+-	unsigned int tmp_max_addr = 0;
+-	unsigned int min_addr = 0;
+-	unsigned int max_addr = 0;
+-	int nidlist_count = 0;
+-	int rc;
+-
+-	list_for_each_entry(nr, nidlist, nr_link) {
+-		if (nidlist_count > 0)
+-			return -EINVAL;
+-
+-		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
+-			rc = cfs_num_ar_min_max(ar, &tmp_min_addr,
+-						&tmp_max_addr);
+-			if (rc)
+-				return rc;
+-
+-			if (tmp_min_addr < min_addr || !min_addr)
+-				min_addr = tmp_min_addr;
+-			if (tmp_max_addr > max_addr)
+-				max_addr = tmp_min_addr;
+-		}
+-	}
+-
+-	if (max_nid)
+-		*max_nid = max_addr;
+-	if (min_nid)
+-		*min_nid = min_addr;
+-
+-	return 0;
+-}
+-
+-/**
+- * Takes an nidlist and determines the minimum and maximum
+- * ip addresses.
+- *
+- * @nidlist
+- * @min_nid	*min_nid if provided, returns string representation of min NID
+- * @max_nid	*max_nid if provided, returns string representation of max NID
+- *
+- * Return:	-EINVAL unsupported LNET range
+- *		-ERANGE non-contiguous LNET range
+- */
+-static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+-			  u32 *max_nid)
+-{
+-	struct nidrange *nr;
+-	struct addrrange *ar;
+-	u32 tmp_min_ip_addr = 0;
+-	u32 tmp_max_ip_addr = 0;
+-	u32 min_ip_addr = 0;
+-	u32 max_ip_addr = 0;
+-	int nidlist_count = 0;
+-	int rc;
+-
+-	list_for_each_entry(nr, nidlist, nr_link) {
+-		if (nidlist_count > 0)
+-			return -EINVAL;
+-
+-		if (nr->nr_all) {
+-			min_ip_addr = 0;
+-			max_ip_addr = 0xffffffff;
+-			break;
+-		}
+-
+-		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
+-			rc = cfs_ip_ar_min_max(ar, &tmp_min_ip_addr,
+-					       &tmp_max_ip_addr);
+-			if (rc)
+-				return rc;
+-
+-			if (tmp_min_ip_addr < min_ip_addr || !min_ip_addr)
+-				min_ip_addr = tmp_min_ip_addr;
+-			if (tmp_max_ip_addr > max_ip_addr)
+-				max_ip_addr = tmp_max_ip_addr;
+-		}
+-
+-		nidlist_count++;
+-	}
+-
+-	if (min_nid)
+-		*min_nid = min_ip_addr;
+-	if (max_nid)
+-		*max_nid = max_ip_addr;
+-
+-	return 0;
+-}
+-
+ static int
+ libcfs_lo_str2addr(const char *str, int nob, u32 *addr)
+ {
+@@ -912,8 +654,8 @@ static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+ 	  .nf_str2addr		= libcfs_lo_str2addr,
+ 	  .nf_parse_addrlist	= libcfs_num_parse,
+ 	  .nf_print_addrlist	= libcfs_num_addr_range_print,
+-	  .nf_match_addr	= libcfs_num_match,
+-	  .nf_min_max		= cfs_num_min_max },
++	  .nf_match_addr	= libcfs_num_match
++	},
+ 	{ .nf_type		= SOCKLND,
+ 	  .nf_name		= "tcp",
+ 	  .nf_modname		= "ksocklnd",
+@@ -921,8 +663,8 @@ static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+ 	  .nf_str2addr		= libcfs_ip_str2addr,
+ 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
+ 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
+-	  .nf_match_addr	= cfs_ip_addr_match,
+-	  .nf_min_max		= cfs_ip_min_max },
++	  .nf_match_addr	= cfs_ip_addr_match
++	},
+ 	{ .nf_type		= O2IBLND,
+ 	  .nf_name		= "o2ib",
+ 	  .nf_modname		= "ko2iblnd",
+@@ -930,8 +672,8 @@ static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+ 	  .nf_str2addr		= libcfs_ip_str2addr,
+ 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
+ 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
+-	  .nf_match_addr	= cfs_ip_addr_match,
+-	  .nf_min_max		= cfs_ip_min_max },
++	  .nf_match_addr	= cfs_ip_addr_match
++	},
+ 	{ .nf_type		= GNILND,
+ 	  .nf_name		= "gni",
+ 	  .nf_modname		= "kgnilnd",
+@@ -939,8 +681,8 @@ static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+ 	  .nf_str2addr		= libcfs_num_str2addr,
+ 	  .nf_parse_addrlist	= libcfs_num_parse,
+ 	  .nf_print_addrlist	= libcfs_num_addr_range_print,
+-	  .nf_match_addr	= libcfs_num_match,
+-	  .nf_min_max		= cfs_num_min_max },
++	  .nf_match_addr	= libcfs_num_match
++	},
+ 	{ .nf_type		= GNIIPLND,
+ 	  .nf_name		= "gip",
+ 	  .nf_modname		= "kgnilnd",
+@@ -948,8 +690,8 @@ static int cfs_ip_min_max(struct list_head *nidlist, u32 *min_nid,
+ 	  .nf_str2addr		= libcfs_ip_str2addr,
+ 	  .nf_parse_addrlist	= cfs_ip_addr_parse,
+ 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
+-	  .nf_match_addr	= cfs_ip_addr_match,
+-	  .nf_min_max		= cfs_ip_min_max },
++	  .nf_match_addr	= cfs_ip_addr_match
++	},
+ };
  
+ static const size_t libcfs_nnetstrfns = ARRAY_SIZE(libcfs_netstrfns);
 -- 
 1.8.3.1
