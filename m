@@ -1,98 +1,136 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:13:58 -0500
-Subject: [lustre-devel] [PATCH 370/622] lustre: llite,
- readahead: don't always use max RPC size
+Date: Thu, 27 Feb 2020 16:14:09 -0500
+Subject: [lustre-devel] [PATCH 381/622] lustre: obdclass: generate random
+ u64 max correctly
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-371-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-382-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-Since 64M RPC landed, @PTLRPC_MAX_BRW_PAGES will be 64M.
-And we always try to use this max possible RPC size to check
-whether we should avoid fast IO and trigger real context IO.
+Generate random u64 max number correctly, and make it an obdclass
+function lu_prandom_u64_max().
 
-This is not good for following reasons:
+Fixes: bcfa98a507 ("staging: lustre: replace cfs_rand() with prandom_u32_max()")
 
-(1) Since current default RPC size is still 4M,
-most of system won't use 64M for most of time.
-
-(2) Currently default readahead size per file is still 64M,
-which makes fast IO always run out of all readahead pages
-before next IO. This breaks what users really want for readahead
-grapping pages in advance.
-
-To fix this problem, we use 16M as a balance value if RPC smaller
-than 16M, patch also fix the problem that @ras_rpc_size could not
-grow bigger which is possibe in the following case:
-
-1) set RPC to 16M
-2) Set RPC to 64M
-
-In the current logic ras->ras_rpc_size will be kept as 16M which is wrong.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12043
-Lustre-commit: 7864a6854c3d ("LU-12043 llite,readahead: don't always use max RPC size")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/35033
-Reviewed-by: Li Xi <lixi@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12495
+Lustre-commit: 645b72c5c058 ("LU-12495 obdclass: generate random u64 max correctly")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35394
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h | 3 +++
- fs/lustre/llite/rw.c             | 6 ++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ fs/lustre/include/lu_object.h |  1 +
+ fs/lustre/lmv/lmv_qos.c       | 26 +-------------------------
+ fs/lustre/obdclass/lu_qos.c   | 36 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 38 insertions(+), 25 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index d36e01e..36b620e 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -307,6 +307,9 @@ static inline struct pcc_inode *ll_i2pcci(struct inode *inode)
- 	return ll_i2info(inode)->lli_pcc_inode;
+diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
+index 0f3e3be..6b1064a 100644
+--- a/fs/lustre/include/lu_object.h
++++ b/fs/lustre/include/lu_object.h
+@@ -1390,6 +1390,7 @@ struct lu_qos {
+ 
+ int lqos_add_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
+ int lqos_del_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd);
++u64 lu_prandom_u64_max(u64 ep_ro);
+ 
+ /** @} lu */
+ #endif /* __LUSTRE_LU_OBJECT_H */
+diff --git a/fs/lustre/lmv/lmv_qos.c b/fs/lustre/lmv/lmv_qos.c
+index e323398..85053d2e 100644
+--- a/fs/lustre/lmv/lmv_qos.c
++++ b/fs/lustre/lmv/lmv_qos.c
+@@ -370,31 +370,7 @@ struct lu_tgt_desc *lmv_locate_tgt_qos(struct lmv_obd *lmv, u32 *mdt)
+ 		total_weight += tgt->ltd_qos.ltq_weight;
+ 	}
+ 
+-	if (total_weight) {
+-#if BITS_PER_LONG == 32
+-		/*
+-		 * If total_weight > 32-bit, first generate the high
+-		 * 32 bits of the random number, then add in the low
+-		 * 32 bits (truncated to the upper limit, if needed)
+-		 */
+-		if (total_weight > 0xffffffffULL)
+-			rand = (u64)(prandom_u32_max(
+-				(unsigned int)(total_weight >> 32)) << 32;
+-		else
+-			rand = 0;
+-
+-		if (rand == (total_weight & 0xffffffff00000000ULL))
+-			rand |= prandom_u32_max((unsigned int)total_weight);
+-		else
+-			rand |= prandom_u32();
+-
+-#else
+-		rand = ((u64)prandom_u32() << 32 | prandom_u32()) %
+-			total_weight;
+-#endif
+-	} else {
+-		rand = 0;
+-	}
++	rand = lu_prandom_u64_max(total_weight);
+ 
+ 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+ 		tgt = lmv->tgts[i];
+diff --git a/fs/lustre/obdclass/lu_qos.c b/fs/lustre/obdclass/lu_qos.c
+index 4ee3f59..9fdcbc2 100644
+--- a/fs/lustre/obdclass/lu_qos.c
++++ b/fs/lustre/obdclass/lu_qos.c
+@@ -35,6 +35,7 @@
+ 
+ #include <linux/module.h>
+ #include <linux/list.h>
++#include <linux/random.h>
+ #include <obd_class.h>
+ #include <obd_support.h>
+ #include <lustre_disk.h>
+@@ -164,3 +165,38 @@ int lqos_del_tgt(struct lu_qos *qos, struct lu_tgt_desc *ltd)
+ 	return rc;
  }
- 
-+/* default to use at least 16M for fast read if possible */
-+#define RA_REMAIN_WINDOW_MIN			MiB_TO_PAGES(16UL)
+ EXPORT_SYMBOL(lqos_del_tgt);
 +
- /* default to about 64M of readahead on a given system. */
- #define SBI_DEFAULT_READAHEAD_MAX		MiB_TO_PAGES(64UL)
- 
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index c42bbab..ad55695 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -376,7 +376,7 @@ static int ras_inside_ra_window(unsigned long idx, struct ra_io_arg *ria)
- 				 * update read ahead RPC size.
- 				 * NB: it's racy but doesn't matter
- 				 */
--				if (ras->ras_rpc_size > ra.cra_rpc_size &&
-+				if (ras->ras_rpc_size != ra.cra_rpc_size &&
- 				    ra.cra_rpc_size > 0)
- 					ras->ras_rpc_size = ra.cra_rpc_size;
- 				/* trim it to align with optimal RPC size */
-@@ -1203,6 +1203,8 @@ int ll_readpage(struct file *file, struct page *vmpage)
- 		struct ll_readahead_state *ras = &fd->fd_ras;
- 		struct lu_env *local_env = NULL;
- 		struct inode *inode = file_inode(file);
-+		unsigned long fast_read_pages =
-+			max(RA_REMAIN_WINDOW_MIN, ras->ras_rpc_size);
- 		struct vvp_page *vpg;
- 
- 		result = -ENODATA;
-@@ -1245,7 +1247,7 @@ int ll_readpage(struct file *file, struct page *vmpage)
- 			 * a cl_io to issue the RPC.
- 			 */
- 			if (ras->ras_window_start + ras->ras_window_len <
--			    ras->ras_next_readahead + PTLRPC_MAX_BRW_PAGES) {
-+			    ras->ras_next_readahead + fast_read_pages) {
- 				/* export the page and skip io stack */
- 				vpg->vpg_ra_used = 1;
- 				cl_page_export(env, page, 1);
++/**
++ * lu_prandom_u64_max - returns a pseudo-random u64 number in interval
++ * [0, ep_ro)
++ *
++ * #ep_ro	right open interval endpoint
++ *
++ * Return:	a pseudo-random 64-bit number that is in interval [0, ep_ro).
++ */
++u64 lu_prandom_u64_max(u64 ep_ro)
++{
++	u64 rand = 0;
++
++	if (ep_ro) {
++#if BITS_PER_LONG == 32
++		/*
++		 * If ep_ro > 32-bit, first generate the high
++		 * 32 bits of the random number, then add in the low
++		 * 32 bits (truncated to the upper limit, if needed)
++		 */
++		if (ep_ro > 0xffffffffULL)
++			rand = prandom_u32_max((u32)(ep_ro >> 32)) << 32;
++
++		if (rand == (ep_ro & 0xffffffff00000000ULL))
++			rand |= prandom_u32_max((u32)ep_ro);
++		else
++			rand |= prandom_u32();
++#else
++		rand = ((u64)prandom_u32() << 32 | prandom_u32()) % ep_ro;
++#endif
++	}
++
++	return rand;
++}
++EXPORT_SYMBOL(lu_prandom_u64_max);
 -- 
 1.8.3.1
