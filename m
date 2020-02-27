@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:17:51 -0500
-Subject: [lustre-devel] [PATCH 603/622] lnet: modules: use list_move were
- appropriate.
+Date: Thu, 27 Feb 2020 16:17:52 -0500
+Subject: [lustre-devel] [PATCH 604/622] lnet: fix small race in unloading
+ klnd modules.
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-604-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-605-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,61 +13,50 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.de>
 
-Rather than
-  list_del(&foo);
-  list_add(&foo, &bar);
-use
-  list_move(&foo, &bar);
+Reference counting of klnd modules is handled by the module itself.
+Currently, it is possible for a module to be completely unloaded
+between the time when the module called module_put(), and when
+it subsequently returns from the function that makes that call.
+During this time there may be one or two instructions to execute,
+and if the module is unmapped before they are executed, an
+exception will result.
 
-Similarly for list_add_tail and list_move_tail.
+The module unload will call lnet_unregister_lnd() which takes
+the_lnet.ln_lnd_mutex, so module unload cannot complete while
+that is held.  lnd_startup is called with this mutex held to
+avoid any races, but lnd_shutdown is not.  Adding that
+protection will close the race.
 
-In lnet_attach_rsp_tracker, local_rspt already has a suitably
-initialised ->rspt_on_list, so the new_entry variable can
-be discarded.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
-Lustre-commit: 7525fd36a266 ("LU-9679 modules: use list_move were appropriate.")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: c087091cd901 ("LU-12678 lnet: fix small race in unloading klnd modules.")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/36670
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-on: https://review.whamcloud.com/36853
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-move.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ net/lnet/lnet/api-ni.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index ca292a6..47d5389 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -4374,7 +4374,6 @@ void lnet_monitor_thr_stop(void)
- 			struct lnet_libmd *md, struct lnet_handle_md mdh)
- {
- 	s64 timeout_ns;
--	bool new_entry = true;
- 	struct lnet_rsp_tracker *local_rspt;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 0ca8bef..5df39aa 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -1983,7 +1983,14 @@ static void lnet_push_target_fini(void)
+ 		islo = ni->ni_net->net_lnd->lnd_type == LOLND;
  
- 	/* MD has a refcount taken by message so it's not going away.
-@@ -4391,7 +4390,6 @@ void lnet_monitor_thr_stop(void)
- 		 * update the deadline on that one.
- 		 */
- 		lnet_rspt_free(rspt, cpt);
--		new_entry = false;
- 	} else {
- 		/* new md */
- 		rspt->rspt_mdh = mdh;
-@@ -4406,9 +4404,7 @@ void lnet_monitor_thr_stop(void)
- 	 * list in order to expire all the older entries first.
- 	 */
- 	lnet_net_lock(cpt);
--	if (!new_entry && !list_empty(&local_rspt->rspt_on_list))
--		list_del_init(&local_rspt->rspt_on_list);
--	list_add_tail(&local_rspt->rspt_on_list, the_lnet.ln_mt_rstq[cpt]);
-+	list_move_tail(&local_rspt->rspt_on_list, the_lnet.ln_mt_rstq[cpt]);
- 	lnet_net_unlock(cpt);
- 	lnet_res_unlock(cpt);
- }
+ 		LASSERT(!in_interrupt());
++		/* Holding the mutex makes it safe for lnd_shutdown
++		 * to call module_put(). Module unload cannot finish
++		 * until lnet_unregister_lnd() completes, and that
++		 * requires the mutex.
++		 */
++		mutex_lock(&the_lnet.ln_lnd_mutex);
+ 		net->net_lnd->lnd_shutdown(ni);
++		mutex_unlock(&the_lnet.ln_lnd_mutex);
+ 
+ 		if (!islo)
+ 			CDEBUG(D_LNI, "Removed LNI %s\n",
 -- 
 1.8.3.1
