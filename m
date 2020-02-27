@@ -1,83 +1,84 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:16:23 -0500
-Subject: [lustre-devel] [PATCH 515/622] lustre: llite: move agl_thread
- cleanup out of thread.
+Date: Thu, 27 Feb 2020 16:13:54 -0500
+Subject: [lustre-devel] [PATCH 366/622] lustre: ldlm: layout lock fixes
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-516-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-367-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.de>
+From: Vitaly Fertman <c17818@cray.com>
 
-When we start a thread with kthread_create() and later stop
-it with kthread_stop(), there is no guarantee that the thread
-function runs at all.  So it is not safe to leave cleanup
-to the thread.
+as the intent_layout operation becomes more frequent with SEL,
+cancel existent layout locks in advance and reuse ELC to deliver
+cancels to MDS
 
-So move the cleanup code to a separate function which
-stops the thread and then cleans up.
+as clients are given LCK_EX layout locks, take into account this
+mode as well in ldlm_lock_match
 
-Fixes: c044fb0f835c ("staging: lustre: remove 'ptlrpc_thread usage' for sai_agl_thread")
-Signed-off-by: NeilBrown <neilb@suse.de>
-Reviewed-by: James Simmons <jsimmons@infradaed.org>
+Cray-bug-id: LUS-2528
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10070
+Lustre-commit: 51f23ffa4dae ("LU-10070 ldlm: layout lock fixes")
+Signed-off-by: Vitaly Fertman <c17818@cray.com>
+Reviewed-on: https://review.whamcloud.com/35232
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/statahead.c | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ fs/lustre/llite/file.c    |  3 ++-
+ fs/lustre/mdc/mdc_locks.c | 12 ++++++++++--
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
-index 497aba3..1639408 100644
---- a/fs/lustre/llite/statahead.c
-+++ b/fs/lustre/llite/statahead.c
-@@ -915,7 +915,19 @@ static int ll_agl_thread(void *arg)
- 			schedule();
- 		__set_current_state(TASK_RUNNING);
- 	}
-+	return 0;
-+}
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index a27c06c..9321b84 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -4978,7 +4978,8 @@ int ll_layout_refresh(struct inode *inode, u32 *gen)
+ 		 * match it before grabbing layout lock mutex.
+ 		 */
+ 		mode = ll_take_md_lock(inode, MDS_INODELOCK_LAYOUT, &lockh, 0,
+-				       LCK_CR | LCK_CW | LCK_PR | LCK_PW);
++				       LCK_CR | LCK_CW | LCK_PR |
++				       LCK_PW | LCK_EX);
+ 		if (mode != 0) { /* hit cached lock */
+ 			rc = ll_layout_lock_set(&lockh, mode, inode);
+ 			if (rc == -EAGAIN)
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index cf6bc9d..5885bbd 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -580,18 +580,26 @@ static struct ptlrpc_request *mdc_intent_layout_pack(struct obd_export *exp,
+ 						     struct md_op_data *op_data)
+ {
+ 	struct obd_device *obd = class_exp2obd(exp);
++	struct list_head cancels = LIST_HEAD_INIT(cancels);
+ 	struct ptlrpc_request *req;
+ 	struct ldlm_intent *lit;
+ 	struct layout_intent *layout;
+-	int rc;
++	int count = 0, rc;
+ 
+ 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
+ 				   &RQF_LDLM_INTENT_LAYOUT);
+ 	if (!req)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	if (fid_is_sane(&op_data->op_fid2) && (it->it_op & IT_LAYOUT) &&
++	    (it->it_flags & FMODE_WRITE)) {
++		count = mdc_resource_get_unused(exp, &op_data->op_fid2,
++						&cancels, LCK_EX,
++						MDS_INODELOCK_LAYOUT);
++	}
 +
-+static void ll_stop_agl(struct ll_statahead_info *sai)
-+{
-+	struct ll_inode_info *plli = ll_i2info(sai->sai_dentry->d_inode);
-+	struct ll_inode_info *clli;
- 
-+	CDEBUG(D_READA, "stop agl thread: sai %p pid %u\n",
-+	       sai, (unsigned int)sai->sai_agl_task->pid);
-+	kthread_stop(sai->sai_agl_task);
-+
-+	sai->sai_agl_task = NULL;
- 	spin_lock(&plli->lli_agl_lock);
- 	sai->sai_agl_valid = 0;
- 	while ((clli = list_first_entry_or_null(&sai->sai_agls,
-@@ -929,9 +941,8 @@ static int ll_agl_thread(void *arg)
- 	}
- 	spin_unlock(&plli->lli_agl_lock);
- 	CDEBUG(D_READA, "agl thread stopped: sai %p, parent %pd\n",
--	       sai, parent);
-+	       sai, sai->sai_dentry);
- 	ll_sai_put(sai);
--	return 0;
- }
- 
- /* start agl thread */
-@@ -1134,13 +1145,9 @@ static int ll_statahead_thread(void *arg)
- 		__set_current_state(TASK_RUNNING);
- 	}
- out:
--	if (sai->sai_agl_task) {
--		kthread_stop(sai->sai_agl_task);
-+	if (sai->sai_agl_task)
-+		ll_stop_agl(sai);
- 
--		CDEBUG(D_READA, "stop agl thread: sai %p pid %u\n",
--		       sai, (unsigned int)sai->sai_agl_task->pid);
--		sai->sai_agl_task = NULL;
--	}
- 	/*
- 	 * wait for inflight statahead RPCs to finish, and then we can free sai
- 	 * safely because statahead RPC will access sai data
+ 	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_CLIENT, 0);
+-	rc = ldlm_prep_enqueue_req(exp, req, NULL, 0);
++	rc = ldlm_prep_enqueue_req(exp, req, &cancels, count);
+ 	if (rc) {
+ 		ptlrpc_request_free(req);
+ 		return ERR_PTR(rc);
 -- 
 1.8.3.1
