@@ -1,108 +1,139 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Feb 2020 16:14:36 -0500
-Subject: [lustre-devel] [PATCH 408/622] lustre: llite: release active extent
- on sync write commit
+Date: Thu, 27 Feb 2020 16:14:42 -0500
+Subject: [lustre-devel] [PATCH 414/622] lustre: mdc: polling mode for
+ changelog reader
 In-Reply-To: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
 References: <1582838290-17243-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1582838290-17243-409-git-send-email-jsimmons@infradead.org>
+Message-ID: <1582838290-17243-415-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Ann Koehler <amk@cray.com>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-Processes can wait forever in osc_extent_wait() for the extent state
-to change because the extent write is not started before the wait
-begins. A 4.7 kernel change to generic_write_sync() modified it to
-check IOCB_DSYNC instead of O_SYNC. Thus an active extent is not
-released (written) in osc_io_commit_async() in the synchronous case.
+this allows the user (like lsom_sync and similar) to follow
+the changelog and don't rescan getting duplicates.
 
-Cray-bug-id: LUS-7435
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12536
-Lustre-commit: a9af7100ce72 ("LU-12536 llite: release active extent on sync write commit")
-Signed-off-by: Ann Koehler <amk@cray.com>
-Reviewed-on: https://review.whamcloud.com/35472
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12553
+Lustre-commit: e215002883d5 ("LU-12553  mdc: polling mode for changelog reader")
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/35262
 Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c           | 9 +++++++--
- fs/lustre/llite/llite_internal.h | 4 +++-
- fs/lustre/llite/rw.c             | 2 +-
- 3 files changed, 11 insertions(+), 4 deletions(-)
+ fs/lustre/mdc/mdc_changelog.c            | 37 +++++++++++++++++++++++++++++++-
+ include/uapi/linux/lustre/lustre_ioctl.h |  1 +
+ 2 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 5a3e80e..6f418e0 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -1407,7 +1407,8 @@ static bool file_is_noatime(const struct file *file)
- 	return false;
- }
+diff --git a/fs/lustre/mdc/mdc_changelog.c b/fs/lustre/mdc/mdc_changelog.c
+index fb0de68..ea74bab 100644
+--- a/fs/lustre/mdc/mdc_changelog.c
++++ b/fs/lustre/mdc/mdc_changelog.c
+@@ -37,6 +37,7 @@
+ #include <linux/miscdevice.h>
  
--void ll_io_init(struct cl_io *io, const struct file *file, int write)
-+void ll_io_init(struct cl_io *io, const struct file *file, int write,
-+		struct vvp_io_args *args)
- {
- 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
- 	struct inode *inode = file_inode(file);
-@@ -1420,7 +1421,11 @@ void ll_io_init(struct cl_io *io, const struct file *file, int write)
- 		io->u.ci_wr.wr_sync = file->f_flags & O_SYNC ||
- 				      file->f_flags & O_DIRECT ||
- 				      IS_SYNC(inode);
-+		io->u.ci_wr.wr_sync |= !!(args &&
-+					  (args->u.normal.via_iocb->ki_flags &
-+					   IOCB_DSYNC));
- 	}
+ #include <lustre_log.h>
++#include <uapi/linux/lustre/lustre_ioctl.h>
+ 
+ #include "mdc_internal.h"
+ 
+@@ -88,6 +89,9 @@ struct chlg_reader_state {
+ 	u64			 crs_rec_count;
+ 	/* List of prefetched enqueued_record::enq_linkage_items */
+ 	struct list_head	 crs_rec_queue;
++	unsigned int		 crs_last_catidx;
++	unsigned int		 crs_last_idx;
++	bool			 crs_poll;
+ };
+ 
+ struct chlg_rec_entry {
+@@ -132,6 +136,9 @@ static int chlg_read_cat_process_cb(const struct lu_env *env,
+ 
+ 	rec = container_of(hdr, struct llog_changelog_rec, cr_hdr);
+ 
++	crs->crs_last_catidx = llh->lgh_hdr->llh_cat_idx;
++	crs->crs_last_idx = hdr->lrh_index;
 +
- 	io->ci_obj = ll_i2info(inode)->lli_clob;
- 	io->ci_lockreq = CILR_MAYBE;
- 	if (ll_file_nolock(file)) {
-@@ -1491,7 +1496,7 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
- 
- restart:
- 	io = vvp_env_thread_io(env);
--	ll_io_init(io, file, iot == CIT_WRITE);
-+	ll_io_init(io, file, iot == CIT_WRITE, args);
- 	io->ci_ndelay_tried = retried;
- 
- 	if (cl_io_rw_init(env, io, iot, *ppos, count) == 0) {
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index a0d631d..49c0c78 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -786,7 +786,6 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 		       struct ll_file_data *file, loff_t pos,
- 		       size_t count, int rw);
--void ll_io_init(struct cl_io *io, const struct file *file, int write);
- 
- enum {
- 	LPROC_LL_READ_BYTES,
-@@ -1056,6 +1055,9 @@ static inline struct vvp_io_args *ll_env_args(const struct lu_env *env)
- 	return &ll_env_info(env)->lti_args;
- }
- 
-+void ll_io_init(struct cl_io *io, const struct file *file, int write,
-+		struct vvp_io_args *args);
-+
- /* llite/llite_mmap.c */
- 
- int ll_teardown_mmaps(struct address_space *mapping, u64 first, u64 last);
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index fe9a2b0..9c4b89f 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -503,7 +503,7 @@ static void ll_readahead_handle_work(struct work_struct *wq)
+ 	if (rec->cr_hdr.lrh_type != CHANGELOG_REC) {
+ 		rc = -EINVAL;
+ 		CERROR("%s: not a changelog rec %x/%d in llog : rc = %d\n",
+@@ -225,6 +232,10 @@ static int chlg_load(void *args)
+ 		goto err_out;
  	}
  
- 	io = vvp_env_thread_io(env);
--	ll_io_init(io, file, 0);
-+	ll_io_init(io, file, 0, NULL);
++	crs->crs_last_catidx = -1;
++	crs->crs_last_idx = 0;
++
++again:
+ 	rc = llog_open(NULL, ctx, &llh, NULL, CHANGELOG_CATALOG,
+ 		       LLOG_OPEN_EXISTS);
+ 	if (rc) {
+@@ -248,12 +259,18 @@ static int chlg_load(void *args)
+ 		goto err_out;
+ 	}
  
- 	rc = ll_readahead_file_kms(env, io, &kms);
- 	if (rc != 0)
+-	rc = llog_cat_process(NULL, llh, chlg_read_cat_process_cb, crs, 0, 0);
++	rc = llog_cat_process(NULL, llh, chlg_read_cat_process_cb, crs,
++				crs->crs_last_catidx, crs->crs_last_idx);
+ 	if (rc < 0) {
+ 		CERROR("%s: fail to process llog: rc = %d\n",
+ 		       obd->obd_name, rc);
+ 		goto err_out;
+ 	}
++	if (!kthread_should_stop() && crs->crs_poll) {
++		llog_cat_close(NULL, llh);
++		schedule_timeout_interruptible(HZ);
++		goto again;
++	}
+ 
+ 	crs->crs_eof = true;
+ 
+@@ -602,6 +619,23 @@ static unsigned int chlg_poll(struct file *file, poll_table *wait)
+ 	return mask;
+ }
+ 
++static long chlg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	struct chlg_reader_state *crs = file->private_data;
++	int rc;
++
++	switch (cmd) {
++	case OBD_IOC_CHLG_POLL:
++		crs->crs_poll = !!arg;
++		rc = 0;
++		break;
++	default:
++		rc = -EINVAL;
++		break;
++	}
++	return rc;
++}
++
+ static const struct file_operations chlg_fops = {
+ 	.owner		= THIS_MODULE,
+ 	.llseek		= chlg_llseek,
+@@ -610,6 +644,7 @@ static unsigned int chlg_poll(struct file *file, poll_table *wait)
+ 	.open		= chlg_open,
+ 	.release	= chlg_release,
+ 	.poll		= chlg_poll,
++	.unlocked_ioctl	= chlg_ioctl,
+ };
+ 
+ /**
+diff --git a/include/uapi/linux/lustre/lustre_ioctl.h b/include/uapi/linux/lustre/lustre_ioctl.h
+index b067cc6..53dd34f 100644
+--- a/include/uapi/linux/lustre/lustre_ioctl.h
++++ b/include/uapi/linux/lustre/lustre_ioctl.h
+@@ -221,6 +221,7 @@ static inline __u32 obd_ioctl_packlen(struct obd_ioctl_data *data)
+ #define OBD_IOC_START_LFSCK	_IOWR('f', 230, OBD_IOC_DATA_TYPE)
+ #define OBD_IOC_STOP_LFSCK	_IOW('f', 231, OBD_IOC_DATA_TYPE)
+ #define OBD_IOC_QUERY_LFSCK	_IOR('f', 232, struct obd_ioctl_data)
++#define OBD_IOC_CHLG_POLL	_IOR('f', 233, long)
+ /*	lustre/lustre_user.h	240-249 */
+ /* was LIBCFS_IOC_DEBUG_MASK   _IOWR('f', 250, long) until 2.11 */
+ 
 -- 
 1.8.3.1
