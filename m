@@ -1,124 +1,341 @@
-From: NeilBrown <neilb@suse.de>
-Date: Thu, 05 Mar 2020 11:26:46 +1100
-Subject: [lustre-devel] Setting GFP_FS flag for Lustre threads doing DMU
- calls?
-In-Reply-To: <F0FCA906-7B52-4DEF-B3C2-6B3E027CB846@amazon.com>
-References: <F0FCA906-7B52-4DEF-B3C2-6B3E027CB846@amazon.com>
-Message-ID: <87mu8vwss9.fsf@notabene.neil.brown.name>
+From: Oleg Drokin <green@whamcloud.com>
+Date: Tue, 7 Apr 2020 15:50:14 +0000
+Subject: [lustre-devel] New tag 2.13.53
+Message-ID: <E5BABB05-6415-446D-879F-A15808391A1D@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Feb 28 2020, Degremont, Aurelien wrote:
-
-> Some thoughts on this?
-
-This particular stack trace looks to me like it should be handled
-internally to ZFS.
-
-In general, the safe and sensible approach is to call
-memalloc_nofs_save() whenever you take a lock that could possibly be
-involved in memory reclaim.
-Historically a lot of code doesn't do this, but instead relies on
-all using GFP_NOFS in all allocations that could happen while the lock
-is held.
-
-So the options are:
- - use GFP_NOFS anywhere that a lock might be held
- - call memalloc_nofs_save() whenever you take a lock that might cause
-   problems.
-
-It seems from the stack trace that  arc_buf_alloc_impl() doesn't set
-GFP_NOFS, and whatever takes the lock doesn't call memalloc_nofs_save().
-
-NeilBrown
+Hello!
 
 
->
-> ?Le 14/02/2020 18:14, ? lustre-devel au nom de Degremont, Aurelien ? <lustre-devel-bounces at lists.lustre.org au nom de degremoa@amazon.com> a ?crit :
->
->     Hello
->     
->     I would like to bring a technical discussion undergoing for a ZFS patch which relates to Lustre.
->     
->     Debugging a deadlock on an OSS we noticed a Lustre thread deadlocked itself due to memory reclaim, an arc_read() can trigger kernel memory allocation that in turn leads to a memory reclaim callback and a deadlock within a single zfs process. (see below for the full stack)
->     ZFS code should call spl_fstrans_mark() everywhere it could be doing memory allocation that could trigger ZFS cache reclaim. Doing so ended up adding GFP_FS flag for memory allocations in ZFS code.
->     
->     After discussing this with Brian on https://github.com/zfsonlinux/zfs/pull/9987, there is a discussion wondering where is the good spot to add this. For proper layering, it seems they should rather be done in Lustre threads calling DMU calls, likewise this is done in ZPL for ZFS.
->     
->     Brian said: "This will resolve the deadlock but it also somewhat violates the existing layering. Normally we call spl_fstrans_check() when setting up a new kthread if it's going to call the DMU interfaces, or for system calls it's done in our registered VFS callbacks. Feel free to update the PR, but before moving forward with this solution let's check with @adilger about potentially calling this on the Lustre side when they setup the threads which access the DMU. There may be other cases this doesn't cover."
->     
->     What do you think of it?
->     
->     PID: 108591  TASK: ffff888ee68ccb80  CPU: 12  COMMAND: "ldlm_bl_16"
->      #0 [ffffc9002b98adc8] __schedule at ffffffff81610f2e
->      #1 [ffffc9002b98ae68] schedule at ffffffff81611558
->      #2 [ffffc9002b98ae70] schedule_preempt_disabled at ffffffff8161184a
->      #3 [ffffc9002b98ae78] __mutex_lock at ffffffff816131e8
->      #4 [ffffc9002b98af18] arc_buf_destroy at ffffffffa0bf37d7 [zfs]
->      #5 [ffffc9002b98af48] dbuf_destroy at ffffffffa0bfa6fe [zfs]
->      #6 [ffffc9002b98af88] dbuf_evict_one at ffffffffa0bfaa96 [zfs]
->      #7 [ffffc9002b98afa0] dbuf_rele_and_unlock at ffffffffa0bfa561 [zfs]
->      #8 [ffffc9002b98b050] dbuf_rele_and_unlock at ffffffffa0bfa32b [zfs]
->      #9 [ffffc9002b98b100] osd_object_delete at ffffffffa0b64ecc [osd_zfs]
->     #10 [ffffc9002b98b118] lu_object_free at ffffffffa06d6a74 [obdclass]
->     #11 [ffffc9002b98b178] lu_site_purge_objects at ffffffffa06d7fc1 [obdclass]
->     #12 [ffffc9002b98b220] lu_cache_shrink_scan at ffffffffa06d81b8 [obdclass]
->     #13 [ffffc9002b98b278] shrink_slab at ffffffff811ca9d8
->     #14 [ffffc9002b98b338] shrink_node at ffffffff811cfd94
->     #15 [ffffc9002b98b3b8] do_try_to_free_pages at ffffffff811cfe63
->     #16 [ffffc9002b98b408] try_to_free_pages at ffffffff811d01c4
->     #17 [ffffc9002b98b488] __alloc_pages_slowpath at ffffffff811be7f2
->     #18 [ffffc9002b98b580] __alloc_pages_nodemask at ffffffff811bf3ed
->     #19 [ffffc9002b98b5e0] new_slab at ffffffff81226304
->     #20 [ffffc9002b98b638] ___slab_alloc at ffffffff812272ab
->     #21 [ffffc9002b98b6f8] __slab_alloc at ffffffff8122740c
->     #22 [ffffc9002b98b708] kmem_cache_alloc at ffffffff81227578
->     #23 [ffffc9002b98b740] spl_kmem_cache_alloc at ffffffffa048a1fd [spl]
->     #24 [ffffc9002b98b780] arc_buf_alloc_impl at ffffffffa0befba2 [zfs]
->     #25 [ffffc9002b98b7b0] arc_read at ffffffffa0bf0924 [zfs]
->     #26 [ffffc9002b98b858] dbuf_read at ffffffffa0bf9083 [zfs]
->     #27 [ffffc9002b98b900] dmu_buf_hold_by_dnode at ffffffffa0c04869 [zfs]
->     #28 [ffffc9002b98b930] zap_get_leaf_byblk at ffffffffa0c71e86 [zfs]
->     #29 [ffffc9002b98b988] zap_deref_leaf at ffffffffa0c720b6 [zfs]
->     #30 [ffffc9002b98b9c0] fzap_lookup at ffffffffa0c730ca [zfs]
->     #31 [ffffc9002b98ba38] zap_lookup_impl at ffffffffa0c77418 [zfs]
->     #32 [ffffc9002b98ba78] zap_lookup_norm at ffffffffa0c77c89 [zfs]
->     #33 [ffffc9002b98bae0] zap_lookup at ffffffffa0c77ce2 [zfs]
->     #34 [ffffc9002b98bb08] osd_fid_lookup at ffffffffa0b6f4ef [osd_zfs]
->     #35 [ffffc9002b98bb50] osd_object_init at ffffffffa0b68abf [osd_zfs]
->     #36 [ffffc9002b98bbb0] lu_object_alloc at ffffffffa06d9778 [obdclass]
->     #37 [ffffc9002b98bc08] lu_object_find_at at ffffffffa06d9b5a [obdclass]
->     #38 [ffffc9002b98bc68] ofd_object_find at ffffffffa0f860a0 [ofd]
->     #39 [ffffc9002b98bc88] ofd_lvbo_update at ffffffffa0f94cba [ofd]
->     #40 [ffffc9002b98bd40] ldlm_cancel_lock_for_export at ffffffffa0923ba1 [ptlrpc]
->     #41 [ffffc9002b98bd78] ldlm_cancel_locks_for_export_cb at ffffffffa0923e85 [ptlrpc]
->     #42 [ffffc9002b98bd98] cfs_hash_for_each_relax at ffffffffa05a85a5 [libcfs]
->     #43 [ffffc9002b98be18] cfs_hash_for_each_empty at ffffffffa05ab948 [libcfs]
->     #44 [ffffc9002b98be58] ldlm_export_cancel_locks at ffffffffa092410f [ptlrpc]
->     #45 [ffffc9002b98be80] ldlm_bl_thread_main at ffffffffa094d147 [ptlrpc]
->     #46 [ffffc9002b98bf10] kthread at ffffffff810a921a
->     
->     
->     Aur?lien
->     
->     
->     _______________________________________________
->     lustre-devel mailing list
->     lustre-devel at lists.lustre.org
->     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->     
->
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200305/710727a5/attachment.sig>
+ I tagged 2.13.53 in the master Lustre development branch.
+
+ Here?s the changelog:
+Alex Zhuravlev (7):
+      LU-12988 ldiskfs: revert prefetch patch
+      LU-11269 ptlrpc: do not expose transient IDLE state
+      LU-13190 mds: send mbo_max_mdsize in open intent reply
+      LU-13291 ldiskfs: mballoc don't skip uninit-on-disk groups
+      LU-12988 ldiskfs: mballoc to prefetch groups
+      LU-13253 libcfs: protect libcfs_debug_dumplog()
+      LU-12988 ldiskfs: port ext4-mballoc-prefetch.patch to RHEL 8.1
+
+Alexander Boyko (1):
+      LU-13102 llog: fix processing of a wrapped catalog
+
+Alexander Zarochentsev (2):
+      LU-12651 osc: always call update_next_shrink
+      LU-13228 clio: mmap write when overquota
+
+Alexey Lyashkov (7):
+      LU-12981 lnet: Check MTU accurately
+      LU-13296 obd: make statfs cache working again
+      LU-13229 ldlm: unlock request memory leak
+      LU-12214 build: fixes if the name is not just 'lustre'
+      LU-12214 build: fix build with mofed
+      LU-12214 build: fix build with MPI
+      LU-12214 build: add right kernel detect
+
+Alexey Zhuravlev (1):
+      LU-12722 target: disable recovery for local clients
+
+Amir Shehata (11):
+      LU-13071 lnet: reduce log severity for health events
+      LU-13025 lnet: pick healthiest peer net
+      LU-13026 lnet: MR selection of gateway ni
+      LU-12955 lnet: fix routed final dest selection
+      LU-13029 lnet: fix asym routing with multi-hop
+      LU-13035 lnet: fix remote peer ni selection
+      LU-13027 lnet: fix route consolidation
+      LU-13041 lnet: fix router primary_nid deletion
+      LU-13028 lnet: advertise discovery when toggled
+      LU-12303 lnet: recover health at same rate as dec
+      LU-12292 lnet: keep health even if recovery failed
+
+Andreas Dilger (19):
+      LU-13169 tests: add ONLY_REPEAT parameter to repeat subtests
+      LU-12747 tests: wait properly for orhpan thread stop
+      LU-13131 osc: remove redundant osc_list() helper
+      LU-11915 tests: add debugging to conf-sanity test_115
+      LU-13225 utils: bash completion for lfs and lctl
+      LU-12931 gnilnd: use time_after() to compare jiffies
+      LU-11668 mdd: use mdd_object_fid() instead of mdo2fid()
+      LU-12043 llite: move tunable params to sysfs_memparse()
+      LU-10447 tests: remove use of SETSTRIPE from sanity
+      LU-12207 tests: allow some margin for sanity/76
+      LU-930 utils: fix lfs setstripe option description
+      LU-13156 tests: skip sanity-selinux test_21a+21b
+      LU-6142 llite: Fix style issues for llite/statahead.c
+      LU-9091 obdclass: allow bare KMGTPE param suffix
+      LU-11596 tests: wait for grant to stop changing
+      LU-9091 procfs: remove old string parsing routines
+      LU-13321 tests: force even DNE file distribution
+      LU-6179 llite: remove LOCKAHEAD_OLD compatibility
+      LU-13379 tests: don't use localrecov for older servers
+
+Andrew Perepechko (3):
+      LU-13309 osd-ldiskfs: remove per-page object_get/put in brw
+      LU-13294 libcfs: incorrect rotor behaviour
+      LU-13309 ofd: optimize the brw codepath
+
+Ann Koehler (1):
+      LU-12461 contrib: Add epython scripts for crash dump analysis
+
+Artem Blagodarenko (1):
+      LU-12950 osd-ldiskfs: increase supported size to 1024tb
+
+Bobi Jam (1):
+      LU-13324 llite: page delete race
+
+Bruno Faccini (4):
+      LU-13263 osc: use LDLM_LOCK_RELEASE() if no lu_ref added
+      LU-13264 osc: ensure lu_ref work atomic from osc_lock_upcall()
+      LU-12914 mdt: mdt_prep_ma_buf_from_rep() is called twice
+      LU-8221 osc: fix for lu_ref feature in osc_extent_put()
+
+Chris Horn (10):
+      LU-12756 lnet: Refactor lnet_set_non_mr_pref_nid
+      LU-12756 lnet: Refactor lnet_find_existing_preferred_best_ni
+      LU-12756 lnet: Introduce lnet_msg_is_response
+      LU-12756 lnet: Remove unnecessary rtr_nid argument
+      LU-13277 lnet: Discovery thread can deadlock on shutdown
+      LU-13276 lnet: Update nnis to avoid infinite loop
+      LU-12756 lnet: Use info cached in lnet_msg on resend
+      LU-13265 lnet: Modify push MD to have single threshold
+      LU-13362 lnet: Disc reply race with finalize and routed recv
+      LU-13278 lnet: Reconcile discovery push and reply handling
+
+Dominique Martinet (2):
+      LU-10235 mdt: mdt_create: check EEXIST without lock
+      LU-12198 libcfs: always copy ioctl header back to user
+
+Elena Gryaznova (12):
+      LU-13267 tests: improve racer cleanup
+      LU-13268 tests: customize lnet-selftest for performance
+      LU-13269 tests: make lnet-selftest.sh more flexible
+      LU-13270 tests: dom-performance fixes
+      LU-13281 tests: ha.sh improvements
+      LU-13283 tests: add racer to nonmpi load
+      LU-11505 tests: customise run_*() functions
+      LU-13282 tests: wait $LFSCK_BG_PID properly
+      LU-13271 tests: skip 87, 115 tests if FILESET set
+      LU-13273 tests: run_ior() parameters order fix
+      LU-13280 tests: customize run_mdtest for several mount points
+      LU-12390 tests: customise mdsrate tests
+
+Emoly Liu (4):
+      LU-12811 ptlrpc: pass buffer size to the swabbing functions
+      LU-11510 lfs: migrate a composite layout file correctly
+      LU-12811 ptlrpc: pass buflen to lustre_swab_object_update_*()
+      LU-12811 ptlrpc: do some cleanups in swabber_dumper_helper()
+
+Geliang Tang (1):
+      LU-9679 osc: use rb_entry_safe
+
+Hongchao Zhang (4):
+      LU-12280 quota: add notify grace
+      LU-13261 mdt: PFL layout changed while accessing
+      LU-12506 changelog: support large number of MDT
+      LU-12546 lfsck: print logs for LLIT_UNMATCHED_PAIR
+
+James Nunez (6):
+      LU-11597 tests: skip sanityn tests for PPC
+      LU-13232 tests: add stack_trap to clean up sanity 160j
+      LU-13186 tests: stop running tests for PPC clients
+      LU-10073 tests: skip test smoke for PPC
+      LU-12251 tests: stop running sanity-flr for PPC
+      LU-12312 tests: stop running sanity-sec test 31
+
+James Simmons (12):
+      LU-12477 lustre: remove obsolete config checks
+      LU-10467 mdc: change ssleep to msleep_interruptible
+      LU-13258 libcfs: make apply_workqueue_attrs() available for Lustre
+      LU-10467 ptlrpc: convert waiting in ptlrpc_hr_main()
+      LU-13274 uapi: make lustre UAPI headers C99 compliant
+      LU-9859 ptlrpc: change imp_refcount to refcount_t
+      LU-6174 nrs: perform proper division
+      LU-6174 osd-ldiskfs: perform proper division
+      LU-12477 ldiskfs: remove obsolete ext4 patches
+      LU-13344 ptlrpc: change request timeouts to s32
+      LU-13344 sec: remove time_t usage
+      LU-13344 servers: change request timeouts to s32
+
+Jian Yu (3):
+      LU-12637 kernel: RHEL 8.1 server support
+      LU-13110 kernel: kernel update SLES12 SP4 [4.12.14-95.45.1]
+      LU-13219 tests: add nfs-server service in setup-nfs.sh
+
+Lai Siyao (5):
+      LU-12775 test: reorder 'tar' command options
+      LU-11025 dne: introduce new directory hash type: "crush"
+      LU-11025 dne: change dir layout via dt_layout_change
+      LU-11025 lmv: simplify name to stripe mapping
+      LU-13157 mdd: migrate readlink from wrong place
+
+Li Dongyang (4):
+      LU-13160 tests: fix sanity-hsm monitor setup
+      LU-13241 utils: use libext2fs for ldiskfs operations
+      LU-12580 lov: fix typo in lov_comp_md_size
+      LU-12580 lov: fix out of bound usercopy
+
+Mikhail Pershin (6):
+      LU-12321 mdc: allow ELC for DOM file unlink
+      LU-10756 ptlrpc: fix IMP_CLOSED state is being never set
+      LU-13254 mdt: clear mti_mdt in mdt_thread_info_fini()
+      LU-13004 target: take offset into account in tgt_send_buffer
+      LU-13354 ptlrpc: update wirecheck with missed checks
+      LU-13354 capa: remove remained lustre capa code
+
+Mr NeilBrown (66):
+      LU-13235 lnet: copy the correct amount of CPTs to lnet_cpts
+      LU-9679 lustre: avoid cast of file->private_data
+      LU-9679 modules: convert MIN/MAX to kernel style
+      LU-9679 lnet: discard lnet_ping_buffer_numref()
+      LU-12911 llite: Don't access lov_md fields before size check
+      LU-12930 various: use schedule_timeout_*interruptible
+      LU-13004 osp: break read request into pages.
+      LU-13004 target: use KIOV for out_handle
+      LU-13004 osp: use KIOV in osp_prep_update_req
+      LU-12678 lnet: socklnd: mark all ksock_proto struct 'const'.
+      LU-9855 lustre: replace LPROCFS_CLIMP_CHECK()
+      LU-10467 lustre: use l_wait_event_abortable where appropriate.
+      LU-10467 ptlrpc: convert final users of LWI_TIMEOUT_INTERVAL
+      LU-9679 llite: Discard LUSTRE_FPRIVATE()
+      LU-10391 lnet: use data_ready callback to trigger accept()
+      LU-10391 lnet: discard lnet_sock_accept()
+      LU-9679 various: use list_splice and list_splice_init
+      LU-10467 ldlm: use wait_event_idle() instead of l_wait_event
+      LU-10467 lfsck: use wait_event_idle()
+      LU-12780 llite: don't use ptlrpc_thread for sai_agl_thread
+      LU-12780 llite: avoid ptlrpc_thread for ll_statahead_thread
+      LU-13005 lnet: eq: discard struct lnet_handle_eq
+      LU-13004 osp: use correct page count in osp_prep_update_req
+      LU-9679 general: add missing spaces near punctuation
+      LU-12780 osp: use native kthreads for opd_pre_thread
+      LU-12678 lnet: remove lnet_me_alloc/lnet_me_free
+      LU-13004 lustre: remove support for KVEC bulk descriptors
+      LU-13004 ptlrpc: remove *GET*KVEC macros and fields.
+      LU-9679 libcfs: Add CFS_ALLOC_PTR_ARRAY and free
+      LU-9868 llite: remove lld_it field of ll_dentry_data
+      LU-12542 ldlm: don't access l_resource when not locked.
+      LU-12780 osp: don't use ptlrpc_thread for opd_update_thread
+      LU-13005 lnet: don't use LNetEQPoll for ping replies.
+      LU-13005 lnet: remove LNetEQPoll
+      LU-13005 lnet: remove the 'queue' from LNetEQ
+      LU-13004 ptlrpc: simplify bd_vec access.
+      LU-12477 lustre: restore time_after32()
+      LU-13258 libcfs: fixes for cfs_arch_init()
+      LU-10391 lnet: remove 'accept' variable.
+      LU-10467 libcfs: remove l_wait_event() and related macros.
+      LU-9855 lustre: rename obd_device variables to obd
+      LU-12780 lod: don't use ptlrpc_thread for recovery thread
+      LU-13255 lnet: introduce wait_var_event_warning.
+      LU-9859 libcfs: prepare for switch to container_of_safe()
+      LU-4198 clio: Remove pl_owner
+      LU-10391 lnet: remove 'fatal' arg from lnet_{sock_}connect
+      LU-10391 lnet: change various function to return pointer
+      LU-12511 fld: remove unused functions from fld_cache.c
+      LU-12511 lustre: introduce LUSTRE_MDT_MAXNAMELEN
+      LU-12511 fld: use list_last_entry in fld_cache_shrink
+      LU-6142 fld: remove function typedefs
+      LU-6142 lustre: unwrap some ldebugfs_register() calls
+      LU-6142 lustre: remove remaining users of ldebugfs_register
+      LU-12780 osp: don't use ptlrpc_thread for lwp_notify_main()
+      LU-12780 quota: don't use ptlrpc_thread for qsd_reint_main()
+      LU-13005 ptlrpc: use percpu refcount to track requests.
+      LU-13004 modules: replace lnet_kiov_t with struct bio_vec
+      LU-9859 libcfs: always range-check libcfs_debug_mb setting.
+      LU-9859 libcfs: open code cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
+      LU-13344 libcfs: adler32: don't set CRYPTO_TFM_RES_BAD_KEY_LEN
+      LU-11591 llog: remove partial_chunk variable
+      LU-12780 quota: don't use ptlrpc_thread for qsd_upd_thread()
+      LU-8130 lu_object: use RCU to free lu_object_header
+      LU-13004 net: discard LNET_MD_IOVEC
+      LU-13255 gnilnd: Use wait_var_event_warning()
+      LU-12542 lustre: remove INIT_LIST_HEAD_RCU support.
+
+Nathaniel Clark (1):
+      LU-13178 build: Update ZFS version to 0.8.3
+
+NeilBrown (17):
+      LU-8130 lov: convert lo[v|d]_pool to use rhashtable
+      LU-9859 libcfs: move tracefile locking from linux-tracefile.c  to tracefile.c
+      LU-9859 libcfs: remove unnecessary cfs_block_allsigs() calls
+      LU-9859 libcfs: rename cfs_cpt_table to cfs_cpt_tab
+      LU-9679 osc: use assert_spin_locked()
+      LU-9679 osc: remove cl_io_cancel()
+      LU-9679 osc: use overlapped() consistently.
+      LU-9679 osc: centralize handling of PTLRPCD_SET
+      LU-9679 osc: convert a while loop to for
+      LU-9859 libcfs: simplify linux-prim.c
+      LU-9679 osc: simplify osc_page_gang_lookup()
+      LU-9859 lustre: remove current_pid() and current_comm()
+      LU-9679 osc: simplify osc_extent_wait()
+      LU-9679 osc: convert while to for in get_write_extents()
+      LU-9679 osc: discard oe_intree
+      LU-9679 osc: convert cl_cache_waiters to a wait_queue.
+      LU-9859 libcfs: improve API and implementation of blocking signals.
+
+Oleg Drokin (4):
+      LU-12761: tests: make version_code() accept two number versions too
+      LU-13131 osc: Make sure we don't accidentally deprioritize extents
+      LU-8454 Remove struct mgs_send_param and its users
+      New tag 2.13.53
+
+Sebastien Buisson (11):
+      LU-11961 nodemap: nodemap_create() handles default nodemap
+      LU-13133 tests: sanity-selinux test_21{a,b} sepol update
+      LU-13097 tests: set fail_loc on all MDS nodes for pdir tests
+      LU-13082 tests: enable lgss_keyring debug traces
+      LU-13343 tests: skip recovery-small test_140 with SSK
+      LU-13355 crypto: adler32 wrapper in libcfs
+      LU-13116 mgc: do not lose sptlrpc config lock
+      LU-12992 gss: retry in case of short computed shared key
+      LU-13216 ptlrpc: sptlrpc_req_refresh_ctx's timeout semantic
+      LU-13116 ptlrpc: return error for conn with NULL export
+      LU-13116 tests: properly clean keyring in sanity-sec test_30
+
+Sergey Cheremencev (1):
+      LU-12642 ofd: change last_id output in proc
+
+Shaun Tancheff (15):
+      LU-13210 lnet: gcc8 add implicit-fallthrough decorator
+      LU-13226 ldiskfs: Add support for Ubuntu eoan 5.3
+      LU-12861 libcfs: Cleanup libcfs_debug_msg use of snprintf
+      LU-13040 lmv: Pool name string handling
+      LU-13288 llite: Find account_page_dirtied on module init
+      LU-12945 lnet: Disable zero copy when running on VM
+      LU-13211 ldiskfs: rework data-in-dirent for linux 5.4.7+
+      LU-13209 build: Fix vvp_account_page_dirtied
+      LU-11310 kernel: new kernel [SLES15 SP1 4.12.14-197.29]
+      LU-13209 build: SUSE 15 SP2 fix for KBUILD_SRC removed
+      LU-13252 mgs: Handle possible failure from name_create_mdt
+      LU-12670 osd-ldiskfs: Shrink rcu critical section
+      LU-11310 ldiskfs: Support for SUSE 15 GA and SP1
+      LU-13120 build: Fix ZFS dependancies for osd-zfs-mount
+      LU-13226 ldiskfs: Add support for SUSE 15 SP2
+
+Sonia Sharma (1):
+      LU-12191 utils: Make "lctl list_param" read exact path under sysfs tree
+
+Wang Shilong (14):
+      LU-12644 llite: try fast io for stride io correctly
+      LU-12518 llite: fix stride window increase
+      LU-13166 osd-ldiskfs: fix to allow to get system inode
+      LU-13293 llite: don't abort readahead too aggressively
+      LU-13227 LDLM: update LVB if it is server lock
+      LU-13096 llite: fix potential overflow in ll_max_cached_mb_seq_write()
+      LU-13314 test: add 56ob to ALWAYS_EXCEPT for now
+      LU-9679 osc: fix to return right weight in osc_lock_weight()
+      LU-13234: osd-ldiskfs: hold inode mutex for ldiskfs_orphan_add()
+      LU-13227 ofd: update lvb before dropping server lock
+      LU-13300 ldiskfs: port patches to improve extent status shrink
+      LU-13096 llite: serialize max_cached_mb write operation
+      LU-13312 ldlm: fix to stop iterating tree early in ldlm_kms_shift_cb()
+      LU-12748 readahead: limit async ra requests
+
+Yang Sheng (1):
+      LU-13260 lov: fix size check when stripe is zero
