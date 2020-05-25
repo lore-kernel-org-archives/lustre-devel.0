@@ -1,242 +1,254 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:50 -0400
-Subject: [lustre-devel] [PATCH 13/45] lnet: Introduce constant for the lolnd
- NID
+Date: Mon, 25 May 2020 18:07:43 -0400
+Subject: [lustre-devel] [PATCH 06/45] lnet: discard kvec option from
+ lnet_libmd.
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-This patch adds a new constant, LNET_NID_LO_0, to represent the lolnd
-NID 0 at lo.
+The 'struct kvec' field in 'struct lnet_libmd' is no longer set - the
+memory is always presented as pages.  So remove that option and the
+union that contained iov and kiov.
 
-HPE-bug-id: LUS-8457
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12222
-Lustre-commit: 56203e4ba0a6 ("LU-12222 lnet: Introduce constant for the lolnd NID")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/38312
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Rename md_iov.kiov to md_kiov.
+Discard all code that made use of md_iov.iov.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
+Lustre-commit: 4775d52439f4f ("LU-13004 lnet: discard kvec option from lnet_libmd.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/37843
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_lib.c          | 2 +-
- fs/lustre/lmv/lmv_obd.c              | 4 ++--
- fs/lustre/ptlrpc/events.c            | 2 +-
- include/uapi/linux/lnet/lnet-types.h | 3 +++
- net/lnet/lnet/api-ni.c               | 6 +++---
- net/lnet/lnet/config.c               | 3 +--
- net/lnet/lnet/lib-move.c             | 6 +++---
- net/lnet/lnet/lib-msg.c              | 5 ++---
- net/lnet/lnet/peer.c                 | 6 +++---
- net/lnet/lnet/router.c               | 2 +-
- 10 files changed, 20 insertions(+), 19 deletions(-)
+ include/linux/lnet/lib-lnet.h       |  7 +---
+ include/linux/lnet/lib-types.h      |  5 +--
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 14 ++-----
+ net/lnet/lnet/lib-md.c              | 79 +++++++++----------------------------
+ net/lnet/lnet/lib-move.c            |  5 +--
+ 5 files changed, 27 insertions(+), 83 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 84ec734..83b95ce 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -2817,7 +2817,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
- 		i = 0;
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index 66e01a0..03ac3f9 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -89,7 +89,7 @@
  
- 		while (LNetGetId(i++, &id) != -ENOENT) {
--			if (LNET_NETTYP(LNET_NIDNET(id.nid)) == LOLND)
-+			if (id.nid == LNET_NID_LO_0)
- 				continue;
- 			if (cfs_match_nid(id.nid, &squash->rsi_nosquash_nids)) {
- 				matched = true;
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 83e38bf..f241269 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -1114,7 +1114,7 @@ static int lmv_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	 * can distribute subdirs evenly from the beginning.
- 	 */
- 	while (LNetGetId(i++, &lnet_id) != -ENOENT) {
--		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
-+		if (lnet_id.nid != LNET_NID_LO_0) {
- 			lmv->lmv_qos_rr_index = (u32)lnet_id.nid;
- 			break;
+ bool lnet_is_route_alive(struct lnet_route *route);
+ 
+-#define LNET_SMALL_MD_SIZE	offsetof(struct lnet_libmd, md_iov.iov[1])
++#define LNET_SMALL_MD_SIZE	offsetof(struct lnet_libmd, md_kiov[1])
+ extern struct kmem_cache *lnet_mes_cachep;	 /* MEs kmem_cache */
+ extern struct kmem_cache *lnet_small_mds_cachep; /* <= LNET_SMALL_MD_SIZE bytes
+ 						  * MDs kmem_cache
+@@ -165,10 +165,7 @@ static inline int lnet_md_unlinkable(struct lnet_libmd *md)
+ 
+ 	LASSERTF(md->md_rspt_ptr == NULL, "md %p rsp %p\n", md, md->md_rspt_ptr);
+ 
+-	if ((md->md_options & LNET_MD_KIOV) != 0)
+-		size = offsetof(struct lnet_libmd, md_iov.kiov[md->md_niov]);
+-	else
+-		size = offsetof(struct lnet_libmd, md_iov.iov[md->md_niov]);
++	size = offsetof(struct lnet_libmd, md_kiov[md->md_niov]);
+ 
+ 	if (size <= LNET_SMALL_MD_SIZE) {
+ 		CDEBUG(D_MALLOC, "slab-freed 'md'@%p.\n", md);
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 0629f20..9a11aa5 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -208,10 +208,7 @@ struct lnet_libmd {
+ 	struct lnet_rsp_tracker	*md_rspt_ptr;
+ 	lnet_handler_t		 md_handler;
+ 	struct lnet_handle_md	 md_bulk_handle;
+-	union {
+-		struct kvec	iov[LNET_MAX_IOV];
+-		struct bio_vec	kiov[LNET_MAX_IOV];
+-	} md_iov;
++	struct bio_vec		 md_kiov[LNET_MAX_IOV];
+ };
+ 
+ #define LNET_MD_FLAG_ZOMBIE		BIT(0)
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 087657c..7f782fb 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1626,16 +1626,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 		ibmsg = tx->tx_msg;
+ 		rd = &ibmsg->ibm_u.get.ibgm_rd;
+-		if (!(lntmsg->msg_md->md_options & LNET_MD_KIOV))
+-			rc = kiblnd_setup_rd_iov(ni, tx, rd,
+-						 lntmsg->msg_md->md_niov,
+-						 lntmsg->msg_md->md_iov.iov,
+-						 0, lntmsg->msg_md->md_length);
+-		else
+-			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
+-						  lntmsg->msg_md->md_niov,
+-						  lntmsg->msg_md->md_iov.kiov,
+-						  0, lntmsg->msg_md->md_length);
++		rc = kiblnd_setup_rd_kiov(ni, tx, rd,
++					  lntmsg->msg_md->md_niov,
++					  lntmsg->msg_md->md_kiov,
++					  0, lntmsg->msg_md->md_length);
+ 		if (rc) {
+ 			CERROR("Can't setup GET sink for %s: %d\n",
+ 			       libcfs_nid2str(target.nid), rc);
+diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
+index e1b8a06..cfa285a 100644
+--- a/net/lnet/lnet/lib-md.c
++++ b/net/lnet/lnet/lib-md.c
+@@ -91,6 +91,7 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ {
+ 	int cpt = CFS_CPT_ANY;
+ 	unsigned int niov;
++	struct bio_vec *kiov;
+ 
+ 	/*
+ 	 * if the md_options has a bulk handle then we want to look at the
+@@ -103,63 +104,21 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 	if (!md || md->md_niov == 0)
+ 		return CFS_CPT_ANY;
+ 
++	kiov = md->md_kiov;
+ 	niov = md->md_niov;
+ 
+-	/*
+-	 * There are three cases to handle:
+-	 *  1. The MD is using lnet_kiov_t
+-	 *  2. The MD is using struct kvec
+-	 *  3. Contiguous buffer allocated via vmalloc
+-	 *
+-	 *  in case 2 we can use virt_to_page() macro to get the page
+-	 *  address of the memory kvec describes.
+-	 *
+-	 *  in case 3 use is_vmalloc_addr() and vmalloc_to_page()
+-	 *
+-	 * The offset provided can be within the first iov/kiov entry or
+-	 * it could go beyond it. In that case we need to make sure to
+-	 * look at the page which actually contains the data that will be
+-	 * DMAed.
+-	 */
+-	if ((md->md_options & LNET_MD_KIOV) != 0) {
+-		struct bio_vec *kiov = md->md_iov.kiov;
+-
+-		while (offset >= kiov->bv_len) {
+-			offset -= kiov->bv_len;
+-			niov--;
+-			kiov++;
+-			if (niov == 0) {
+-				CERROR("offset %d goes beyond kiov\n", offset);
+-				goto out;
+-			}
+-		}
+-
+-		cpt = cfs_cpt_of_node(lnet_cpt_table(),
+-				      page_to_nid(kiov->bv_page));
+-	} else {
+-		struct kvec *iov = md->md_iov.iov;
+-		unsigned long vaddr;
+-		struct page *page;
+-
+-		while (offset >= iov->iov_len) {
+-			offset -= iov->iov_len;
+-			niov--;
+-			iov++;
+-			if (niov == 0) {
+-				CERROR("offset %d goes beyond iov\n", offset);
+-				goto out;
+-			}
+-		}
+-
+-		vaddr = ((unsigned long)iov->iov_base) + offset;
+-		page = lnet_kvaddr_to_page(vaddr);
+-		if (!page) {
+-			CERROR("Couldn't resolve vaddr 0x%lx to page\n", vaddr);
++	while (offset >= kiov->bv_len) {
++		offset -= kiov->bv_len;
++		niov--;
++		kiov++;
++		if (niov == 0) {
++			CERROR("offset %d goes beyond iov\n", offset);
+ 			goto out;
  		}
-@@ -1208,7 +1208,7 @@ static int lmv_select_statfs_mdt(struct lmv_obd *lmv, u32 flags)
- 		if (LNetGetId(i, &lnet_id) == -ENOENT)
- 			break;
- 
--		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
-+		if (lnet_id.nid != LNET_NID_LO_0) {
- 			/* We dont need a full 64-bit modulus, just enough
- 			 * to distribute the requests across MDTs evenly.
- 			 */
-diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
-index bc2af35..5e3787c 100644
---- a/fs/lustre/ptlrpc/events.c
-+++ b/fs/lustre/ptlrpc/events.c
-@@ -478,7 +478,7 @@ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
- 			continue;
- 
- 		if (dist == 0) {		/* local! use loopback LND */
--			peer->nid = *self = LNET_MKNID(LNET_MKNET(LOLND, 0), 0);
-+			peer->nid = *self = LNET_NID_LO_0;
- 			rc = 0;
- 			break;
- 		}
-diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
-index 1ef1e98..947ed7f 100644
---- a/include/uapi/linux/lnet/lnet-types.h
-+++ b/include/uapi/linux/lnet/lnet-types.h
-@@ -109,6 +109,9 @@ static inline __u32 LNET_MKNET(__u32 type, __u32 num)
- 	return (type << 16) | num;
- }
- 
-+/** The lolnd NID (i.e. myself) */
-+#define LNET_NID_LO_0 LNET_MKNID(LNET_MKNET(LOLND, 0), 0)
-+
- /* Packed version of lnet_process_id to transfer via network */
- struct lnet_process_id_packed {
- 	/* node id / process id */
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index b3e1fe9..b0f2a62 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -1567,7 +1567,7 @@ struct lnet_ping_buffer *
- 	/* Loopback is guaranteed to be present */
- 	if (pinfo->pi_nnis < 1 || pinfo->pi_nnis > lnet_interfaces_max)
- 		return -ERANGE;
--	if (LNET_NETTYP(LNET_NIDNET(LNET_PING_INFO_LONI(pinfo))) != LOLND)
-+	if (LNET_PING_INFO_LONI(pinfo) != LNET_NID_LO_0)
- 		return -EPROTO;
- 	return 0;
- }
-@@ -2732,7 +2732,7 @@ void lnet_lib_exit(void)
+-		cpt = cfs_cpt_of_node(lnet_cpt_table(), page_to_nid(page));
  	}
  
- 	cfg_ni->lic_nid = ni->ni_nid;
--	if (LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND)
-+	if (ni->ni_nid == LNET_NID_LO_0)
- 		cfg_ni->lic_status = LNET_NI_STATUS_UP;
++	cpt = cfs_cpt_of_node(lnet_cpt_table(),
++			      page_to_nid(kiov->bv_page));
+ out:
+ 	return cpt;
+ }
+@@ -178,7 +137,7 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
  	else
- 		cfg_ni->lic_status = ni->ni_status->ns_status;
-@@ -2824,7 +2824,7 @@ void lnet_lib_exit(void)
- 	config->cfg_config_u.cfg_net.net_peer_rtr_credits =
- 		ni->ni_net->net_tunables.lct_peer_rtr_credits;
+ 		niov = DIV_ROUND_UP(offset_in_page(umd->start) + umd->length,
+ 				    PAGE_SIZE);
+-	size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
++	size = offsetof(struct lnet_libmd, md_kiov[niov]);
  
--	if (LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND)
-+	if (ni->ni_nid == LNET_NID_LO_0)
- 		net_config->ni_status = LNET_NI_STATUS_UP;
- 	else
- 		net_config->ni_status = ni->ni_status->ns_status;
-diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
-index 9d3813c..d120dab 100644
---- a/net/lnet/lnet/config.c
-+++ b/net/lnet/lnet/config.c
-@@ -1179,8 +1179,7 @@ struct lnet_ni *
- 					goto token_error;
+ 	if (size <= LNET_SMALL_MD_SIZE) {
+ 		lmd = kmem_cache_zalloc(lnet_small_mds_cachep, GFP_NOFS);
+@@ -214,18 +173,18 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 	if (umd->options & LNET_MD_KIOV) {
+ 		niov = umd->length;
+ 		lmd->md_niov = umd->length;
+-		memcpy(lmd->md_iov.kiov, umd->start,
+-		       niov * sizeof(lmd->md_iov.kiov[0]));
++		memcpy(lmd->md_kiov, umd->start,
++		       niov * sizeof(lmd->md_kiov[0]));
  
- 				nid = libcfs_str2nid(ltb->ltb_text);
--				if (nid == LNET_NID_ANY ||
--				    LNET_NETTYP(LNET_NIDNET(nid)) == LOLND)
-+				if (nid == LNET_NID_ANY || nid == LNET_NID_LO_0)
- 					goto token_error;
+ 		for (i = 0; i < (int)niov; i++) {
+ 			/* We take the page pointer on trust */
+-			if (lmd->md_iov.kiov[i].bv_offset +
+-			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
++			if (lmd->md_kiov[i].bv_offset +
++			    lmd->md_kiov[i].bv_len > PAGE_SIZE) {
+ 				lnet_md_free(lmd);
+ 				return ERR_PTR(-EINVAL); /* invalid length */
  			}
+ 
+-			total_length += lmd->md_iov.kiov[i].bv_len;
++			total_length += lmd->md_kiov[i].bv_len;
  		}
+ 
+ 		lmd->md_length = total_length;
+@@ -247,10 +206,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 
+ 			plen = min_t(int, len, PAGE_SIZE - offset_in_page(pa));
+ 
+-			lmd->md_iov.kiov[i].bv_page =
++			lmd->md_kiov[i].bv_page =
+ 				lnet_kvaddr_to_page((unsigned long) pa);
+-			lmd->md_iov.kiov[i].bv_offset = offset_in_page(pa);
+-			lmd->md_iov.kiov[i].bv_len = plen;
++			lmd->md_kiov[i].bv_offset = offset_in_page(pa);
++			lmd->md_kiov[i].bv_len = plen;
+ 
+ 			len -= plen;
+ 			pa += plen;
 diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 6ef9978..4eaaa5f 100644
+index 9f815c1..dc49e60 100644
 --- a/net/lnet/lnet/lib-move.c
 +++ b/net/lnet/lnet/lib-move.c
-@@ -563,7 +563,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	int rc;
+@@ -538,10 +538,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	LASSERT(!msg->msg_kiov);
  
- 	LASSERT(!in_interrupt());
--	LASSERT(LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND ||
-+	LASSERT(ni->ni_nid == LNET_NID_LO_0 ||
- 		(msg->msg_txcredit && msg->msg_peertxcredit));
+ 	msg->msg_niov = md->md_niov;
+-	if (md->md_options & LNET_MD_KIOV)
+-		msg->msg_kiov = md->md_iov.kiov;
+-	else
+-		msg->msg_iov = md->md_iov.iov;
++	msg->msg_kiov = md->md_kiov;
+ }
  
- 	rc = ni->ni_net->net_lnd->lnd_send(ni, priv, msg);
-@@ -2407,7 +2407,7 @@ struct lnet_ni *
- 	 */
- 	send_data.sd_msg = msg;
- 	send_data.sd_cpt = cpt;
--	if (LNET_NETTYP(LNET_NIDNET(dst_nid)) == LOLND) {
-+	if (dst_nid == LNET_NID_LO_0) {
- 		rc = lnet_handle_lo_send(&send_data);
- 		lnet_net_unlock(cpt);
- 		return rc;
-@@ -4793,7 +4793,7 @@ struct lnet_msg *
- 			if (srcnidp)
- 				*srcnidp = dstnid;
- 			if (orderp) {
--				if (LNET_NETTYP(LNET_NIDNET(dstnid)) == LOLND)
-+				if (dstnid == LNET_NID_LO_0)
- 					*orderp = 0;
- 				else
- 					*orderp = 1;
-diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
-index dbb218d..7ce9c47 100644
---- a/net/lnet/lnet/lib-msg.c
-+++ b/net/lnet/lnet/lib-msg.c
-@@ -784,11 +784,10 @@
- 	/* if we're sending to the LOLND then the msg_txpeer will not be
- 	 * set. So no need to sanity check it.
- 	 */
--	if (msg->msg_tx_committed &&
--	    LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) != LOLND)
-+	if (msg->msg_tx_committed && msg->msg_txni->ni_nid != LNET_NID_LO_0)
- 		LASSERT(msg->msg_txpeer);
- 	else if (msg->msg_tx_committed &&
--		 LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) == LOLND)
-+		 msg->msg_txni->ni_nid == LNET_NID_LO_0)
- 		lo = true;
- 
- 	if (hstatus != LNET_MSG_STATUS_OK &&
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 1605c24..1b9190b 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -233,7 +233,7 @@
- 	 * to ever use a different interface when sending messages to
- 	 * myself.
- 	 */
--	if (LNET_NETTYP(LNET_NIDNET(nid)) == LOLND)
-+	if (nid == LNET_NID_LO_0)
- 		lp->lp_state = LNET_PEER_NO_DISCOVERY;
- 	lp->lp_cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
- 
-@@ -2615,7 +2615,7 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
- 	 * present in curnis[] then this peer is for this node.
- 	 */
- 	for (i = 0; i < ncurnis; i++) {
--		if (LNET_NETTYP(LNET_NIDNET(curnis[i])) == LOLND)
-+		if (curnis[i] == LNET_NID_LO_0)
- 			continue;
- 		for (j = 1; j < pbuf->pb_info.pi_nnis; j++) {
- 			if (curnis[i] == pbuf->pb_info.pi_ni[j].ns_nid) {
-@@ -2838,7 +2838,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
- 	if (pbuf->pb_info.pi_nnis <= 1)
- 		goto out;
- 	nid = pbuf->pb_info.pi_ni[1].ns_nid;
--	if (LNET_NETTYP(LNET_NIDNET(lp->lp_primary_nid)) == LOLND) {
-+	if (lp->lp_primary_nid == LNET_NID_LO_0) {
- 		rc = lnet_peer_set_primary_nid(lp, nid, flags);
- 		if (!rc)
- 			rc = lnet_peer_merge_data(lp, pbuf);
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index ff0a665..af50e51 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -661,7 +661,7 @@ static void lnet_shuffle_seed(void)
- 	       libcfs_net2str(net), hops, priority, libcfs_nid2str(gateway));
- 
- 	if (gateway == LNET_NID_ANY ||
--	    LNET_NETTYP(LNET_NIDNET(gateway)) == LOLND ||
-+	    gateway == LNET_NID_LO_0 ||
- 	    net == LNET_NIDNET(LNET_NID_ANY) ||
- 	    LNET_NETTYP(net) == LOLND ||
- 	    LNET_NIDNET(gateway) == net ||
+ void
 -- 
 1.8.3.1
