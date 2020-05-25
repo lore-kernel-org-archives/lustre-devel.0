@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:51 -0400
-Subject: [lustre-devel] [PATCH 14/45] lustre: Remove inappropriate uses of
- BIT() macro.
+Date: Mon, 25 May 2020 18:07:41 -0400
+Subject: [lustre-devel] [PATCH 04/45] lnet: merge lnet_md_alloc into
+ lnet_md_build.
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,135 +13,209 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.de>
 
-The BIT() macro exists for identifying a specific bit in a word when
-it is being used as a bitmap (or mask for set of flags etc).
-While it uses "1 << ...." it is not a general replacement for that
-construct and should not be used to simply to raise '2' to some power.
+lnet_md_alloc is only called twice, each time immediately before a
+call to lnet_md_build(), and these are the only calls to
+lnet_md_build().
 
-Varous places in lustre and libcfs use BIT() when a size, rather than
-a BIT, are required.  Convert these to explicitly use "1 << exponent".
+So simplify the code by merging lnet_md_alloc into lnet_md_build.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 423ad81446973 ("LU-6142 lustre: Remove inappropriate uses of BIT() macro.")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
+Lustre-commit: c0598f15dd502 ("LU-13004 lnet: merge lnet_md_alloc into lnet_md_build.")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/38373
-Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
+Reviewed-on: https://review.whamcloud.com/37841
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_resource.c |  4 ++--
- fs/lustre/llite/lproc_llite.c  |  4 ++--
- fs/lustre/obdclass/class_obd.c | 12 +++++++-----
- net/lnet/libcfs/module.c       | 17 ++++++++---------
- 4 files changed, 19 insertions(+), 18 deletions(-)
+ include/linux/lnet/lib-lnet.h | 39 ----------------------
+ net/lnet/lnet/lib-md.c        | 75 +++++++++++++++++++++++++++++--------------
+ 2 files changed, 51 insertions(+), 63 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
-index 9b24be7..0a3d861 100644
---- a/fs/lustre/ldlm/ldlm_resource.c
-+++ b/fs/lustre/ldlm/ldlm_resource.c
-@@ -613,8 +613,8 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 	ns->ns_bucket_bits = ldlm_ns_hash_defs[ns_type].nsd_all_bits -
- 			     ldlm_ns_hash_defs[ns_type].nsd_bkt_bits;
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index d64c9bf..66e01a0 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -215,45 +215,6 @@ static inline int lnet_md_unlinkable(struct lnet_libmd *md)
  
--	ns->ns_rs_buckets = kvmalloc(BIT(ns->ns_bucket_bits) *
--				     sizeof(ns->ns_rs_buckets[0]),
-+	ns->ns_rs_buckets = kvzalloc((1 << ns->ns_bucket_bits) *
-+				     sizeof(*ns->ns_rs_buckets),
- 				     GFP_KERNEL);
- 	if (!ns->ns_rs_buckets)
- 		goto out_hash;
-diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
-index 5b10ed0..36cc8bc 100644
---- a/fs/lustre/llite/lproc_llite.c
-+++ b/fs/lustre/llite/lproc_llite.c
-@@ -1780,7 +1780,7 @@ static void ll_display_extents_info(struct ll_rw_extents_info *io_extents,
- 		w = pp_info->pp_w_hist.oh_buckets[i];
- 		read_cum += r;
- 		write_cum += w;
--		end = BIT(i + LL_HIST_START - units);
-+		end = 1 << (i + LL_HIST_START - units);
- 		seq_printf(seq,
- 			   "%4lu%c - %4lu%c%c: %14lu %4u %4u  | %14lu %4u %4u\n",
- 			   start, *unitp, end, *unitp,
-@@ -1958,7 +1958,7 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 		lprocfs_oh_clear(&io_extents->pp_extents[cur].pp_w_hist);
- 	}
+ #define MAX_PORTALS		64
  
--	for (i = 0; (count >= BIT(LL_HIST_START + i)) &&
-+	for (i = 0; (count >= 1 << (LL_HIST_START + i)) &&
- 	     (i < (LL_HIST_MAX - 1)); i++)
- 		;
- 	if (rw == 0) {
-diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
-index 038ee62..76664bf 100644
---- a/fs/lustre/obdclass/class_obd.c
-+++ b/fs/lustre/obdclass/class_obd.c
-@@ -113,27 +113,29 @@ static int class_resolve_dev_name(u32 len, const char *name)
+-static inline struct lnet_libmd *
+-lnet_md_alloc(struct lnet_md *umd)
+-{
+-	struct lnet_libmd *md;
+-	unsigned int size;
+-	unsigned int niov;
+-
+-	if (umd->options & LNET_MD_KIOV) {
+-		niov = umd->length;
+-		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
+-	} else {
+-		niov = 1;
+-		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
+-	}
+-
+-	if (size <= LNET_SMALL_MD_SIZE) {
+-		md = kmem_cache_alloc(lnet_small_mds_cachep,
+-				      GFP_NOFS | __GFP_ZERO);
+-		if (md) {
+-			CDEBUG(D_MALLOC,
+-			       "slab-alloced 'md' of size %u@%p.\n",
+-			       size, md);
+-		} else {
+-			CDEBUG(D_MALLOC, "failed to allocate 'md' of size %u\n",
+-			       size);
+-		}
+-	} else {
+-		md = kzalloc(size, GFP_NOFS);
+-	}
+-	if (md) {
+-		/* Set here in case of early free */
+-		md->md_options = umd->options;
+-		md->md_niov = niov;
+-		INIT_LIST_HEAD(&md->md_list);
+-	}
+-
+-	return md;
+-}
+-
+ struct lnet_libhandle *lnet_res_lh_lookup(struct lnet_res_container *rec,
+ 					  u64 cookie);
+ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
+index d745b91..a9a83c3 100644
+--- a/net/lnet/lnet/lib-md.c
++++ b/net/lnet/lnet/lib-md.c
+@@ -164,12 +164,42 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 	return cpt;
+ }
  
- static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+-static int
+-lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
++static struct lnet_libmd *
++lnet_md_build(struct lnet_md *umd, int unlink)
  {
--	if (data->ioc_len > BIT(30)) {
-+	const int maxlen = 1 << 30;
+ 	int i;
+ 	unsigned int niov;
+ 	int total_length = 0;
++	struct lnet_libmd *lmd;
++	unsigned int size;
 +
-+	if (data->ioc_len > maxlen) {
- 		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
- 		return 1;
++	if ((umd->options & LNET_MD_KIOV) != 0) {
++		niov = umd->length;
++		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
++	} else {
++		niov = 1;
++		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
++	}
++
++	if (size <= LNET_SMALL_MD_SIZE) {
++		lmd = kmem_cache_zalloc(lnet_small_mds_cachep, GFP_NOFS);
++		if (lmd) {
++			CDEBUG(D_MALLOC,
++			       "slab-alloced 'md' of size %u@%p.\n",
++			       size, lmd);
++		} else {
++			CDEBUG(D_MALLOC, "failed to allocate 'md' of size %u\n",
++			       size);
++		}
++	} else {
++		lmd = kzalloc(size, GFP_NOFS);
++	}
++
++	if (!lmd)
++		return ERR_PTR(-ENOMEM);
++
++	lmd->md_niov = niov;
++	INIT_LIST_HEAD(&lmd->md_list);
+ 
+ 	lmd->md_me = NULL;
+ 	lmd->md_start = umd->start;
+@@ -192,8 +222,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 		for (i = 0; i < (int)niov; i++) {
+ 			/* We take the page pointer on trust */
+ 			if (lmd->md_iov.kiov[i].bv_offset +
+-			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE)
+-				return -EINVAL; /* invalid length */
++			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
++				lnet_md_free(lmd);
++				return ERR_PTR(-EINVAL); /* invalid length */
++			}
+ 
+ 			total_length += lmd->md_iov.kiov[i].bv_len;
+ 		}
+@@ -202,8 +234,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 
+ 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
+ 		    (umd->max_size < 0 ||
+-		     umd->max_size > total_length)) /* illegal max_size */
+-			return -EINVAL;
++		     umd->max_size > total_length)) { /* illegal max_size */
++			lnet_md_free(lmd);
++			return ERR_PTR(-EINVAL);
++		}
+ 	} else {   /* contiguous */
+ 		lmd->md_length = umd->length;
+ 		niov = 1;
+@@ -213,11 +247,13 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 
+ 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
+ 		    (umd->max_size < 0 ||
+-		     umd->max_size > (int)umd->length)) /* illegal max_size */
+-			return -EINVAL;
++		     umd->max_size > (int)umd->length)) { /* illegal max_size */
++			lnet_md_free(lmd);
++			return ERR_PTR(-EINVAL);
++		}
  	}
  
--	if (data->ioc_inllen1 > BIT(30)) {
-+	if (data->ioc_inllen1 > maxlen) {
- 		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
- 		return 1;
+-	return 0;
++	return lmd;
+ }
+ 
+ /* must be called with resource lock held */
+@@ -326,13 +362,9 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 		return -EINVAL;
  	}
  
--	if (data->ioc_inllen2 > BIT(30)) {
-+	if (data->ioc_inllen2 > maxlen) {
- 		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
- 		return 1;
+-	md = lnet_md_alloc(&umd);
+-	if (!md)
+-		return -ENOMEM;
+-
+-	rc = lnet_md_build(md, &umd, unlink);
+-	if (rc)
+-		goto out_free;
++	md = lnet_md_build(&umd, unlink);
++	if (IS_ERR(md))
++		return PTR_ERR(md);
+ 
+ 	cpt = me->me_cpt;
+ 
+@@ -363,7 +395,6 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 
+ out_unlock:
+ 	lnet_res_unlock(cpt);
+-out_free:
+ 	kfree(md);
+ 	return rc;
+ }
+@@ -403,13 +434,9 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+ 		return -EINVAL;
  	}
  
--	if (data->ioc_inllen3 > BIT(30)) {
-+	if (data->ioc_inllen3 > maxlen) {
- 		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
- 		return 1;
- 	}
+-	md = lnet_md_alloc(&umd);
+-	if (!md)
+-		return -ENOMEM;
+-
+-	rc = lnet_md_build(md, &umd, unlink);
+-	if (rc)
+-		goto out_free;
++	md = lnet_md_build(&umd, unlink);
++	if (IS_ERR(md))
++		return PTR_ERR(md);
  
--	if (data->ioc_inllen4 > BIT(30)) {
-+	if (data->ioc_inllen4 > maxlen) {
- 		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
- 		return 1;
- 	}
-diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
-index fc5bc25..ad6935c 100644
---- a/net/lnet/libcfs/module.c
-+++ b/net/lnet/libcfs/module.c
-@@ -80,18 +80,17 @@ static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
- 
- static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
- {
--	if (data->ioc_hdr.ioc_len > BIT(30)) {
--		CERROR("LIBCFS ioctl: ioc_len larger than 1<<30\n");
-+	const int maxlen = 1 << 30;
-+
-+	if (data->ioc_hdr.ioc_len > maxlen)
- 		return true;
--	}
--	if (data->ioc_inllen1 > BIT(30)) {
--		CERROR("LIBCFS ioctl: ioc_inllen1 larger than 1<<30\n");
-+
-+	if (data->ioc_inllen1 > maxlen)
- 		return true;
--	}
--	if (data->ioc_inllen2 > BIT(30)) {
--		CERROR("LIBCFS ioctl: ioc_inllen2 larger than 1<<30\n");
-+
-+	if (data->ioc_inllen2 > maxlen)
- 		return true;
--	}
-+
- 	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
- 		CERROR("LIBCFS ioctl: inlbuf1 pointer but 0 length\n");
- 		return true;
+ 	if (md->md_length > LNET_MTU) {
+ 		CERROR("Invalid length: too big transfer size %u, %d max\n",
 -- 
 1.8.3.1
