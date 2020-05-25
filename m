@@ -1,56 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:48 -0400
-Subject: [lustre-devel] [PATCH 11/45] lustre: uapi: add OBD_CONNECT2_FIDMAP
+Date: Mon, 25 May 2020 18:08:16 -0400
+Subject: [lustre-devel] [PATCH 39/45] lnet: simplify ksock_tx.
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-40-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-Add OBD_CONNECT2_FIDMAP connect flag, which indicates whether client
-supports FID mapping.
+The tx_frags union in 'struct ksock_tx' is largely unnecessary.  The
+payload is always lnet_kiov_t, the only kvec is a header.  So replace
+the union with just those two fields.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11025
-Lustre-commit: c96fa612d5b0f ("LU-11025 uapi: add OBD_CONNECT2_FIDMAP")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38232
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
+Lustre-commit: 28ffde29603b1 ("LU-13004 lnet: simplify ksock_tx.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/37850
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/wiretest.c            | 2 ++
- include/uapi/linux/lustre/lustre_idl.h | 1 +
- 2 files changed, 3 insertions(+)
+ net/lnet/klnds/socklnd/socklnd.h    | 13 +++----------
+ net/lnet/klnds/socklnd/socklnd_cb.c |  8 ++++----
+ 2 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index fee4be2..81d0a99 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1241,6 +1241,8 @@ void lustre_assert_wire_constants(void)
- 		 OBD_CONNECT2_ASYNC_DISCARD);
- 	LASSERTF(OBD_CONNECT2_ENCRYPT == 0x8000ULL, "found 0x%.16llxULL\n",
- 		 OBD_CONNECT2_ENCRYPT);
-+	LASSERTF(OBD_CONNECT2_FIDMAP== 0x10000ULL, "found 0x%.16llxULL\n",
-+		 OBD_CONNECT2_FIDMAP);
- 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
- 		 (unsigned int)OBD_CKSUM_CRC32);
- 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index f6f2761..fd880f3 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -818,6 +818,7 @@ struct ptlrpc_body_v2 {
- 						  * discard
- 						  */
- #define OBD_CONNECT2_ENCRYPT	       0x8000ULL /* client-to-disk encrypt */
-+#define OBD_CONNECT2_FIDMAP	      0x10000ULL /* FID map */
- /* XXX README XXX:
-  * Please DO NOT add flag values here before first ensuring that this same
-  * flag value is not in use on some other branch.  Please clear any such
+diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
+index 2504e52..f85eb3c 100644
+--- a/net/lnet/klnds/socklnd/socklnd.h
++++ b/net/lnet/klnds/socklnd/socklnd.h
+@@ -291,18 +291,11 @@ struct ksock_tx {				/* transmit packet */
+ 	struct ksock_msg	tx_msg;		/* socklnd message buffer */
+ 	int			tx_desc_size;	/* size of this descriptor */
+ 	enum lnet_msg_hstatus	tx_hstatus;	/* health status of tx */
+-	union {
+-		struct {
+-			struct kvec	iov;	/* virt hdr */
+-			struct bio_vec	kiov[0];/* paged payload */
+-		} paged;
+-		struct {
+-			struct kvec	iov[1];	/* virt hdr + payload */
+-		} virt;
+-	} tx_frags;
++	struct kvec		tx_hdr;		/* virt hdr */
++	struct bio_vec		tx_payload[0];	/* paged payload */
+ };
+ 
+-#define KSOCK_NOOP_TX_SIZE (offsetof(struct ksock_tx, tx_frags.paged.kiov[0]))
++#define KSOCK_NOOP_TX_SIZE (offsetof(struct ksock_tx, tx_payload[0]))
+ 
+ /* network zero copy callback descriptor embedded in struct ksock_tx */
+ 
+diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
+index 83fcb28..b40fbf1 100644
+--- a/net/lnet/klnds/socklnd/socklnd_cb.c
++++ b/net/lnet/klnds/socklnd/socklnd_cb.c
+@@ -79,7 +79,7 @@ struct ksock_tx *
+ 	tx->tx_lnetmsg = NULL;
+ 	tx->tx_kiov = NULL;
+ 	tx->tx_nkiov = 0;
+-	tx->tx_iov = tx->tx_frags.virt.iov;
++	tx->tx_iov = &tx->tx_hdr;
+ 	tx->tx_niov = 1;
+ 	tx->tx_nonblk = nonblk;
+ 
+@@ -933,7 +933,7 @@ struct ksock_route *
+ 	LASSERT(!in_interrupt());
+ 
+ 	desc_size = offsetof(struct ksock_tx,
+-			     tx_frags.paged.kiov[payload_niov]);
++			     tx_payload[payload_niov]);
+ 
+ 	if (lntmsg->msg_vmflush)
+ 		mpflag = memalloc_noreclaim_save();
+@@ -950,8 +950,8 @@ struct ksock_route *
+ 	tx->tx_lnetmsg = lntmsg;
+ 
+ 	tx->tx_niov = 1;
+-	tx->tx_iov = &tx->tx_frags.paged.iov;
+-	tx->tx_kiov = tx->tx_frags.paged.kiov;
++	tx->tx_iov = &tx->tx_hdr;
++	tx->tx_kiov = tx->tx_payload;
+ 	tx->tx_nkiov = lnet_extract_kiov(payload_niov, tx->tx_kiov,
+ 					 payload_niov, payload_kiov,
+ 					 payload_offset, payload_nob);
 -- 
 1.8.3.1
