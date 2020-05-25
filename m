@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:42 -0400
-Subject: [lustre-devel] [PATCH 05/45] lnet: always put a page list into
- struct lnet_libmd
+Date: Mon, 25 May 2020 18:07:51 -0400
+Subject: [lustre-devel] [PATCH 14/45] lustre: Remove inappropriate uses of
+ BIT() macro.
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,94 +13,135 @@ To: lustre-devel@lists.lustre.org
 
 From: Mr NeilBrown <neilb@suse.de>
 
-'struct lnet_libmd' is only created in lnet_md_build().  It can be
-given a list of pages or a virtual address.  In the latter case, the
-memory will eventually be split into a list of pages.  It is cleaner
-to split it into a list of pages early so that all lower levels only
-need to handle one type: a page list.
+The BIT() macro exists for identifying a specific bit in a word when
+it is being used as a bitmap (or mask for set of flags etc).
+While it uses "1 << ...." it is not a general replacement for that
+construct and should not be used to simply to raise '2' to some power.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
-Lustre-commit: 857f11169fc8 ("LU-13004 lnet: always put a page list into struct lnet_libmd")
+Varous places in lustre and libcfs use BIT() when a size, rather than
+a BIT, are required.  Convert these to explicitly use "1 << exponent".
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: 423ad81446973 ("LU-6142 lustre: Remove inappropriate uses of BIT() macro.")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/37842
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-on: https://review.whamcloud.com/38373
+Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/lib-md.c | 38 +++++++++++++++++++++++++-------------
- 1 file changed, 25 insertions(+), 13 deletions(-)
+ fs/lustre/ldlm/ldlm_resource.c |  4 ++--
+ fs/lustre/llite/lproc_llite.c  |  4 ++--
+ fs/lustre/obdclass/class_obd.c | 12 +++++++-----
+ net/lnet/libcfs/module.c       | 17 ++++++++---------
+ 4 files changed, 19 insertions(+), 18 deletions(-)
 
-diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
-index a9a83c3..e1b8a06 100644
---- a/net/lnet/lnet/lib-md.c
-+++ b/net/lnet/lnet/lib-md.c
-@@ -173,13 +173,12 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	struct lnet_libmd *lmd;
- 	unsigned int size;
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 9b24be7..0a3d861 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -613,8 +613,8 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 	ns->ns_bucket_bits = ldlm_ns_hash_defs[ns_type].nsd_all_bits -
+ 			     ldlm_ns_hash_defs[ns_type].nsd_bkt_bits;
  
--	if ((umd->options & LNET_MD_KIOV) != 0) {
-+	if (umd->options & LNET_MD_KIOV)
- 		niov = umd->length;
--		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
--	} else {
--		niov = 1;
--		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
--	}
-+	else
-+		niov = DIV_ROUND_UP(offset_in_page(umd->start) + umd->length,
-+				    PAGE_SIZE);
-+	size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
- 
- 	if (size <= LNET_SMALL_MD_SIZE) {
- 		lmd = kmem_cache_zalloc(lnet_small_mds_cachep, GFP_NOFS);
-@@ -200,7 +199,6 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 
- 	lmd->md_niov = niov;
- 	INIT_LIST_HEAD(&lmd->md_list);
--
- 	lmd->md_me = NULL;
- 	lmd->md_start = umd->start;
- 	lmd->md_offset = 0;
-@@ -238,19 +236,33 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 			lnet_md_free(lmd);
- 			return ERR_PTR(-EINVAL);
- 		}
--	} else {   /* contiguous */
--		lmd->md_length = umd->length;
--		niov = 1;
--		lmd->md_niov = 1;
--		lmd->md_iov.iov[0].iov_base = umd->start;
--		lmd->md_iov.iov[0].iov_len = umd->length;
-+	} else {   /* contiguous - split into pages */
-+		void *pa = umd->start;
-+		int len = umd->length;
- 
-+		lmd->md_length = len;
-+		i = 0;
-+		while (len) {
-+			int plen;
-+
-+			plen = min_t(int, len, PAGE_SIZE - offset_in_page(pa));
-+
-+			lmd->md_iov.kiov[i].bv_page =
-+				lnet_kvaddr_to_page((unsigned long) pa);
-+			lmd->md_iov.kiov[i].bv_offset = offset_in_page(pa);
-+			lmd->md_iov.kiov[i].bv_len = plen;
-+
-+			len -= plen;
-+			pa += plen;
-+			i += 1;
-+		}
- 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
- 		     umd->max_size > (int)umd->length)) { /* illegal max_size */
- 			lnet_md_free(lmd);
- 			return ERR_PTR(-EINVAL);
- 		}
-+		lmd->md_options |= LNET_MD_KIOV;
+-	ns->ns_rs_buckets = kvmalloc(BIT(ns->ns_bucket_bits) *
+-				     sizeof(ns->ns_rs_buckets[0]),
++	ns->ns_rs_buckets = kvzalloc((1 << ns->ns_bucket_bits) *
++				     sizeof(*ns->ns_rs_buckets),
+ 				     GFP_KERNEL);
+ 	if (!ns->ns_rs_buckets)
+ 		goto out_hash;
+diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
+index 5b10ed0..36cc8bc 100644
+--- a/fs/lustre/llite/lproc_llite.c
++++ b/fs/lustre/llite/lproc_llite.c
+@@ -1780,7 +1780,7 @@ static void ll_display_extents_info(struct ll_rw_extents_info *io_extents,
+ 		w = pp_info->pp_w_hist.oh_buckets[i];
+ 		read_cum += r;
+ 		write_cum += w;
+-		end = BIT(i + LL_HIST_START - units);
++		end = 1 << (i + LL_HIST_START - units);
+ 		seq_printf(seq,
+ 			   "%4lu%c - %4lu%c%c: %14lu %4u %4u  | %14lu %4u %4u\n",
+ 			   start, *unitp, end, *unitp,
+@@ -1958,7 +1958,7 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
+ 		lprocfs_oh_clear(&io_extents->pp_extents[cur].pp_w_hist);
  	}
  
- 	return lmd;
+-	for (i = 0; (count >= BIT(LL_HIST_START + i)) &&
++	for (i = 0; (count >= 1 << (LL_HIST_START + i)) &&
+ 	     (i < (LL_HIST_MAX - 1)); i++)
+ 		;
+ 	if (rw == 0) {
+diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
+index 038ee62..76664bf 100644
+--- a/fs/lustre/obdclass/class_obd.c
++++ b/fs/lustre/obdclass/class_obd.c
+@@ -113,27 +113,29 @@ static int class_resolve_dev_name(u32 len, const char *name)
+ 
+ static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+ {
+-	if (data->ioc_len > BIT(30)) {
++	const int maxlen = 1 << 30;
++
++	if (data->ioc_len > maxlen) {
+ 		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
+ 		return 1;
+ 	}
+ 
+-	if (data->ioc_inllen1 > BIT(30)) {
++	if (data->ioc_inllen1 > maxlen) {
+ 		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
+ 		return 1;
+ 	}
+ 
+-	if (data->ioc_inllen2 > BIT(30)) {
++	if (data->ioc_inllen2 > maxlen) {
+ 		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
+ 		return 1;
+ 	}
+ 
+-	if (data->ioc_inllen3 > BIT(30)) {
++	if (data->ioc_inllen3 > maxlen) {
+ 		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
+ 		return 1;
+ 	}
+ 
+-	if (data->ioc_inllen4 > BIT(30)) {
++	if (data->ioc_inllen4 > maxlen) {
+ 		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
+ 		return 1;
+ 	}
+diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
+index fc5bc25..ad6935c 100644
+--- a/net/lnet/libcfs/module.c
++++ b/net/lnet/libcfs/module.c
+@@ -80,18 +80,17 @@ static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
+ 
+ static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
+ {
+-	if (data->ioc_hdr.ioc_len > BIT(30)) {
+-		CERROR("LIBCFS ioctl: ioc_len larger than 1<<30\n");
++	const int maxlen = 1 << 30;
++
++	if (data->ioc_hdr.ioc_len > maxlen)
+ 		return true;
+-	}
+-	if (data->ioc_inllen1 > BIT(30)) {
+-		CERROR("LIBCFS ioctl: ioc_inllen1 larger than 1<<30\n");
++
++	if (data->ioc_inllen1 > maxlen)
+ 		return true;
+-	}
+-	if (data->ioc_inllen2 > BIT(30)) {
+-		CERROR("LIBCFS ioctl: ioc_inllen2 larger than 1<<30\n");
++
++	if (data->ioc_inllen2 > maxlen)
+ 		return true;
+-	}
++
+ 	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
+ 		CERROR("LIBCFS ioctl: inlbuf1 pointer but 0 length\n");
+ 		return true;
 -- 
 1.8.3.1
