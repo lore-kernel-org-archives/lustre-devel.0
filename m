@@ -1,221 +1,242 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:41 -0400
-Subject: [lustre-devel] [PATCH 04/45] lnet: merge lnet_md_alloc into
- lnet_md_build.
+Date: Mon, 25 May 2020 18:07:50 -0400
+Subject: [lustre-devel] [PATCH 13/45] lnet: Introduce constant for the lolnd
+ NID
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-14-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Chris Horn <hornc@cray.com>
 
-lnet_md_alloc is only called twice, each time immediately before a
-call to lnet_md_build(), and these are the only calls to
-lnet_md_build().
+This patch adds a new constant, LNET_NID_LO_0, to represent the lolnd
+NID 0 at lo.
 
-So simplify the code by merging lnet_md_alloc into lnet_md_build.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
-Lustre-commit: c0598f15dd502 ("LU-13004 lnet: merge lnet_md_alloc into lnet_md_build.")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/37841
+HPE-bug-id: LUS-8457
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12222
+Lustre-commit: 56203e4ba0a6 ("LU-12222 lnet: Introduce constant for the lolnd NID")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/38312
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h | 39 ----------------------
- net/lnet/lnet/lib-md.c        | 75 +++++++++++++++++++++++++++++--------------
- 2 files changed, 51 insertions(+), 63 deletions(-)
+ fs/lustre/llite/llite_lib.c          | 2 +-
+ fs/lustre/lmv/lmv_obd.c              | 4 ++--
+ fs/lustre/ptlrpc/events.c            | 2 +-
+ include/uapi/linux/lnet/lnet-types.h | 3 +++
+ net/lnet/lnet/api-ni.c               | 6 +++---
+ net/lnet/lnet/config.c               | 3 +--
+ net/lnet/lnet/lib-move.c             | 6 +++---
+ net/lnet/lnet/lib-msg.c              | 5 ++---
+ net/lnet/lnet/peer.c                 | 6 +++---
+ net/lnet/lnet/router.c               | 2 +-
+ 10 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index d64c9bf..66e01a0 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -215,45 +215,6 @@ static inline int lnet_md_unlinkable(struct lnet_libmd *md)
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 84ec734..83b95ce 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -2817,7 +2817,7 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 		i = 0;
  
- #define MAX_PORTALS		64
- 
--static inline struct lnet_libmd *
--lnet_md_alloc(struct lnet_md *umd)
--{
--	struct lnet_libmd *md;
--	unsigned int size;
--	unsigned int niov;
--
--	if (umd->options & LNET_MD_KIOV) {
--		niov = umd->length;
--		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
--	} else {
--		niov = 1;
--		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
--	}
--
--	if (size <= LNET_SMALL_MD_SIZE) {
--		md = kmem_cache_alloc(lnet_small_mds_cachep,
--				      GFP_NOFS | __GFP_ZERO);
--		if (md) {
--			CDEBUG(D_MALLOC,
--			       "slab-alloced 'md' of size %u@%p.\n",
--			       size, md);
--		} else {
--			CDEBUG(D_MALLOC, "failed to allocate 'md' of size %u\n",
--			       size);
--		}
--	} else {
--		md = kzalloc(size, GFP_NOFS);
--	}
--	if (md) {
--		/* Set here in case of early free */
--		md->md_options = umd->options;
--		md->md_niov = niov;
--		INIT_LIST_HEAD(&md->md_list);
--	}
--
--	return md;
--}
--
- struct lnet_libhandle *lnet_res_lh_lookup(struct lnet_res_container *rec,
- 					  u64 cookie);
- void lnet_res_lh_initialize(struct lnet_res_container *rec,
-diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
-index d745b91..a9a83c3 100644
---- a/net/lnet/lnet/lib-md.c
-+++ b/net/lnet/lnet/lib-md.c
-@@ -164,12 +164,42 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	return cpt;
- }
- 
--static int
--lnet_md_build(struct lnet_libmd *lmd, struct lnet_md *umd, int unlink)
-+static struct lnet_libmd *
-+lnet_md_build(struct lnet_md *umd, int unlink)
- {
- 	int i;
- 	unsigned int niov;
- 	int total_length = 0;
-+	struct lnet_libmd *lmd;
-+	unsigned int size;
-+
-+	if ((umd->options & LNET_MD_KIOV) != 0) {
-+		niov = umd->length;
-+		size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
-+	} else {
-+		niov = 1;
-+		size = offsetof(struct lnet_libmd, md_iov.iov[niov]);
-+	}
-+
-+	if (size <= LNET_SMALL_MD_SIZE) {
-+		lmd = kmem_cache_zalloc(lnet_small_mds_cachep, GFP_NOFS);
-+		if (lmd) {
-+			CDEBUG(D_MALLOC,
-+			       "slab-alloced 'md' of size %u@%p.\n",
-+			       size, lmd);
-+		} else {
-+			CDEBUG(D_MALLOC, "failed to allocate 'md' of size %u\n",
-+			       size);
-+		}
-+	} else {
-+		lmd = kzalloc(size, GFP_NOFS);
-+	}
-+
-+	if (!lmd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	lmd->md_niov = niov;
-+	INIT_LIST_HEAD(&lmd->md_list);
- 
- 	lmd->md_me = NULL;
- 	lmd->md_start = umd->start;
-@@ -192,8 +222,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 		for (i = 0; i < (int)niov; i++) {
- 			/* We take the page pointer on trust */
- 			if (lmd->md_iov.kiov[i].bv_offset +
--			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE)
--				return -EINVAL; /* invalid length */
-+			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
-+				lnet_md_free(lmd);
-+				return ERR_PTR(-EINVAL); /* invalid length */
-+			}
- 
- 			total_length += lmd->md_iov.kiov[i].bv_len;
+ 		while (LNetGetId(i++, &id) != -ENOENT) {
+-			if (LNET_NETTYP(LNET_NIDNET(id.nid)) == LOLND)
++			if (id.nid == LNET_NID_LO_0)
+ 				continue;
+ 			if (cfs_match_nid(id.nid, &squash->rsi_nosquash_nids)) {
+ 				matched = true;
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 83e38bf..f241269 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -1114,7 +1114,7 @@ static int lmv_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	 * can distribute subdirs evenly from the beginning.
+ 	 */
+ 	while (LNetGetId(i++, &lnet_id) != -ENOENT) {
+-		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
++		if (lnet_id.nid != LNET_NID_LO_0) {
+ 			lmv->lmv_qos_rr_index = (u32)lnet_id.nid;
+ 			break;
  		}
-@@ -202,8 +234,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+@@ -1208,7 +1208,7 @@ static int lmv_select_statfs_mdt(struct lmv_obd *lmv, u32 flags)
+ 		if (LNetGetId(i, &lnet_id) == -ENOENT)
+ 			break;
  
- 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
--		     umd->max_size > total_length)) /* illegal max_size */
--			return -EINVAL;
-+		     umd->max_size > total_length)) { /* illegal max_size */
-+			lnet_md_free(lmd);
-+			return ERR_PTR(-EINVAL);
-+		}
- 	} else {   /* contiguous */
- 		lmd->md_length = umd->length;
- 		niov = 1;
-@@ -213,11 +247,13 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+-		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
++		if (lnet_id.nid != LNET_NID_LO_0) {
+ 			/* We dont need a full 64-bit modulus, just enough
+ 			 * to distribute the requests across MDTs evenly.
+ 			 */
+diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
+index bc2af35..5e3787c 100644
+--- a/fs/lustre/ptlrpc/events.c
++++ b/fs/lustre/ptlrpc/events.c
+@@ -478,7 +478,7 @@ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
+ 			continue;
  
- 		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
--		     umd->max_size > (int)umd->length)) /* illegal max_size */
--			return -EINVAL;
-+		     umd->max_size > (int)umd->length)) { /* illegal max_size */
-+			lnet_md_free(lmd);
-+			return ERR_PTR(-EINVAL);
-+		}
- 	}
- 
--	return 0;
-+	return lmd;
+ 		if (dist == 0) {		/* local! use loopback LND */
+-			peer->nid = *self = LNET_MKNID(LNET_MKNET(LOLND, 0), 0);
++			peer->nid = *self = LNET_NID_LO_0;
+ 			rc = 0;
+ 			break;
+ 		}
+diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
+index 1ef1e98..947ed7f 100644
+--- a/include/uapi/linux/lnet/lnet-types.h
++++ b/include/uapi/linux/lnet/lnet-types.h
+@@ -109,6 +109,9 @@ static inline __u32 LNET_MKNET(__u32 type, __u32 num)
+ 	return (type << 16) | num;
  }
  
- /* must be called with resource lock held */
-@@ -326,13 +362,9 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 		return -EINVAL;
- 	}
- 
--	md = lnet_md_alloc(&umd);
--	if (!md)
--		return -ENOMEM;
--
--	rc = lnet_md_build(md, &umd, unlink);
--	if (rc)
--		goto out_free;
-+	md = lnet_md_build(&umd, unlink);
-+	if (IS_ERR(md))
-+		return PTR_ERR(md);
- 
- 	cpt = me->me_cpt;
- 
-@@ -363,7 +395,6 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 
- out_unlock:
- 	lnet_res_unlock(cpt);
--out_free:
- 	kfree(md);
- 	return rc;
++/** The lolnd NID (i.e. myself) */
++#define LNET_NID_LO_0 LNET_MKNID(LNET_MKNET(LOLND, 0), 0)
++
+ /* Packed version of lnet_process_id to transfer via network */
+ struct lnet_process_id_packed {
+ 	/* node id / process id */
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index b3e1fe9..b0f2a62 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -1567,7 +1567,7 @@ struct lnet_ping_buffer *
+ 	/* Loopback is guaranteed to be present */
+ 	if (pinfo->pi_nnis < 1 || pinfo->pi_nnis > lnet_interfaces_max)
+ 		return -ERANGE;
+-	if (LNET_NETTYP(LNET_NIDNET(LNET_PING_INFO_LONI(pinfo))) != LOLND)
++	if (LNET_PING_INFO_LONI(pinfo) != LNET_NID_LO_0)
+ 		return -EPROTO;
+ 	return 0;
  }
-@@ -403,13 +434,9 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 		return -EINVAL;
+@@ -2732,7 +2732,7 @@ void lnet_lib_exit(void)
  	}
  
--	md = lnet_md_alloc(&umd);
--	if (!md)
--		return -ENOMEM;
--
--	rc = lnet_md_build(md, &umd, unlink);
--	if (rc)
--		goto out_free;
-+	md = lnet_md_build(&umd, unlink);
-+	if (IS_ERR(md))
-+		return PTR_ERR(md);
+ 	cfg_ni->lic_nid = ni->ni_nid;
+-	if (LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND)
++	if (ni->ni_nid == LNET_NID_LO_0)
+ 		cfg_ni->lic_status = LNET_NI_STATUS_UP;
+ 	else
+ 		cfg_ni->lic_status = ni->ni_status->ns_status;
+@@ -2824,7 +2824,7 @@ void lnet_lib_exit(void)
+ 	config->cfg_config_u.cfg_net.net_peer_rtr_credits =
+ 		ni->ni_net->net_tunables.lct_peer_rtr_credits;
  
- 	if (md->md_length > LNET_MTU) {
- 		CERROR("Invalid length: too big transfer size %u, %d max\n",
+-	if (LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND)
++	if (ni->ni_nid == LNET_NID_LO_0)
+ 		net_config->ni_status = LNET_NI_STATUS_UP;
+ 	else
+ 		net_config->ni_status = ni->ni_status->ns_status;
+diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
+index 9d3813c..d120dab 100644
+--- a/net/lnet/lnet/config.c
++++ b/net/lnet/lnet/config.c
+@@ -1179,8 +1179,7 @@ struct lnet_ni *
+ 					goto token_error;
+ 
+ 				nid = libcfs_str2nid(ltb->ltb_text);
+-				if (nid == LNET_NID_ANY ||
+-				    LNET_NETTYP(LNET_NIDNET(nid)) == LOLND)
++				if (nid == LNET_NID_ANY || nid == LNET_NID_LO_0)
+ 					goto token_error;
+ 			}
+ 		}
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 6ef9978..4eaaa5f 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -563,7 +563,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	int rc;
+ 
+ 	LASSERT(!in_interrupt());
+-	LASSERT(LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND ||
++	LASSERT(ni->ni_nid == LNET_NID_LO_0 ||
+ 		(msg->msg_txcredit && msg->msg_peertxcredit));
+ 
+ 	rc = ni->ni_net->net_lnd->lnd_send(ni, priv, msg);
+@@ -2407,7 +2407,7 @@ struct lnet_ni *
+ 	 */
+ 	send_data.sd_msg = msg;
+ 	send_data.sd_cpt = cpt;
+-	if (LNET_NETTYP(LNET_NIDNET(dst_nid)) == LOLND) {
++	if (dst_nid == LNET_NID_LO_0) {
+ 		rc = lnet_handle_lo_send(&send_data);
+ 		lnet_net_unlock(cpt);
+ 		return rc;
+@@ -4793,7 +4793,7 @@ struct lnet_msg *
+ 			if (srcnidp)
+ 				*srcnidp = dstnid;
+ 			if (orderp) {
+-				if (LNET_NETTYP(LNET_NIDNET(dstnid)) == LOLND)
++				if (dstnid == LNET_NID_LO_0)
+ 					*orderp = 0;
+ 				else
+ 					*orderp = 1;
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index dbb218d..7ce9c47 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -784,11 +784,10 @@
+ 	/* if we're sending to the LOLND then the msg_txpeer will not be
+ 	 * set. So no need to sanity check it.
+ 	 */
+-	if (msg->msg_tx_committed &&
+-	    LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) != LOLND)
++	if (msg->msg_tx_committed && msg->msg_txni->ni_nid != LNET_NID_LO_0)
+ 		LASSERT(msg->msg_txpeer);
+ 	else if (msg->msg_tx_committed &&
+-		 LNET_NETTYP(LNET_NIDNET(msg->msg_txni->ni_nid)) == LOLND)
++		 msg->msg_txni->ni_nid == LNET_NID_LO_0)
+ 		lo = true;
+ 
+ 	if (hstatus != LNET_MSG_STATUS_OK &&
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 1605c24..1b9190b 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -233,7 +233,7 @@
+ 	 * to ever use a different interface when sending messages to
+ 	 * myself.
+ 	 */
+-	if (LNET_NETTYP(LNET_NIDNET(nid)) == LOLND)
++	if (nid == LNET_NID_LO_0)
+ 		lp->lp_state = LNET_PEER_NO_DISCOVERY;
+ 	lp->lp_cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
+ 
+@@ -2615,7 +2615,7 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
+ 	 * present in curnis[] then this peer is for this node.
+ 	 */
+ 	for (i = 0; i < ncurnis; i++) {
+-		if (LNET_NETTYP(LNET_NIDNET(curnis[i])) == LOLND)
++		if (curnis[i] == LNET_NID_LO_0)
+ 			continue;
+ 		for (j = 1; j < pbuf->pb_info.pi_nnis; j++) {
+ 			if (curnis[i] == pbuf->pb_info.pi_ni[j].ns_nid) {
+@@ -2838,7 +2838,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
+ 	if (pbuf->pb_info.pi_nnis <= 1)
+ 		goto out;
+ 	nid = pbuf->pb_info.pi_ni[1].ns_nid;
+-	if (LNET_NETTYP(LNET_NIDNET(lp->lp_primary_nid)) == LOLND) {
++	if (lp->lp_primary_nid == LNET_NID_LO_0) {
+ 		rc = lnet_peer_set_primary_nid(lp, nid, flags);
+ 		if (!rc)
+ 			rc = lnet_peer_merge_data(lp, pbuf);
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index ff0a665..af50e51 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -661,7 +661,7 @@ static void lnet_shuffle_seed(void)
+ 	       libcfs_net2str(net), hops, priority, libcfs_nid2str(gateway));
+ 
+ 	if (gateway == LNET_NID_ANY ||
+-	    LNET_NETTYP(LNET_NIDNET(gateway)) == LOLND ||
++	    gateway == LNET_NID_LO_0 ||
+ 	    net == LNET_NIDNET(LNET_NID_ANY) ||
+ 	    LNET_NETTYP(net) == LOLND ||
+ 	    LNET_NIDNET(gateway) == net ||
 -- 
 1.8.3.1
