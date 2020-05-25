@@ -1,254 +1,174 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:07:43 -0400
-Subject: [lustre-devel] [PATCH 06/45] lnet: discard kvec option from
- lnet_libmd.
+Date: Mon, 25 May 2020 18:07:47 -0400
+Subject: [lustre-devel] [PATCH 10/45] lustre: sec: check permissions for
+ changelogs access
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-The 'struct kvec' field in 'struct lnet_libmd' is no longer set - the
-memory is always presented as pages.  So remove that option and the
-union that contained iov and kiov.
+root permissions should be checked when reading or clearing changelogs
+from clients. In particular, if root is squashed via a nodemap entry,
+it should not be allowed to access changelogs.
+To achieve this send mdt body along with RQF_LLOG_ORIGIN_HANDLE_CREATE
+and RQF_MDT_SET_INFO requests. And on server side, retrieve user
+credentials and make sure they have root permission.
 
-Rename md_iov.kiov to md_kiov.
-Discard all code that made use of md_iov.iov.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13004
-Lustre-commit: 4775d52439f4f ("LU-13004 lnet: discard kvec option from lnet_libmd.")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/37843
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13064
+Lustre-commit: 4e8fcee92d751 ("LU-13064 sec: check permissions for changelogs access")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/36990
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Emoly Liu <emoly@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h       |  7 +---
- include/linux/lnet/lib-types.h      |  5 +--
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 14 ++-----
- net/lnet/lnet/lib-md.c              | 79 +++++++++----------------------------
- net/lnet/lnet/lib-move.c            |  5 +--
- 5 files changed, 27 insertions(+), 83 deletions(-)
+ fs/lustre/include/lustre_req_layout.h |  1 +
+ fs/lustre/ptlrpc/layout.c             | 15 ++++++++++++++-
+ fs/lustre/ptlrpc/llog_client.c        |  4 ++++
+ fs/lustre/ptlrpc/pack_generic.c       |  7 ++++++-
+ fs/lustre/ptlrpc/ptlrpc_internal.h    | 19 +++++++++++++++++++
+ 5 files changed, 44 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 66e01a0..03ac3f9 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -89,7 +89,7 @@
+diff --git a/fs/lustre/include/lustre_req_layout.h b/fs/lustre/include/lustre_req_layout.h
+index ea6baef..f56dc8b 100644
+--- a/fs/lustre/include/lustre_req_layout.h
++++ b/fs/lustre/include/lustre_req_layout.h
+@@ -123,6 +123,7 @@ void req_capsule_shrink(struct req_capsule *pill,
  
- bool lnet_is_route_alive(struct lnet_route *route);
- 
--#define LNET_SMALL_MD_SIZE	offsetof(struct lnet_libmd, md_iov.iov[1])
-+#define LNET_SMALL_MD_SIZE	offsetof(struct lnet_libmd, md_kiov[1])
- extern struct kmem_cache *lnet_mes_cachep;	 /* MEs kmem_cache */
- extern struct kmem_cache *lnet_small_mds_cachep; /* <= LNET_SMALL_MD_SIZE bytes
- 						  * MDs kmem_cache
-@@ -165,10 +165,7 @@ static inline int lnet_md_unlinkable(struct lnet_libmd *md)
- 
- 	LASSERTF(md->md_rspt_ptr == NULL, "md %p rsp %p\n", md, md->md_rspt_ptr);
- 
--	if ((md->md_options & LNET_MD_KIOV) != 0)
--		size = offsetof(struct lnet_libmd, md_iov.kiov[md->md_niov]);
--	else
--		size = offsetof(struct lnet_libmd, md_iov.iov[md->md_niov]);
-+	size = offsetof(struct lnet_libmd, md_kiov[md->md_niov]);
- 
- 	if (size <= LNET_SMALL_MD_SIZE) {
- 		CDEBUG(D_MALLOC, "slab-freed 'md'@%p.\n", md);
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 0629f20..9a11aa5 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -208,10 +208,7 @@ struct lnet_libmd {
- 	struct lnet_rsp_tracker	*md_rspt_ptr;
- 	lnet_handler_t		 md_handler;
- 	struct lnet_handle_md	 md_bulk_handle;
--	union {
--		struct kvec	iov[LNET_MAX_IOV];
--		struct bio_vec	kiov[LNET_MAX_IOV];
--	} md_iov;
-+	struct bio_vec		 md_kiov[LNET_MAX_IOV];
+ extern struct req_format RQF_OBD_PING;
+ extern struct req_format RQF_OBD_SET_INFO;
++extern struct req_format RQF_MDT_SET_INFO;
+ extern struct req_format RQF_SEC_CTX;
+ /* MGS req_format */
+ extern struct req_format RQF_MGS_TARGET_REG;
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index 6f849f0..fd8676d 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -348,6 +348,13 @@
+ 	&RMF_SETINFO_VAL
  };
  
- #define LNET_MD_FLAG_ZOMBIE		BIT(0)
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 087657c..7f782fb 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1626,16 +1626,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
++static const struct req_msg_field *mdt_set_info_client[] = {
++	&RMF_PTLRPC_BODY,
++	&RMF_SETINFO_KEY,
++	&RMF_SETINFO_VAL,
++	&RMF_MDT_BODY
++};
++
+ static const struct req_msg_field *ost_grant_shrink_client[] = {
+ 	&RMF_PTLRPC_BODY,
+ 	&RMF_SETINFO_KEY,
+@@ -549,7 +556,8 @@
+ static const struct req_msg_field *llog_origin_handle_create_client[] = {
+ 	&RMF_PTLRPC_BODY,
+ 	&RMF_LLOGD_BODY,
+-	&RMF_NAME
++	&RMF_NAME,
++	&RMF_MDT_BODY,
+ };
  
- 		ibmsg = tx->tx_msg;
- 		rd = &ibmsg->ibm_u.get.ibgm_rd;
--		if (!(lntmsg->msg_md->md_options & LNET_MD_KIOV))
--			rc = kiblnd_setup_rd_iov(ni, tx, rd,
--						 lntmsg->msg_md->md_niov,
--						 lntmsg->msg_md->md_iov.iov,
--						 0, lntmsg->msg_md->md_length);
--		else
--			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
--						  lntmsg->msg_md->md_niov,
--						  lntmsg->msg_md->md_iov.kiov,
--						  0, lntmsg->msg_md->md_length);
-+		rc = kiblnd_setup_rd_kiov(ni, tx, rd,
-+					  lntmsg->msg_md->md_niov,
-+					  lntmsg->msg_md->md_kiov,
-+					  0, lntmsg->msg_md->md_length);
- 		if (rc) {
- 			CERROR("Can't setup GET sink for %s: %d\n",
- 			       libcfs_nid2str(target.nid), rc);
-diff --git a/net/lnet/lnet/lib-md.c b/net/lnet/lnet/lib-md.c
-index e1b8a06..cfa285a 100644
---- a/net/lnet/lnet/lib-md.c
-+++ b/net/lnet/lnet/lib-md.c
-@@ -91,6 +91,7 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- {
- 	int cpt = CFS_CPT_ANY;
- 	unsigned int niov;
-+	struct bio_vec *kiov;
+ static const struct req_msg_field *llogd_body_only[] = {
+@@ -698,6 +706,7 @@
+ static struct req_format *req_formats[] = {
+ 	&RQF_OBD_PING,
+ 	&RQF_OBD_SET_INFO,
++	&RQF_MDT_SET_INFO,
+ 	&RQF_SEC_CTX,
+ 	&RQF_MGS_TARGET_REG,
+ 	&RQF_MGS_CONFIG_READ,
+@@ -1238,6 +1247,10 @@ struct req_format RQF_OBD_SET_INFO =
+ 	DEFINE_REQ_FMT0("OBD_SET_INFO", obd_set_info_client, empty);
+ EXPORT_SYMBOL(RQF_OBD_SET_INFO);
  
- 	/*
- 	 * if the md_options has a bulk handle then we want to look at the
-@@ -103,63 +104,21 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	if (!md || md->md_niov == 0)
- 		return CFS_CPT_ANY;
++struct req_format RQF_MDT_SET_INFO =
++	DEFINE_REQ_FMT0("MDT_SET_INFO", mdt_set_info_client, empty);
++EXPORT_SYMBOL(RQF_MDT_SET_INFO);
++
+ struct req_format RQF_SEC_CTX =
+ 	DEFINE_REQ_FMT0("SEC_CTX", empty, empty);
+ EXPORT_SYMBOL(RQF_SEC_CTX);
+diff --git a/fs/lustre/ptlrpc/llog_client.c b/fs/lustre/ptlrpc/llog_client.c
+index ff1ca36..aeefa8f 100644
+--- a/fs/lustre/ptlrpc/llog_client.c
++++ b/fs/lustre/ptlrpc/llog_client.c
+@@ -44,6 +44,8 @@
+ #include <lustre_net.h>
+ #include <linux/list.h>
  
-+	kiov = md->md_kiov;
- 	niov = md->md_niov;
- 
--	/*
--	 * There are three cases to handle:
--	 *  1. The MD is using lnet_kiov_t
--	 *  2. The MD is using struct kvec
--	 *  3. Contiguous buffer allocated via vmalloc
--	 *
--	 *  in case 2 we can use virt_to_page() macro to get the page
--	 *  address of the memory kvec describes.
--	 *
--	 *  in case 3 use is_vmalloc_addr() and vmalloc_to_page()
--	 *
--	 * The offset provided can be within the first iov/kiov entry or
--	 * it could go beyond it. In that case we need to make sure to
--	 * look at the page which actually contains the data that will be
--	 * DMAed.
--	 */
--	if ((md->md_options & LNET_MD_KIOV) != 0) {
--		struct bio_vec *kiov = md->md_iov.kiov;
--
--		while (offset >= kiov->bv_len) {
--			offset -= kiov->bv_len;
--			niov--;
--			kiov++;
--			if (niov == 0) {
--				CERROR("offset %d goes beyond kiov\n", offset);
--				goto out;
--			}
--		}
--
--		cpt = cfs_cpt_of_node(lnet_cpt_table(),
--				      page_to_nid(kiov->bv_page));
--	} else {
--		struct kvec *iov = md->md_iov.iov;
--		unsigned long vaddr;
--		struct page *page;
--
--		while (offset >= iov->iov_len) {
--			offset -= iov->iov_len;
--			niov--;
--			iov++;
--			if (niov == 0) {
--				CERROR("offset %d goes beyond iov\n", offset);
--				goto out;
--			}
--		}
--
--		vaddr = ((unsigned long)iov->iov_base) + offset;
--		page = lnet_kvaddr_to_page(vaddr);
--		if (!page) {
--			CERROR("Couldn't resolve vaddr 0x%lx to page\n", vaddr);
-+	while (offset >= kiov->bv_len) {
-+		offset -= kiov->bv_len;
-+		niov--;
-+		kiov++;
-+		if (niov == 0) {
-+			CERROR("offset %d goes beyond iov\n", offset);
- 			goto out;
- 		}
--		cpt = cfs_cpt_of_node(lnet_cpt_table(), page_to_nid(page));
++#include "ptlrpc_internal.h"
++
+ #define LLOG_CLIENT_ENTRY(ctxt, imp) do {				\
+ 	mutex_lock(&ctxt->loc_mutex);					\
+ 	if (ctxt->loc_imp) {						\
+@@ -120,6 +122,8 @@ static int llog_client_open(const struct lu_env *env,
+ 						   strlen(name) + 1);
+ 		LASSERT(tmp);
+ 		strcpy(tmp, name);
++
++		do_pack_body(req);
  	}
  
-+	cpt = cfs_cpt_of_node(lnet_cpt_table(),
-+			      page_to_nid(kiov->bv_page));
- out:
- 	return cpt;
- }
-@@ -178,7 +137,7 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	else
- 		niov = DIV_ROUND_UP(offset_in_page(umd->start) + umd->length,
- 				    PAGE_SIZE);
--	size = offsetof(struct lnet_libmd, md_iov.kiov[niov]);
-+	size = offsetof(struct lnet_libmd, md_kiov[niov]);
+ 	rc = ptlrpc_queue_wait(req);
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index dfde8cc..ec853d1 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -1506,7 +1506,9 @@ int do_set_info_async(struct obd_import *imp,
+ 	char *tmp;
+ 	int rc;
  
- 	if (size <= LNET_SMALL_MD_SIZE) {
- 		lmd = kmem_cache_zalloc(lnet_small_mds_cachep, GFP_NOFS);
-@@ -214,18 +173,18 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 	if (umd->options & LNET_MD_KIOV) {
- 		niov = umd->length;
- 		lmd->md_niov = umd->length;
--		memcpy(lmd->md_iov.kiov, umd->start,
--		       niov * sizeof(lmd->md_iov.kiov[0]));
-+		memcpy(lmd->md_kiov, umd->start,
-+		       niov * sizeof(lmd->md_kiov[0]));
+-	req = ptlrpc_request_alloc(imp, &RQF_OBD_SET_INFO);
++	req = ptlrpc_request_alloc(imp, KEY_IS(KEY_CHANGELOG_CLEAR) ?
++					&RQF_MDT_SET_INFO :
++					&RQF_OBD_SET_INFO);
+ 	if (!req)
+ 		return -ENOMEM;
  
- 		for (i = 0; i < (int)niov; i++) {
- 			/* We take the page pointer on trust */
--			if (lmd->md_iov.kiov[i].bv_offset +
--			    lmd->md_iov.kiov[i].bv_len > PAGE_SIZE) {
-+			if (lmd->md_kiov[i].bv_offset +
-+			    lmd->md_kiov[i].bv_len > PAGE_SIZE) {
- 				lnet_md_free(lmd);
- 				return ERR_PTR(-EINVAL); /* invalid length */
- 			}
+@@ -1520,6 +1522,9 @@ int do_set_info_async(struct obd_import *imp,
+ 		return rc;
+ 	}
  
--			total_length += lmd->md_iov.kiov[i].bv_len;
-+			total_length += lmd->md_kiov[i].bv_len;
- 		}
- 
- 		lmd->md_length = total_length;
-@@ -247,10 +206,10 @@ int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
- 
- 			plen = min_t(int, len, PAGE_SIZE - offset_in_page(pa));
- 
--			lmd->md_iov.kiov[i].bv_page =
-+			lmd->md_kiov[i].bv_page =
- 				lnet_kvaddr_to_page((unsigned long) pa);
--			lmd->md_iov.kiov[i].bv_offset = offset_in_page(pa);
--			lmd->md_iov.kiov[i].bv_len = plen;
-+			lmd->md_kiov[i].bv_offset = offset_in_page(pa);
-+			lmd->md_kiov[i].bv_len = plen;
- 
- 			len -= plen;
- 			pa += plen;
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 9f815c1..dc49e60 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -538,10 +538,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	LASSERT(!msg->msg_kiov);
- 
- 	msg->msg_niov = md->md_niov;
--	if (md->md_options & LNET_MD_KIOV)
--		msg->msg_kiov = md->md_iov.kiov;
--	else
--		msg->msg_iov = md->md_iov.iov;
-+	msg->msg_kiov = md->md_kiov;
++	if (KEY_IS(KEY_CHANGELOG_CLEAR))
++		do_pack_body(req);
++
+ 	tmp = req_capsule_client_get(&req->rq_pill, &RMF_SETINFO_KEY);
+ 	memcpy(tmp, key, keylen);
+ 	tmp = req_capsule_client_get(&req->rq_pill, &RMF_SETINFO_VAL);
+diff --git a/fs/lustre/ptlrpc/ptlrpc_internal.h b/fs/lustre/ptlrpc/ptlrpc_internal.h
+index b340de7..83995cc 100644
+--- a/fs/lustre/ptlrpc/ptlrpc_internal.h
++++ b/fs/lustre/ptlrpc/ptlrpc_internal.h
+@@ -377,4 +377,23 @@ static inline bool ptlrpc_req_is_disconnect(struct ptlrpc_request *req)
+ 		return false;
  }
  
- void
++static inline void do_pack_body(struct ptlrpc_request *req)
++{
++	struct mdt_body *b = req_capsule_client_get(&req->rq_pill,
++						    &RMF_MDT_BODY);
++
++	if (!b)
++		return;
++
++	b->mbo_valid = 0;
++	b->mbo_eadatasize = 0;
++	b->mbo_flags = 0;
++	b->mbo_suppgid = -1;
++	b->mbo_uid = from_kuid(&init_user_ns, current_uid());
++	b->mbo_gid = from_kgid(&init_user_ns, current_gid());
++	b->mbo_fsuid = from_kuid(&init_user_ns, current_fsuid());
++	b->mbo_fsgid = from_kgid(&init_user_ns, current_fsgid());
++	b->mbo_capability = current_cap().cap[0];
++}
++
+ #endif /* PTLRPC_INTERNAL_H */
 -- 
 1.8.3.1
