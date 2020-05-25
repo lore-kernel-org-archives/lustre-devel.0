@@ -1,47 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 May 2020 18:08:21 -0400
-Subject: [lustre-devel] [PATCH 44/45] lustre: dne: improve temp file name
- check
+Date: Mon, 25 May 2020 18:07:52 -0400
+Subject: [lustre-devel] [PATCH 15/45] lustre: mgc: protect from NULL exp in
+ mgc_enqueue()
 In-Reply-To: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
 References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1590444502-20533-45-git-send-email-jsimmons@infradead.org>
+Message-ID: <1590444502-20533-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-Previously if all but two characters in file name suffix are digit,
-it's not treated as temp file, as is too strict if suffix length is
-short, e.g. 6. Change it to allow one character, and this non-digit
-character should not be the starting character.
+Return an error in mgc_enqueue() is exp parameter is NULL.
+Otherwise, it might crash in class_exp2cliimp().
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13481
-Lustre-commit: 51e5749683838 ("LU-13481 dne: improve temp file name check")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38539
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13466
+Lustre-commit: 83906f97c1d3b ("LU-13466 mgc: protect from NULL exp in mgc_enqueue()")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/38280
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lu_object.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ fs/lustre/mgc/mgc_request.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
-index 718fdb8..6886177 100644
---- a/fs/lustre/include/lu_object.h
-+++ b/fs/lustre/include/lu_object.h
-@@ -1309,7 +1309,8 @@ static inline bool lu_name_is_temp_file(const char *name, int namelen,
- 	 * About 0.07% of randomly-generated names will slip through,
- 	 * but this avoids 99.93% of cross-MDT renames for those files.
- 	 */
--	if (digit >= suffixlen - 2 || upper == suffixlen || lower == suffixlen)
-+	if ((digit >= suffixlen - 1 && !isdigit(name[namelen - suffixlen])) ||
-+	    upper == suffixlen || lower == suffixlen)
- 		return false;
+diff --git a/fs/lustre/mgc/mgc_request.c b/fs/lustre/mgc/mgc_request.c
+index 81f3873..cc3c82e 100644
+--- a/fs/lustre/mgc/mgc_request.c
++++ b/fs/lustre/mgc/mgc_request.c
+@@ -875,6 +875,9 @@ static int mgc_enqueue(struct obd_export *exp, u32 type,
+ 	int short_limit = cld_is_sptlrpc(cld);
+ 	int rc;
  
- 	return true;
++	if (!exp)
++		return -EBADR;
++
+ 	CDEBUG(D_MGC, "Enqueue for %s (res %#llx)\n", cld->cld_logname,
+ 	       cld->cld_resid.name[0]);
+ 
 -- 
 1.8.3.1
