@@ -1,50 +1,61 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:54 -0400
-Subject: [lustre-devel] [PATCH 15/22] lnet: set route aliveness properly
+Date: Tue,  2 Jun 2020 20:59:56 -0400
+Subject: [lustre-devel] [PATCH 17/22] lnet: Add lnet_lnd_timeout to sysfs
 In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
 References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1591146001-27171-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Chris Horn <hornc@cray.com>
 
-In the case when the discover is toggled from on to off, the route
-aliveness might become stale due to not updating the route->lr_alive
-variable correctly. It will get updated once the gateway is pinged.
-However, there is a period of max alive_router_check_interval where
-the route can be down.
+Allow lnet_lnd_timeout to be read (only) from sysfs.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13472
-Lustre-commit: eee4358d9d467 ("LU-13472 lnet: set route aliveness properly")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38323
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13510
+Lustre-commit: 17802b329cdea ("LU-13510 lnet: Add lnet_lnd_timeout to sysfs")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/38482
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/router.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ include/linux/lnet/lib-lnet.h | 1 +
+ net/lnet/lnet/router_proc.c   | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index 903d027..c0578d9 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -513,8 +513,10 @@ bool lnet_is_route_alive(struct lnet_route *route)
- 		 * on the gateway we assume this is intentional and we mark the
- 		 * gateway as multi-hop
- 		 */
--		list_for_each_entry(route, &lp->lp_routes, lr_gwlist)
-+		list_for_each_entry(route, &lp->lp_routes, lr_gwlist) {
-+			lnet_set_route_aliveness(route, true);
- 			lnet_set_route_hop_type(lp, route);
-+		}
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index a7825f9..def0923 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -417,6 +417,7 @@ struct lnet_ni *
  
- 		return;
+ extern unsigned int lnet_transaction_timeout;
+ extern unsigned int lnet_retry_count;
++extern unsigned int lnet_lnd_timeout;
+ extern unsigned int lnet_numa_range;
+ extern unsigned int lnet_health_sensitivity;
+ extern unsigned int lnet_recovery_interval;
+diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
+index 180bbde..7fe8d33 100644
+--- a/net/lnet/lnet/router_proc.c
++++ b/net/lnet/lnet/router_proc.c
+@@ -881,6 +881,13 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+ 		.proc_handler	= &proc_lnet_portal_rotor,
+ 	},
+ 	{
++		.procname	= "lnet_lnd_timeout",
++		.data		= &lnet_lnd_timeout,
++		.maxlen		= sizeof(lnet_lnd_timeout),
++		.mode		= 0444,
++		.proc_handler	= &proc_dointvec,
++	},
++	{
  	}
+ };
+ 
 -- 
 1.8.3.1
