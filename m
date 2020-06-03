@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:58 -0400
-Subject: [lustre-devel] [PATCH 19/22] lnet: lnd: Allow independent socklnd
- timeout
+Date: Tue,  2 Jun 2020 20:59:55 -0400
+Subject: [lustre-devel] [PATCH 16/22] lnet: Correct the default LND timeout
 In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
 References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1591146001-27171-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,152 +12,107 @@ To: lustre-devel@lists.lustre.org
 
 From: Chris Horn <hornc@cray.com>
 
-Allow the socklnd timeout to be set independent of
-lnet_transaction_timeout and retry_count.
+Default LND timeout is currently too low. To allow for
+lnet_retry_count resend attempts within a single
+lnet_transaction_timeout window, the LND timeout needs to be less
+than lnet_transaction_timeout / lnet_retry_count. If the retry
+count is 0, we still want LND timeout to be less than the LNet
+transaction timeout.
+
+Also, be sure to update the LND timeout when health is toggled on or
+off.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-13510
-Lustre-commit: 5c2a1267f9471 ("LU-13510 lnd: Allow independent socklnd timeout")
+Lustre-commit: 0127d64b8cadd ("LU-13510 lnet: Correct the default LND timeout")
 Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/38460
+Reviewed-on: https://review.whamcloud.com/38481
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/socklnd/socklnd.c           |  4 ++--
- net/lnet/klnds/socklnd/socklnd.h           |  7 +++++++
- net/lnet/klnds/socklnd/socklnd_cb.c        | 16 ++++++++--------
- net/lnet/klnds/socklnd/socklnd_modparams.c |  2 +-
- 4 files changed, 18 insertions(+), 11 deletions(-)
+ include/linux/lnet/lib-lnet.h |  1 -
+ net/lnet/lnet/api-ni.c        | 28 +++++++++++++++++++---------
+ 2 files changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index b5d92d3..444b90b 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -1311,7 +1311,7 @@ struct ksock_peer_ni *
- 	/* Set the deadline for the outgoing HELLO to drain */
- 	conn->ksnc_tx_bufnob = sock->sk->sk_wmem_queued;
- 	conn->ksnc_tx_deadline = ktime_get_seconds() +
--				 lnet_get_lnd_timeout();
-+				 ksocknal_timeout();
- 	mb();   /* order with adding to peer_ni's conn list */
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index a4a323c..a7825f9 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -83,7 +83,6 @@
  
- 	list_add(&conn->ksnc_list, &peer_ni->ksnp_conns);
-@@ -1699,7 +1699,7 @@ struct ksock_peer_ni *
- 	switch (conn->ksnc_rx_state) {
- 	case SOCKNAL_RX_LNET_PAYLOAD:
- 		last_rcv = conn->ksnc_rx_deadline -
--			   lnet_get_lnd_timeout();
-+			   ksocknal_timeout();
- 		CERROR("Completing partial receive from %s[%d], ip %pI4h:%d, with error, wanted: %zd, left: %d, last alive is %lld secs ago\n",
- 		       libcfs_id2str(conn->ksnc_peer->ksnp_id), conn->ksnc_type,
- 		       &conn->ksnc_ipaddr, conn->ksnc_port,
-diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
-index 6c77b75..7d49fff 100644
---- a/net/lnet/klnds/socklnd/socklnd.h
-+++ b/net/lnet/klnds/socklnd/socklnd.h
-@@ -610,6 +610,13 @@ struct ksock_proto {
- 		ksocknal_destroy_peer(peer_ni);
- }
+ /* default timeout */
+ #define DEFAULT_PEER_TIMEOUT    180
+-#define LNET_LND_DEFAULT_TIMEOUT 5
  
-+static inline int ksocknal_timeout(void)
+ int choose_ipv4_src(u32 *ret, int interface, u32 dst_ipaddr, struct net *ns);
+ 
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index a966e64..62b4fa7 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -170,7 +170,15 @@ static int recovery_interval_set(const char *val,
+ MODULE_PARM_DESC(lnet_retry_count,
+ 		 "Maximum number of times to retry transmitting a message");
+ 
+-unsigned int lnet_lnd_timeout = LNET_LND_DEFAULT_TIMEOUT;
++#define LNET_LND_TIMEOUT_DEFAULT ((LNET_TRANSACTION_TIMEOUT_HEALTH_DEFAULT - 1) / \
++				  (LNET_RETRY_COUNT_HEALTH_DEFAULT + 1))
++unsigned int lnet_lnd_timeout = LNET_LND_TIMEOUT_DEFAULT;
++static void lnet_set_lnd_timeout(void)
 +{
-+	return *ksocknal_tunables.ksnd_timeout ?
-+		*ksocknal_tunables.ksnd_timeout :
-+		lnet_get_lnd_timeout();
++	lnet_lnd_timeout = (lnet_transaction_timeout - 1) /
++			   (lnet_retry_count + 1);
 +}
 +
- int ksocknal_startup(struct lnet_ni *ni);
- void ksocknal_shutdown(struct lnet_ni *ni);
- int ksocknal_ctl(struct lnet_ni *ni, unsigned int cmd, void *arg);
-diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
-index c03f91c7..2759455 100644
---- a/net/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/net/lnet/klnds/socklnd/socklnd_cb.c
-@@ -218,7 +218,7 @@ struct ksock_tx *
- 			 * something got ACKed
- 			 */
- 			conn->ksnc_tx_deadline = ktime_get_seconds() +
--						 lnet_get_lnd_timeout();
-+						 ksocknal_timeout();
- 			conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
- 			conn->ksnc_tx_bufnob = bufnob;
- 			mb();
-@@ -264,7 +264,7 @@ struct ksock_tx *
+ unsigned int lnet_current_net_count;
  
- 	conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
- 	conn->ksnc_rx_deadline = ktime_get_seconds() +
--				 lnet_get_lnd_timeout();
-+				 ksocknal_timeout();
- 	mb();		/* order with setting rx_started */
- 	conn->ksnc_rx_started = 1;
+ /*
+@@ -220,6 +228,7 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
+ 		lnet_transaction_timeout =
+ 			LNET_TRANSACTION_TIMEOUT_HEALTH_DEFAULT;
+ 		lnet_retry_count = LNET_RETRY_COUNT_HEALTH_DEFAULT;
++		lnet_set_lnd_timeout();
+ 	/* if we're turning off health then use the no health timeout
+ 	 * default.
+ 	 */
+@@ -227,6 +236,7 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
+ 		lnet_transaction_timeout =
+ 			LNET_TRANSACTION_TIMEOUT_NO_HEALTH_DEFAULT;
+ 		lnet_retry_count = 0;
++		lnet_set_lnd_timeout();
+ 	}
  
-@@ -419,7 +419,7 @@ struct ksock_tx *
+ 	*sensitivity = value;
+@@ -385,10 +395,10 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
+ 	}
  
- 	/* ZC_REQ is going to be pinned to the peer_ni */
- 	tx->tx_deadline = ktime_get_seconds() +
--			  lnet_get_lnd_timeout();
-+			  ksocknal_timeout();
+ 	*transaction_to = value;
+-	if (lnet_retry_count == 0)
+-		lnet_lnd_timeout = value;
+-	else
+-		lnet_lnd_timeout = value / lnet_retry_count;
++	/* Update the lnet_lnd_timeout now that we've modified the
++	 * transaction timeout
++	 */
++	lnet_set_lnd_timeout();
  
- 	LASSERT(!tx->tx_msg.ksm_zc_cookies[0]);
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
  
-@@ -711,7 +711,7 @@ struct ksock_conn *
- 	if (list_empty(&conn->ksnc_tx_queue) && !bufnob) {
- 		/* First packet starts the timeout */
- 		conn->ksnc_tx_deadline = ktime_get_seconds() +
--					 lnet_get_lnd_timeout();
-+					 ksocknal_timeout();
- 		if (conn->ksnc_tx_bufnob > 0) /* something got ACKed */
- 			conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
- 		conn->ksnc_tx_bufnob = 0;
-@@ -887,7 +887,7 @@ struct ksock_route *
- 	    ksocknal_find_connecting_route_locked(peer_ni)) {
- 		/* the message is going to be pinned to the peer_ni */
- 		tx->tx_deadline = ktime_get_seconds() +
--				  lnet_get_lnd_timeout();
-+				  ksocknal_timeout();
+@@ -428,10 +438,10 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
  
- 		/* Queue the message until a connection is established */
- 		list_add_tail(&tx->tx_list, &peer_ni->ksnp_tx_queue);
-@@ -1652,7 +1652,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 	/* socket type set on active connections - not set on passive */
- 	LASSERT(!active == !(conn->ksnc_type != SOCKLND_CONN_NONE));
+ 	*retry_count = value;
  
--	timeout = active ? lnet_get_lnd_timeout() :
-+	timeout = active ? ksocknal_timeout() :
- 			    lnet_acceptor_timeout();
+-	if (value == 0)
+-		lnet_lnd_timeout = lnet_transaction_timeout;
+-	else
+-		lnet_lnd_timeout = lnet_transaction_timeout / value;
++	/* Update the lnet_lnd_timeout now that we've modified the
++	 * transaction timeout
++	 */
++	lnet_set_lnd_timeout();
  
- 	rc = lnet_sock_read(sock, &hello->kshm_magic,
-@@ -1790,7 +1790,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 	int retry_later = 0;
- 	int rc = 0;
- 
--	deadline = ktime_get_seconds() + lnet_get_lnd_timeout();
-+	deadline = ktime_get_seconds() + ksocknal_timeout();
- 
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
- 
-@@ -2550,7 +2550,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 			 * timeout interval.
- 			 */
- 
--			lnd_timeout = lnet_get_lnd_timeout();
-+			lnd_timeout = ksocknal_timeout();
- 			if (lnd_timeout > n * p)
- 				chunk = (chunk * n * p) / lnd_timeout;
- 			if (!chunk)
-diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
-index 35b71ba..b511e54 100644
---- a/net/lnet/klnds/socklnd/socklnd_modparams.c
-+++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
-@@ -24,7 +24,7 @@
- #include <asm/hypervisor.h>
- #endif
- 
--static int sock_timeout = 50;
-+static int sock_timeout;
- module_param(sock_timeout, int, 0644);
- MODULE_PARM_DESC(sock_timeout, "dead socket timeout (seconds)");
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
  
 -- 
 1.8.3.1
