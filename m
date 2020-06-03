@@ -1,190 +1,131 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:51 -0400
-Subject: [lustre-devel] [PATCH 12/22] lustre: obdclass: bind zombie export
- cleanup workqueue
+Date: Tue,  2 Jun 2020 20:59:53 -0400
+Subject: [lustre-devel] [PATCH 14/22] lnet: Force full discovery cycle
 In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
 References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1591146001-27171-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lustre uses a workqueue to clear out stale exports. Bind this
-workqueue to the cores used by Lustre defined by the CPT setup.
+From: Amir Shehata <ashehata@whamcloud.com>
 
-Move the code handling workqueue binding to libcfs so it can be
-used by everyone.
+There are scenarios where there could be a discrepancy between
+cached peer information and reality. In these cases what could
+end-up happening is incomplete interface information might be
+cached because one side determined that the peer didn't require
+a PUSH. This will lead to undesired MR behavior, where not all
+the interfaces are used for a period of time.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13258
-Lustre-commit: 76b602c2bfe9d ("LU-13258 obdclass: bind zombie export cleanup workqueue")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/38212
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
+Therefore, it is safer to always force a full discovery cycle:
+GET/PUSH to ensure both sides are up-to-date.
+
+In the NMR case, when discovery is turned off, make sure to flag
+discovery as complete to avoid stalling the state machine.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13477
+Lustre-commit: 9bafd530d7858 ("LU-13477 lnet: Force full discovery cycle")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/38322
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_lib.c       | 21 +++++----------------
- fs/lustre/obdclass/genops.c       |  9 +++++----
- fs/lustre/ptlrpc/pinger.c         | 19 ++++---------------
- include/linux/libcfs/libcfs_cpu.h | 24 ++++++++++++++++++++++++
- net/lnet/libcfs/libcfs_cpu.c      |  2 +-
- 5 files changed, 39 insertions(+), 36 deletions(-)
+ net/lnet/lnet/peer.c   | 40 ++++++++++++++++++++++++----------------
+ net/lnet/lnet/router.c |  5 +++--
+ 2 files changed, 27 insertions(+), 18 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 70e839b..05d949b 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -81,8 +81,6 @@ static inline unsigned int ll_get_ra_async_max_active(void)
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 60749da..5869a20 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -1179,6 +1179,11 @@ struct lnet_peer_ni *
+ 	lp = lpni->lpni_peer_net->lpn_peer;
  
- static struct ll_sb_info *ll_init_sbi(void)
- {
--	struct workqueue_attrs attrs = { };
--	cpumask_var_t *mask;
- 	struct ll_sb_info *sbi = NULL;
- 	unsigned long pages;
- 	unsigned long lru_page_max;
-@@ -111,23 +109,14 @@ static struct ll_sb_info *ll_init_sbi(void)
- 
- 	sbi->ll_ra_info.ra_async_max_active = ll_get_ra_async_max_active();
- 	sbi->ll_ra_info.ll_readahead_wq =
--		alloc_workqueue("ll-readahead-wq", WQ_UNBOUND,
--				sbi->ll_ra_info.ra_async_max_active);
--	if (!sbi->ll_ra_info.ll_readahead_wq) {
--		rc = -ENOMEM;
-+		cfs_cpt_bind_workqueue("ll-readahead-wq", cfs_cpt_tab,
-+				       0, CFS_CPT_ANY,
-+				       sbi->ll_ra_info.ra_async_max_active);
-+	if (IS_ERR(sbi->ll_ra_info.ll_readahead_wq)) {
-+		rc = PTR_ERR(sbi->ll_ra_info.ll_readahead_wq);
- 		goto out_pcc;
- 	}
- 
--	mask = cfs_cpt_cpumask(cfs_cpt_tab, CFS_CPT_ANY);
--	if (mask && alloc_cpumask_var(&attrs.cpumask, GFP_KERNEL)) {
--		cpumask_copy(attrs.cpumask, *mask);
--		cpus_read_lock();
--		apply_workqueue_attrs(sbi->ll_ra_info.ll_readahead_wq,
--				      &attrs);
--		cpus_read_unlock();
--		free_cpumask_var(attrs.cpumask);
--	}
--
- 	sbi->ll_cache = cl_cache_init(lru_page_max);
- 	if (!sbi->ll_cache) {
- 		rc = -ENOMEM;
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index e4ad53c..607f0d6 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -37,6 +37,7 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_CLASS
-+#include <linux/libcfs/libcfs_cpu.h>
- #include <obd_class.h>
- #include <lustre_log.h>
- #include <lprocfs_status.h>
-@@ -1207,11 +1208,11 @@ void obd_zombie_barrier(void)
-  */
- int obd_zombie_impexp_init(void)
- {
--	zombie_wq = alloc_workqueue("obd_zombid", 0, 0);
--	if (!zombie_wq)
--		return -ENOMEM;
-+	zombie_wq = cfs_cpt_bind_workqueue("obd_zombid", cfs_cpt_tab,
-+					   0, CFS_CPT_ANY,
-+					   cfs_cpt_number(cfs_cpt_tab));
- 
--	return 0;
-+	return IS_ERR(zombie_wq) ? PTR_ERR(zombie_wq) : 0;
+ 	while (!lnet_peer_is_uptodate(lp)) {
++		spin_lock(&lp->lp_lock);
++		/* force a full discovery cycle */
++		lp->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH;
++		spin_unlock(&lp->lp_lock);
++
+ 		rc = lnet_discover_peer_locked(lpni, cpt, true);
+ 		if (rc)
+ 			goto out_decref;
+@@ -3043,6 +3048,19 @@ static int lnet_peer_push_failed(struct lnet_peer *lp)
+ 	return rc ? rc : LNET_REDISCOVER_PEER;
  }
  
- /**
-diff --git a/fs/lustre/ptlrpc/pinger.c b/fs/lustre/ptlrpc/pinger.c
-index 63bd132..ec4c51a 100644
---- a/fs/lustre/ptlrpc/pinger.c
-+++ b/fs/lustre/ptlrpc/pinger.c
-@@ -298,25 +298,14 @@ static void ptlrpc_pinger_main(struct work_struct *ws)
- int ptlrpc_start_pinger(void)
- {
- #ifdef CONFIG_LUSTRE_FS_PINGER
--	struct workqueue_attrs attrs = { };
--	cpumask_var_t *mask;
--
- 	if (pinger_wq)
- 		return -EALREADY;
- 
--	pinger_wq = alloc_workqueue("ptlrpc_pinger", WQ_UNBOUND, 1);
--	if (!pinger_wq) {
-+	pinger_wq = cfs_cpt_bind_workqueue("ptlrpc_pinger", cfs_cpt_tab,
-+					   0, CFS_CPT_ANY, 1);
-+	if (IS_ERR(pinger_wq)) {
- 		CERROR("cannot start pinger workqueue\n");
--		return -ENOMEM;
--	}
--
--	mask = cfs_cpt_cpumask(cfs_cpt_tab, CFS_CPT_ANY);
--	if (mask && alloc_cpumask_var(&attrs.cpumask, GFP_KERNEL)) {
--		cpumask_copy(attrs.cpumask, *mask);
--		cpus_read_lock();
--		apply_workqueue_attrs(pinger_wq, &attrs);
--		cpus_read_unlock();
--		free_cpumask_var(attrs.cpumask);
-+		return PTR_ERR(pinger_wq);
- 	}
- 
- 	queue_delayed_work(pinger_wq, &ping_work, 0);
-diff --git a/include/linux/libcfs/libcfs_cpu.h b/include/linux/libcfs/libcfs_cpu.h
-index 4b0604a..310b25c 100644
---- a/include/linux/libcfs/libcfs_cpu.h
-+++ b/include/linux/libcfs/libcfs_cpu.h
-@@ -293,6 +293,30 @@ static inline void cfs_cpu_fini(void)
- 
- #endif /* CONFIG_SMP */
- 
-+static inline
-+struct workqueue_struct *cfs_cpt_bind_workqueue(const char *wq_name,
-+						struct cfs_cpt_table *tbl,
-+						int flags, int cpt, int nthrs)
++/* Mark the peer as discovered. */
++static int lnet_peer_discovered(struct lnet_peer *lp)
++__must_hold(&lp->lp_lock)
 +{
-+	cpumask_var_t *mask = cfs_cpt_cpumask(tbl, cpt);
-+	struct workqueue_attrs attrs = { };
-+	struct workqueue_struct *wq;
++	lp->lp_state |= LNET_PEER_DISCOVERED;
++	lp->lp_state &= ~(LNET_PEER_DISCOVERING |
++			  LNET_PEER_REDISCOVER);
 +
-+	wq = alloc_workqueue(wq_name, WQ_UNBOUND | flags, nthrs);
-+	if (!wq)
-+		return ERR_PTR(-ENOMEM);
++	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
 +
-+	if (mask && alloc_cpumask_var(&attrs.cpumask, GFP_KERNEL)) {
-+		cpumask_copy(attrs.cpumask, *mask);
-+		cpus_read_lock();
-+		apply_workqueue_attrs(wq, &attrs);
-+		cpus_read_unlock();
-+		free_cpumask_var(attrs.cpumask);
-+	}
-+
-+	return wq;
++	return 0;
 +}
 +
+ /* Active side of push. */
+ static int lnet_peer_send_push(struct lnet_peer *lp)
+ __must_hold(&lp->lp_lock)
+@@ -3056,6 +3074,12 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ 	/* Don't push to a non-multi-rail peer. */
+ 	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+ 		lp->lp_state &= ~LNET_PEER_FORCE_PUSH;
++		/* if peer's NIDs are uptodate then peer is discovered */
++		if (lp->lp_state & LNET_PEER_NIDS_UPTODATE) {
++			rc = lnet_peer_discovered(lp);
++			return rc;
++		}
++
+ 		return 0;
+ 	}
+ 
+@@ -3147,22 +3171,6 @@ static void lnet_peer_discovery_error(struct lnet_peer *lp, int error)
+ }
+ 
  /*
-  * allocate per-cpu-partition data, returned value is an array of pointers,
-  * variable can be indexed by CPU ID.
-diff --git a/net/lnet/libcfs/libcfs_cpu.c b/net/lnet/libcfs/libcfs_cpu.c
-index 8969e1f..8e4fdb1 100644
---- a/net/lnet/libcfs/libcfs_cpu.c
-+++ b/net/lnet/libcfs/libcfs_cpu.c
-@@ -36,9 +36,9 @@
- #include <linux/module.h>
- #include <linux/slab.h>
+- * Mark the peer as discovered.
+- */
+-static int lnet_peer_discovered(struct lnet_peer *lp)
+-__must_hold(&lp->lp_lock)
+-{
+-	lp->lp_state |= LNET_PEER_DISCOVERED;
+-	lp->lp_state &= ~(LNET_PEER_DISCOVERING |
+-			  LNET_PEER_REDISCOVER);
+-
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
+-
+-	return 0;
+-}
+-
+-
+-/*
+  * Discovering this peer is taking too long. Cancel any Ping or Push
+  * that discovery is waiting on by unlinking the relevant MDs. The
+  * lnet_discovery_event_handler() will proceed from here and complete
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index af50e51..903d027 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -1154,9 +1154,10 @@ bool lnet_router_checker_active(void)
+ 			spin_unlock(&rtr->lp_lock);
+ 			continue;
+ 		}
+-		/* make sure we actively discover the router */
++		/* make sure we fully discover the router */
+ 		rtr->lp_state &= ~LNET_PEER_NIDS_UPTODATE;
+-		rtr->lp_state |= LNET_PEER_RTR_DISCOVERY;
++		rtr->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH |
++				 LNET_PEER_RTR_DISCOVERY;
+ 		spin_unlock(&rtr->lp_lock);
  
--#include <linux/libcfs/libcfs_cpu.h>
- #include <linux/libcfs/libcfs_string.h>
- #include <linux/libcfs/libcfs.h>
-+#include <linux/libcfs/libcfs_cpu.h>
- 
- /** virtual processing unit */
- struct cfs_cpu_partition {
+ 		/* find the peer_ni associated with the primary NID */
 -- 
 1.8.3.1
