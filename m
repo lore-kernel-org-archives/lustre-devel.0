@@ -1,61 +1,48 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:56 -0400
-Subject: [lustre-devel] [PATCH 17/22] lnet: Add lnet_lnd_timeout to sysfs
+Date: Tue,  2 Jun 2020 20:59:46 -0400
+Subject: [lustre-devel] [PATCH 07/22] lustre: llite: prevent MAX_DIO_SIZE
+ 32-bit truncation
 In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
 References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1591146001-27171-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-Allow lnet_lnd_timeout to be read (only) from sysfs.
+On 4kB PAGE_SIZE systems, kmalloc can allocate up to 4MB, which makes
+MAX_DIO_SIZE up to 682MB. This number can fit into 32 bits.
+But on 64kB PAGE_SIZE systems, kmalloc can allocate up to 512MB, which
+then makes MAX_DIO_SIZE up to 1365GB. This needs 64 bits to fit.
+Make sure that for every platform MAX_DIO_SIZE is not abusively
+truncated, by casting it to size_t.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13510
-Lustre-commit: 17802b329cdea ("LU-13510 lnet: Add lnet_lnd_timeout to sysfs")
-Signed-off-by: Chris Horn <hornc@cray.com>
-Reviewed-on: https://review.whamcloud.com/38482
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13528
+Lustre-commit: 8cfd5be8b04bd ("LU-13528 llite: prevent MAX_DIO_SIZE 32-bit truncation")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/38526
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h | 1 +
- net/lnet/lnet/router_proc.c   | 7 +++++++
- 2 files changed, 8 insertions(+)
+ fs/lustre/llite/rw26.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index a7825f9..def0923 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -417,6 +417,7 @@ struct lnet_ni *
+diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
+index 7abf3fc..5e7aa6e 100644
+--- a/fs/lustre/llite/rw26.c
++++ b/fs/lustre/llite/rw26.c
+@@ -276,7 +276,7 @@ struct ll_dio_pages {
+  * up to 22MB for 128kB kmalloc and up to 682MB for 4MB kmalloc.
+  */
+ #define MAX_DIO_SIZE ((KMALLOC_MAX_SIZE / sizeof(struct brw_page) * PAGE_SIZE) & \
+-		      ~(DT_MAX_BRW_SIZE - 1))
++		      ~((size_t)DT_MAX_BRW_SIZE - 1))
  
- extern unsigned int lnet_transaction_timeout;
- extern unsigned int lnet_retry_count;
-+extern unsigned int lnet_lnd_timeout;
- extern unsigned int lnet_numa_range;
- extern unsigned int lnet_health_sensitivity;
- extern unsigned int lnet_recovery_interval;
-diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
-index 180bbde..7fe8d33 100644
---- a/net/lnet/lnet/router_proc.c
-+++ b/net/lnet/lnet/router_proc.c
-@@ -881,6 +881,13 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
- 		.proc_handler	= &proc_lnet_portal_rotor,
- 	},
- 	{
-+		.procname	= "lnet_lnd_timeout",
-+		.data		= &lnet_lnd_timeout,
-+		.maxlen		= sizeof(lnet_lnd_timeout),
-+		.mode		= 0444,
-+		.proc_handler	= &proc_dointvec,
-+	},
-+	{
- 	}
- };
- 
+ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ {
 -- 
 1.8.3.1
