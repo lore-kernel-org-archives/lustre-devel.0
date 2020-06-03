@@ -1,131 +1,164 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:53 -0400
-Subject: [lustre-devel] [PATCH 14/22] lnet: Force full discovery cycle
+Date: Tue,  2 Jun 2020 20:59:58 -0400
+Subject: [lustre-devel] [PATCH 19/22] lnet: lnd: Allow independent socklnd
+ timeout
 In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
 References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1591146001-27171-20-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Chris Horn <hornc@cray.com>
 
-There are scenarios where there could be a discrepancy between
-cached peer information and reality. In these cases what could
-end-up happening is incomplete interface information might be
-cached because one side determined that the peer didn't require
-a PUSH. This will lead to undesired MR behavior, where not all
-the interfaces are used for a period of time.
+Allow the socklnd timeout to be set independent of
+lnet_transaction_timeout and retry_count.
 
-Therefore, it is safer to always force a full discovery cycle:
-GET/PUSH to ensure both sides are up-to-date.
-
-In the NMR case, when discovery is turned off, make sure to flag
-discovery as complete to avoid stalling the state machine.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13477
-Lustre-commit: 9bafd530d7858 ("LU-13477 lnet: Force full discovery cycle")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38322
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13510
+Lustre-commit: 5c2a1267f9471 ("LU-13510 lnd: Allow independent socklnd timeout")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/38460
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/peer.c   | 40 ++++++++++++++++++++++++----------------
- net/lnet/lnet/router.c |  5 +++--
- 2 files changed, 27 insertions(+), 18 deletions(-)
+ net/lnet/klnds/socklnd/socklnd.c           |  4 ++--
+ net/lnet/klnds/socklnd/socklnd.h           |  7 +++++++
+ net/lnet/klnds/socklnd/socklnd_cb.c        | 16 ++++++++--------
+ net/lnet/klnds/socklnd/socklnd_modparams.c |  2 +-
+ 4 files changed, 18 insertions(+), 11 deletions(-)
 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 60749da..5869a20 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -1179,6 +1179,11 @@ struct lnet_peer_ni *
- 	lp = lpni->lpni_peer_net->lpn_peer;
+diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
+index b5d92d3..444b90b 100644
+--- a/net/lnet/klnds/socklnd/socklnd.c
++++ b/net/lnet/klnds/socklnd/socklnd.c
+@@ -1311,7 +1311,7 @@ struct ksock_peer_ni *
+ 	/* Set the deadline for the outgoing HELLO to drain */
+ 	conn->ksnc_tx_bufnob = sock->sk->sk_wmem_queued;
+ 	conn->ksnc_tx_deadline = ktime_get_seconds() +
+-				 lnet_get_lnd_timeout();
++				 ksocknal_timeout();
+ 	mb();   /* order with adding to peer_ni's conn list */
  
- 	while (!lnet_peer_is_uptodate(lp)) {
-+		spin_lock(&lp->lp_lock);
-+		/* force a full discovery cycle */
-+		lp->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH;
-+		spin_unlock(&lp->lp_lock);
-+
- 		rc = lnet_discover_peer_locked(lpni, cpt, true);
- 		if (rc)
- 			goto out_decref;
-@@ -3043,6 +3048,19 @@ static int lnet_peer_push_failed(struct lnet_peer *lp)
- 	return rc ? rc : LNET_REDISCOVER_PEER;
+ 	list_add(&conn->ksnc_list, &peer_ni->ksnp_conns);
+@@ -1699,7 +1699,7 @@ struct ksock_peer_ni *
+ 	switch (conn->ksnc_rx_state) {
+ 	case SOCKNAL_RX_LNET_PAYLOAD:
+ 		last_rcv = conn->ksnc_rx_deadline -
+-			   lnet_get_lnd_timeout();
++			   ksocknal_timeout();
+ 		CERROR("Completing partial receive from %s[%d], ip %pI4h:%d, with error, wanted: %zd, left: %d, last alive is %lld secs ago\n",
+ 		       libcfs_id2str(conn->ksnc_peer->ksnp_id), conn->ksnc_type,
+ 		       &conn->ksnc_ipaddr, conn->ksnc_port,
+diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
+index 6c77b75..7d49fff 100644
+--- a/net/lnet/klnds/socklnd/socklnd.h
++++ b/net/lnet/klnds/socklnd/socklnd.h
+@@ -610,6 +610,13 @@ struct ksock_proto {
+ 		ksocknal_destroy_peer(peer_ni);
  }
  
-+/* Mark the peer as discovered. */
-+static int lnet_peer_discovered(struct lnet_peer *lp)
-+__must_hold(&lp->lp_lock)
++static inline int ksocknal_timeout(void)
 +{
-+	lp->lp_state |= LNET_PEER_DISCOVERED;
-+	lp->lp_state &= ~(LNET_PEER_DISCOVERING |
-+			  LNET_PEER_REDISCOVER);
-+
-+	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
-+
-+	return 0;
++	return *ksocknal_tunables.ksnd_timeout ?
++		*ksocknal_tunables.ksnd_timeout :
++		lnet_get_lnd_timeout();
 +}
 +
- /* Active side of push. */
- static int lnet_peer_send_push(struct lnet_peer *lp)
- __must_hold(&lp->lp_lock)
-@@ -3056,6 +3074,12 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
- 	/* Don't push to a non-multi-rail peer. */
- 	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
- 		lp->lp_state &= ~LNET_PEER_FORCE_PUSH;
-+		/* if peer's NIDs are uptodate then peer is discovered */
-+		if (lp->lp_state & LNET_PEER_NIDS_UPTODATE) {
-+			rc = lnet_peer_discovered(lp);
-+			return rc;
-+		}
-+
- 		return 0;
- 	}
+ int ksocknal_startup(struct lnet_ni *ni);
+ void ksocknal_shutdown(struct lnet_ni *ni);
+ int ksocknal_ctl(struct lnet_ni *ni, unsigned int cmd, void *arg);
+diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
+index c03f91c7..2759455 100644
+--- a/net/lnet/klnds/socklnd/socklnd_cb.c
++++ b/net/lnet/klnds/socklnd/socklnd_cb.c
+@@ -218,7 +218,7 @@ struct ksock_tx *
+ 			 * something got ACKed
+ 			 */
+ 			conn->ksnc_tx_deadline = ktime_get_seconds() +
+-						 lnet_get_lnd_timeout();
++						 ksocknal_timeout();
+ 			conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
+ 			conn->ksnc_tx_bufnob = bufnob;
+ 			mb();
+@@ -264,7 +264,7 @@ struct ksock_tx *
  
-@@ -3147,22 +3171,6 @@ static void lnet_peer_discovery_error(struct lnet_peer *lp, int error)
- }
+ 	conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
+ 	conn->ksnc_rx_deadline = ktime_get_seconds() +
+-				 lnet_get_lnd_timeout();
++				 ksocknal_timeout();
+ 	mb();		/* order with setting rx_started */
+ 	conn->ksnc_rx_started = 1;
  
- /*
-- * Mark the peer as discovered.
-- */
--static int lnet_peer_discovered(struct lnet_peer *lp)
--__must_hold(&lp->lp_lock)
--{
--	lp->lp_state |= LNET_PEER_DISCOVERED;
--	lp->lp_state &= ~(LNET_PEER_DISCOVERING |
--			  LNET_PEER_REDISCOVER);
--
--	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
--
--	return 0;
--}
--
--
--/*
-  * Discovering this peer is taking too long. Cancel any Ping or Push
-  * that discovery is waiting on by unlinking the relevant MDs. The
-  * lnet_discovery_event_handler() will proceed from here and complete
-diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
-index af50e51..903d027 100644
---- a/net/lnet/lnet/router.c
-+++ b/net/lnet/lnet/router.c
-@@ -1154,9 +1154,10 @@ bool lnet_router_checker_active(void)
- 			spin_unlock(&rtr->lp_lock);
- 			continue;
- 		}
--		/* make sure we actively discover the router */
-+		/* make sure we fully discover the router */
- 		rtr->lp_state &= ~LNET_PEER_NIDS_UPTODATE;
--		rtr->lp_state |= LNET_PEER_RTR_DISCOVERY;
-+		rtr->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH |
-+				 LNET_PEER_RTR_DISCOVERY;
- 		spin_unlock(&rtr->lp_lock);
+@@ -419,7 +419,7 @@ struct ksock_tx *
  
- 		/* find the peer_ni associated with the primary NID */
+ 	/* ZC_REQ is going to be pinned to the peer_ni */
+ 	tx->tx_deadline = ktime_get_seconds() +
+-			  lnet_get_lnd_timeout();
++			  ksocknal_timeout();
+ 
+ 	LASSERT(!tx->tx_msg.ksm_zc_cookies[0]);
+ 
+@@ -711,7 +711,7 @@ struct ksock_conn *
+ 	if (list_empty(&conn->ksnc_tx_queue) && !bufnob) {
+ 		/* First packet starts the timeout */
+ 		conn->ksnc_tx_deadline = ktime_get_seconds() +
+-					 lnet_get_lnd_timeout();
++					 ksocknal_timeout();
+ 		if (conn->ksnc_tx_bufnob > 0) /* something got ACKed */
+ 			conn->ksnc_peer->ksnp_last_alive = ktime_get_seconds();
+ 		conn->ksnc_tx_bufnob = 0;
+@@ -887,7 +887,7 @@ struct ksock_route *
+ 	    ksocknal_find_connecting_route_locked(peer_ni)) {
+ 		/* the message is going to be pinned to the peer_ni */
+ 		tx->tx_deadline = ktime_get_seconds() +
+-				  lnet_get_lnd_timeout();
++				  ksocknal_timeout();
+ 
+ 		/* Queue the message until a connection is established */
+ 		list_add_tail(&tx->tx_list, &peer_ni->ksnp_tx_queue);
+@@ -1652,7 +1652,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 	/* socket type set on active connections - not set on passive */
+ 	LASSERT(!active == !(conn->ksnc_type != SOCKLND_CONN_NONE));
+ 
+-	timeout = active ? lnet_get_lnd_timeout() :
++	timeout = active ? ksocknal_timeout() :
+ 			    lnet_acceptor_timeout();
+ 
+ 	rc = lnet_sock_read(sock, &hello->kshm_magic,
+@@ -1790,7 +1790,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 	int retry_later = 0;
+ 	int rc = 0;
+ 
+-	deadline = ktime_get_seconds() + lnet_get_lnd_timeout();
++	deadline = ktime_get_seconds() + ksocknal_timeout();
+ 
+ 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
+ 
+@@ -2550,7 +2550,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 			 * timeout interval.
+ 			 */
+ 
+-			lnd_timeout = lnet_get_lnd_timeout();
++			lnd_timeout = ksocknal_timeout();
+ 			if (lnd_timeout > n * p)
+ 				chunk = (chunk * n * p) / lnd_timeout;
+ 			if (!chunk)
+diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
+index 35b71ba..b511e54 100644
+--- a/net/lnet/klnds/socklnd/socklnd_modparams.c
++++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
+@@ -24,7 +24,7 @@
+ #include <asm/hypervisor.h>
+ #endif
+ 
+-static int sock_timeout = 50;
++static int sock_timeout;
+ module_param(sock_timeout, int, 0644);
+ MODULE_PARM_DESC(sock_timeout, "dead socket timeout (seconds)");
+ 
 -- 
 1.8.3.1
