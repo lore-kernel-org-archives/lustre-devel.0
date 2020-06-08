@@ -1,58 +1,29 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  2 Jun 2020 20:59:59 -0400
-Subject: [lustre-devel] [PATCH 20/22] lnet: lnd: gracefully handle
- unexpected events
-In-Reply-To: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-References: <1591146001-27171-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1591146001-27171-21-git-send-email-jsimmons@infradead.org>
+From: Peter Jones <pjones@whamcloud.com>
+Date: Mon, 8 Jun 2020 17:54:46 +0000
+Subject: [lustre-devel] Lustre 2.12.5 released
+Message-ID: <AAB1975B-61B1-4153-8881-EC9872D1B095@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+We are pleased to announce that the Lustre 2.12.5 Release has been declared GA and is available for download<https://downloads.whamcloud.com/public/lustre/lustre-2.12.5/>. You can also grab the source from git <https://git.whamcloud.com/?p=fs/lustre-release.git;a=commit;h=78d712a21973ef1f4b4f8e37f54fd2e293345c58> .
 
-When a tx completes kiblnd_tx_complete() callback is invoked.
-We ensure:
-LASSERT (tx->tx_sending > 0);
-However this assert is being triggered in some rare scenarios.
-The reason tx_sending would be 0 at this point is because:
- 1. ib_post_send() failed but OFED stack is still sending
-    a tx complete event.
- 2. We're getting two different events for the same tx
+Details of changes since 2.12.4<http://wiki.lustre.org/Lustre_2.12.4_Changelog> can be found in the 2.12.5 change log<http://wiki.lustre.org/Lustre_2.12.5_Changelog>.
 
-Instead of asserting, ignore that tx_complete event and print
-the tx pointer and its status.
+There are the following notable enhancements over 2.12.4:
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13553
-Lustre-commit: 60f9f539e686f ("LU-13553 lnd: gracefully handle unexpected events")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38669
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+RHEL 7.8 is now supported for servers and clients  (LU-13566<https://jira.whamcloud.com/browse/LU-13566>) .
+RHEL 8.2 is now supported for clients  (LU-13488<https://jira.whamcloud.com/browse/LU-13488>) .
+SLES12 SP5 is now supported for clients  (LU-13111<https://jira.whamcloud.com/browse/LU-13111>) .
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 09a46d6..40e196d 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -969,7 +969,11 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	struct kib_conn *conn = tx->tx_conn;
- 	int idle;
- 
--	LASSERT(tx->tx_sending > 0);
-+	if (tx->tx_sending <= 0) {
-+		CERROR("Received an event on a freed tx: %p status %d\n",
-+		       tx, tx->tx_status);
-+		return;
-+	}
- 
- 	if (failed) {
- 		if (conn->ibc_state == IBLND_CONN_ESTABLISHED)
--- 
-1.8.3.1
+Please log any issues found in the issue tracking system<https://jira.whamcloud.com/>.
+
+Thanks to all those who have contributed to the creation of this release.
+
+The next LTS release will be 2.12.6
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200608/fc635888/attachment.html>
