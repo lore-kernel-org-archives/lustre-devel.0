@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:27:07 -0400
-Subject: [lustre-devel] [PATCH 11/20] lustre: sec: documentation for
- client-side encryption
+Date: Sat, 13 Jun 2020 12:27:08 -0400
+Subject: [lustre-devel] [PATCH 12/20] lustre: sec: enable client side
+ encryption
 In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,559 +13,497 @@ To: lustre-devel@lists.lustre.org
 
 From: Sebastien Buisson <sbuisson@ddn.com>
 
-Add several documents about client-side encryption under
-Documentation/client_side_encryption:
-- threat_model.txt is the description of the threat model for Lustre
-  client-side encryption;
-- key_hierarchy.txt is the description of the key hierarchy for Lustre
-  client-side encryption;
-- modes_usage.txt is the description of the encryption modes and usage
-  for Lustre client-side encryption;
-- access_semantics.txt is the description of the access semantics for
-  Lustre client-side encryption.
+Enable client side encryption. By default it is activated,
+letting user specifies actual encryption policy to use on
+a per-directory basis. It is possible to deactivate client
+side encryption by using the 'noencrypt' mount option.
 
-As we rely on kernel's fscrypt library for this feature, fscrypt's
-concepts are largely valid. These documents are inspired by fscrypt
-documentation in the Linux kernel tree, see
-Documentation/filesystems/fscrypt.rst
+Also add the test dummy encryption mode option to ease
+testing.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-12275
-Lustre-commit: f2bf564e691ea ("LU-12275 sec: documentation for client-side encryption")
+Lustre-commit: 28be31137cd22 ("LU-12275 sec: enable client side encryption")
 Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/38759
+Reviewed-on: https://review.whamcloud.com/36143
 Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../client_side_encryption/access_semantics.txt    | 128 +++++++++++++++++
- .../client_side_encryption/key_hierarchy.txt       | 112 +++++++++++++++
- .../lustre/client_side_encryption/modes_usage.txt  |  97 +++++++++++++
- .../lustre/client_side_encryption/threat_model.txt | 159 +++++++++++++++++++++
- 4 files changed, 496 insertions(+)
- create mode 100644 Documentation/lustre/client_side_encryption/access_semantics.txt
- create mode 100644 Documentation/lustre/client_side_encryption/key_hierarchy.txt
- create mode 100644 Documentation/lustre/client_side_encryption/modes_usage.txt
- create mode 100644 Documentation/lustre/client_side_encryption/threat_model.txt
+ fs/lustre/include/lustre_crypto.h      | 106 ++++++++++++++++++++++++++
+ fs/lustre/include/obd_support.h        |   6 ++
+ fs/lustre/llite/Makefile               |   1 +
+ fs/lustre/llite/crypto.c               | 132 +++++++++++++++++++++++++++++++++
+ fs/lustre/llite/llite_internal.h       |  26 +++++++
+ fs/lustre/llite/llite_lib.c            |  33 +++++++++
+ fs/lustre/llite/super25.c              |   1 +
+ include/uapi/linux/lustre/lustre_idl.h |  12 +++
+ 8 files changed, 317 insertions(+)
+ create mode 100644 fs/lustre/include/lustre_crypto.h
+ create mode 100644 fs/lustre/llite/crypto.c
 
-diff --git a/Documentation/lustre/client_side_encryption/access_semantics.txt b/Documentation/lustre/client_side_encryption/access_semantics.txt
+diff --git a/fs/lustre/include/lustre_crypto.h b/fs/lustre/include/lustre_crypto.h
 new file mode 100644
-index 0000000..fe2c28d
+index 0000000..e9091a2
 --- /dev/null
-+++ b/Documentation/lustre/client_side_encryption/access_semantics.txt
-@@ -0,0 +1,128 @@
-+===============================================
-+Lustre client-level encryption access semantics
-+===============================================
++++ b/fs/lustre/include/lustre_crypto.h
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2019, 2020, Whamcloud.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ */
 +
-+Lustre client-level encryption relies on kernel's fscrypt, and more
-+precisely on v2 encryption policies.
-+fscrypt is a library which filesystems can hook into to support
-+transparent encryption of files and directories.
++#ifndef _LUSTRE_CRYPTO_H_
++#define _LUSTRE_CRYPTO_H_
 +
-+As a consequence, the access semantics described here, extracted from
-+fscrypt's doc, apply to Lustre client-level encryption.
++struct ll_sb_info;
++bool ll_sbi_has_test_dummy_encryption(struct ll_sb_info *sbi);
++bool ll_sbi_has_encrypt(struct ll_sb_info *sbi);
++void ll_sbi_set_encrypt(struct ll_sb_info *sbi, bool set);
 +
-+Ref:
-+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/filesystems/fscrypt.rst
++#ifdef CONFIG_FS_ENCRYPTION
++#define __FS_HAS_ENCRYPTION 1
++#include <linux/fscrypt.h>
 +
-+Access
-+======
++#define llcrypt_operations	fscrypt_operations
++#define llcrypt_symlink_data	fscrypt_symlink_data
++#define llcrypt_dummy_context_enabled(inode) \
++	fscrypt_dummy_context_enabled(inode)
++#define llcrypt_has_encryption_key(inode) fscrypt_has_encryption_key(inode)
++#define llcrypt_encrypt_pagecache_blocks(page, len, offs, gfp_flags)	\
++	fscrypt_encrypt_pagecache_blocks(page, len, offs, gfp_flags)
++#define llcrypt_decrypt_pagecache_blocks(page, len, offs)	\
++	fscrypt_decrypt_pagecache_blocks(page, len, offs)
++#define llcrypt_inherit_context(parent, child, fs_data, preload)	\
++	fscrypt_inherit_context(parent, child, fs_data, preload)
++#define llcrypt_get_encryption_info(inode) fscrypt_get_encryption_info(inode)
++#define llcrypt_put_encryption_info(inode) fscrypt_put_encryption_info(inode)
++#define llcrypt_free_inode(inode)	   fscrypt_free_inode(inode)
++#define llcrypt_finalize_bounce_page(pagep)  fscrypt_finalize_bounce_page(pagep)
++#define llcrypt_file_open(inode, filp)	fscrypt_file_open(inode, filp)
++#define llcrypt_ioctl_set_policy(filp, arg)  fscrypt_ioctl_set_policy(filp, arg)
++#define llcrypt_ioctl_get_policy_ex(filp, arg)	\
++	fscrypt_ioctl_get_policy_ex(filp, arg)
++#define llcrypt_ioctl_add_key(filp, arg)	fscrypt_ioctl_add_key(filp, arg)
++#define llcrypt_ioctl_remove_key(filp, arg)  fscrypt_ioctl_remove_key(filp, arg)
++#define llcrypt_ioctl_remove_key_all_users(filp, arg)	\
++	fscrypt_ioctl_remove_key_all_users(filp, arg)
++#define llcrypt_ioctl_get_key_status(filp, arg)	\
++	fscrypt_ioctl_get_key_status(filp, arg)
++#define llcrypt_drop_inode(inode)	fscrypt_drop_inode(inode)
++#define llcrypt_prepare_rename(olddir, olddentry, newdir, newdentry, flags) \
++	fscrypt_prepare_rename(olddir, olddentry, newdir, newdentry, flags)
++#define llcrypt_prepare_link(old_dentry, dir, dentry)	\
++	fscrypt_prepare_link(old_dentry, dir, dentry)
++#define llcrypt_prepare_setattr(dentry, attr)		\
++	fscrypt_prepare_setattr(dentry, attr)
++#define llcrypt_set_ops(sb, cop)	fscrypt_set_ops(sb, cop)
++#else /* !CONFIG_FS_ENCRYPTION */
++#undef IS_ENCRYPTED
++#define IS_ENCRYPTED(x)	0
++#define llcrypt_dummy_context_enabled(inode)	NULL
++/* copied from include/linux/fscrypt.h */
++#define llcrypt_has_encryption_key(inode) false
++#define llcrypt_encrypt_pagecache_blocks(page, len, offs, gfp_flags)	\
++	ERR_PTR(-EOPNOTSUPP)
++#define llcrypt_decrypt_pagecache_blocks(page, len, offs)	-EOPNOTSUPP
++#define llcrypt_inherit_context(parent, child, fs_data, preload)     -EOPNOTSUPP
++#define llcrypt_get_encryption_info(inode)			-EOPNOTSUPP
++#define llcrypt_put_encryption_info(inode)			do {} while (0)
++#define llcrypt_free_inode(inode)				do {} while (0)
++#define llcrypt_finalize_bounce_page(pagep)			do {} while (0)
++static inline int llcrypt_file_open(struct inode *inode, struct file *filp)
++{
++	return IS_ENCRYPTED(inode) ? -EOPNOTSUPP : 0;
++}
++#define llcrypt_ioctl_set_policy(filp, arg)			-EOPNOTSUPP
++#define llcrypt_ioctl_get_policy_ex(filp, arg)			-EOPNOTSUPP
++#define llcrypt_ioctl_add_key(filp, arg)			-EOPNOTSUPP
++#define llcrypt_ioctl_remove_key(filp, arg)			-EOPNOTSUPP
++#define llcrypt_ioctl_remove_key_all_users(filp, arg)		-EOPNOTSUPP
++#define llcrypt_ioctl_get_key_status(filp, arg)			-EOPNOTSUPP
++#define llcrypt_drop_inode(inode)				 0
++#define llcrypt_prepare_rename(olddir, olddentry, newdir, newdentry, flags)    0
++#define llcrypt_prepare_link(old_dentry, dir, dentry)		 0
++#define llcrypt_prepare_setattr(dentry, attr)			 0
++#define llcrypt_set_ops(sb, cop)				do {} while (0)
++#endif /* CONFIG_FS_ENCRYPTION */
 +
-+Only Lustre clients need access to encryption master keys. Keys are
-+added to the filesystem-level encryption keyring on the Lustre client.
-+
-+With the key
-+------------
-+
-+With the encryption key, encrypted regular files, directories, and
-+symlinks behave very similarly to their unencrypted counterparts ---
-+after all, the encryption is intended to be transparent.  However,
-+astute users may notice some differences in behavior:
-+
-+- Unencrypted files, or files encrypted with a different encryption
-+  policy (i.e. different key, modes, or flags), cannot be renamed or
-+  linked into an encrypted directory; see `Encryption policy
-+  enforcement`_.  Attempts to do so will fail with EXDEV.  However,
-+  encrypted files can be renamed within an encrypted directory, or
-+  into an unencrypted directory.
-+
-+  Note: "moving" an unencrypted file into an encrypted directory, e.g.
-+  with the `mv` program, is implemented in userspace by a copy
-+  followed by a delete.  Be aware that the original unencrypted data
-+  may remain recoverable from free space on the disk; prefer to keep
-+  all files encrypted from the very beginning.  The `shred` program
-+  may be used to overwrite the source files but isn't guaranteed to be
-+  effective on all filesystems and storage devices.
-+
-+- Direct I/O is not supported on encrypted files.  Attempts to use
-+  direct I/O on such files will fall back to buffered I/O.
-+
-+- The fallocate operations FALLOC_FL_COLLAPSE_RANGE,
-+  FALLOC_FL_INSERT_RANGE, and FALLOC_FL_ZERO_RANGE are not supported
-+  on encrypted files and will fail with EOPNOTSUPP.
-+
-+- DAX (Direct Access) is not supported on encrypted files.
-+
-+- The st_size of an encrypted symlink will not necessarily give the
-+  length of the symlink target as required by POSIX.  It will actually
-+  give the length of the ciphertext, which will be slightly longer
-+  than the plaintext due to NUL-padding and an extra 2-byte overhead.
-+
-+- The maximum length of an encrypted symlink is 2 bytes shorter than
-+  the maximum length of an unencrypted symlink.  For example, on an
-+  EXT4 filesystem with a 4K block size, unencrypted symlinks can be up
-+  to 4095 bytes long, while encrypted symlinks can only be up to 4093
-+  bytes long (both lengths excluding the terminating null).
-+
-+Note that mmap *is* supported.  This is possible because the pagecache
-+for an encrypted file contains the plaintext, not the ciphertext.
-+
-+Without the key
-+---------------
-+
-+Some filesystem operations may be performed on encrypted regular
-+files, directories, and symlinks even before their encryption key has
-+been added, or after their encryption key has been removed:
-+
-+- File metadata may be read, e.g. using stat().
-+
-+- Directories may be listed, in which case the filenames will be
-+  listed in an encoded form derived from their ciphertext.  The
-+  algorithm is subject to change, but it is guaranteed that the
-+  presented filenames will be no longer than NAME_MAX bytes, will not
-+  contain the ``/`` or ``\0`` characters, and will uniquely identify
-+  directory entries.
-+
-+  The ``.`` and ``..`` directory entries are special.  They are always
-+  present and are not encrypted or encoded.
-+
-+- Files may be deleted.  That is, nondirectory files may be deleted
-+  with unlink() as usual, and empty directories may be deleted with
-+  rmdir() as usual.  Therefore, ``rm`` and ``rm -r`` will work as
-+  expected.
-+
-+- Symlink targets may be read and followed, but they will be presented
-+  in encrypted form, similar to filenames in directories.  Hence, they
-+  are unlikely to point to anywhere useful.
-+
-+Without the key, regular files cannot be opened or truncated.
-+Attempts to do so will fail with ENOKEY.  This implies that any
-+regular file operations that require a file descriptor, such as
-+read(), write(), mmap(), fallocate(), and ioctl(), are also forbidden.
-+
-+Also without the key, files of any type (including directories) cannot
-+be created or linked into an encrypted directory, nor can a name in an
-+encrypted directory be the source or target of a rename, nor can an
-+O_TMPFILE temporary file be created in an encrypted directory.  All
-+such operations will fail with ENOKEY.
-+
-+It is not currently possible to backup and restore encrypted files
-+without the encryption key.  This would require special APIs which
-+have not yet been implemented.
-+
-+Encryption policy enforcement
-+=============================
-+
-+After an encryption policy has been set on a directory, all regular
-+files, directories, and symbolic links created in that directory
-+(recursively) will inherit that encryption policy.  Special files ---
-+that is, named pipes, device nodes, and UNIX domain sockets --- will
-+not be encrypted.
-+
-+Except for those special files, it is forbidden to have unencrypted
-+files, or files encrypted with a different encryption policy, in an
-+encrypted directory tree.  Attempts to link or rename such a file into
-+an encrypted directory will fail with EXDEV.  This is also enforced
-+during ->lookup() to provide limited protection against offline
-+attacks that try to disable or downgrade encryption in known locations
-+where applications may later write sensitive data.  It is recommended
-+that systems implementing a form of "verified boot" take advantage of
-+this by validating all top-level encryption policies prior to access.
-diff --git a/Documentation/lustre/client_side_encryption/key_hierarchy.txt b/Documentation/lustre/client_side_encryption/key_hierarchy.txt
++#endif /* _LUSTRE_CRYPTO_H_ */
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index d1d21e0..b5736f8 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -559,6 +559,9 @@ static inline int ll_ext_to_inode_flags(int flags)
+ 		((flags & LUSTRE_NOATIME_FL)   ? S_NOATIME   : 0) |
+ 		((flags & LUSTRE_APPEND_FL)    ? S_APPEND    : 0) |
+ 		((flags & LUSTRE_DIRSYNC_FL)   ? S_DIRSYNC   : 0) |
++#if defined(S_ENCRYPTED)
++		((flags & LUSTRE_ENCRYPT_FL)   ? S_ENCRYPTED : 0) |
++#endif
+ 		((flags & LUSTRE_IMMUTABLE_FL) ? S_IMMUTABLE : 0));
+ }
+ 
+@@ -568,6 +571,9 @@ static inline int ll_inode_to_ext_flags(int iflags)
+ 		((iflags & S_NOATIME)   ? LUSTRE_NOATIME_FL   : 0) |
+ 		((iflags & S_APPEND)    ? LUSTRE_APPEND_FL    : 0) |
+ 		((iflags & S_DIRSYNC)   ? LUSTRE_DIRSYNC_FL   : 0) |
++#if defined(S_ENCRYPTED)
++		((iflags & S_ENCRYPTED) ? LUSTRE_ENCRYPT_FL   : 0) |
++#endif
+ 		((iflags & S_IMMUTABLE) ? LUSTRE_IMMUTABLE_FL : 0));
+ }
+ 
+diff --git a/fs/lustre/llite/Makefile b/fs/lustre/llite/Makefile
+index c88a1b0..aa388bb6 100644
+--- a/fs/lustre/llite/Makefile
++++ b/fs/lustre/llite/Makefile
+@@ -10,3 +10,4 @@ lustre-y := dcache.o dir.o file.o llite_lib.o llite_nfs.o \
+ 	    lproc_llite.o pcc.o
+ 
+ lustre-$(CONFIG_LUSTRE_FS_POSIX_ACL) += acl.o
++lustre-$(CONFIG_FS_ENCRYPTION)	     += crypto.o
+diff --git a/fs/lustre/llite/crypto.c b/fs/lustre/llite/crypto.c
 new file mode 100644
-index 0000000..d96e189
+index 0000000..94189c9
 --- /dev/null
-+++ b/Documentation/lustre/client_side_encryption/key_hierarchy.txt
-@@ -0,0 +1,112 @@
-+============================================
-+Lustre client-level encryption key hierarchy
-+============================================
-+
-+Lustre client-level encryption relies on kernel's fscrypt, and more
-+precisely on v2 encryption policies.
-+fscrypt is a library which filesystems can hook into to support
-+transparent encryption of files and directories.
-+
-+As a consequence, the following key hierarchy description, extracted
-+from fscrypt's, is directly applicable to Lustre client-level encryption.
-+
-+Ref:
-+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/filesystems/fscrypt.rst
-+
-+Master Keys
-+-----------
-+
-+Each encrypted directory tree is protected by a *master key*.  Master
-+keys can be up to 64 bytes long, and must be at least as long as the
-+greater of the key length needed by the contents and filenames
-+encryption modes being used.  For example, if AES-256-XTS is used for
-+contents encryption, the master key must be 64 bytes (512 bits).  Note
-+that the XTS mode is defined to require a key twice as long as that
-+required by the underlying block cipher.
-+
-+To "unlock" an encrypted directory tree, userspace must provide the
-+appropriate master key.  There can be any number of master keys, each
-+of which protects any number of directory trees on any number of
-+filesystems.
-+
-+Master keys should be pseudorandom, i.e. indistinguishable from random
-+bytestrings of the same length.  This implies that users **must not**
-+directly use a password as a master key, zero-pad a shorter key, or
-+repeat a shorter key.  Instead, users should generate master keys
-+either using a cryptographically secure random number generator, or by
-+using a KDF (Key Derivation Function).  Note that whenever a KDF is
-+used to "stretch" a lower-entropy secret such as a passphrase, it is
-+critical that a KDF designed for this purpose be used, such as scrypt,
-+PBKDF2, or Argon2.
-+
-+Key derivation function
-+-----------------------
-+
-+With one exception, fscrypt never uses the master key(s) for
-+encryption directly.  Instead, they are only used as input to a KDF
-+(Key Derivation Function) to derive the actual keys.
-+
-+For v2 encryption policies, the KDF is HKDF-SHA512. The master key is
-+passed as the "input keying material", no salt is used, and a distinct
-+"application-specific information string" is used for each distinct
-+key to be derived.  For example, when a per-file encryption key is
-+derived, the application-specific information string is the file's
-+nonce prefixed with "fscrypt\0" and a context byte.  Different context
-+bytes are used for other types of derived keys.
-+
-+HKDF-SHA512 is preferred KDF because HKDF is more flexible, is
-+nonreversible, and evenly distributes entropy from the master key.
-+HKDF is also standardized and widely used by other software.
-+
-+Per-file keys
-+-------------
-+
-+Since each master key can protect many files, it is necessary to
-+"tweak" the encryption of each file so that the same plaintext in two
-+files doesn't map to the same ciphertext, or vice versa.  In most
-+cases, fscrypt does this by deriving per-file keys.  When a new
-+encrypted inode (regular file, directory, or symlink) is created,
-+fscrypt randomly generates a 16-byte nonce and stores it in the
-+inode's encryption xattr.  Then, it uses a KDF (as described in `Key
-+derivation function`_) to derive the file's key from the master key
-+and nonce.
-+
-+Key derivation was chosen over key wrapping because wrapped keys would
-+require larger xattrs which would be less likely to fit in-line in the
-+filesystem's inode table, and there didn't appear to be any
-+significant advantages to key wrapping.  In particular, currently
-+there is no requirement to support unlocking a file with multiple
-+alternative master keys or to support rotating master keys.  Instead,
-+the master keys may be wrapped in userspace, e.g. as is done by the
-+`fscrypt <https://github.com/google/fscrypt>`_ tool.
-+
-+Including the inode number in the IVs was considered.  However, it was
-+rejected as it would have prevented ext4 filesystems from being
-+resized, and by itself still wouldn't have been sufficient to prevent
-+the same key from being directly reused for both XTS and CTS-CBC.
-+
-+DIRECT_KEY and per-mode keys
-+----------------------------
-+
-+The Adiantum encryption mode is suitable for both contents and
-+filenames encryption, and it accepts long IVs --- long enough to hold
-+both an 8-byte logical block number and a 16-byte per-file nonce.
-+Also, the overhead of each Adiantum key is greater than that of an
-+AES-256-XTS key.
-+
-+Therefore, to improve performance and save memory, for Adiantum a
-+"direct key" configuration is supported.  When the user has enabled
-+this by setting FSCRYPT_POLICY_FLAG_DIRECT_KEY in the fscrypt policy,
-+per-file keys are not used.  Instead, whenever any data (contents or
-+filenames) is encrypted, the file's 16-byte nonce is included in the
-+IV.  Moreover, for v2 encryption policies, the encryption is done with
-+a per-mode key derived using the KDF.  Users may use the same master
-+key for other v2 encryption policies.
-+
-+Key identifiers
-+---------------
-+
-+For master keys used for v2 encryption policies, a unique 16-byte "key
-+identifier" is also derived using the KDF.  This value is stored in
-+the clear, since it is needed to reliably identify the key itself.
-+
-diff --git a/Documentation/lustre/client_side_encryption/modes_usage.txt b/Documentation/lustre/client_side_encryption/modes_usage.txt
-new file mode 100644
-index 0000000..4ad8cf5
---- /dev/null
-+++ b/Documentation/lustre/client_side_encryption/modes_usage.txt
-@@ -0,0 +1,97 @@
-+==============================================
-+Lustre client-level encryption modes and usage
-+==============================================
-+
-+Lustre client-level encryption relies on kernel's fscrypt, and more
-+precisely on v2 encryption policies.
-+fscrypt is a library which filesystems can hook into to support
-+transparent encryption of files and directories.
-+
-+As a consequence, the encryption modes and usage described here,
-+extracted from fscrypt's doc, apply to Lustre client-level encryption.
-+
-+Ref:
-+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/filesystems/fscrypt.rst
-+
-+Encryption modes
-+----------------
-+
-+fscrypt allows one encryption mode to be specified for file contents
-+and one encryption mode to be specified for filenames.  Different
-+directory trees are permitted to use different encryption modes.
-+Currently, the following pairs of encryption modes are supported:
-+
-+- AES-256-XTS for contents and AES-256-CTS-CBC for filenames
-+- AES-128-CBC for contents and AES-128-CTS-CBC for filenames
-+- Adiantum for both contents and filenames
-+
-+If unsure, you should use the (AES-256-XTS, AES-256-CTS-CBC) pair.
-+
-+AES-128-CBC was added only for low-powered embedded devices with
-+crypto accelerators such as CAAM or CESA that do not support XTS.
-+
-+Adiantum is a (primarily) stream cipher-based mode that is fast even
-+on CPUs without dedicated crypto instructions.  It's also a true
-+wide-block mode, unlike XTS.  It can also eliminate the need to derive
-+per-file keys.  However, it depends on the security of two primitives,
-+XChaCha12 and AES-256, rather than just one.  See the paper
-+"Adiantum: length-preserving encryption for entry-level processors"
-+(https://eprint.iacr.org/2018/720.pdf) for more details.  To use
-+Adiantum, CONFIG_CRYPTO_ADIANTUM must be enabled.  Also, fast
-+implementations of ChaCha and NHPoly1305 should be enabled, e.g.
-+CONFIG_CRYPTO_CHACHA20_NEON and CONFIG_CRYPTO_NHPOLY1305_NEON for ARM.
-+
-+Contents encryption
-+-------------------
-+
-+For file contents, each filesystem block is encrypted independently.
-+Currently, only the case where the filesystem block size is equal to
-+the system's page size (usually 4096 bytes) is supported.
-+
-+Each block's IV is set to the logical block number within the file as
-+a little endian number, except that:
-+
-+- With CBC mode encryption, ESSIV is also used.  Specifically, each IV
-+  is encrypted with AES-256 where the AES-256 key is the SHA-256 hash
-+  of the file's data encryption key.
-+
-+- In the "direct key" configuration (FSCRYPT_POLICY_FLAG_DIRECT_KEY
-+  set in the fscrypt_policy), the file's nonce is also appended to the
-+  IV.  Currently this is only allowed with the Adiantum encryption
-+  mode.
-+
-+Filenames encryption
-+--------------------
-+
-+For filenames, each full filename is encrypted at once.  Because of
-+the requirements to retain support for efficient directory lookups and
-+filenames of up to 255 bytes, the same IV is used for every filename
-+in a directory.
-+
-+However, each encrypted directory still uses a unique key; or
-+alternatively (for the "direct key" configuration) has the file's
-+nonce included in the IVs.  Thus, IV reuse is limited to within a
-+single directory.
-+
-+With CTS-CBC, the IV reuse means that when the plaintext filenames
-+share a common prefix at least as long as the cipher block size (16
-+bytes for AES), the corresponding encrypted filenames will also share
-+a common prefix.  This is undesirable.  Adiantum does not have this
-+weakness, as it is a wide-block encryption mode.
-+
-+All supported filenames encryption modes accept any plaintext length
-+>= 16 bytes; cipher block alignment is not required.  However,
-+filenames shorter than 16 bytes are NUL-padded to 16 bytes before
-+being encrypted.  In addition, to reduce leakage of filename lengths
-+via their ciphertexts, all filenames are NUL-padded to the next 4, 8,
-+16, or 32-byte boundary (configurable).  32 is recommended since this
-+provides the best confidentiality, at the cost of making directory
-+entries consume slightly more space.  Note that since NUL (``\0``) is
-+not otherwise a valid character in filenames, the padding will never
-+produce duplicate plaintexts.
-+
-+Symbolic link targets are considered a type of filename and are
-+encrypted in the same way as filenames in directory entries, except
-+that IV reuse is not a problem as each symlink has its own inode.
-+
-+
-diff --git a/Documentation/lustre/client_side_encryption/threat_model.txt b/Documentation/lustre/client_side_encryption/threat_model.txt
-new file mode 100644
-index 0000000..f9153a2
---- /dev/null
-+++ b/Documentation/lustre/client_side_encryption/threat_model.txt
-@@ -0,0 +1,159 @@
-+===========================================
-+Lustre client-level encryption threat model
-+===========================================
-+
-+Lustre client-level encryption relies on kernel's fscrypt, and more
-+precisely on v2 encryption policies.
-+fscrypt is a library which filesystems can hook into to support
-+transparent encryption of files and directories.
-+
-+As a consequence, the following threat model, extracted from
-+fscrypt's and adapted, is applicable to Lustre client-level
-+encryption.
-+
-+Ref:
-+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/filesystems/fscrypt.rst
-+
-+Offline attacks
-+---------------
-+
-+Provided that userspace chooses a strong encryption key, fscrypt
-+protects the confidentiality of file contents and filenames in the
-+event of a single point-in-time permanent offline compromise of the
-+block device content.  fscrypt does not protect the confidentiality of
-+non-filename metadata, e.g. file sizes, file permissions, file
-+timestamps, and extended attributes.  Also, the existence and location
-+of holes (unallocated blocks which logically contain all zeroes) in
-+files is not protected.
-+
-+fscrypt is not guaranteed to protect confidentiality or authenticity
-+if an attacker is able to manipulate the filesystem offline prior to
-+an authorized user later accessing the filesystem.
-+
-+For the Lustre case, block devices are Lustre targets attached to
-+the Lustre servers. Manipulating the filesystem offline means
-+accessing the filesystem on these targets while Lustre is offline.
-+
-+Online attacks
-+--------------
-+
-+fscrypt (and storage encryption in general) can only provide limited
-+protection, if any at all, against online attacks.  In detail:
-+
-+Side-channel attacks
-+~~~~~~~~~~~~~~~~~~~~
-+
-+fscrypt is only resistant to side-channel attacks, such as timing or
-+electromagnetic attacks, to the extent that the underlying Linux
-+Cryptographic API algorithms are.  If a vulnerable algorithm is used,
-+such as a table-based implementation of AES, it may be possible for an
-+attacker to mount a side channel attack against the online system.
-+Side channel attacks may also be mounted against applications
-+consuming decrypted data.
-+
-+Unauthorized file access on Lustre client
-+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+
-+After an encryption key has been added, fscrypt does not hide the
-+plaintext file contents or filenames from other users on the same
-+system.  Instead, existing access control mechanisms such as file mode
-+bits, POSIX ACLs, LSMs, or namespaces should be used for this purpose.
-+
-+(For the reasoning behind this, understand that while the key is
-+added, the confidentiality of the data, from the perspective of the
-+system itself, is *not* protected by the mathematical properties of
-+encryption but rather only by the correctness of the kernel.
-+Therefore, any encryption-specific access control checks would merely
-+be enforced by kernel *code* and therefore would be largely redundant
-+with the wide variety of access control mechanisms already available.)
-+
-+For the Lustre case, it means plaintext file contents or filenames are
-+not hidden from other users on the same Lustre client.
-+
-+Lustre client kernel memory compromise
-+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+
-+An attacker who compromises the system enough to read from arbitrary
-+memory, e.g. by mounting a physical attack or by exploiting a kernel
-+security vulnerability, can compromise all encryption keys that are
-+currently in use.
-+
-+However, fscrypt with v2 encryption policies allows encryption keys to
-+be removed from the kernel, which may protect them from later
-+compromise. Key removal can be carried out by non-root users.
-+
-+In more detail, the FS_IOC_REMOVE_ENCRYPTION_KEY ioctl will wipe a
-+master encryption key from kernel memory.  Moreover, it will try to
-+evict all cached inodes which had been "unlocked" using the key,
-+thereby wiping their per-file keys and making them once again appear
-+"locked", i.e. in ciphertext or encrypted form.
-+
-+However, FS_IOC_REMOVE_ENCRYPTION_KEY has some limitations:
-+
-+- Per-file keys for in-use files will *not* be removed or wiped.
-+  Therefore, for maximum effect, userspace should close the relevant
-+  encrypted files and directories before removing a master key, as
-+  well as kill any processes whose working directory is in an affected
-+  encrypted directory.
-+
-+- The kernel cannot magically wipe copies of the master key(s) that
-+  userspace might have as well.  Therefore, userspace must wipe all
-+  copies of the master key(s) it makes as well.  Naturally, the same
-+  also applies to all higher levels in the key hierarchy.  Userspace
-+  should also follow other security precautions such as mlock()ing
-+  memory containing keys to prevent it from being swapped out.
-+
-+- In general, decrypted contents and filenames in the kernel VFS
-+  caches are freed but not wiped.  Therefore, portions thereof may be
-+  recoverable from freed memory, even after the corresponding key(s)
-+  were wiped.  To partially solve this, you can set
-+  CONFIG_PAGE_POISONING=y in your kernel config and add page_poison=1
-+  to your kernel command line.  However, this has a performance cost.
-+
-+- Secret keys might still exist in CPU registers, in crypto
-+  accelerator hardware (if used by the crypto API to implement any of
-+  the algorithms), or in other places not explicitly considered here.
-+
-+Lustre server kernel memory compromise
-+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+
-+An attacker on a Lustre server who compromises the system enough to
-+read from arbitrary memory, e.g. by mounting a physical attack or by
-+exploiting a kernel security vulnerability, cannot compromise Lustre
-+files content. Indeed, encryption keys are not forwarded to the Lustre
-+servers, and servers do not carry out decryption or encryption.
-+Moreover, RPCs received by servers contain encrypted data, which is
-+put as is in blocks to be stored on disk.
-+
-+Per-file key compromise
-+~~~~~~~~~~~~~~~~~~~~~~~
-+
-+With one exception, fscrypt never uses the master key(s) for
-+encryption directly.  Instead, they are only used as input to a KDF
-+(Key Derivation Function) to derive the actual keys.
-+
-+For v2 encryption policies, the KDF is HKDF-SHA512. The master key is
-+passed as the "input keying material", no salt is used, and a distinct
-+"application-specific information string" is used for each distinct
-+key to be derived.  For example, when a per-file encryption key is
-+derived, the application-specific information string is the file's
-+nonce prefixed with "fscrypt\0" and a context byte.  Different context
-+bytes are used for other types of derived keys.
-+
-+So the per-file keys used to encrypt each file individually are
-+obtained from a HKDF-SHA512 mechanism that is flexible, nonreversible,
-+and evenly distributes entropy from the master key.
-+HKDF is also standardized and widely used by other software.
-+
-+As a consequence, a compromise of a per-file key only impacts the
-+associated file, not the master key.
-+
-+Master key verification
-+~~~~~~~~~~~~~~~~~~~~~~~
-+
-+For master keys used for v2 encryption policies, a unique 16-byte "key
-+identifier" is derived using the KDF.  This value is stored in
-+the clear, and is used to reliably identify the key itself.
-+
-+Consequently, no malicious user can associate the wrong key with
-+encrypted files.
++++ b/fs/lustre/llite/crypto.c
+@@ -0,0 +1,132 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2019, 2020, Whamcloud.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ */
++
++#include "llite_internal.h"
++
++static int ll_get_context(struct inode *inode, void *ctx, size_t len)
++{
++	struct dentry *dentry;
++
++	if (hlist_empty(&inode->i_dentry))
++		return -ENODATA;
++
++	hlist_for_each_entry(dentry, &inode->i_dentry, d_u.d_alias)
++		break;
++
++	return __vfs_getxattr(dentry, inode, LL_XATTR_NAME_ENCRYPTION_CONTEXT,
++			      ctx, len);
++}
++
++static int ll_set_context(struct inode *inode, const void *ctx, size_t len,
++			  void *fs_data)
++{
++	unsigned int ext_flags;
++	struct dentry *dentry;
++	struct md_op_data *op_data;
++	struct ptlrpc_request *req = NULL;
++	int rc;
++
++	if (inode == NULL)
++		return 0;
++
++	ext_flags = ll_inode_to_ext_flags(inode->i_flags) | LUSTRE_ENCRYPT_FL;
++	dentry = (struct dentry *)fs_data;
++
++	/* Encrypting the root directory is not allowed */
++	if (inode->i_ino == inode->i_sb->s_root->d_inode->i_ino)
++		return -EPERM;
++
++	op_data = ll_prep_md_op_data(NULL, inode, NULL, NULL, 0, 0,
++				     LUSTRE_OPC_ANY, NULL);
++	if (IS_ERR(op_data))
++		return PTR_ERR(op_data);
++
++	op_data->op_attr_flags = LUSTRE_ENCRYPT_FL;
++	op_data->op_xvalid |= OP_XVALID_FLAGS;
++	rc = md_setattr(ll_i2sbi(inode)->ll_md_exp, op_data, NULL, 0, &req);
++	ll_finish_md_op_data(op_data);
++	ptlrpc_req_finished(req);
++	if (rc)
++		return rc;
++
++	rc = __vfs_setxattr(dentry, inode, LL_XATTR_NAME_ENCRYPTION_CONTEXT,
++			    ctx, len, XATTR_CREATE);
++	if (rc)
++		return rc;
++
++	ll_update_inode_flags(inode, ext_flags);
++	return 0;
++}
++
++inline bool ll_sbi_has_test_dummy_encryption(struct ll_sb_info *sbi)
++{
++	return unlikely(sbi->ll_flags & LL_SBI_TEST_DUMMY_ENCRYPTION);
++}
++
++static bool ll_dummy_context(struct inode *inode)
++{
++	struct ll_sb_info *sbi = ll_i2sbi(inode);
++
++	return sbi ? ll_sbi_has_test_dummy_encryption(sbi) : false;
++}
++
++inline bool ll_sbi_has_encrypt(struct ll_sb_info *sbi)
++{
++	return sbi->ll_flags & LL_SBI_ENCRYPT;
++}
++
++inline void ll_sbi_set_encrypt(struct ll_sb_info *sbi, bool set)
++{
++	if (set)
++		sbi->ll_flags |= LL_SBI_ENCRYPT;
++	else
++		sbi->ll_flags &=
++			~(LL_SBI_ENCRYPT | LL_SBI_TEST_DUMMY_ENCRYPTION);
++}
++
++static bool ll_empty_dir(struct inode *inode)
++{
++	/* used by llcrypt_ioctl_set_policy(), because a policy can only be set
++	 * on an empty dir.
++	 */
++	/* Here we choose to return true, meaning we always call .set_context.
++	 * Then we rely on server side, with mdd_fix_attr() that calls
++	 * mdd_dir_is_empty() when setting encryption flag on directory.
++	 */
++	return true;
++}
++
++const struct llcrypt_operations lustre_cryptops = {
++	.key_prefix		= "lustre:",
++	.get_context		= ll_get_context,
++	.set_context		= ll_set_context,
++	.dummy_context		= ll_dummy_context,
++	.empty_dir		= ll_empty_dir,
++	.max_namelen		= NAME_MAX,
++};
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index be3a0b0..96585a7 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -44,9 +44,11 @@
+ #include <lustre_mdc.h>
+ #include <lustre_intent.h>
+ #include <linux/compat.h>
++#include <lustre_crypto.h>
+ #include <linux/namei.h>
+ #include <linux/xattr.h>
+ #include <linux/posix_acl_xattr.h>
++
+ #include "vvp_internal.h"
+ #include "range_lock.h"
+ #include "pcc.h"
+@@ -551,6 +553,8 @@ enum stats_track_type {
+ 					  */
+ #define LL_SBI_TINY_WRITE	0x2000000 /* tiny write support */
+ #define LL_SBI_FILE_HEAT    0x4000000 /* file heat support */
++#define LL_SBI_TEST_DUMMY_ENCRYPTION	0x8000000 /* test dummy encryption */
++#define LL_SBI_ENCRYPT	   0x10000000 /* client side encryption */
+ #define LL_SBI_FLAGS {	\
+ 	"nolck",	\
+ 	"checksum",	\
+@@ -579,6 +583,8 @@ enum stats_track_type {
+ 	"pio",		\
+ 	"tiny_write",	\
+ 	"file_heat",	\
++	"test_dummy_encryption", \
++	"noencrypt",	\
+ }
+ 
+ /*
+@@ -1578,4 +1584,24 @@ static inline struct pcc_super *ll_info2pccs(struct ll_inode_info *lli)
+ 	return ll_i2pccs(ll_info2i(lli));
+ }
+ 
++#ifdef CONFIG_FS_ENCRYPTION
++/* crypto.c */
++extern const struct llcrypt_operations lustre_cryptops;
++
++#else /* !CONFIG_FS_ENCRYPTION */
++inline bool ll_sbi_has_test_dummy_encryption(struct ll_sb_info *sbi)
++{
++	return false;
++}
++
++inline bool ll_sbi_has_encrypt(struct ll_sb_info *sbi)
++{
++	return false;
++}
++
++inline void ll_sbi_set_encrypt(struct ll_sb_info *sbi, bool set)
++{
++}
++#endif /* !CONFIG_FS_ENCRYPTION */
++
+ #endif /* LLITE_INTERNAL_H */
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 05d949b..5639b16 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -155,6 +155,7 @@ static struct ll_sb_info *ll_init_sbi(void)
+ 	sbi->ll_flags |= LL_SBI_AGL_ENABLED;
+ 	sbi->ll_flags |= LL_SBI_FAST_READ;
+ 	sbi->ll_flags |= LL_SBI_TINY_WRITE;
++	ll_sbi_set_encrypt(sbi, true);
+ 
+ 	/* root squash */
+ 	sbi->ll_squash.rsi_uid = 0;
+@@ -551,6 +552,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ #if THREAD_SIZE >= 8192 /*b=17630*/
+ 	sb->s_export_op = &lustre_export_operations;
+ #endif
++	llcrypt_set_ops(sb, &lustre_cryptops);
+ 
+ 	/* make root inode
+ 	 * XXX: move this to after cbd setup?
+@@ -923,6 +925,25 @@ static int ll_options(char *options, struct ll_sb_info *sbi)
+ 			*flags |= tmp;
+ 			goto next;
+ 		}
++		tmp = ll_set_opt("test_dummy_encryption", s1,
++				 LL_SBI_TEST_DUMMY_ENCRYPTION);
++		if (tmp) {
++#ifdef CONFIG_FS_ENCRYPTION
++			*flags |= tmp;
++#else
++			LCONSOLE_WARN("Test dummy encryption mount option ignored: encryption not supported\n");
++#endif
++			goto next;
++		}
++		tmp = ll_set_opt("noencrypt", s1, LL_SBI_ENCRYPT);
++		if (tmp) {
++#ifdef CONFIG_FS_ENCRYPTION
++			*flags &= ~tmp;
++#else
++			LCONSOLE_WARN("noencrypt mount option ignored: encryption not supported\n");
++#endif
++			goto next;
++		}
+ 		LCONSOLE_ERROR_MSG(0x152, "Unknown option '%s', won't mount.\n",
+ 				   s1);
+ 		return -EINVAL;
+@@ -1558,6 +1579,8 @@ void ll_clear_inode(struct inode *inode)
+ 	 * cl_object still uses inode lsm.
+ 	 */
+ 	cl_inode_fini(inode);
++
++	llcrypt_put_encryption_info(inode);
+ }
+ 
+ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data)
+@@ -1978,6 +2001,8 @@ void ll_update_inode_flags(struct inode *inode, int ext_flags)
+ {
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ 
++	/* do not clear encryption flag */
++	ext_flags |= ll_inode_to_ext_flags(inode->i_flags) & LUSTRE_ENCRYPT_FL;
+ 	inode->i_flags = ll_ext_to_inode_flags(ext_flags);
+ 	if (ext_flags & LUSTRE_PROJINHERIT_FL)
+ 		set_bit(LLIF_PROJECT_INHERIT, &lli->lli_flags);
+@@ -2702,6 +2727,14 @@ int ll_show_options(struct seq_file *seq, struct dentry *dentry)
+ 	if (sbi->ll_flags & LL_SBI_ALWAYS_PING)
+ 		seq_puts(seq, ",always_ping");
+ 
++	if (ll_sbi_has_test_dummy_encryption(sbi))
++		seq_puts(seq, ",test_dummy_encryption");
++
++	if (ll_sbi_has_encrypt(sbi))
++		seq_puts(seq, ",encrypt");
++	else
++		seq_puts(seq, ",noencrypt");
++
+ 	return 0;
+ }
+ 
+diff --git a/fs/lustre/llite/super25.c b/fs/lustre/llite/super25.c
+index 006be6b..8eb3fc3 100644
+--- a/fs/lustre/llite/super25.c
++++ b/fs/lustre/llite/super25.c
+@@ -63,6 +63,7 @@ static void ll_inode_destroy_callback(struct rcu_head *head)
+ 	struct inode *inode = container_of(head, struct inode, i_rcu);
+ 	struct ll_inode_info *ptr = ll_i2info(inode);
+ 
++	llcrypt_free_inode(inode);
+ 	kmem_cache_free(ll_inode_cachep, ptr);
+ }
+ 
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index d0b43c8..d4df989 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1108,6 +1108,8 @@ struct lov_mds_md_v1 {		/* LOV EA mds/wire data (little-endian) */
+ #define XATTR_NAME_HSM		"trusted.hsm"
+ #define XATTR_NAME_LFSCK_NAMESPACE "trusted.lfsck_namespace"
+ 
++#define LL_XATTR_NAME_ENCRYPTION_CONTEXT XATTR_SECURITY_PREFIX"c"
++
+ struct lov_mds_md_v3 {		/* LOV EA mds/wire data (little-endian) */
+ 	__u32 lmm_magic;	/* magic number = LOV_MAGIC_V3 */
+ 	__u32 lmm_pattern;	/* LOV_PATTERN_RAID0, LOV_PATTERN_RAID1 */
+@@ -1571,6 +1573,16 @@ enum {
+ 	LUSTRE_TOPDIR_FL	= 0x00020000, /* Top of directory hierarchies*/
+ 	LUSTRE_INLINE_DATA_FL	= 0x10000000, /* Inode has inline data. */
+ 	LUSTRE_PROJINHERIT_FL	= 0x20000000, /* Create with parents projid */
++
++	/* These flags will not be identical to any EXT4_*_FL counterparts,
++	 * and only reserved for lustre purpose. Note: these flags might
++	 * be conflict with some of EXT4 flags, so
++	 * 1. these conflict flags needs to be removed when the flag is
++	 * wired by la_flags see osd_attr_get().
++	 * 2. If these flags needs to be stored into inode, they will be
++	 * stored in LMA. see LMAI_XXXX
++	 */
++	LUSTRE_ENCRYPT_FL       = 0x00800000, /* encrypted file */
+ };
+ 
+ /* 64 possible states */
 -- 
 1.8.3.1
