@@ -1,73 +1,46 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:27:02 -0400
-Subject: [lustre-devel] [PATCH 06/20] lustre: uapi: change LUSTRE_*_FL
- defines to enum
+Date: Sat, 13 Jun 2020 12:27:04 -0400
+Subject: [lustre-devel] [PATCH 08/20] lustre: lmv: check stripe FID sanity
 In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Di Wang <di.wang@intel.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-The preferred style in the case of LUSTRE_*_FL is to use enum.
+Striped directory layout may be broken, if some stripe FID is insane,
+return -ENODEV.
 
-Fixes: d344c54f4a90c ("lustre: llite: handle ORPHAN/DEAD directories")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7579
-Lustre-commit: 098fb363c39 ("LU-7579 osd: move ORPHAN/DEAD flag to OSD")
-Signed-off-by: Di Wang <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/18024
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13437
+Lustre-commit: 698a496aac51e ("LU-13437 lmv: check stripe FID sanity")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/38560
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_idl.h | 30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ fs/lustre/lmv/lmv_obd.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index bb3f5f1..800154d 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1537,19 +1537,23 @@ enum {
- #define MDS_STATUS_CONN 1
- #define MDS_STATUS_LOV 2
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 4583cea..203a17b 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -1539,6 +1539,10 @@ static struct lu_tgt_desc *lmv_locate_tgt_rr(struct lmv_obd *lmv, u32 *mdt)
+ 			return ERR_CAST(oinfo);
+ 	}
  
--/* these should be identical to their EXT4_*_FL counterparts, they are
-- * redefined here only to avoid dragging in fs/ext4/ext4.h
-- */
--#define LUSTRE_SYNC_FL		0x00000008 /* Synchronous updates */
--#define LUSTRE_IMMUTABLE_FL	0x00000010 /* Immutable file */
--#define LUSTRE_APPEND_FL	0x00000020 /* writes to file may only append */
--#define LUSTRE_NODUMP_FL	0x00000040 /* do not dump file */
--#define LUSTRE_NOATIME_FL	0x00000080 /* do not update atime */
--#define LUSTRE_INDEX_FL		0x00001000 /* hash-indexed directory */
--#define LUSTRE_DIRSYNC_FL	0x00010000 /* dirsync behaviour (dir only) */
--#define LUSTRE_TOPDIR_FL	0x00020000 /* Top of directory hierarchies*/
--#define LUSTRE_INLINE_DATA_FL	0x10000000 /* Inode has inline data. */
--#define LUSTRE_PROJINHERIT_FL	0x20000000 /* Create with parents projid */
-+enum {
-+	/* these should be identical to their EXT4_*_FL counterparts, they are
-+	 * redefined here only to avoid dragging in fs/ext4/ext4.h
-+	 */
-+	LUSTRE_SYNC_FL		= 0x00000008, /* Synchronous updates */
-+	LUSTRE_IMMUTABLE_FL	= 0x00000010, /* Immutable file */
-+	LUSTRE_APPEND_FL	= 0x00000020, /* writes to file may only
-+					       * append
-+					       */
-+	LUSTRE_NODUMP_FL	= 0x00000040, /* do not dump file */
-+	LUSTRE_NOATIME_FL	= 0x00000080, /* do not update atime */
-+	LUSTRE_INDEX_FL		= 0x00001000, /* hash-indexed directory */
-+	LUSTRE_DIRSYNC_FL	= 0x00010000, /* dirsync behaviour (dir only) */
-+	LUSTRE_TOPDIR_FL	= 0x00020000, /* Top of directory hierarchies*/
-+	LUSTRE_INLINE_DATA_FL	= 0x10000000, /* Inode has inline data. */
-+	LUSTRE_PROJINHERIT_FL	= 0x20000000, /* Create with parents projid */
-+};
- 
- /* 64 possible states */
- enum md_transient_state {
++	/* check stripe FID is sane */
++	if (!fid_is_sane(&oinfo->lmo_fid))
++		return ERR_PTR(-ENODEV);
++
+ 	*fid = oinfo->lmo_fid;
+ 	*mds = oinfo->lmo_mds;
+ 	tgt = lmv_tgt(lmv, oinfo->lmo_mds);
 -- 
 1.8.3.1
