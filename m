@@ -1,75 +1,95 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:27:03 -0400
-Subject: [lustre-devel] [PATCH 07/20] lustre: SEL: Add flag & setstripe
- support
+Date: Sat, 13 Jun 2020 12:27:05 -0400
+Subject: [lustre-devel] [PATCH 09/20] lustre: ptlrpc: Clear bd_registered in
+ ptlrpc_unregister_bulk
 In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Patrick Farrell <paf@cray.com>
+From: Chris Horn <hornc@cray.com>
 
-The self-extending layouts feature adds a new layout flag
-and also uses the stripe size field differently.
+The patch for LU-12816 https://review.whamcloud.com/36309 has us
+clearing the bd_registered flag in ptl_send_rpc(). This flag is set
+in ptlrpc_register_bulk(), so it makes sense for us to clear it in
+ptlrpc_unregister_bulk(). When we're cleaning up in ptl_send_rpc()
+we can be sure the flag is cleared with the call to
+ptlrpc_unregister_bulk().
 
-This patch implements this basic functionality, to be used
-in subsequent patches.
+This commit also adds a test case for the LU-12816 bug.
 
-Cray-bug-id: LUS-2528
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10070
-Lustre-commit: fed241911f61b ("LU-10070 lod: SEL: Add flag & setstripe support")
-Signed-off-by: Patrick Farrell <paf@cray.com>
-Reviewed-on: https://review.whamcloud.com/33782
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Fixes: 1010595a9bb6 ("lustre: ptlrpc: ptlrpc_register_bulk LBUG on ENOMEM")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13509
+Lustre-commit: 15057a17ca1e2 ("LU-13509 ptlrpc: Clear bd_registered in ptlrpc_unregister_bulk")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/38457
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/wiretest.c             | 1 +
- include/uapi/linux/lustre/lustre_user.h | 8 ++++----
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ fs/lustre/include/obd_support.h |  1 +
+ fs/lustre/ptlrpc/niobuf.c       | 18 +++++++++++++-----
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index dc1d0af..719d73b 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -1659,6 +1659,7 @@ void lustre_assert_wire_constants(void)
- 	BUILD_BUG_ON(LCME_FL_OFFLINE != 0x00000008);
- 	BUILD_BUG_ON(LCME_FL_INIT != 0x00000010);
- 	BUILD_BUG_ON(LCME_FL_NOSYNC != 0x00000020);
-+	BUILD_BUG_ON(LCME_FL_EXTENSION != 0x00000040);
- 	BUILD_BUG_ON(LCME_FL_NEG != 0x80000000);
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index b706a20..d1d21e0 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -362,6 +362,7 @@
+ #define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK			0x51b
+ #define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK		0x51c
+ #define OBD_FAIL_PTLRPC_BULK_ATTACH			0x521
++#define OBD_FAIL_PTLRPC_BULK_REPLY_ATTACH		0x522
+ #define OBD_FAIL_PTLRPC_ROUND_XID			0x530
+ #define OBD_FAIL_PTLRPC_CONNECT_RACE			0x531
  
- 	/* Checks for struct lov_comp_md_v1 */
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index b255f14..004d373 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -548,17 +548,17 @@ enum lov_comp_md_entry_flags {
- 	LCME_FL_OFFLINE		= 0x00000008,	/* Not used */
- 	LCME_FL_INIT		= 0x00000010,	/* instantiated */
- 	LCME_FL_NOSYNC		= 0x00000020,	/* FLR: no sync for the mirror */
-+	LCME_FL_EXTENSION	= 0x00000040,	/* extension comp, never init */
- 	LCME_FL_NEG		= 0x80000000,	/* used to indicate a negative
- 						 * flag, won't be stored on disk
- 						 */
- };
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index d62629a..331a0c8 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -250,6 +250,9 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
  
- #define LCME_KNOWN_FLAGS	(LCME_FL_NEG | LCME_FL_INIT | LCME_FL_STALE | \
--				 LCME_FL_PREF_RW | LCME_FL_NOSYNC)
--/* The flags can be set by users at mirror creation time. */
--#define LCME_USER_FLAGS		(LCME_FL_PREF_RW)
-+				 LCME_FL_PREF_RW | LCME_FL_NOSYNC | \
-+				 LCME_FL_EXTENSION)
+ 	LASSERT(!in_interrupt());     /* might sleep */
  
--/* The flags are for mirrors */
-+/* The mirror flags sent by client */
- #define LCME_MIRROR_FLAGS	(LCME_FL_NOSYNC)
++	if (desc)
++		desc->bd_registered = 0;
++
+ 	/* Let's setup deadline for reply unlink. */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK) &&
+ 	    async && req->rq_bulk_deadline == 0 && cfs_fail_val == 0)
+@@ -614,9 +617,16 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 			request->rq_repmsg = NULL;
+ 		}
  
- /* the highest bit in obdo::o_layout_version is used to mark if the file is
+-		reply_me = LNetMEAttach(request->rq_reply_portal,
+-					connection->c_peer, request->rq_xid, 0,
+-					LNET_UNLINK, LNET_INS_AFTER);
++		if (request->rq_bulk &&
++		    OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_BULK_REPLY_ATTACH)) {
++			reply_me = ERR_PTR(-ENOMEM);
++		} else {
++			reply_me = LNetMEAttach(request->rq_reply_portal,
++						connection->c_peer,
++						request->rq_xid, 0,
++						LNET_UNLINK, LNET_INS_AFTER);
++		}
++
+ 		if (IS_ERR(reply_me)) {
+ 			rc = PTR_ERR(reply_me);
+ 			CERROR("LNetMEAttach failed: %d\n", rc);
+@@ -724,8 +734,6 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	 * the chance to have long unlink to sluggish net is smaller here.
+ 	 */
+ 	ptlrpc_unregister_bulk(request, 0);
+-	if (request->rq_bulk)
+-		request->rq_bulk->bd_registered = 0;
+ out:
+ 	if (rc == -ENOMEM) {
+ 		/*
 -- 
 1.8.3.1
