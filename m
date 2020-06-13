@@ -1,130 +1,100 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:27:15 -0400
-Subject: [lustre-devel] [PATCH 19/20] lustre: mdc: allow setting
- max_mod_rpcs_in_flight larger
-In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-20-git-send-email-jsimmons@infradead.org>
+Date: Sat, 13 Jun 2020 12:26:56 -0400
+Subject: [lustre-devel] [PATCH 00/20] lustre: patches landed for week of
+ June 8 2020
+Message-ID: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+Several patches from Neil tree to address bugs specific to linux
+client. Backport patches from OpenSFS tree for the week of June 8
+2020 and a few to support building the Lustre utilities.
 
-Allow setting mdc.*.max_mod_rpcs_in_flight > mdc.*.max_rpcs_in_flight
-by increasing the latter value, rather than returning an error and
-telling the user to do that.  This matches the similar behavior if
-mdc.*.max_rpcs_in_flight is reduced lower than max_mod_rpcs_in_flight.
+Alexey Lyashkov (2):
+  lustre: ptlrpc: separate number MD and refrences for bulk
+  lustre: ptlrpc: fill md correctly.
 
-If there are multiple MDTs, the "mdc.*.max_mod_rpcs_in_flight" param
-may be set from e.g. the MDT0000 config log before MDT0001 is fully
-configured, catching MDT0001 with ocd_maxmodrpcs = 0 before the OCD
-from the MDT has been filled in, and incorrectly trigger an error.
-If seen during setup, allow ocd_maxmodrpcs = (max_rpcs_in_flight - 1),
-since this will be fixed up later if mdc.*.max_rpcs_in_flight is set
-smaller in the config log (if set larger it doesn't matter).
+Andreas Dilger (1):
+  lustre: mdc: allow setting max_mod_rpcs_in_flight larger
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13503
-Lustre-commit: 6d314902e6d19 ("LU-13503 mdc: allow setting max_mod_rpcs_in_flight larger")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Signed-off-by: Jian Yu <yujian@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38455
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- fs/lustre/obdclass/genops.c | 50 +++++++++++++++++++++++++++++++++------------
- 1 file changed, 37 insertions(+), 13 deletions(-)
+Bobi Jam (1):
+  lustre: llite: don't check mirror info for page discard
 
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index 607f0d6..1647fe9 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -1324,7 +1324,6 @@ u32 obd_get_max_rpcs_in_flight(struct client_obd *cli)
- int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- {
- 	struct obd_request_slot_waiter *orsw;
--	const char *type_name;
- 	u32 old;
- 	int diff;
- 	int rc;
-@@ -1333,14 +1332,18 @@ int obd_set_max_rpcs_in_flight(struct client_obd *cli, u32 max)
- 	if (max > OBD_MAX_RIF_MAX || max < 1)
- 		return -ERANGE;
- 
--	type_name = cli->cl_import->imp_obd->obd_type->typ_name;
--	if (!strcmp(type_name, LUSTRE_MDC_NAME)) {
-+	CDEBUG(D_INFO, "%s: max = %hu max_mod = %u rif = %u\n",
-+	       cli->cl_import->imp_obd->obd_name, max,
-+	       cli->cl_max_mod_rpcs_in_flight, cli->cl_max_rpcs_in_flight);
-+
-+	if (strcmp(cli->cl_import->imp_obd->obd_type->typ_name,
-+		   LUSTRE_MDC_NAME) == 0) {
- 		/*
- 		 * adjust max_mod_rpcs_in_flight to ensure it is always
- 		 * strictly lower that max_rpcs_in_flight
- 		 */
- 		if (max < 2) {
--			CERROR("%s: cannot set max_rpcs_in_flight to 1 because it must be higher than max_mod_rpcs_in_flight value\n",
-+			CERROR("%s: cannot set mdc.*.max_rpcs_in_flight=1\n",
- 			       cli->cl_import->imp_obd->obd_name);
- 			return -ERANGE;
- 		}
-@@ -1385,22 +1388,43 @@ int obd_set_max_mod_rpcs_in_flight(struct client_obd *cli, u16 max)
- 	if (max > OBD_MAX_RIF_MAX || max < 1)
- 		return -ERANGE;
- 
--	/* cannot exceed or equal max_rpcs_in_flight */
-+	CDEBUG(D_INFO, "%s: max = %hu flags = %llx, max_mod = %u rif = %u\n",
-+	       cli->cl_import->imp_obd->obd_name, max, ocd->ocd_connect_flags,
-+	       ocd->ocd_maxmodrpcs, cli->cl_max_rpcs_in_flight);
-+
-+	if (max == OBD_MAX_RIF_MAX)
-+		max = OBD_MAX_RIF_MAX - 1;
-+
-+	/* Cannot exceed or equal max_rpcs_in_flight.  If we are asked to
-+	 * increase this value, also bump up max_rpcs_in_flight to match.
-+	 */
- 	if (max >= cli->cl_max_rpcs_in_flight) {
--		CERROR("%s: can't set max_mod_rpcs_in_flight to a value (%hu) higher or equal to max_rpcs_in_flight value (%u)\n",
--		       cli->cl_import->imp_obd->obd_name,
--		       max, cli->cl_max_rpcs_in_flight);
-+		CDEBUG(D_INFO,
-+		       "%s: increasing max_rpcs_in_flight=%hu to allow larger max_mod_rpcs_in_flight=%u\n",
-+		       cli->cl_import->imp_obd->obd_name, max + 1, max);
- 		return -ERANGE;
- 	}
- 
--	/* cannot exceed max modify RPCs in flight supported by the server */
--	ocd = &cli->cl_import->imp_connect_data;
--	if (ocd->ocd_connect_flags & OBD_CONNECT_MULTIMODRPCS)
-+	/* cannot exceed max modify RPCs in flight supported by the server,
-+	 * but verify ocd_connect_flags is at least initialized first.  If
-+	 * not, allow it and fix value later in ptlrpc_connect_set_flags().
-+	 */
-+	if (!ocd->ocd_connect_flags) {
-+		maxmodrpcs = cli->cl_max_rpcs_in_flight - 1;
-+	} else if (ocd->ocd_connect_flags & OBD_CONNECT_MULTIMODRPCS) {
- 		maxmodrpcs = ocd->ocd_maxmodrpcs;
--	else
-+		if (maxmodrpcs == 0) { /* connection not finished yet */
-+			maxmodrpcs = cli->cl_max_rpcs_in_flight - 1;
-+			CDEBUG(D_INFO,
-+			       "%s: partial connect, assume maxmodrpcs=%hu\n",
-+			       cli->cl_import->imp_obd->obd_name, maxmodrpcs);
-+		}
-+	} else {
- 		maxmodrpcs = 1;
-+	}
-+
- 	if (max > maxmodrpcs) {
--		CERROR("%s: can't set max_mod_rpcs_in_flight to a value (%hu) higher than max_mod_rpcs_per_client value (%hu) returned by the server at connection\n",
-+		CERROR("%s: can't set max_mod_rpcs_in_flight=%hu higher than ocd_maxmodrpcs=%hu returned by the server at connection\n",
- 		       cli->cl_import->imp_obd->obd_name,
- 		       max, maxmodrpcs);
- 		return -ERANGE;
+Chris Horn (1):
+  lustre: ptlrpc: Clear bd_registered in ptlrpc_unregister_bulk
+
+Di Wang (1):
+  lustre: uapi: change LUSTRE_*_FL defines to enum
+
+Lai Siyao (2):
+  lustre: lmv: check stripe FID sanity
+  lustre: dne: directory restripe and auto split
+
+Mr NeilBrown (1):
+  lnet: fix uninitialize var in choose_ipv4_src()
+
+NeilBrown (5):
+  lnet: fix kmalloc size in config.c
+  lnet: test against LNET_STATE_RUNNING rather than LNET_STATE_SHUTDOWN
+  lnet: use lnet_md_free in lnet_res_container_cleanup()
+  lustre: obdclass: discard process_quota_config
+  lnet: socklnd: remove comments about "darwin".
+
+Patrick Farrell (2):
+  lustre: SEL: Add flag & setstripe support
+  lustre: obd: Rename OS_STATE flags to OS_STATFS
+
+Sebastien Buisson (3):
+  lustre: sec: documentation for client-side encryption
+  lustre: sec: enable client side encryption
+  lustre: sec: control client side encryption
+
+Sonia Sharma (1):
+  lnet: o2iblnd: 'Timed out tx' error message
+
+ .../client_side_encryption/access_semantics.txt    | 128 +++++++++++++++++
+ .../client_side_encryption/key_hierarchy.txt       | 112 +++++++++++++++
+ .../lustre/client_side_encryption/modes_usage.txt  |  97 +++++++++++++
+ .../lustre/client_side_encryption/threat_model.txt | 159 +++++++++++++++++++++
+ fs/lustre/include/lustre_crypto.h                  | 106 ++++++++++++++
+ fs/lustre/include/lustre_lmv.h                     |  20 ++-
+ fs/lustre/include/lustre_net.h                     |   9 +-
+ fs/lustre/include/obd_class.h                      |   4 +-
+ fs/lustre/include/obd_support.h                    |   7 +
+ fs/lustre/llite/Makefile                           |   1 +
+ fs/lustre/llite/crypto.c                           | 132 +++++++++++++++++
+ fs/lustre/llite/dir.c                              |  25 +---
+ fs/lustre/llite/llite_internal.h                   |  43 ++++++
+ fs/lustre/llite/llite_lib.c                        |  58 +++++++-
+ fs/lustre/llite/super25.c                          |   1 +
+ fs/lustre/lmv/lmv_obd.c                            |   6 +-
+ fs/lustre/lov/lov_io.c                             |   9 +-
+ fs/lustre/obdclass/genops.c                        |  50 +++++--
+ fs/lustre/obdclass/obd_config.c                    |  10 --
+ fs/lustre/ptlrpc/client.c                          |  24 +++-
+ fs/lustre/ptlrpc/events.c                          |   6 +-
+ fs/lustre/ptlrpc/niobuf.c                          |  40 +++---
+ fs/lustre/ptlrpc/pers.c                            |  20 ++-
+ fs/lustre/ptlrpc/wiretest.c                        |  29 ++--
+ include/uapi/linux/lustre/lustre_idl.h             |  60 ++++++--
+ include/uapi/linux/lustre/lustre_user.h            |  28 ++--
+ net/lnet/klnds/o2iblnd/o2iblnd.h                   |   2 +
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c                |  26 +++-
+ net/lnet/klnds/socklnd/socklnd_cb.c                |   8 --
+ net/lnet/lnet/api-ni.c                             |  10 +-
+ net/lnet/lnet/config.c                             |   6 +-
+ net/lnet/lnet/lib-socket.c                         |   2 +-
+ net/lnet/lnet/peer.c                               |   6 +-
+ 33 files changed, 1091 insertions(+), 153 deletions(-)
+ create mode 100644 Documentation/lustre/client_side_encryption/access_semantics.txt
+ create mode 100644 Documentation/lustre/client_side_encryption/key_hierarchy.txt
+ create mode 100644 Documentation/lustre/client_side_encryption/modes_usage.txt
+ create mode 100644 Documentation/lustre/client_side_encryption/threat_model.txt
+ create mode 100644 fs/lustre/include/lustre_crypto.h
+ create mode 100644 fs/lustre/llite/crypto.c
+
 -- 
 1.8.3.1
