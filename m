@@ -1,76 +1,73 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:26:58 -0400
-Subject: [lustre-devel] [PATCH 02/20] lnet: test against LNET_STATE_RUNNING
- rather than LNET_STATE_SHUTDOWN
+Date: Sat, 13 Jun 2020 12:27:02 -0400
+Subject: [lustre-devel] [PATCH 06/20] lustre: uapi: change LUSTRE_*_FL
+ defines to enum
 In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.de>
+From: Di Wang <di.wang@intel.com>
 
-The difference between LNET_STATE_STOPPING and LNET_STATE_SHUTDOWN
-is of little interest.  As soon as the state isn't
-LNET_STATE_RUNNING, various API calls should refuse
-to act.
+The preferred style in the case of LUSTRE_*_FL is to use enum.
 
-So change tests for SHUTDOWN to instead compare against
-RUNNING.
-
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: NeilBrown <neilb@suse.de>
+Fixes: d344c54f4a90c ("lustre: llite: handle ORPHAN/DEAD directories")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-7579
+Lustre-commit: 098fb363c39 ("LU-7579 osd: move ORPHAN/DEAD flag to OSD")
+Signed-off-by: Di Wang <di.wang@intel.com>
+Reviewed-on: http://review.whamcloud.com/18024
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/api-ni.c | 2 +-
- net/lnet/lnet/peer.c   | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ include/uapi/linux/lustre/lustre_idl.h | 30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index 62b4fa7..7c91800 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -309,7 +309,7 @@ static int lnet_discover(struct lnet_process_id id, u32 force,
- 	 * changing the value dynamically, we want to set it after
- 	 * updating the peers
- 	 */
--	if (the_lnet.ln_state == LNET_STATE_SHUTDOWN) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		*discovery_off = value;
- 		mutex_unlock(&the_lnet.ln_api_mutex);
- 		return 0;
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 5869a20..f745394 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -810,7 +810,7 @@ struct lnet_peer_ni *
- 	int rc;
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index bb3f5f1..800154d 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1537,19 +1537,23 @@ enum {
+ #define MDS_STATUS_CONN 1
+ #define MDS_STATUS_LOV 2
  
- 	rc = -ESHUTDOWN;
--	if (the_lnet.ln_state == LNET_STATE_SHUTDOWN)
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING)
- 		goto done;
+-/* these should be identical to their EXT4_*_FL counterparts, they are
+- * redefined here only to avoid dragging in fs/ext4/ext4.h
+- */
+-#define LUSTRE_SYNC_FL		0x00000008 /* Synchronous updates */
+-#define LUSTRE_IMMUTABLE_FL	0x00000010 /* Immutable file */
+-#define LUSTRE_APPEND_FL	0x00000020 /* writes to file may only append */
+-#define LUSTRE_NODUMP_FL	0x00000040 /* do not dump file */
+-#define LUSTRE_NOATIME_FL	0x00000080 /* do not update atime */
+-#define LUSTRE_INDEX_FL		0x00001000 /* hash-indexed directory */
+-#define LUSTRE_DIRSYNC_FL	0x00010000 /* dirsync behaviour (dir only) */
+-#define LUSTRE_TOPDIR_FL	0x00020000 /* Top of directory hierarchies*/
+-#define LUSTRE_INLINE_DATA_FL	0x10000000 /* Inode has inline data. */
+-#define LUSTRE_PROJINHERIT_FL	0x20000000 /* Create with parents projid */
++enum {
++	/* these should be identical to their EXT4_*_FL counterparts, they are
++	 * redefined here only to avoid dragging in fs/ext4/ext4.h
++	 */
++	LUSTRE_SYNC_FL		= 0x00000008, /* Synchronous updates */
++	LUSTRE_IMMUTABLE_FL	= 0x00000010, /* Immutable file */
++	LUSTRE_APPEND_FL	= 0x00000020, /* writes to file may only
++					       * append
++					       */
++	LUSTRE_NODUMP_FL	= 0x00000040, /* do not dump file */
++	LUSTRE_NOATIME_FL	= 0x00000080, /* do not update atime */
++	LUSTRE_INDEX_FL		= 0x00001000, /* hash-indexed directory */
++	LUSTRE_DIRSYNC_FL	= 0x00010000, /* dirsync behaviour (dir only) */
++	LUSTRE_TOPDIR_FL	= 0x00020000, /* Top of directory hierarchies*/
++	LUSTRE_INLINE_DATA_FL	= 0x10000000, /* Inode has inline data. */
++	LUSTRE_PROJINHERIT_FL	= 0x20000000, /* Create with parents projid */
++};
  
- 	lncpt = cfs_percpt_number(the_lnet.ln_peer_tables);
-@@ -1805,7 +1805,7 @@ struct lnet_peer_ni *
- 	lnet_net_lock(cpt);
- 
- 	/* Lock has been dropped, check again for shutdown. */
--	if (the_lnet.ln_state == LNET_STATE_SHUTDOWN) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		if (!IS_ERR(lpni))
- 			lnet_peer_ni_decref_locked(lpni);
- 		lpni = ERR_PTR(-ESHUTDOWN);
-@@ -2816,7 +2816,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
- 	 * LNET_LOCK_EX mode is used.
- 	 */
- 	mutex_lock(&the_lnet.ln_api_mutex);
--	if (the_lnet.ln_state == LNET_STATE_SHUTDOWN) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		rc = -ESHUTDOWN;
- 		goto out;
- 	}
+ /* 64 possible states */
+ enum md_transient_state {
 -- 
 1.8.3.1
