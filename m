@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:26:59 -0400
-Subject: [lustre-devel] [PATCH 03/20] lnet: use lnet_md_free in
- lnet_res_container_cleanup()
+Date: Sat, 13 Jun 2020 12:27:00 -0400
+Subject: [lustre-devel] [PATCH 04/20] lustre: obdclass: discard
+ process_quota_config
 In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
 References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,35 +13,44 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.de>
 
-When we added lnet_md_free(), we should have called it
-from lnet_res_container_cleanup() - but that was missed.
-Fix it now.
+This variable is never set, so it can be discarded since it is
+server side only.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Should the server side quota layer need configuration, it should
+use class_modify_config().
+
 Signed-off-by: NeilBrown <neilb@suse.de>
 ---
- net/lnet/lnet/api-ni.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ fs/lustre/obdclass/obd_config.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index 7c91800..d6694cb 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -927,12 +927,10 @@ static void lnet_assert_wire_constants(void)
- 		struct list_head *e = rec->rec_active.next;
+diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
+index b8973db..5495609 100644
+--- a/fs/lustre/obdclass/obd_config.c
++++ b/fs/lustre/obdclass/obd_config.c
+@@ -764,11 +764,6 @@ void class_del_profiles(void)
+ }
+ EXPORT_SYMBOL(class_del_profiles);
  
- 		list_del_init(e);
--		if (rec->rec_type == LNET_COOKIE_TYPE_MD) {
--			kfree(list_entry(e, struct lnet_libmd, md_list));
+-/* We can't call lquota_process_config directly because
+- * it lives in a module that must be loaded after this one.
+- */
+-static int (*quota_process_config)(struct lustre_cfg *lcfg);
 -
--		} else { /* NB: Active MEs should be attached on portals */
-+		if (rec->rec_type == LNET_COOKIE_TYPE_MD)
-+			lnet_md_free(list_entry(e, struct lnet_libmd, md_list));
-+		else /* NB: Active MEs should be attached on portals */
- 			LBUG();
--		}
- 		count++;
- 	}
+ static int process_param2_config(struct lustre_cfg *lcfg)
+ {
+ 	char *param = lustre_cfg_string(lcfg, 1);
+@@ -949,11 +944,6 @@ int class_process_config(struct lustre_cfg *lcfg)
  
+ 			err = 0;
+ 			goto out;
+-		} else if ((class_match_param(lustre_cfg_string(lcfg, 1),
+-					      PARAM_QUOTA, &tmp) == 0) &&
+-			   quota_process_config) {
+-			err = (*quota_process_config)(lcfg);
+-			goto out;
+ 		}
+ 
+ 		break;
 -- 
 1.8.3.1
