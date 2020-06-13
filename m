@@ -1,29 +1,62 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Mon, 8 Jun 2020 17:54:46 +0000
-Subject: [lustre-devel] Lustre 2.12.5 released
-Message-ID: <AAB1975B-61B1-4153-8881-EC9872D1B095@ddn.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sat, 13 Jun 2020 12:26:57 -0400
+Subject: [lustre-devel] [PATCH 01/20] lnet: fix kmalloc size in config.c
+In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
+References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1592065636-28333-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We are pleased to announce that the Lustre 2.12.5 Release has been declared GA and is available for download<https://downloads.whamcloud.com/public/lustre/lustre-2.12.5/>. You can also grab the source from git <https://git.whamcloud.com/?p=fs/lustre-release.git;a=commit;h=78d712a21973ef1f4b4f8e37f54fd2e293345c58> .
+From: NeilBrown <neilb@suse.de>
 
-Details of changes since 2.12.4<http://wiki.lustre.org/Lustre_2.12.4_Changelog> can be found in the 2.12.5 change log<http://wiki.lustre.org/Lustre_2.12.5_Changelog>.
+sizeof(net->net_cpts) should be sizeof(*net->net_cpts).
 
-There are the following notable enhancements over 2.12.4:
+For consistency, also change a sizeof(ni->ni_cpts[0]) to
+sizeof(*ni->ni_cpts).
 
-RHEL 7.8 is now supported for servers and clients  (LU-13566<https://jira.whamcloud.com/browse/LU-13566>) .
-RHEL 8.2 is now supported for clients  (LU-13488<https://jira.whamcloud.com/browse/LU-13488>) .
-SLES12 SP5 is now supported for clients  (LU-13111<https://jira.whamcloud.com/browse/LU-13111>) .
+and when allocating 'array' use sizeof(*array), not
+sizeof(*net->net_cpts);
 
-Please log any issues found in the issue tracking system<https://jira.whamcloud.com/>.
+Fixes: 47db2bfba415 ("lnet: add list of cpts to lnet_net.")
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: NeilBrown <neilb@suse.de>
+---
+ net/lnet/lnet/config.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks to all those who have contributed to the creation of this release.
-
-The next LTS release will be 2.12.6
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200608/fc635888/attachment.html>
+diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
+index 3fc0298..9f36c82 100644
+--- a/net/lnet/lnet/config.c
++++ b/net/lnet/lnet/config.c
+@@ -171,7 +171,7 @@ struct lnet_text_buf {		/* tmp struct for parsing routes */
+ 	}
+ 
+ 	if (!net->net_cpts) {
+-		net->net_cpts = kmalloc_array(ncpts, sizeof(net->net_cpts),
++		net->net_cpts = kmalloc_array(ncpts, sizeof(*net->net_cpts),
+ 					      GFP_KERNEL);
+ 		if (!net->net_cpts)
+ 			return -ENOMEM;
+@@ -197,7 +197,7 @@ struct lnet_text_buf {		/* tmp struct for parsing routes */
+ 		u32 *array = NULL, *loc;
+ 		u32 total_entries = j + net->net_ncpts;
+ 
+-		array = kmalloc_array(total_entries, sizeof(*net->net_cpts),
++		array = kmalloc_array(total_entries, sizeof(*array),
+ 				      GFP_KERNEL);
+ 		if (!array) {
+ 			rc = -ENOMEM;
+@@ -545,7 +545,7 @@ struct lnet_ni *
+ 	} else {
+ 		size_t array_size = ncpts * sizeof(ni->ni_cpts[0]);
+ 
+-		ni->ni_cpts = kmalloc_array(ncpts, sizeof(ni->ni_cpts[0]),
++		ni->ni_cpts = kmalloc_array(ncpts, sizeof(*ni->ni_cpts),
+ 					    GFP_KERNEL);
+ 		if (!ni->ni_cpts)
+ 			goto failed;
+-- 
+1.8.3.1
