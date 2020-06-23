@@ -1,106 +1,53 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 13 Jun 2020 12:27:16 -0400
-Subject: [lustre-devel] [PATCH 20/20] lnet: o2iblnd: 'Timed out tx' error
- message
-In-Reply-To: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-References: <1592065636-28333-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1592065636-28333-21-git-send-email-jsimmons@infradead.org>
+From: NeilBrown <neilb@suse.de>
+Date: Tue, 23 Jun 2020 14:10:52 +1000
+Subject: [lustre-devel] [PATCH 00/45] lustre: merged OpenSFS client
+ patches from April 30 to today
+In-Reply-To: <alpine.LFD.2.21.2006012345440.1967@casper.infradead.org>
+References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
+ <87sgfj6ypq.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.2006012345440.1967@casper.infradead.org>
+Message-ID: <87pn9q1kxf.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Sonia Sharma <sharmaso@whamcloud.com>
+On Mon, Jun 01 2020, James Simmons wrote:
 
-Fix the error message in kiblnd_check_txs_locked()
-to report the total RDMA time outstanding rather
-than the number of seconds past the deadline.
+>> > Merge the client side patches that landed to the OpenSFS
+>> > tree since Apirl 30 to today. Include a fid missing patches
+>> > as well and one patch to fix issues with 2 patches from the
+>> > earlier 600+ patch set. Please review to ensure their correctness.
+>> 
+>> Hi James,
+>> I tried applying these and hit lots of conflicts.
+>> What tree are they on top of?
+>
+> This is based off the top of my tree. Currently I'm using my tree as the 
+> OpenSFS version of the Linux client so I only add things that land. Your
+> tree is more the development / prototype tree since it has not yet landed
+> things. So most likely its the LNet LU-13004 work that is conflicting.
+> I also run the patches by checkpatch which has the LNET comment change 
+> that  wasn't in the OpenSFS branch until just recently; OpenSFS commit
+> d3f1ceeb123da9603cd5ee3acbd4ee638a995f10. That should reduce the conflicts
+> going forward. We are getting to the point in which both our trees are
+> almost in sync ;-) 
 
-This patch also adds time_on_activeq to struct kib_tx
-so the time spent by tx in internal queue and active
-queue can be tracked and reported. This would help
-in diagnosing the issue.
+I don't think it makes any sense to maintain two separate trees like
+this.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1742
-Lustre-commit: 7308662efc02f ("LU-1742 o2iblnd: 'Timed out tx' error message")
-Signed-off-by: Sonia Sharma <sharmaso@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33235
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Stephen Champion <stephen.champion@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- net/lnet/klnds/o2iblnd/o2iblnd.h    |  2 ++
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 26 ++++++++++++++++++++++----
- 2 files changed, 24 insertions(+), 4 deletions(-)
+Would you like to just keep maintaining your tree, and I'll stop with
+mine?
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index f60a69d..dc09e5e 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -541,6 +541,8 @@ struct kib_tx {					/* transmit message */
- 	bool			tx_gaps;
- 	struct kib_fmr		tx_fmr;		/* FMR */
- 	int			tx_dmadir;	/* dma direction */
-+	/* time when tx added on ibc_active_txs */
-+	ktime_t			tx_on_activeq;
- };
- 
- struct kib_connvars {
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 40e196d..f421cdf 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -821,6 +821,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	 */
- 	tx->tx_sending++;
- 	list_add(&tx->tx_list, &conn->ibc_active_txs);
-+	tx->tx_on_activeq = ktime_get();
- 
- 	/* I'm still holding ibc_lock! */
- 	if (conn->ibc_state != IBLND_CONN_ESTABLISHED) {
-@@ -3169,6 +3170,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- static int
- kiblnd_check_txs_locked(struct kib_conn *conn, struct list_head *txs)
- {
-+	bool active_txs = strcmp(kiblnd_queue2str(conn, txs),
-+				 "active_txs") == 0;
- 	struct kib_tx *tx;
- 
- 	list_for_each_entry(tx, txs, tx_list) {
-@@ -3179,13 +3182,28 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 			LASSERT(tx->tx_waiting || tx->tx_sending);
- 		}
- 
--		if (ktime_compare(ktime_get(), tx->tx_deadline) >= 0) {
--			CERROR("Timed out tx: %s, %lld seconds\n",
-+		if (ktime_compare(ktime_get(), tx->tx_deadline) < 0)
-+			continue;
-+
-+		if (!active_txs) {
-+			CERROR("Timed out tx: %s, outstanding RDMA time: %lld sec\n",
- 			       kiblnd_queue2str(conn, txs),
-+			       *kiblnd_tunables.kib_timeout +
-+			       (ktime_ms_delta(ktime_get(),
-+					      tx->tx_deadline) / MSEC_PER_SEC));
-+		} else {
-+			CERROR("Timed out tx: %s, time in internal queue: %lld sec, time in active queue: %lld sec, outstanding RDMA time: %lld sec\n",
-+			       kiblnd_queue2str(conn, txs),
-+			       ktime_ms_delta(tx->tx_deadline,
-+					      tx->tx_on_activeq) / MSEC_PER_SEC,
- 			       ktime_ms_delta(ktime_get(),
--					      tx->tx_deadline) / MSEC_PER_SEC);
--			return 1;
-+					      tx->tx_on_activeq) / MSEC_PER_SEC,
-+			       *kiblnd_tunables.kib_timeout +
-+			       (ktime_ms_delta(ktime_get(),
-+					       tx->tx_deadline) / MSEC_PER_SEC));
- 		}
-+
-+		return 1;
- 	}
- 
- 	return 0;
--- 
-1.8.3.1
+If so, is your git tree published somewhere?
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200623/0d25b182/attachment.sig>
