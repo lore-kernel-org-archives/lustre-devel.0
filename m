@@ -1,148 +1,154 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  1 Jul 2020 20:04:58 -0400
-Subject: [lustre-devel] [PATCH 18/18] lnet: handle undefined parameters
+Date: Wed,  1 Jul 2020 20:04:52 -0400
+Subject: [lustre-devel] [PATCH 12/18] lnet: Skip health and resends for
+ single rail configs
 In-Reply-To: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
 References: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1593648298-10571-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1593648298-10571-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Chris Horn <hornc@cray.com>
 
-If peer_tx_credits or peer_credits are 0, they should be
-defaulted to the system defaults 8 and 256 respectively
+If the sender of a message only has a single interface it doesn't
+make sense to have LNet track the health of that interface, nor
+should it attempt to resend a message when it encounters a local
+error. There aren't any alternative interfaces to use for a resend.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13662
-Lustre-commit: d934eb3c4f638 ("LU-13662 lnet: handle undefined parameters")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38894
+Similarly, we needn't track health values of a peer's NIs if the peer
+only has a single interface. Nor do we need to attempt to resend
+a message to a peer with a single interface. There's an exception for
+routers. We rely on NI health to determine route aliveness, so even
+if a router only has a single interface we still need to track its
+health.
+
+We can use the ln_ping_target to get the count of local NIs, and the
+lnet_peer struct already contains a count of the number of peer NIs.
+
+HPE-bug-id: LUS-8826
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13501
+Lustre-commit: c5381d73b1d83 ("LU-13501 lnet: Skip health and resends for single rail configs")
+Signed-off-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/38448
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h              |  4 +++-
- net/lnet/klnds/o2iblnd/o2iblnd_modparams.c |  4 ++--
- net/lnet/klnds/socklnd/socklnd_modparams.c |  4 ++--
- net/lnet/lnet/api-ni.c                     | 26 +++++++++++++++++++++++---
- 4 files changed, 30 insertions(+), 8 deletions(-)
+ net/lnet/lnet/lib-msg.c | 65 ++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 46 insertions(+), 19 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index def0923..75c0da7 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -81,8 +81,10 @@
- #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
- #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index 7ce9c47..f759b2d 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -774,6 +774,10 @@
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_ni *ni;
+ 	bool lo = false;
++	bool attempt_local_resend;
++	bool attempt_remote_resend;
++	bool handle_local_health;
++	bool handle_remote_health;
  
--/* default timeout */
-+/* default timeout and credits */
- #define DEFAULT_PEER_TIMEOUT    180
-+#define DEFAULT_PEER_CREDITS	8
-+#define DEFAULT_CREDITS	256
- 
- int choose_ipv4_src(u32 *ret, int interface, u32 dst_ipaddr, struct net *ns);
- 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-index 7407ced..f341376 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-@@ -67,11 +67,11 @@
- MODULE_PARM_DESC(ntx, "# of message descriptors allocated for each pool");
- 
- /* NB: this value is shared by all CPTs */
--static int credits = 256;
-+static int credits = DEFAULT_CREDITS;
- module_param(credits, int, 0444);
- MODULE_PARM_DESC(credits, "# concurrent sends");
- 
--static int peer_credits = 8;
-+static int peer_credits = DEFAULT_PEER_CREDITS;
- module_param(peer_credits, int, 0444);
- MODULE_PARM_DESC(peer_credits, "# concurrent sends to 1 peer");
- 
-diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
-index b511e54..017627f 100644
---- a/net/lnet/klnds/socklnd/socklnd_modparams.c
-+++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
-@@ -28,11 +28,11 @@
- module_param(sock_timeout, int, 0644);
- MODULE_PARM_DESC(sock_timeout, "dead socket timeout (seconds)");
- 
--static int credits = 256;
-+static int credits = DEFAULT_CREDITS;
- module_param(credits, int, 0444);
- MODULE_PARM_DESC(credits, "# concurrent sends");
- 
--static int peer_credits = 8;
-+static int peer_credits = DEFAULT_PEER_CREDITS;
- module_param(peer_credits, int, 0444);
- MODULE_PARM_DESC(peer_credits, "# concurrent sends to 1 peer");
- 
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index d6694cb..3e69435 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -3093,6 +3093,19 @@ static int lnet_add_net_common(struct lnet_net *net,
- 	return rc;
- }
- 
-+static void
-+lnet_set_tune_defaults(struct lnet_ioctl_config_lnd_tunables *tun)
-+{
-+	if (tun) {
-+		if (!tun->lt_cmn.lct_peer_timeout)
-+			tun->lt_cmn.lct_peer_timeout = DEFAULT_PEER_TIMEOUT;
-+		if (!tun->lt_cmn.lct_peer_tx_credits)
-+			tun->lt_cmn.lct_peer_tx_credits = DEFAULT_PEER_CREDITS;
-+		if (!tun->lt_cmn.lct_max_tx_credits)
-+			tun->lt_cmn.lct_max_tx_credits = DEFAULT_CREDITS;
+ 	/* if we're shutting down no point in handling health. */
+ 	if (the_lnet.ln_mt_state != LNET_MT_STATE_RUNNING)
+@@ -800,9 +804,45 @@
+ 	if (msg->msg_tx_committed) {
+ 		ni = msg->msg_txni;
+ 		lpni = msg->msg_txpeer;
++		attempt_local_resend = true;
++		attempt_remote_resend = true;
+ 	} else {
+ 		ni = msg->msg_rxni;
+ 		lpni = msg->msg_rxpeer;
++		attempt_local_resend = false;
++		attempt_remote_resend = false;
 +	}
-+}
 +
- static int lnet_handle_legacy_ip2nets(char *ip2nets,
- 				      struct lnet_ioctl_config_lnd_tunables *tun)
- {
-@@ -3109,6 +3122,8 @@ static int lnet_handle_legacy_ip2nets(char *ip2nets,
- 	if (rc < 0)
- 		return rc;
- 
-+	lnet_set_tune_defaults(tun);
++	/* Don't further decrement the health value if a recovery message
++	 * failed.
++	 */
++	if (msg->msg_recovery) {
++		handle_local_health = false;
++		handle_remote_health = false;
++	} else {
++		handle_local_health = false;
++		handle_remote_health = true;
++	}
 +
- 	mutex_lock(&the_lnet.ln_api_mutex);
- 	while ((net = list_first_entry_or_null(&net_head,
- 					       struct lnet_net,
-@@ -3172,6 +3187,8 @@ int lnet_dyn_add_ni(struct lnet_ioctl_config_ni *conf)
- 	if (!ni)
- 		return -ENOMEM;
- 
-+	lnet_set_tune_defaults(tun);
++	/* For local failures, health/recovery/resends are not needed if I only
++	 * have a single (non-lolnd) interface. NB: pb_nnis includes the lolnd
++	 * interface, so a single-rail node would have pb_nnis == 2.
++	 */
++	if (the_lnet.ln_ping_target->pb_nnis <= 2) {
++		handle_local_health = false;
++		attempt_local_resend = false;
++	}
 +
- 	mutex_lock(&the_lnet.ln_api_mutex);
++	/* For remote failures, health/recovery/resends are not needed if the
++	 * peer only has a single interface. Special case for routers where we
++	 * rely on health feature to manage route aliveness. NB: unlike pb_nnis
++	 * above, lp_nnis does _not_ include the lolnd, so a single-rail node
++	 * would have lp_nnis == 1.
++	 */
++	if (lpni && lpni->lpni_peer_net->lpn_peer->lp_nnis <= 1) {
++		attempt_remote_resend = false;
++		if (!lnet_isrouter(lpni))
++			handle_remote_health = false;
+ 	}
  
- 	rc = lnet_add_net_common(net, tun);
-@@ -3304,13 +3321,16 @@ int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
- 	memset(&tun, 0, sizeof(tun));
+ 	if (!lo)
+@@ -865,41 +905,28 @@
+ 	case LNET_MSG_STATUS_LOCAL_ABORTED:
+ 	case LNET_MSG_STATUS_LOCAL_NO_ROUTE:
+ 	case LNET_MSG_STATUS_LOCAL_TIMEOUT:
+-		/* don't further decrement the health value if the
+-		 * recovery message failed.
+-		 */
+-		if (!msg->msg_recovery)
++		if (handle_local_health)
+ 			lnet_handle_local_failure(ni);
+-		if (msg->msg_tx_committed)
+-			/* add to the re-send queue */
++		if (attempt_local_resend)
+ 			return lnet_attempt_msg_resend(msg);
+ 		break;
  
- 	tun.lt_cmn.lct_peer_timeout =
--		conf->cfg_config_u.cfg_net.net_peer_timeout;
-+	 (!conf->cfg_config_u.cfg_net.net_peer_timeout) ? DEFAULT_PEER_TIMEOUT :
-+	  conf->cfg_config_u.cfg_net.net_peer_timeout;
- 	tun.lt_cmn.lct_peer_tx_credits =
--		conf->cfg_config_u.cfg_net.net_peer_tx_credits;
-+	 (!conf->cfg_config_u.cfg_net.net_peer_tx_credits) ? DEFAULT_PEER_CREDITS :
-+	  conf->cfg_config_u.cfg_net.net_peer_tx_credits;
- 	tun.lt_cmn.lct_peer_rtr_credits =
- 		conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
- 	tun.lt_cmn.lct_max_tx_credits =
--		conf->cfg_config_u.cfg_net.net_max_tx_credits;
-+	 (!conf->cfg_config_u.cfg_net.net_max_tx_credits) ? DEFAULT_CREDITS :
-+	  conf->cfg_config_u.cfg_net.net_max_tx_credits;
+-	/* These errors will not trigger a resend so simply
+-	 * finalize the message
+-	 */
+ 	case LNET_MSG_STATUS_LOCAL_ERROR:
+-		/* don't further decrement the health value if the
+-		 * recovery message failed.
+-		 */
+-		if (!msg->msg_recovery)
++		if (handle_local_health)
+ 			lnet_handle_local_failure(ni);
+ 		return -1;
  
- 	rc = lnet_add_net_common(net, &tun);
+-	/* TODO: since the remote dropped the message we can
+-	 * attempt a resend safely.
+-	 */
+ 	case LNET_MSG_STATUS_REMOTE_DROPPED:
+-		if (!msg->msg_recovery)
++		if (handle_remote_health)
+ 			lnet_handle_remote_failure(lpni);
+-		if (msg->msg_tx_committed)
++		if (attempt_remote_resend)
+ 			return lnet_attempt_msg_resend(msg);
+ 		break;
  
+ 	case LNET_MSG_STATUS_REMOTE_ERROR:
+ 	case LNET_MSG_STATUS_REMOTE_TIMEOUT:
+ 	case LNET_MSG_STATUS_NETWORK_TIMEOUT:
+-		if (!msg->msg_recovery)
++		if (handle_remote_health)
+ 			lnet_handle_remote_failure(lpni);
+ 		return -1;
+ 	default:
 -- 
 1.8.3.1
