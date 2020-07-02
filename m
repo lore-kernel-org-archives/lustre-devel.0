@@ -1,65 +1,129 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  1 Jul 2020 20:04:54 -0400
-Subject: [lustre-devel] [PATCH 14/18] lnet: define new network driver ptl4lnd
+From: NeilBrown <neilb@suse.de>
+Date: Thu, 02 Jul 2020 14:47:35 +1000
+Subject: [lustre-devel] [PATCH 00/18] Port of OpenSFS landing as of July
+ 1, 2020
 In-Reply-To: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
 References: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1593648298-10571-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <87zh8i1q1k.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Gregoire Pichon <gregoire.pichon@bull.net>
+On Wed, Jul 01 2020, James Simmons wrote:
 
-Assign an ID to the new network driver ptl4lnd developed by Bull
-that implements a LND based on Portals 4 API. It is intended to be
-used with BXI, the Bull interconnect hardware.
+> Port of patches that landed to the OpenSFS branch. A few patches added
+> the were missing that enables potential lustre utilities building
+> against the Linux client. Please review to make sure everything is
+> okay.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8932
-Lustre-commit: c54bf3faa29f5 ("LU-8932 lnet: define new network driver ptl4lnd")
-Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
-Reviewed-on: https://review.whamcloud.com/24768
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- include/uapi/linux/lnet/nidstr.h | 1 +
- net/lnet/lnet/nidstrings.c       | 9 +++++++++
- 2 files changed, 10 insertions(+)
+Hi James,
+ could you please always be explicit about which Linux client tree
+ these are ported to?  It avoids confusion.
 
-diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
-index 9133641..34ba497 100644
---- a/include/uapi/linux/lnet/nidstr.h
-+++ b/include/uapi/linux/lnet/nidstr.h
-@@ -53,6 +53,7 @@ enum {
- 	/*MXLND		= 12, removed v2_7_50_0-34-g8be9e41	*/
- 	GNILND		= 13,
- 	GNIIPLND	= 14,
-+	PTL4LND		= 15,
- 
- 	NUM_LNDS
- };
-diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
-index eca5092..fb8d3e2 100644
---- a/net/lnet/lnet/nidstrings.c
-+++ b/net/lnet/lnet/nidstrings.c
-@@ -692,6 +692,15 @@ int cfs_print_nidlist(char *buffer, int count, struct list_head *nidlist)
- 	  .nf_print_addrlist	= libcfs_ip_addr_range_print,
- 	  .nf_match_addr	= cfs_ip_addr_match
- 	},
-+	{ .nf_type		= PTL4LND,
-+	  .nf_name		= "ptlf",
-+	  .nf_modname		= "kptl4lnd",
-+	  .nf_addr2str		= libcfs_decnum_addr2str,
-+	  .nf_str2addr		= libcfs_num_str2addr,
-+	  .nf_parse_addrlist	= libcfs_num_parse,
-+	  .nf_print_addrlist	= libcfs_num_addr_range_print,
-+	  .nf_match_addr	= libcfs_num_match
-+	},
- };
- 
- static const size_t libcfs_nnetstrfns = ARRAY_SIZE(libcfs_netstrfns);
--- 
-1.8.3.1
+Thanks,
+NeilBrown
+
+
+>
+> Alexander Boyko (1):
+>   lustre: llite: don't hold inode_lock for security notify
+>
+> Alexey Lyashkov (2):
+>   lnet: restore an maximal fragments count
+>   lnet: o2ib: fix page mapping error
+>
+> Amir Shehata (1):
+>   lnet: handle undefined parameters
+>
+> Andriy Skulysh (1):
+>   lustre: llite: truncate deadlock with DoM files
+>
+> Chris Horn (1):
+>   lnet: Skip health and resends for single rail configs
+>
+> Emoly Liu (1):
+>   lustre: obd: add new LPROCFS_TYPE_*
+>
+> Gregoire Pichon (1):
+>   lnet: define new network driver ptl4lnd
+>
+> Hongchao Zhang (1):
+>   lustre: mdc: chlg device could be used after free
+>
+> James Simmons (2):
+>   lustre: llite: bind kthread thread to accepted node set
+>   lustre: lov: use lov_pattern_support() to verify lmm
+>
+> Lai Siyao (1):
+>   lustre: mdt: don't fetch LOOKUP lock for remote object
+>
+> Mikhail Pershin (1):
+>   lustre: ptlrpc: limit rate of lock replays
+>
+> Sebastien Buisson (5):
+>   lustre: sec: encryption for write path
+>   lustre: sec: decryption for read path
+>   lustre: sec: deal with encrypted object size
+>   lustre: sec: support truncate for encrypted files
+>   lustre: sec: ioctls to handle encryption policies
+>
+>  fs/lustre/include/lprocfs_status.h         |   9 +-
+>  fs/lustre/include/lustre_import.h          |   2 +
+>  fs/lustre/include/lustre_osc.h             |   1 +
+>  fs/lustre/include/obd.h                    |  19 ++-
+>  fs/lustre/include/obd_class.h              |   3 +-
+>  fs/lustre/include/obd_support.h            |   5 +
+>  fs/lustre/ldlm/ldlm_request.c              |  69 ++++++++++-
+>  fs/lustre/llite/crypto.c                   |  15 ++-
+>  fs/lustre/llite/dir.c                      |  50 +++++++-
+>  fs/lustre/llite/file.c                     |  19 ++-
+>  fs/lustre/llite/llite_internal.h           |   1 +
+>  fs/lustre/llite/llite_lib.c                | 187 ++++++++++++++++++++++++++++-
+>  fs/lustre/llite/lproc_llite.c              |   8 +-
+>  fs/lustre/llite/namei.c                    | 105 +++++++++++++---
+>  fs/lustre/llite/rw.c                       |  13 +-
+>  fs/lustre/llite/rw26.c                     |   4 +
+>  fs/lustre/llite/statahead.c                |  11 +-
+>  fs/lustre/llite/vvp_io.c                   |  17 ++-
+>  fs/lustre/lmv/lmv_intent.c                 |  19 ++-
+>  fs/lustre/lmv/lmv_internal.h               |   1 +
+>  fs/lustre/lmv/lmv_obd.c                    |   3 +-
+>  fs/lustre/lov/lov_ea.c                     |   6 +-
+>  fs/lustre/mdc/mdc_changelog.c              |  46 ++++---
+>  fs/lustre/mdc/mdc_internal.h               |   1 +
+>  fs/lustre/mdc/mdc_request.c                |   8 +-
+>  fs/lustre/obdclass/genops.c                |   1 +
+>  fs/lustre/obdecho/echo_client.c            |   2 +
+>  fs/lustre/obdecho/echo_internal.h          |   3 +
+>  fs/lustre/osc/osc_internal.h               |   1 +
+>  fs/lustre/osc/osc_request.c                | 121 ++++++++++++++++++-
+>  fs/lustre/ptlrpc/import.c                  |   8 +-
+>  include/linux/lnet/lib-lnet.h              |   4 +-
+>  include/linux/lnet/lib-types.h             |   2 +-
+>  include/uapi/linux/lnet/nidstr.h           |   1 +
+>  include/uapi/linux/lustre/lustre_user.h    |   8 ++
+>  net/lnet/klnds/o2iblnd/o2iblnd.c           |   7 +-
+>  net/lnet/klnds/o2iblnd/o2iblnd_cb.c        |   3 +-
+>  net/lnet/klnds/o2iblnd/o2iblnd_modparams.c |   4 +-
+>  net/lnet/klnds/socklnd/socklnd_modparams.c |   4 +-
+>  net/lnet/lnet/api-ni.c                     |  26 +++-
+>  net/lnet/lnet/lib-msg.c                    |  65 +++++++---
+>  net/lnet/lnet/nidstrings.c                 |   9 ++
+>  42 files changed, 759 insertions(+), 132 deletions(-)
+>
+> -- 
+> 1.8.3.1
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200702/d4f03367/attachment.sig>
