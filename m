@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  1 Jul 2020 20:04:46 -0400
-Subject: [lustre-devel] [PATCH 06/18] lustre: sec: support truncate for
- encrypted files
+Date: Wed,  1 Jul 2020 20:04:43 -0400
+Subject: [lustre-devel] [PATCH 03/18] lustre: sec: encryption for write path
 In-Reply-To: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
 References: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1593648298-10571-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1593648298-10571-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,339 +12,541 @@ To: lustre-devel@lists.lustre.org
 
 From: Sebastien Buisson <sbuisson@ddn.com>
 
-Truncation of encrypted files is not a trivial operation. The page
-corresponding to the point where truncation occurs must be read,
-decrypted, zeroed after truncation point, re-encrypted and then
-written back.
+First aspect is to make sure encryption context is properly set on
+files/dirs that are created or opened/looked up.
+Then encryption itself is carried out in osc_brw_prep_request(), just
+before pages are added to the request to be sent. Because pages in
+the page cache must hold clear text data, we have to use bounce pages
+for encryption. The allocation is handled by fscrypt, and for
+deallocation we call fscrypt_pullback_bio_page() and/or
+fscrypt_pullback_bio_page().
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-12275
-Lustre-commit: adf46db962f65 ("LU-12275 sec: support truncate for encrypted files")
+Lustre-commit: a9ed5b149646f ("LU-12275 sec: encryption for write path")
 Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/37794
+Reviewed-on: https://review.whamcloud.com/36144
 Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c      |   7 ++
- fs/lustre/llite/llite_lib.c | 182 +++++++++++++++++++++++++++++++++++++++++++-
- fs/lustre/llite/rw.c        |  13 +++-
- fs/lustre/llite/vvp_io.c    |   9 ++-
- fs/lustre/osc/osc_request.c |   7 +-
- 5 files changed, 211 insertions(+), 7 deletions(-)
+ fs/lustre/include/lustre_osc.h    |  1 +
+ fs/lustre/include/obd.h           | 17 ++++++++
+ fs/lustre/include/obd_support.h   |  5 +++
+ fs/lustre/llite/crypto.c          |  5 ++-
+ fs/lustre/llite/dir.c             | 16 +++++++
+ fs/lustre/llite/namei.c           | 87 ++++++++++++++++++++++++++++++++++-----
+ fs/lustre/llite/rw26.c            |  4 ++
+ fs/lustre/obdecho/echo_client.c   |  2 +
+ fs/lustre/obdecho/echo_internal.h |  3 ++
+ fs/lustre/osc/osc_internal.h      |  1 +
+ fs/lustre/osc/osc_request.c       | 77 +++++++++++++++++++++++++++++++++-
+ 11 files changed, 206 insertions(+), 12 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 3b04952..55ae2b3 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -2086,6 +2086,13 @@ static int ll_lov_setstripe(struct inode *inode, struct file *file,
- 			goto out;
+diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
+index 4b448b9..11b7e92 100644
+--- a/fs/lustre/include/lustre_osc.h
++++ b/fs/lustre/include/lustre_osc.h
+@@ -52,6 +52,7 @@
+ #include <obd.h>
+ #include <cl_object.h>
+ #include <linux/libcfs/libcfs_hash.h>
++#include <lustre_crypto.h>
  
- 		rc = ll_file_getstripe(inode, arg, lum_size);
-+		if (S_ISREG(inode->i_mode) && IS_ENCRYPTED(inode) &&
-+		    ll_i2info(inode)->lli_clob) {
-+			struct iattr attr = { 0 };
+ struct osc_quota_info {
+ 	/* linkage for quota hash table */
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index 0ff19c8..f9e0920 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -116,6 +116,11 @@ struct brw_page {
+ 	struct page	       *pg;
+ 	unsigned int		count;
+ 	u32			flag;
++	/* used for encryption: difference with offset in clear text page */
++	u16			bp_off_diff;
++	/* used for encryption: difference with count in clear text page */
++	u16			bp_count_diff;
++	u32			bp_padding;
+ };
+ 
+ struct timeout_item {
+@@ -1161,4 +1166,16 @@ static inline void client_adjust_max_dirty(struct client_obd *cli)
+ 					   1 << (20 - PAGE_SHIFT));
+ }
+ 
++static inline struct inode *page2inode(struct page *page)
++{
++	if (page->mapping) {
++		if (PageAnon(page))
++			return NULL;
++		else
++			return page->mapping->host;
++	} else {
++		return NULL;
++	}
++}
 +
-+			rc = cl_setattr_ost(ll_i2info(inode)->lli_clob, &attr,
-+					    OP_XVALID_FLAGS, LUSTRE_ENCRYPT_FL);
+ #endif /* __OBD_H */
+diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
+index b5736f8..35c7ef3 100644
+--- a/fs/lustre/include/obd_support.h
++++ b/fs/lustre/include/obd_support.h
+@@ -583,4 +583,9 @@ struct obd_heat_instance {
+ 	u64 ohi_count;
+ };
+ 
++/* Define a fixed 4096-byte encryption unit size */
++#define LUSTRE_ENCRYPTION_BLOCKBITS	12
++#define LUSTRE_ENCRYPTION_UNIT_SIZE	((size_t)1 << LUSTRE_ENCRYPTION_BLOCKBITS)
++#define LUSTRE_ENCRYPTION_MASK		(~(LUSTRE_ENCRYPTION_UNIT_SIZE - 1))
++
+ #endif
+diff --git a/fs/lustre/llite/crypto.c b/fs/lustre/llite/crypto.c
+index 94189c9..f411343 100644
+--- a/fs/lustre/llite/crypto.c
++++ b/fs/lustre/llite/crypto.c
+@@ -52,7 +52,7 @@ static int ll_set_context(struct inode *inode, const void *ctx, size_t len,
+ 	struct ptlrpc_request *req = NULL;
+ 	int rc;
+ 
+-	if (inode == NULL)
++	if (!inode)
+ 		return 0;
+ 
+ 	ext_flags = ll_inode_to_ext_flags(inode->i_flags) | LUSTRE_ENCRYPT_FL;
+@@ -80,6 +80,9 @@ static int ll_set_context(struct inode *inode, const void *ctx, size_t len,
+ 	if (rc)
+ 		return rc;
+ 
++	/* used as encryption unit size */
++	if (S_ISREG(inode->i_mode))
++		inode->i_blkbits = LUSTRE_ENCRYPTION_BLOCKBITS;
+ 	ll_update_inode_flags(inode, ext_flags);
+ 	return 0;
+ }
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index 0ffe134..2c93908 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -388,6 +388,7 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
+ 					       strlen(dirname)),
+ 		},
+ 	};
++	bool encrypt = false;
+ 	int err;
+ 
+ 	if (unlikely(!lmv_user_magic_supported(lump->lum_magic)))
+@@ -446,6 +447,18 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
+ 
++	if (IS_ENCRYPTED(parent) ||
++	    unlikely(llcrypt_dummy_context_enabled(parent))) {
++		err = llcrypt_get_encryption_info(parent);
++		if (err)
++			goto out_op_data;
++		if (!llcrypt_has_encryption_key(parent)) {
++			err = -ENOKEY;
++			goto out_op_data;
 +		}
++		encrypt = true;
++	}
++
+ 	if (sbi->ll_flags & LL_SBI_FILE_SECCTX) {
+ 		/*
+ 		 * selinux_dentry_init_security() uses dentry->d_parent and name
+@@ -484,6 +497,9 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
+ 		err = ll_inode_init_security(&dentry, inode, parent);
  	}
  
- 	cl_lov_delay_create_clear(&file->f_flags);
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index aad19a2..0db9eae 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -1665,6 +1665,164 @@ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data)
++	if (encrypt)
++		err = llcrypt_inherit_context(parent, inode, NULL, false);
++
+ out_inode:
+ 	iput(inode);
+ out_request:
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index aa2dd13..2353a8f 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -47,7 +47,8 @@
+ #include "llite_internal.h"
+ 
+ static int ll_create_it(struct inode *dir, struct dentry *dentry,
+-			struct lookup_intent *it, void *secctx, u32 secctxlen);
++			struct lookup_intent *it,
++			void *secctx, u32 secctxlen, bool encrypt);
+ 
+ /* called from iget5_locked->find_inode() under inode_hash_lock spinlock */
+ static int ll_test_inode(struct inode *inode, void *opaque)
+@@ -605,7 +606,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 			       struct lookup_intent *it,
+ 			       struct inode *parent, struct dentry **de,
+ 			       void *secctx, u32 secctxlen,
+-			       ktime_t kstart)
++			       ktime_t kstart, bool encrypt)
+ {
+ 	struct inode *inode = NULL;
+ 	u64 bits = 0;
+@@ -679,6 +680,16 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 		/* We have the "lookup" lock, so unhide dentry */
+ 		if (bits & MDS_INODELOCK_LOOKUP)
+ 			d_lustre_revalidate(*de);
++
++		if (encrypt) {
++			rc = llcrypt_get_encryption_info(inode);
++			if (rc)
++				goto out;
++			if (!llcrypt_has_encryption_key(inode)) {
++				rc = -ENOKEY;
++				goto out;
++			}
++		}
+ 	} else if (!it_disposition(it, DISP_OPEN_CREATE)) {
+ 		/*
+ 		 * If file was created on the server, the dentry is revalidated
+@@ -725,7 +736,8 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
+ 				   struct lookup_intent *it, void **secctx,
+ 				   u32 *secctxlen,
+-				   struct pcc_create_attach *pca)
++				   struct pcc_create_attach *pca,
++				   bool encrypt)
+ {
+ 	ktime_t kstart = ktime_get();
+ 	struct lookup_intent lookup_it = { .it_op = IT_LOOKUP };
+@@ -894,7 +906,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
+ 	rc = ll_lookup_it_finish(req, it, parent, &dentry,
+ 				 secctx ? *secctx : NULL,
+ 				 secctxlen ? *secctxlen : 0,
+-				kstart);
++				 kstart, encrypt);
+ 	if (rc != 0) {
+ 		ll_intent_release(it);
+ 		retval = ERR_PTR(rc);
+@@ -952,7 +964,7 @@ static struct dentry *ll_lookup_nd(struct inode *parent, struct dentry *dentry,
+ 		itp = NULL;
+ 	else
+ 		itp = &it;
+-	de = ll_lookup_it(parent, dentry, itp, NULL, NULL, NULL);
++	de = ll_lookup_it(parent, dentry, itp, NULL, NULL, NULL, false);
+ 
+ 	if (itp)
+ 		ll_intent_release(itp);
+@@ -972,8 +984,9 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 	void *secctx = NULL;
+ 	u32 secctxlen = 0;
+ 	struct dentry *de;
+-	struct ll_sb_info *sbi;
++	struct ll_sb_info *sbi = NULL;
+ 	struct pcc_create_attach pca = { NULL, NULL };
++	bool encrypt = false;
+ 	int rc = 0;
+ 
+ 	CDEBUG(D_VFSTRACE,
+@@ -1025,8 +1038,23 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 	it->it_flags = (open_flags & ~O_ACCMODE) | OPEN_FMODE(open_flags);
+ 	it->it_flags &= ~MDS_OPEN_FL_INTERNAL;
+ 
++	if (IS_ENCRYPTED(dir)) {
++		/* we know that we are going to create a regular file because
++		 * we set S_IFREG bit on it->it_create_mode above
++		 */
++		rc = llcrypt_get_encryption_info(dir);
++		if (rc)
++			goto out_release;
++		if (!llcrypt_has_encryption_key(dir)) {
++			rc = -ENOKEY;
++			goto out_release;
++		}
++		encrypt = true;
++		rc = 0;
++	}
++
+ 	/* Dentry added to dcache tree in ll_lookup_it */
+-	de = ll_lookup_it(dir, dentry, it, &secctx, &secctxlen, &pca);
++	de = ll_lookup_it(dir, dentry, it, &secctx, &secctxlen, &pca, encrypt);
+ 	if (IS_ERR(de))
+ 		rc = PTR_ERR(de);
+ 	else if (de)
+@@ -1035,7 +1063,8 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 	if (!rc) {
+ 		if (it_disposition(it, DISP_OPEN_CREATE)) {
+ 			/* Dentry instantiated in ll_create_it. */
+-			rc = ll_create_it(dir, dentry, it, secctx, secctxlen);
++			rc = ll_create_it(dir, dentry, it, secctx, secctxlen,
++					  encrypt);
+ 			security_release_secctx(secctx, secctxlen);
+ 			if (rc) {
+ 				/* We dget in ll_splice_alias. */
+@@ -1150,7 +1179,8 @@ static struct inode *ll_create_node(struct inode *dir, struct lookup_intent *it)
+  * with d_instantiate().
+  */
+ static int ll_create_it(struct inode *dir, struct dentry *dentry,
+-			struct lookup_intent *it, void *secctx, u32 secctxlen)
++			struct lookup_intent *it,
++			void *secctx, u32 secctxlen, bool encrypt)
+ {
+ 	struct inode *inode;
+ 	u64 bits = 0;
+@@ -1185,6 +1215,12 @@ static int ll_create_it(struct inode *dir, struct dentry *dentry,
+ 
+ 	d_instantiate(dentry, inode);
+ 
++	if (encrypt) {
++		rc = llcrypt_inherit_context(dir, inode, dentry, true);
++		if (rc)
++			return rc;
++	}
++
+ 	if (!(ll_i2sbi(inode)->ll_flags & LL_SBI_FILE_SECCTX))
+ 		rc = ll_inode_init_security(dentry, inode, dir);
+ 
+@@ -1214,10 +1250,11 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 		       u32 opc)
+ {
+ 	struct ptlrpc_request *request = NULL;
+-	struct md_op_data *op_data;
++	struct md_op_data *op_data = NULL;
+ 	struct inode *inode = NULL;
+ 	struct ll_sb_info *sbi = ll_i2sbi(dir);
+ 	int tgt_len = 0;
++	int encrypt = 0;
+ 	int err;
+ 
+ 	if (unlikely(tgt))
+@@ -1241,6 +1278,19 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 			goto err_exit;
+ 	}
+ 
++	if ((IS_ENCRYPTED(dir) &&
++	    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode))) ||
++	    (unlikely(llcrypt_dummy_context_enabled(dir)) && S_ISDIR(mode))) {
++		err = llcrypt_get_encryption_info(dir);
++		if (err)
++			goto err_exit;
++		if (!llcrypt_has_encryption_key(dir)) {
++			err = -ENOKEY;
++			goto err_exit;
++		}
++		encrypt = 1;
++	}
++
+ 	err = md_create(sbi->ll_md_exp, op_data, tgt, tgt_len, mode,
+ 			from_kuid(&init_user_ns, current_fsuid()),
+ 			from_kgid(&init_user_ns, current_fsgid()),
+@@ -1335,6 +1385,12 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 
+ 	d_instantiate(dentry, inode);
+ 
++	if (encrypt) {
++		err = llcrypt_inherit_context(dir, inode, NULL, true);
++		if (err)
++			goto err_exit;
++	}
++
+ 	if (!(sbi->ll_flags & LL_SBI_FILE_SECCTX))
+ 		err = ll_inode_init_security(dentry, inode, dir);
+ err_exit:
+@@ -1547,6 +1603,10 @@ static int ll_link(struct dentry *old_dentry, struct inode *dir,
+ 	       PFID(ll_inode2fid(src)), src, PFID(ll_inode2fid(dir)), dir,
+ 	       new_dentry);
+ 
++	err = llcrypt_prepare_link(old_dentry, dir, new_dentry);
++	if (err)
++		return err;
++
+ 	op_data = ll_prep_md_op_data(NULL, src, dir, new_dentry->d_name.name,
+ 				     new_dentry->d_name.len,
+ 				     0, LUSTRE_OPC_ANY, NULL);
+@@ -1584,6 +1644,13 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
+ 	       src_dchild, PFID(ll_inode2fid(src)), src,
+ 	       tgt_dchild, PFID(ll_inode2fid(tgt)), tgt);
+ 
++	if (unlikely(d_mountpoint(src_dchild) || d_mountpoint(tgt_dchild)))
++		return -EBUSY;
++
++	err = llcrypt_prepare_rename(src, src_dchild, tgt, tgt_dchild, flags);
++	if (err)
++		return err;
++
+ 	op_data = ll_prep_md_op_data(NULL, src, tgt, NULL, 0, 0,
+ 				     LUSTRE_OPC_ANY, NULL);
+ 	if (IS_ERR(op_data))
+diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
+index 5e7aa6e..0971185 100644
+--- a/fs/lustre/llite/rw26.c
++++ b/fs/lustre/llite/rw26.c
+@@ -291,6 +291,10 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	loff_t file_offset = iocb->ki_pos;
+ 	int rw = iov_iter_rw(iter);
+ 
++	/* if file is encrypted, return 0 so that we fall back to buffered IO */
++	if (IS_ENCRYPTED(inode))
++		return 0;
++
+ 	/* Check EOF by ourselves */
+ 	if (rw == READ && file_offset >= i_size_read(inode))
+ 		return 0;
+diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
+index 2324e38..a52e0362 100644
+--- a/fs/lustre/obdecho/echo_client.c
++++ b/fs/lustre/obdecho/echo_client.c
+@@ -1317,6 +1317,8 @@ static int echo_client_kbrw(struct echo_device *ed, int rw, struct obdo *oa,
+ 		if (!pgp->pg)
+ 			goto out;
+ 
++		/* set mapping so page is not considered encrypted */
++		pgp->pg->mapping = ECHO_MAPPING_UNENCRYPTED;
+ 		pages[i] = pgp->pg;
+ 		pgp->count = PAGE_SIZE;
+ 		pgp->off = off;
+diff --git a/fs/lustre/obdecho/echo_internal.h b/fs/lustre/obdecho/echo_internal.h
+index f9bb0b91..95b0149 100644
+--- a/fs/lustre/obdecho/echo_internal.h
++++ b/fs/lustre/obdecho/echo_internal.h
+@@ -43,4 +43,7 @@
+ int block_debug_setup(void *addr, int len, u64 off, u64 id);
+ int block_debug_check(char *who, void *addr, int len, u64 off, u64 id);
+ 
++/* mapping value to tell page is not encrypted */
++#define ECHO_MAPPING_UNENCRYPTED ((void *)1)
++
+ #endif
+diff --git a/fs/lustre/osc/osc_internal.h b/fs/lustre/osc/osc_internal.h
+index d05595a..6bec6bf 100644
+--- a/fs/lustre/osc/osc_internal.h
++++ b/fs/lustre/osc/osc_internal.h
+@@ -216,4 +216,5 @@ static inline void osc_set_io_portal(struct ptlrpc_request *req)
+ 	else
+ 		req->rq_request_portal = OST_IO_PORTAL;
+ }
++
+ #endif /* OSC_INTERNAL_H */
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index b1bf8c6..db97d37 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -36,6 +36,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/falloc.h>
+ #include <linux/highmem.h>
++#include <linux/pagemap.h>
+ #include <linux/sched/mm.h>
+ 
+ #include <lustre_dlm.h>
+@@ -1354,6 +1355,26 @@ static int osc_checksum_bulk_rw(const char *obd_name,
  	return rc;
  }
  
-+/**
-+ * Zero portion of page that is part of @inode.
-+ * This implies, if necessary:
-+ * - taking cl_lock on range corresponding to concerned page
-+ * - grabbing vm page
-+ * - associating cl_page
-+ * - proceeding to clio read
-+ * - zeroing range in page
-+ * - proceeding to cl_page flush
-+ * - releasing cl_lock
-+ *
-+ * @inode	inode
-+ * @inde	page index
-+ * @offset	offset in page to start zero from
-+ * @len	len to zero
-+ *
-+ * Return:	0 on success
-+ *		errno on failure
-+ */
-+int ll_io_zero_page(struct inode *inode, pgoff_t index, pgoff_t offset,
-+		    unsigned int len)
++static inline void osc_release_bounce_pages(struct brw_page **pga,
++					    u32 page_count)
 +{
-+	struct ll_inode_info *lli = ll_i2info(inode);
-+	struct cl_object *clob = lli->lli_clob;
-+	u16 refcheck;
-+	struct lu_env *env = NULL;
-+	struct cl_io *io = NULL;
-+	struct cl_page *clpage = NULL;
-+	struct page *vmpage = NULL;
-+	unsigned int from = index << PAGE_SHIFT;
-+	struct cl_lock *lock = NULL;
-+	struct cl_lock_descr *descr = NULL;
-+	struct cl_2queue *queue = NULL;
-+	struct cl_sync_io *anchor = NULL;
-+	bool holdinglock = false;
-+	bool lockedbymyself = true;
-+	int rc;
++#ifdef CONFIG_FS_ENCRYPTION
++	int i;
 +
-+	env = cl_env_get(&refcheck);
-+	if (IS_ERR(env))
-+		return PTR_ERR(env);
-+
-+	io = vvp_env_thread_io(env);
-+	io->ci_obj = clob;
-+	rc = cl_io_rw_init(env, io, CIT_WRITE, from, PAGE_SIZE);
-+	if (rc)
-+		goto putenv;
-+
-+	lock = vvp_env_lock(env);
-+	descr = &lock->cll_descr;
-+	descr->cld_obj = io->ci_obj;
-+	descr->cld_start = cl_index(io->ci_obj, from);
-+	descr->cld_end = cl_index(io->ci_obj, from + PAGE_SIZE - 1);
-+	descr->cld_mode = CLM_WRITE;
-+	descr->cld_enq_flags = CEF_MUST | CEF_NONBLOCK;
-+
-+	/* request lock for page */
-+	rc = cl_lock_request(env, io, lock);
-+	/* -ECANCELED indicates a matching lock with a different extent
-+	 * was already present, and -EEXIST indicates a matching lock
-+	 * on exactly the same extent was already present.
-+	 * In both cases it means we are covered.
-+	 */
-+	if (rc == -ECANCELED || rc == -EEXIST)
-+		rc = 0;
-+	else if (rc < 0)
-+		goto iofini;
-+	else
-+		holdinglock = true;
-+
-+	/* grab page */
-+	vmpage = grab_cache_page_nowait(inode->i_mapping, index);
-+	if (!vmpage) {
-+		rc = -EOPNOTSUPP;
-+		goto rellock;
++	for (i = 0; i < page_count; i++) {
++		if (pga[i]->pg->mapping)
++			/* bounce pages are unmapped */
++			continue;
++		if (pga[i]->flag & OBD_BRW_SYNC)
++			/* sync transfer cannot have encrypted pages */
++			continue;
++		llcrypt_finalize_bounce_page(&pga[i]->pg);
++		pga[i]->count -= pga[i]->bp_count_diff;
++		pga[i]->off += pga[i]->bp_off_diff;
 +	}
-+
-+	if (!PageDirty(vmpage)) {
-+		/* associate cl_page */
-+		clpage = cl_page_find(env, clob, vmpage->index,
-+				      vmpage, CPT_CACHEABLE);
-+		if (IS_ERR(clpage)) {
-+			rc = PTR_ERR(clpage);
-+			goto pagefini;
-+		}
-+
-+		cl_page_assume(env, io, clpage);
-+	}
-+
-+	if (!PageUptodate(vmpage) && !PageDirty(vmpage) &&
-+	    !PageWriteback(vmpage)) {
-+		/* read page */
-+		/* set PagePrivate2 to detect special case of empty page
-+		 * in osc_brw_fini_request()
-+		 */
-+		SetPagePrivate2(vmpage);
-+		rc = ll_io_read_page(env, io, clpage, NULL);
-+		if (!PagePrivate2(vmpage))
-+			/* PagePrivate2 was cleared in osc_brw_fini_request()
-+			 * meaning we read an empty page. In this case, in order
-+			 * to avoid allocating unnecessary block in truncated
-+			 * file, we must not zero and write as below. Subsequent
-+			 * server-side truncate will handle things correctly.
-+			 */
-+			goto clpfini;
-+		ClearPagePrivate2(vmpage);
-+		if (rc)
-+			goto clpfini;
-+		lockedbymyself = trylock_page(vmpage);
-+		cl_page_assume(env, io, clpage);
-+	}
-+
-+	/* zero range in page */
-+	zero_user(vmpage, offset, len);
-+
-+	if (holdinglock && clpage) {
-+		/* explicitly write newly modified page */
-+		queue = &io->ci_queue;
-+		cl_2queue_init(queue);
-+		anchor = &vvp_env_info(env)->vti_anchor;
-+		cl_sync_io_init(anchor, 1);
-+		clpage->cp_sync_io = anchor;
-+		cl_page_list_add(&queue->c2_qin, clpage);
-+		rc = cl_io_submit_rw(env, io, CRT_WRITE, queue);
-+		if (rc)
-+			goto queuefini1;
-+		rc = cl_sync_io_wait(env, anchor, 0);
-+		if (rc)
-+			goto queuefini2;
-+		cl_page_assume(env, io, clpage);
-+
-+queuefini2:
-+		cl_2queue_discard(env, io, queue);
-+queuefini1:
-+		cl_2queue_disown(env, io, queue);
-+		cl_2queue_fini(env, queue);
-+	}
-+
-+clpfini:
-+	if (clpage)
-+		cl_page_put(env, clpage);
-+pagefini:
-+	if (lockedbymyself) {
-+		unlock_page(vmpage);
-+		put_page(vmpage);
-+	}
-+rellock:
-+	if (holdinglock)
-+		cl_lock_release(env, lock);
-+iofini:
-+	cl_io_fini(env, io);
-+putenv:
-+	if (env)
-+		cl_env_put(env, &refcheck);
-+
-+	return rc;
++#endif
 +}
 +
- /* If this inode has objects allocated to it (lsm != NULL), then the OST
-  * object(s) determine the file size and mtime.  Otherwise, the MDS will
-  * keep these values until such a time that objects are allocated for it.
-@@ -1798,6 +1956,8 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
- 				goto out;
- 			}
- 		} else {
-+			unsigned int flags = 0;
+ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 				struct obdo *oa, u32 page_count,
+ 				struct brw_page **pga,
+@@ -1371,7 +1392,9 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 	struct brw_page *pg_prev;
+ 	void *short_io_buf;
+ 	const char *obd_name = cli->cl_import->imp_obd->obd_name;
++	struct inode *inode;
+ 
++	inode = page2inode(pga[0]->pg);
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ))
+ 		return -ENOMEM; /* Recoverable */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ2))
+@@ -1389,6 +1412,51 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 	if (!req)
+ 		return -ENOMEM;
+ 
++	if (opc == OST_WRITE && inode && IS_ENCRYPTED(inode)) {
++		for (i = 0; i < page_count; i++) {
++			struct brw_page *pg = pga[i];
++			struct page *data_page = NULL;
++			bool retried = false;
++			bool lockedbymyself;
 +
- 			/* For truncate and utimes sending attributes to OSTs,
- 			 * setting mtime/atime to the past will be performed
- 			 * under PW [0:EOF] extent lock (new_size:EOF for
-@@ -1806,8 +1966,23 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
- 			 * it is necessary due to possible time
- 			 * de-synchronization between MDT inode and OST objects
- 			 */
-+			if (S_ISREG(inode->i_mode) && IS_ENCRYPTED(inode) &&
-+			    attr->ia_valid & ATTR_SIZE) {
-+				xvalid |= OP_XVALID_FLAGS;
-+				flags = LUSTRE_ENCRYPT_FL;
-+				if (attr->ia_size & ~PAGE_MASK) {
-+					pgoff_t offset;
-+
-+					offset = attr->ia_size & (PAGE_SIZE - 1);
-+					rc = ll_io_zero_page(inode,
-+							     attr->ia_size >> PAGE_SHIFT,
-+							     offset, PAGE_SIZE - offset);
-+					if (rc)
-+						goto out;
++retry_encrypt:
++			/* The page can already be locked when we arrive here.
++			 * This is possible when cl_page_assume/vvp_page_assume
++			 * is stuck on wait_on_page_writeback with page lock
++			 * held. In this case there is no risk for the lock to
++			 * be released while we are doing our encryption
++			 * processing, because writeback against that page will
++			 * end in vvp_page_completion_write/cl_page_completion,
++			 * which means only once the page is fully processed.
++			 */
++			lockedbymyself = trylock_page(pg->pg);
++			data_page =
++				llcrypt_encrypt_pagecache_blocks(pg->pg,
++								 PAGE_SIZE, 0,
++								 GFP_NOFS);
++			if (lockedbymyself)
++				unlock_page(pg->pg);
++			if (IS_ERR(data_page)) {
++				rc = PTR_ERR(data_page);
++				if (rc == -ENOMEM && !retried) {
++					retried = true;
++					rc = 0;
++					goto retry_encrypt;
 +				}
++				ptlrpc_request_free(req);
++				return rc;
 +			}
- 			rc = cl_setattr_ost(ll_i2info(inode)->lli_clob,
--					    attr, xvalid, 0);
-+					    attr, xvalid, flags);
- 		}
- 	}
- 
-@@ -1875,6 +2050,11 @@ int ll_setattr(struct dentry *de, struct iattr *attr)
- {
- 	int mode = d_inode(de)->i_mode;
- 	enum op_xvalid xvalid = 0;
-+	int rc;
-+
-+	rc = llcrypt_prepare_setattr(de, attr);
-+	if (rc)
-+		return rc;
- 
- 	if ((attr->ia_valid & (ATTR_CTIME | ATTR_SIZE | ATTR_MODE)) ==
- 			      (ATTR_CTIME | ATTR_SIZE | ATTR_MODE))
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index ff8f3c6..54f0b9a 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -1453,8 +1453,8 @@ int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
- 			   struct cl_page *page, struct file *file)
- {
- 	struct inode *inode = vvp_object_inode(page->cp_obj);
--	struct ll_file_data *fd = file->private_data;
--	struct ll_readahead_state *ras = &fd->fd_ras;
-+	struct ll_file_data *fd = NULL;
-+	struct ll_readahead_state *ras = NULL;
- 	struct cl_2queue *queue = &io->ci_queue;
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct cl_sync_io *anchor = NULL;
-@@ -1464,10 +1464,15 @@ int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
- 	struct vvp_page *vpg;
- 	bool uptodate;
- 
-+	if (file) {
-+		fd = file->private_data;
-+		ras = &fd->fd_ras;
++			/* len is forced to PAGE_SIZE, and poff to 0
++			 * so store the old, clear text info
++			 */
++			pg->pg = data_page;
++			pg->bp_count_diff = PAGE_SIZE - pg->count;
++			pg->count = PAGE_SIZE;
++			pg->bp_off_diff = pg->off & ~PAGE_MASK;
++			pg->off = pg->off & PAGE_MASK;
++		}
 +	}
 +
- 	vpg = cl2vvp_page(cl_object_page_slice(page->cp_obj, page));
- 	uptodate = vpg->vpg_defer_uptodate;
+ 	for (niocount = i = 1; i < page_count; i++) {
+ 		if (!can_merge_pages(pga[i - 1], pga[i]))
+ 			niocount++;
+@@ -2115,6 +2183,10 @@ static int brw_interpret(const struct lu_env *env,
  
--	if (ll_readahead_enabled(sbi) && !vpg->vpg_ra_updated) {
-+	if (ll_readahead_enabled(sbi) && !vpg->vpg_ra_updated && ras) {
- 		struct vvp_io *vio = vvp_env_io(env);
- 		enum ras_update_flags flags = 0;
- 
-@@ -1494,7 +1499,7 @@ int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
- 	io_start_index = cl_index(io->ci_obj, io->u.ci_rw.crw_pos);
- 	io_end_index = cl_index(io->ci_obj, io->u.ci_rw.crw_pos +
- 				io->u.ci_rw.crw_count - 1);
--	if (ll_readahead_enabled(sbi)) {
-+	if (ll_readahead_enabled(sbi) && ras) {
- 		rc2 = ll_readahead(env, io, &queue->c2_qin, ras,
- 				   uptodate, file);
- 		CDEBUG(D_READA, DFID " %d pages read ahead at %lu\n",
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index 371d988..8df5d39 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -620,7 +620,14 @@ static int vvp_io_setattr_lock(const struct lu_env *env,
- 	u32 enqflags = 0;
- 
- 	if (cl_io_is_trunc(io)) {
--		if (io->u.ci_setattr.sa_attr.lvb_size == 0)
-+		struct inode *inode = vvp_object_inode(io->ci_obj);
+ 	rc = osc_brw_fini_request(req, rc);
+ 	CDEBUG(D_INODE, "request %p aa %p rc %d\n", req, aa, rc);
 +
-+		/* set enqueue flags to CEF_MUST in case of encrypted file,
-+		 * to prevent lockless truncate
-+		 */
-+		if (S_ISREG(inode->i_mode) && IS_ENCRYPTED(inode))
-+			enqflags = CEF_MUST;
-+		else if (io->u.ci_setattr.sa_attr.lvb_size == 0)
- 			enqflags = CEF_DISCARD_DATA;
- 	} else if (cl_io_is_fallocate(io)) {
- 		lock_start = io->u.ci_setattr.sa_falloc_offset;
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index b27a259..1968d62 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -2084,8 +2084,13 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 					break;
- 				p++;
- 			}
--			if (p - q == PAGE_SIZE / sizeof(*p))
-+			if (p - q == PAGE_SIZE / sizeof(*p)) {
-+				/* if page is empty forward info to upper layers
-+				 * (ll_io_zero_page) by clearing PagePrivate2
-+				 */
-+				ClearPagePrivate2(pg->pg);
- 				continue;
-+			}
++	/* restore clear text pages */
++	osc_release_bounce_pages(aa->aa_ppga, aa->aa_page_count);
++
+ 	/*
+ 	 * When server returns -EINPROGRESS, client should always retry
+ 	 * regardless of the number of times the bulk was resent already.
+@@ -2430,7 +2502,10 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+ 		LASSERT(!req);
  
- 			rc = llcrypt_decrypt_pagecache_blocks(pg->pg,
- 							      PAGE_SIZE, 0);
+ 		kmem_cache_free(osc_obdo_kmem, oa);
+-		kfree(pga);
++		if (pga) {
++			osc_release_bounce_pages(pga, page_count);
++			osc_release_ppga(pga, page_count);
++		}
+ 		/* this should happen rarely and is pretty bad, it makes the
+ 		 * pending list not follow the dirty order
+ 		 */
 -- 
 1.8.3.1
