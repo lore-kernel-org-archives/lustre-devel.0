@@ -1,75 +1,80 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  1 Jul 2020 20:04:42 -0400
-Subject: [lustre-devel] [PATCH 02/18] lnet: o2ib: fix page mapping error
+Date: Wed,  1 Jul 2020 20:04:49 -0400
+Subject: [lustre-devel] [PATCH 09/18] lustre: llite: bind kthread thread to
+ accepted node set
 In-Reply-To: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
 References: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1593648298-10571-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1593648298-10571-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexey Lyashkov <c17817@cray.com>
+Bind both the agl and statahead kernel threads to a node that is
+apart of the cpt table that Lustre use. This limits the polluting
+of the cache of HPC applications.
 
-IB DMA mapping can merge a physically continues page region into
-single one.
-It's confused a kiblnd_fmr_pool_map function who expect to see all
-fragments mapped.
-It's generate a error
- (o2iblnd.c:1926:kiblnd_fmr_pool_map()) Failed to map mr 1/16 elements
-
-By study an IB code, it looks ib_map_mr_sg return code should checked
-against of result of ib_dma_map_sg instead of original fragments
-count, same data should be used as argument of ib_map_mr_sg function.
-
-Cray-bug-id: LUS-8139
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13181
-Lustre-commit: 40385cda7afbd ("LU-13181 o2ib: fix page mapping error")
-Signed-off-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-on: https://review.whamcloud.com/37388
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
-Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9441
+Lustre-commit: d6e103e6950d9 ("LU-9441 llite: bind kthread thread to accepted node set")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/38730
+Reviewed-by: Yang Sheng <ys@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c    | 7 ++++---
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 3 ++-
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ fs/lustre/llite/statahead.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 3a76447..16edfba 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1737,10 +1737,11 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
- 				}
+diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
+index fb25520..895e496 100644
+--- a/fs/lustre/llite/statahead.c
++++ b/fs/lustre/llite/statahead.c
+@@ -39,6 +39,7 @@
  
- 				n = ib_map_mr_sg(mr, tx->tx_frags,
--						 tx->tx_nfrags, NULL, PAGE_SIZE);
--				if (unlikely(n != tx->tx_nfrags)) {
-+						 rd->rd_nfrags, NULL,
-+						 PAGE_SIZE);
-+				if (unlikely(n != rd->rd_nfrags)) {
- 					CERROR("Failed to map mr %d/%d elements\n",
--					       n, tx->tx_nfrags);
-+					       n, rd->rd_nfrags);
- 					return n < 0 ? n : -EINVAL;
- 				}
+ #define DEBUG_SUBSYSTEM S_LLITE
  
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 40e196d..3b9d10d 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -595,7 +595,8 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
- 	fps = net->ibn_fmr_ps[cpt];
- 	rc = kiblnd_fmr_pool_map(fps, tx, rd, nob, 0, &tx->tx_fmr);
- 	if (rc) {
--		CERROR("Can't map %u bytes: %d\n", nob, rc);
-+		CERROR("Can't map %u bytes (%u/%u)s: %d\n", nob,
-+		       tx->tx_nfrags, rd->rd_nfrags, rc);
- 		return rc;
- 	}
++#include <linux/libcfs/libcfs_cpu.h>
+ #include <obd_support.h>
+ #include <lustre_dlm.h>
+ #include "llite_internal.h"
+@@ -954,6 +955,7 @@ static void ll_stop_agl(struct ll_statahead_info *sai)
+ /* start agl thread */
+ static void ll_start_agl(struct dentry *parent, struct ll_statahead_info *sai)
+ {
++	int node = cfs_cpt_spread_node(cfs_cpt_tab, CFS_CPT_ANY);
+ 	struct ll_inode_info *plli;
+ 	struct task_struct *task;
  
+@@ -961,8 +963,8 @@ static void ll_start_agl(struct dentry *parent, struct ll_statahead_info *sai)
+ 	       sai, parent);
+ 
+ 	plli = ll_i2info(d_inode(parent));
+-	task = kthread_create(ll_agl_thread, parent, "ll_agl_%u",
+-			      plli->lli_opendir_pid);
++	task = kthread_create_on_node(ll_agl_thread, parent, node, "ll_agl_%u",
++				      plli->lli_opendir_pid);
+ 	if (IS_ERR(task)) {
+ 		CERROR("can't start ll_agl thread, rc: %ld\n", PTR_ERR(task));
+ 		sai->sai_agl_valid = 0;
+@@ -1535,6 +1537,7 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ static int start_statahead_thread(struct inode *dir, struct dentry *dentry,
+ 				  bool agl)
+ {
++	int node = cfs_cpt_spread_node(cfs_cpt_tab, CFS_CPT_ANY);
+ 	struct ll_inode_info *lli = ll_i2info(dir);
+ 	struct ll_statahead_info *sai = NULL;
+ 	struct task_struct *task;
+@@ -1586,8 +1589,8 @@ static int start_statahead_thread(struct inode *dir, struct dentry *dentry,
+ 	CDEBUG(D_READA, "start statahead thread: [pid %d] [parent %pd]\n",
+ 	       current->pid, parent);
+ 
+-	task = kthread_create(ll_statahead_thread, parent, "ll_sa_%u",
+-			      lli->lli_opendir_pid);
++	task = kthread_create_on_node(ll_statahead_thread, parent, node,
++				      "ll_sa_%u", lli->lli_opendir_pid);
+ 	if (IS_ERR(task)) {
+ 		spin_lock(&lli->lli_sa_lock);
+ 		lli->lli_sai = NULL;
 -- 
 1.8.3.1
