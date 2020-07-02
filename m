@@ -1,88 +1,104 @@
-From: NeilBrown <neilb@suse.de>
-Date: Thu, 25 Jun 2020 11:46:18 +1000
-Subject: [lustre-devel] [PATCH 00/45] lustre: merged OpenSFS client
- patches from April 30 to today
-In-Reply-To: <alpine.LFD.2.21.2006241511460.28449@casper.infradead.org>
-References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
- <87sgfj6ypq.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.2006012345440.1967@casper.infradead.org>
- <87pn9q1kxf.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.2006241511460.28449@casper.infradead.org>
-Message-ID: <87bll729zp.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed,  1 Jul 2020 20:04:40 -0400
+Subject: [lustre-devel] [PATCH 00/18] Port of OpenSFS landing as of July 1,
+ 2020
+Message-ID: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Jun 24 2020, James Simmons wrote:
+Port of patches that landed to the OpenSFS branch. A few patches added
+the were missing that enables potential lustre utilities building
+against the Linux client. Please review to make sure everything is
+okay.
 
->> On Mon, Jun 01 2020, James Simmons wrote:
->> 
->> >> > Merge the client side patches that landed to the OpenSFS
->> >> > tree since Apirl 30 to today. Include a fid missing patches
->> >> > as well and one patch to fix issues with 2 patches from the
->> >> > earlier 600+ patch set. Please review to ensure their correctness.
->> >> 
->> >> Hi James,
->> >> I tried applying these and hit lots of conflicts.
->> >> What tree are they on top of?
->> >
->> > This is based off the top of my tree. Currently I'm using my tree as the 
->> > OpenSFS version of the Linux client so I only add things that land. Your
->> > tree is more the development / prototype tree since it has not yet landed
->> > things. So most likely its the LNet LU-13004 work that is conflicting.
->> > I also run the patches by checkpatch which has the LNET comment change 
->> > that  wasn't in the OpenSFS branch until just recently; OpenSFS commit
->> > d3f1ceeb123da9603cd5ee3acbd4ee638a995f10. That should reduce the conflicts
->> > going forward. We are getting to the point in which both our trees are
->> > almost in sync ;-) 
->> 
->> I don't think it makes any sense to maintain two separate trees like
->> this.
->> 
->> Would you like to just keep maintaining your tree, and I'll stop with
->> mine?
->> 
->> If so, is your git tree published somewhere?
->
-> At this point its okay to have two separate trees since our trees have
-> two different purposes. Mind you I do plan to retire my tree in the
-> near future for your tree. My tree:
->
-> https://github.com/jasimmons1973/lustre
+Alexander Boyko (1):
+  lustre: llite: don't hold inode_lock for security notify
 
-Thanks.
+Alexey Lyashkov (2):
+  lnet: restore an maximal fragments count
+  lnet: o2ib: fix page mapping error
 
->
-> is a 1 to 1 OpenSFS port to the Linux client. Your tree has new prototype
-> work; most has landed to the OpenSFS tree; which in turn ends up in my 
-> tree. Work is still outstanding in your tree that needs to be properly
-> vetted and merged. Also I have noticed the work in your tree that has
-> landed to OpenSFS is different. Sometimes the OpenSFS branch has 
-> improvements missing from the Linux client prototype patch and some times
-> the reverse is true. So those issues need to be sorted out as well. Your
-> tree is needed to work out these last bits. Once done a sweep will need
-> to be done on your tree to patch everything up.
+Amir Shehata (1):
+  lnet: handle undefined parameters
 
-Maybe...
-I'm beginning to wonder it might be best to base our eventual submission
-the Linux on the OpenSFS master branch.
-i.e. get it to a state where we can write a tool that collects all the
-code needed for the client and places it in the linux tree at the
-appropriate place.  Then we submit that as a series of commits.
+Andriy Skulysh (1):
+  lustre: llite: truncate deadlock with DoM files
 
-The big value proposition here is that the code we submit is
-demonstrable close to the code that we test.
+Chris Horn (1):
+  lnet: Skip health and resends for single rail configs
 
-I don't know ... maybe maintaining the parallel tree is a good idea.
-I'm just not as sure as I once was.  The testing is really a big deal.
+Emoly Liu (1):
+  lustre: obd: add new LPROCFS_TYPE_*
 
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200625/928d57c2/attachment.sig>
+Gregoire Pichon (1):
+  lnet: define new network driver ptl4lnd
+
+Hongchao Zhang (1):
+  lustre: mdc: chlg device could be used after free
+
+James Simmons (2):
+  lustre: llite: bind kthread thread to accepted node set
+  lustre: lov: use lov_pattern_support() to verify lmm
+
+Lai Siyao (1):
+  lustre: mdt: don't fetch LOOKUP lock for remote object
+
+Mikhail Pershin (1):
+  lustre: ptlrpc: limit rate of lock replays
+
+Sebastien Buisson (5):
+  lustre: sec: encryption for write path
+  lustre: sec: decryption for read path
+  lustre: sec: deal with encrypted object size
+  lustre: sec: support truncate for encrypted files
+  lustre: sec: ioctls to handle encryption policies
+
+ fs/lustre/include/lprocfs_status.h         |   9 +-
+ fs/lustre/include/lustre_import.h          |   2 +
+ fs/lustre/include/lustre_osc.h             |   1 +
+ fs/lustre/include/obd.h                    |  19 ++-
+ fs/lustre/include/obd_class.h              |   3 +-
+ fs/lustre/include/obd_support.h            |   5 +
+ fs/lustre/ldlm/ldlm_request.c              |  69 ++++++++++-
+ fs/lustre/llite/crypto.c                   |  15 ++-
+ fs/lustre/llite/dir.c                      |  50 +++++++-
+ fs/lustre/llite/file.c                     |  19 ++-
+ fs/lustre/llite/llite_internal.h           |   1 +
+ fs/lustre/llite/llite_lib.c                | 187 ++++++++++++++++++++++++++++-
+ fs/lustre/llite/lproc_llite.c              |   8 +-
+ fs/lustre/llite/namei.c                    | 105 +++++++++++++---
+ fs/lustre/llite/rw.c                       |  13 +-
+ fs/lustre/llite/rw26.c                     |   4 +
+ fs/lustre/llite/statahead.c                |  11 +-
+ fs/lustre/llite/vvp_io.c                   |  17 ++-
+ fs/lustre/lmv/lmv_intent.c                 |  19 ++-
+ fs/lustre/lmv/lmv_internal.h               |   1 +
+ fs/lustre/lmv/lmv_obd.c                    |   3 +-
+ fs/lustre/lov/lov_ea.c                     |   6 +-
+ fs/lustre/mdc/mdc_changelog.c              |  46 ++++---
+ fs/lustre/mdc/mdc_internal.h               |   1 +
+ fs/lustre/mdc/mdc_request.c                |   8 +-
+ fs/lustre/obdclass/genops.c                |   1 +
+ fs/lustre/obdecho/echo_client.c            |   2 +
+ fs/lustre/obdecho/echo_internal.h          |   3 +
+ fs/lustre/osc/osc_internal.h               |   1 +
+ fs/lustre/osc/osc_request.c                | 121 ++++++++++++++++++-
+ fs/lustre/ptlrpc/import.c                  |   8 +-
+ include/linux/lnet/lib-lnet.h              |   4 +-
+ include/linux/lnet/lib-types.h             |   2 +-
+ include/uapi/linux/lnet/nidstr.h           |   1 +
+ include/uapi/linux/lustre/lustre_user.h    |   8 ++
+ net/lnet/klnds/o2iblnd/o2iblnd.c           |   7 +-
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c        |   3 +-
+ net/lnet/klnds/o2iblnd/o2iblnd_modparams.c |   4 +-
+ net/lnet/klnds/socklnd/socklnd_modparams.c |   4 +-
+ net/lnet/lnet/api-ni.c                     |  26 +++-
+ net/lnet/lnet/lib-msg.c                    |  65 +++++++---
+ net/lnet/lnet/nidstrings.c                 |   9 ++
+ 42 files changed, 759 insertions(+), 132 deletions(-)
+
+-- 
+1.8.3.1
