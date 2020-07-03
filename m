@@ -1,129 +1,40 @@
 From: NeilBrown <neilb@suse.de>
-Date: Thu, 02 Jul 2020 14:47:35 +1000
-Subject: [lustre-devel] [PATCH 00/18] Port of OpenSFS landing as of July
- 1, 2020
-In-Reply-To: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-References: <1593648298-10571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <87zh8i1q1k.fsf@notabene.neil.brown.name>
+Date: Fri, 03 Jul 2020 16:37:17 +1000
+Subject: [lustre-devel] [PATCH 00/45] lustre: merged OpenSFS client
+ patches from April 30 to today
+In-Reply-To: <87k0zx1dzs.fsf@notabene.neil.brown.name>
+References: <1590444502-20533-1-git-send-email-jsimmons@infradead.org>
+ <87sgfj6ypq.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.2006012345440.1967@casper.infradead.org>
+ <87pn9q1kxf.fsf@notabene.neil.brown.name>
+ <B7168794-A621-413E-9DFA-AF1C02354F76@amazon.com>
+ <87k0zx1dzs.fsf@notabene.neil.brown.name>
+Message-ID: <87tuyp14v6.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Jul 01 2020, James Simmons wrote:
+On Wed, Jun 24 2020, NeilBrown wrote:
+>>
+>> By the way, where's your tree available Neil? I'm checking your github account but not sure this is there.
+>>
+>
+> In the "linux" repo I have quite a few branches.
+>  "lustre/lustre" is the latest lustre code (as of late april).
+>
+> https://github.com/neilbrown/linux/tree/lustre/lustre
 
-> Port of patches that landed to the OpenSFS branch. A few patches added
-> the were missing that enables potential lustre utilities building
-> against the Linux client. Please review to make sure everything is
-> okay.
+Just FYI, I've updated this to Linux 5.7 and *almost* current master.
+There is one patch which causes all my testing to fail, so I've
+postponed that one until I understand the problem.
 
-Hi James,
- could you please always be explicit about which Linux client tree
- these are ported to?  It avoids confusion.
-
-Thanks,
 NeilBrown
-
-
->
-> Alexander Boyko (1):
->   lustre: llite: don't hold inode_lock for security notify
->
-> Alexey Lyashkov (2):
->   lnet: restore an maximal fragments count
->   lnet: o2ib: fix page mapping error
->
-> Amir Shehata (1):
->   lnet: handle undefined parameters
->
-> Andriy Skulysh (1):
->   lustre: llite: truncate deadlock with DoM files
->
-> Chris Horn (1):
->   lnet: Skip health and resends for single rail configs
->
-> Emoly Liu (1):
->   lustre: obd: add new LPROCFS_TYPE_*
->
-> Gregoire Pichon (1):
->   lnet: define new network driver ptl4lnd
->
-> Hongchao Zhang (1):
->   lustre: mdc: chlg device could be used after free
->
-> James Simmons (2):
->   lustre: llite: bind kthread thread to accepted node set
->   lustre: lov: use lov_pattern_support() to verify lmm
->
-> Lai Siyao (1):
->   lustre: mdt: don't fetch LOOKUP lock for remote object
->
-> Mikhail Pershin (1):
->   lustre: ptlrpc: limit rate of lock replays
->
-> Sebastien Buisson (5):
->   lustre: sec: encryption for write path
->   lustre: sec: decryption for read path
->   lustre: sec: deal with encrypted object size
->   lustre: sec: support truncate for encrypted files
->   lustre: sec: ioctls to handle encryption policies
->
->  fs/lustre/include/lprocfs_status.h         |   9 +-
->  fs/lustre/include/lustre_import.h          |   2 +
->  fs/lustre/include/lustre_osc.h             |   1 +
->  fs/lustre/include/obd.h                    |  19 ++-
->  fs/lustre/include/obd_class.h              |   3 +-
->  fs/lustre/include/obd_support.h            |   5 +
->  fs/lustre/ldlm/ldlm_request.c              |  69 ++++++++++-
->  fs/lustre/llite/crypto.c                   |  15 ++-
->  fs/lustre/llite/dir.c                      |  50 +++++++-
->  fs/lustre/llite/file.c                     |  19 ++-
->  fs/lustre/llite/llite_internal.h           |   1 +
->  fs/lustre/llite/llite_lib.c                | 187 ++++++++++++++++++++++++++++-
->  fs/lustre/llite/lproc_llite.c              |   8 +-
->  fs/lustre/llite/namei.c                    | 105 +++++++++++++---
->  fs/lustre/llite/rw.c                       |  13 +-
->  fs/lustre/llite/rw26.c                     |   4 +
->  fs/lustre/llite/statahead.c                |  11 +-
->  fs/lustre/llite/vvp_io.c                   |  17 ++-
->  fs/lustre/lmv/lmv_intent.c                 |  19 ++-
->  fs/lustre/lmv/lmv_internal.h               |   1 +
->  fs/lustre/lmv/lmv_obd.c                    |   3 +-
->  fs/lustre/lov/lov_ea.c                     |   6 +-
->  fs/lustre/mdc/mdc_changelog.c              |  46 ++++---
->  fs/lustre/mdc/mdc_internal.h               |   1 +
->  fs/lustre/mdc/mdc_request.c                |   8 +-
->  fs/lustre/obdclass/genops.c                |   1 +
->  fs/lustre/obdecho/echo_client.c            |   2 +
->  fs/lustre/obdecho/echo_internal.h          |   3 +
->  fs/lustre/osc/osc_internal.h               |   1 +
->  fs/lustre/osc/osc_request.c                | 121 ++++++++++++++++++-
->  fs/lustre/ptlrpc/import.c                  |   8 +-
->  include/linux/lnet/lib-lnet.h              |   4 +-
->  include/linux/lnet/lib-types.h             |   2 +-
->  include/uapi/linux/lnet/nidstr.h           |   1 +
->  include/uapi/linux/lustre/lustre_user.h    |   8 ++
->  net/lnet/klnds/o2iblnd/o2iblnd.c           |   7 +-
->  net/lnet/klnds/o2iblnd/o2iblnd_cb.c        |   3 +-
->  net/lnet/klnds/o2iblnd/o2iblnd_modparams.c |   4 +-
->  net/lnet/klnds/socklnd/socklnd_modparams.c |   4 +-
->  net/lnet/lnet/api-ni.c                     |  26 +++-
->  net/lnet/lnet/lib-msg.c                    |  65 +++++++---
->  net/lnet/lnet/nidstrings.c                 |   9 ++
->  42 files changed, 759 insertions(+), 132 deletions(-)
->
-> -- 
-> 1.8.3.1
->
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200702/d4f03367/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200703/5d6bb3ec/attachment.sig>
