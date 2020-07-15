@@ -1,118 +1,78 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jul 2020 16:45:05 -0400
-Subject: [lustre-devel] [PATCH 24/37] lnet: o2iblnd: Use
- list_for_each_entry_safe
+Date: Wed, 15 Jul 2020 16:45:18 -0400
+Subject: [lustre-devel] [PATCH 37/37] lnet: check rtr_nid is a gateway
 In-Reply-To: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
 References: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1594845918-29027-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1594845918-29027-38-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-Several loops use list_for_each_safe(), then call
-list_entry() as first step.
-These can be merged using list_for_each_entry_safe().
+The rtr_nid is specified for all REPLY/ACK. However it is possible
+for the route through the gateway specified by rtr_nid to be removed.
+In this case we don't want to use it. We should lookup alternative
+paths.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
-Lustre-commit: e5574f72f2fd9 ("LU-12678 o2iblnd: Use list_for_each_entry_safe")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/39126
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+This patch checks if the peer looked up is indeed a gateway. If it's
+not a gateway then we attempt to find another path. There is no need
+to fail right away. It's not a hard requirement to fail if the default
+rtr_nid is not valid.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13713
+Lustre-commit: 07397a2e7473c ("LU-13713 lnet: check rtr_nid is a gateway")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/39175
 Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c    | 26 ++++++++++----------------
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c |  7 ++-----
- 2 files changed, 12 insertions(+), 21 deletions(-)
+ net/lnet/lnet/lib-move.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 6c7659c..c6a077b 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -454,18 +454,16 @@ static int kiblnd_get_peer_info(struct lnet_ni *ni, int index,
- 
- static void kiblnd_del_peer_locked(struct kib_peer_ni *peer_ni)
- {
--	struct list_head *ctmp;
--	struct list_head *cnxt;
-+	struct kib_conn *cnxt;
- 	struct kib_conn *conn;
- 
- 	if (list_empty(&peer_ni->ibp_conns)) {
- 		kiblnd_unlink_peer_locked(peer_ni);
- 	} else {
--		list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
--			conn = list_entry(ctmp, struct kib_conn, ibc_list);
--
-+		list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
-+					 ibc_list)
- 			kiblnd_close_conn_locked(conn, 0);
--		}
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 234fbb5..c0dd30c 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -1777,6 +1777,7 @@ struct lnet_ni *
+ 	struct lnet_route *last_route = NULL;
+ 	struct lnet_peer_ni *lpni = NULL;
+ 	struct lnet_peer_ni *gwni = NULL;
++	bool route_found = false;
+ 	lnet_nid_t src_nid = (sd->sd_src_nid != LNET_NID_ANY) ? sd->sd_src_nid :
+ 			      sd->sd_best_ni ? sd->sd_best_ni->ni_nid :
+ 			      LNET_NID_ANY;
+@@ -1790,15 +1791,20 @@ struct lnet_ni *
+ 	 */
+ 	if (sd->sd_rtr_nid != LNET_NID_ANY) {
+ 		gwni = lnet_find_peer_ni_locked(sd->sd_rtr_nid);
+-		if (!gwni) {
+-			CERROR("No peer NI for gateway %s\n",
++		if (gwni) {
++			gw = gwni->lpni_peer_net->lpn_peer;
++			lnet_peer_ni_decref_locked(gwni);
++			if (gw->lp_rtr_refcount) {
++				local_lnet = LNET_NIDNET(sd->sd_rtr_nid);
++				route_found = true;
++			}
++		} else {
++			CWARN("No peer NI for gateway %s. Attempting to find an alternative route.\n",
+ 			       libcfs_nid2str(sd->sd_rtr_nid));
+-			return -EHOSTUNREACH;
+ 		}
+-		gw = gwni->lpni_peer_net->lpn_peer;
+-		lnet_peer_ni_decref_locked(gwni);
+-		local_lnet = LNET_NIDNET(sd->sd_rtr_nid);
+-	} else {
++	}
 +
- 		/* NB closing peer_ni's last conn unlinked it. */
- 	}
- 	/*
-@@ -952,13 +950,11 @@ void kiblnd_destroy_conn(struct kib_conn *conn)
- int kiblnd_close_peer_conns_locked(struct kib_peer_ni *peer_ni, int why)
- {
- 	struct kib_conn *conn;
--	struct list_head *ctmp;
--	struct list_head *cnxt;
-+	struct kib_conn *cnxt;
- 	int count = 0;
- 
--	list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
--		conn = list_entry(ctmp, struct kib_conn, ibc_list);
--
-+	list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
-+				 ibc_list) {
- 		CDEBUG(D_NET, "Closing conn -> %s, version: %x, reason: %d\n",
- 		       libcfs_nid2str(peer_ni->ibp_nid),
- 		       conn->ibc_version, why);
-@@ -974,13 +970,11 @@ int kiblnd_close_stale_conns_locked(struct kib_peer_ni *peer_ni,
- 				    int version, u64 incarnation)
- {
- 	struct kib_conn *conn;
--	struct list_head *ctmp;
--	struct list_head *cnxt;
-+	struct kib_conn *cnxt;
- 	int count = 0;
- 
--	list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
--		conn = list_entry(ctmp, struct kib_conn, ibc_list);
--
-+	list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
-+				 ibc_list) {
- 		if (conn->ibc_version == version &&
- 		    conn->ibc_incarnation == incarnation)
- 			continue;
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 2c670a33..ba2f46f 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1982,15 +1982,12 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- kiblnd_abort_txs(struct kib_conn *conn, struct list_head *txs)
- {
- 	LIST_HEAD(zombies);
--	struct list_head *tmp;
--	struct list_head *nxt;
-+	struct kib_tx *nxt;
- 	struct kib_tx *tx;
- 
- 	spin_lock(&conn->ibc_lock);
- 
--	list_for_each_safe(tmp, nxt, txs) {
--		tx = list_entry(tmp, struct kib_tx, tx_list);
--
-+	list_for_each_entry_safe(tx, nxt, txs, tx_list) {
- 		if (txs == &conn->ibc_active_txs) {
- 			LASSERT(!tx->tx_queued);
- 			LASSERT(tx->tx_waiting || tx->tx_sending);
++	if (!route_found) {
+ 		/* we've already looked up the initial lpni using dst_nid */
+ 		lpni = sd->sd_best_lpni;
+ 		/* the peer tree must be in existence */
 -- 
 1.8.3.1
