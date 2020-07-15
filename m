@@ -1,71 +1,130 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jul 2020 16:44:48 -0400
-Subject: [lustre-devel] [PATCH 07/37] lustre: osc: disable ext merging for
- rdma only pages and non-rdma
+Date: Wed, 15 Jul 2020 16:44:50 -0400
+Subject: [lustre-devel] [PATCH 09/37] lnet: o2iblnd: allocate init_qp_attr
+ on stack.
 In-Reply-To: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
 References: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1594845918-29027-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1594845918-29027-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-This patch try to add logic to prevent CPU memory pages and RDMA
-memory pages from merging into one RPC, codes which set OBD_BRW_RDMA_ONLY
-will be added whenever RDMA only codes added later.
+'struct ib_qp_init_attr' is not so large that it cannot be allocated
+on the stack.  It is about 100 bytes, various other function in Linux
+allocate it on the stack, and the stack isn't as constrained as it
+once was.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13180
-Lustre-commit: 9f6c9fa44d6e6 ("LU-13180 osc: disable ext merging for rdma only pages and non-rdma")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/37567
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Gu Zheng <gzheng@ddn.com>
-Reviewed-by: Yingjin Qian <qian@ddn.com>
+So allocate on stack instead of using kmalloc and handling errors.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 524a5a733ba1c ("LU-12678 o2iblnd: allocate init_qp_attr on stack.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39122
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_osc.h | 4 +++-
- fs/lustre/osc/osc_cache.c      | 4 ++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 45 +++++++++++++++-------------------------
+ 1 file changed, 17 insertions(+), 28 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index 11b7e92..cd08f27 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -939,7 +939,9 @@ struct osc_extent {
- 	/* Non-delay RPC should be used for this extent. */
- 				oe_ndelay:1,
- 	/* direct IO pages */
--				oe_dio:1;
-+				oe_dio:1,
-+	/* this extent consists of RDMA only pages */
-+				oe_is_rdma_only;
- 	/* how many grants allocated for this extent.
- 	 *  Grant allocated for this extent. There is no grant allocated
- 	 *  for reading extents and sync write extents.
-diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
-index 474b711..f811dadb 100644
---- a/fs/lustre/osc/osc_cache.c
-+++ b/fs/lustre/osc/osc_cache.c
-@@ -1927,6 +1927,9 @@ static inline unsigned int osc_extent_chunks(const struct osc_extent *ext)
- 	if (in_rpc->oe_dio && overlapped(ext, in_rpc))
- 		return false;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index 16edfba..d8fca2a 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -699,7 +699,7 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ 	rwlock_t *glock = &kiblnd_data.kib_global_lock;
+ 	struct kib_net *net = peer_ni->ibp_ni->ni_data;
+ 	struct kib_dev *dev;
+-	struct ib_qp_init_attr *init_qp_attr;
++	struct ib_qp_init_attr init_qp_attr = {};
+ 	struct kib_sched_info *sched;
+ 	struct ib_cq_init_attr cq_attr = {};
+ 	struct kib_conn *conn;
+@@ -727,18 +727,11 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ 	 */
+ 	cpt = sched->ibs_cpt;
  
-+	if (ext->oe_is_rdma_only != in_rpc->oe_is_rdma_only)
-+		return false;
-+
- 	return true;
+-	init_qp_attr = kzalloc_cpt(sizeof(*init_qp_attr), GFP_NOFS, cpt);
+-	if (!init_qp_attr) {
+-		CERROR("Can't allocate qp_attr for %s\n",
+-		       libcfs_nid2str(peer_ni->ibp_nid));
+-		goto failed_0;
+-	}
+-
+ 	conn = kzalloc_cpt(sizeof(*conn), GFP_NOFS, cpt);
+ 	if (!conn) {
+ 		CERROR("Can't allocate connection for %s\n",
+ 		       libcfs_nid2str(peer_ni->ibp_nid));
+-		goto failed_1;
++		goto failed_0;
+ 	}
+ 
+ 	conn->ibc_state = IBLND_CONN_INIT;
+@@ -819,27 +812,27 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ 		goto failed_2;
+ 	}
+ 
+-	init_qp_attr->event_handler = kiblnd_qp_event;
+-	init_qp_attr->qp_context = conn;
+-	init_qp_attr->cap.max_send_sge = *kiblnd_tunables.kib_wrq_sge;
+-	init_qp_attr->cap.max_recv_sge = 1;
+-	init_qp_attr->sq_sig_type = IB_SIGNAL_REQ_WR;
+-	init_qp_attr->qp_type = IB_QPT_RC;
+-	init_qp_attr->send_cq = cq;
+-	init_qp_attr->recv_cq = cq;
++	init_qp_attr.event_handler = kiblnd_qp_event;
++	init_qp_attr.qp_context = conn;
++	init_qp_attr.cap.max_send_sge = *kiblnd_tunables.kib_wrq_sge;
++	init_qp_attr.cap.max_recv_sge = 1;
++	init_qp_attr.sq_sig_type = IB_SIGNAL_REQ_WR;
++	init_qp_attr.qp_type = IB_QPT_RC;
++	init_qp_attr.send_cq = cq;
++	init_qp_attr.recv_cq = cq;
+ 	/* kiblnd_send_wrs() can change the connection's queue depth if
+ 	 * the maximum work requests for the device is maxed out
+ 	 */
+-	init_qp_attr->cap.max_send_wr = kiblnd_send_wrs(conn);
+-	init_qp_attr->cap.max_recv_wr = IBLND_RECV_WRS(conn);
++	init_qp_attr.cap.max_send_wr = kiblnd_send_wrs(conn);
++	init_qp_attr.cap.max_recv_wr = IBLND_RECV_WRS(conn);
+ 
+-	rc = rdma_create_qp(cmid, conn->ibc_hdev->ibh_pd, init_qp_attr);
++	rc = rdma_create_qp(cmid, conn->ibc_hdev->ibh_pd, &init_qp_attr);
+ 	if (rc) {
+ 		CERROR("Can't create QP: %d, send_wr: %d, recv_wr: %d, send_sge: %d, recv_sge: %d\n",
+-		       rc, init_qp_attr->cap.max_send_wr,
+-		       init_qp_attr->cap.max_recv_wr,
+-		       init_qp_attr->cap.max_send_sge,
+-		       init_qp_attr->cap.max_recv_sge);
++		       rc, init_qp_attr.cap.max_send_wr,
++		       init_qp_attr.cap.max_recv_wr,
++		       init_qp_attr.cap.max_send_sge,
++		       init_qp_attr.cap.max_recv_sge);
+ 		goto failed_2;
+ 	}
+ 
+@@ -851,8 +844,6 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ 		      peer_ni->ibp_queue_depth,
+ 		      conn->ibc_queue_depth);
+ 
+-	kfree(init_qp_attr);
+-
+ 	conn->ibc_rxs = kzalloc_cpt(IBLND_RX_MSGS(conn) *
+ 				    sizeof(*conn->ibc_rxs),
+ 				    GFP_NOFS, cpt);
+@@ -918,8 +909,6 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ failed_2:
+ 	kiblnd_destroy_conn(conn);
+ 	kfree(conn);
+-failed_1:
+-	kfree(init_qp_attr);
+ failed_0:
+ 	return NULL;
  }
- 
-@@ -2688,6 +2691,7 @@ int osc_queue_sync_pages(const struct lu_env *env, const struct cl_io *io,
- 	ext->oe_srvlock = !!(brw_flags & OBD_BRW_SRVLOCK);
- 	ext->oe_ndelay = !!(brw_flags & OBD_BRW_NDELAY);
- 	ext->oe_dio = !!(brw_flags & OBD_BRW_NOCACHE);
-+	ext->oe_is_rdma_only = !!(brw_flags & OBD_BRW_RDMA_ONLY);
- 	ext->oe_nr_pages = page_count;
- 	ext->oe_mppr = mppr;
- 	list_splice_init(list, &ext->oe_pages);
 -- 
 1.8.3.1
