@@ -1,65 +1,80 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jul 2020 16:45:15 -0400
-Subject: [lustre-devel] [PATCH 34/37] lustre: ptlrpc: fix endless loop issue
+Date: Wed, 15 Jul 2020 16:45:04 -0400
+Subject: [lustre-devel] [PATCH 23/37] lnet: o2iblnd: use need_resched()
 In-Reply-To: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
 References: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1594845918-29027-35-git-send-email-jsimmons@infradead.org>
+Message-ID: <1594845918-29027-24-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Hongchao Zhang <hongchao@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-In ptlrpc_pinger_main, if the process to ping the recoverable
-clients takes too long time, it could be stuck in endless loop
-because of the negative value returned by pinger_check_timeout.
+Rather than using a counter to decide when to drop
+the lock and see if we need to reshedule we can
+use need_resched(), which is a precise test instead of a guess.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13667
-Lustre-commit: 6be2dbb259512 ("LU-13667 ptlrpc: fix endless loop issue")
-Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38915
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Olaf Faaland-LLNL <faaland1@llnl.gov>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: dcd799269f693 ("LU-12678 o2iblnd: use need_resched()")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39125
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/pinger.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.h    | 2 --
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 5 +----
+ 2 files changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/pinger.c b/fs/lustre/ptlrpc/pinger.c
-index ec4c51a..9f57c61 100644
---- a/fs/lustre/ptlrpc/pinger.c
-+++ b/fs/lustre/ptlrpc/pinger.c
-@@ -258,12 +258,13 @@ static void ptlrpc_pinger_process_import(struct obd_import *imp,
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
+index f60a69d..9a2fb42 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -67,8 +67,6 @@
+ #include <linux/lnet/lib-lnet.h>
  
- static void ptlrpc_pinger_main(struct work_struct *ws)
- {
--	time64_t this_ping = ktime_get_seconds();
--	time64_t time_to_next_wake;
-+	time64_t this_ping, time_after_ping, time_to_next_wake;
- 	struct timeout_item *item;
- 	struct obd_import *imp;
+ #define IBLND_PEER_HASH_SIZE		101	/* # peer_ni lists */
+-/* # scheduler loops before reschedule */
+-#define IBLND_RESCHED			100
  
- 	do {
-+		this_ping = ktime_get_seconds();
-+
- 		mutex_lock(&pinger_mutex);
- 		list_for_each_entry(item, &timeout_list, ti_chain) {
- 			item->ti_cb(item, item->ti_cb_data);
-@@ -277,6 +278,12 @@ static void ptlrpc_pinger_main(struct work_struct *ws)
+ #define IBLND_N_SCHED			2
+ #define IBLND_N_SCHED_HIGH		4
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 3b9d10d..2c670a33 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -3605,7 +3605,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	unsigned long flags;
+ 	struct ib_wc wc;
+ 	int did_something;
+-	int busy_loops = 0;
+ 	int rc;
+ 
+ 	init_waitqueue_entry(&wait, current);
+@@ -3621,11 +3620,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	spin_lock_irqsave(&sched->ibs_lock, flags);
+ 
+ 	while (!kiblnd_data.kib_shutdown) {
+-		if (busy_loops++ >= IBLND_RESCHED) {
++		if (need_resched()) {
+ 			spin_unlock_irqrestore(&sched->ibs_lock, flags);
+ 
+ 			cond_resched();
+-			busy_loops = 0;
+ 
+ 			spin_lock_irqsave(&sched->ibs_lock, flags);
  		}
- 		mutex_unlock(&pinger_mutex);
+@@ -3718,7 +3716,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		spin_unlock_irqrestore(&sched->ibs_lock, flags);
  
-+		time_after_ping = ktime_get_seconds();
-+
-+		if ((ktime_get_seconds() - this_ping - 3) > PING_INTERVAL)
-+			CDEBUG(D_HA, "long time to ping: %lld, %lld, %lld\n",
-+			       this_ping, time_after_ping, ktime_get_seconds());
-+
- 		/* Wait until the next ping time, or until we're stopped. */
- 		time_to_next_wake = pinger_check_timeout(this_ping);
- 		/* The ping sent by ptlrpc_send_rpc may get sent out
+ 		schedule();
+-		busy_loops = 0;
+ 
+ 		remove_wait_queue(&sched->ibs_waitq, &wait);
+ 		spin_lock_irqsave(&sched->ibs_lock, flags);
 -- 
 1.8.3.1
