@@ -1,73 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jul 2020 16:45:00 -0400
-Subject: [lustre-devel] [PATCH 19/37] lustre: misc: quiet compiler warning
- on armv7l
+Date: Wed, 15 Jul 2020 16:45:03 -0400
+Subject: [lustre-devel] [PATCH 22/37] lnet: o2iblnd: wait properly for
+ fps->increasing.
 In-Reply-To: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
 References: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1594845918-29027-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1594845918-29027-23-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-Avoid overflow in lu_prandom_u64_max().
+If we need to allocate a new fmr_pool and another thread is currently
+allocating one, we call schedule() and then try again.  This can spin,
+consuming a CPU and wasting power.
 
-Quiet printk() warning for mismatched type of size_t variables
-by using %z modifier for those variables.
+Instead, use wait_var_event() and wake_up_var() to
+wait for fps_increasing to be cleared.
 
-Fixes: bc2e21c54ba2 ("lustre: obdclass: generate random u64 max correctly")
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13673
-Lustre-commit: 57bb302461383 ("LU-13673 misc: quiet compiler warning on armv7l")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/38927
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 530eca31556f7 ("LU-12768 o2iblnd: wait properly for fps->increasing.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39124
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-by: Yang Sheng <ys@whamcloud.com>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/vvp_io.c          | 4 ++--
- fs/lustre/obdclass/lu_tgt_descs.c | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index 7627431..c3fb03a 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -791,7 +791,7 @@ static int vvp_io_read_start(const struct lu_env *env,
- 		goto out;
- 
- 	LU_OBJECT_HEADER(D_INODE, env, &obj->co_lu,
--			 "Read ino %lu, %lu bytes, offset %lld, size %llu\n",
-+			 "Read ino %lu, %zu bytes, offset %lld, size %llu\n",
- 			 inode->i_ino, cnt, pos, i_size_read(inode));
- 
- 	/* turn off the kernel's read-ahead */
-@@ -1197,7 +1197,7 @@ static int vvp_io_write_start(const struct lu_env *env,
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index e2e94b7..6c7659c 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1750,7 +1750,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
+ 	if (fps->fps_increasing) {
+ 		spin_unlock(&fps->fps_lock);
+ 		CDEBUG(D_NET, "Another thread is allocating new FMR pool, waiting for her to complete\n");
+-		schedule();
++		wait_var_event(fps, !fps->fps_increasing);
+ 		goto again;
  	}
- 	if (vio->vui_iocb->ki_pos != (pos + io->ci_nob - nob)) {
- 		CDEBUG(D_VFSTRACE,
--		       "%s: write position mismatch: ki_pos %lld vs. pos %lld, written %ld, commit %ld rc %ld\n",
-+		       "%s: write position mismatch: ki_pos %lld vs. pos %lld, written %zd, commit %zd rc %zd\n",
- 		       file_dentry(file)->d_name.name,
- 		       vio->vui_iocb->ki_pos, pos + io->ci_nob - nob,
- 		       written, io->ci_nob - nob, result);
-diff --git a/fs/lustre/obdclass/lu_tgt_descs.c b/fs/lustre/obdclass/lu_tgt_descs.c
-index db5a93b..469c935 100644
---- a/fs/lustre/obdclass/lu_tgt_descs.c
-+++ b/fs/lustre/obdclass/lu_tgt_descs.c
-@@ -62,7 +62,7 @@ u64 lu_prandom_u64_max(u64 ep_ro)
- 		 * 32 bits (truncated to the upper limit, if needed)
- 		 */
- 		if (ep_ro > 0xffffffffULL)
--			rand = prandom_u32_max((u32)(ep_ro >> 32)) << 32;
-+			rand = (u64)prandom_u32_max((u32)(ep_ro >> 32)) << 32;
  
- 		if (rand == (ep_ro & 0xffffffff00000000ULL))
- 			rand |= prandom_u32_max((u32)ep_ro);
+@@ -1767,6 +1767,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
+ 	rc = kiblnd_create_fmr_pool(fps, &fpo);
+ 	spin_lock(&fps->fps_lock);
+ 	fps->fps_increasing = 0;
++	wake_up_var(fps);
+ 	if (!rc) {
+ 		fps->fps_version++;
+ 		list_add_tail(&fpo->fpo_list, &fps->fps_pool_list);
 -- 
 1.8.3.1
