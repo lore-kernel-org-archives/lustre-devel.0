@@ -1,89 +1,118 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jul 2020 16:45:01 -0400
-Subject: [lustre-devel] [PATCH 20/37] lustre: llite: fix to free cl_dio_aio
- properly
+Date: Wed, 15 Jul 2020 16:45:05 -0400
+Subject: [lustre-devel] [PATCH 24/37] lnet: o2iblnd: Use
+ list_for_each_entry_safe
 In-Reply-To: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
 References: <1594845918-29027-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1594845918-29027-21-git-send-email-jsimmons@infradead.org>
+Message-ID: <1594845918-29027-25-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-@cl_dio_aio is allocated by slab, we should use slab
-free helper to free its memory.
+Several loops use list_for_each_safe(), then call
+list_entry() as first step.
+These can be merged using list_for_each_entry_safe().
 
-Fixes: ebdbecbaf50b ("lustre: obdclass: use slab allocation for cl_dio_aio")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13134
-Lustre-commit: f71a539c3e41b ("LU-13134 llite: fix to free cl_dio_aio properly")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/39103
-Reviewed-by: Patrick Farrell <farr0186@gmail.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: e5574f72f2fd9 ("LU-12678 o2iblnd: Use list_for_each_entry_safe")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39126
 Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h |  2 ++
- fs/lustre/llite/rw26.c        |  2 +-
- fs/lustre/obdclass/cl_io.c    | 10 ++++++++--
- 3 files changed, 11 insertions(+), 3 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c    | 26 ++++++++++----------------
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c |  7 ++-----
+ 2 files changed, 12 insertions(+), 21 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index 8611285..e656c68 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -2538,6 +2538,8 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
- void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
- 		     int ioret);
- struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb);
-+void cl_aio_free(struct cl_dio_aio *aio);
-+
- static inline void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
- {
- 	cl_sync_io_init_notify(anchor, nr, NULL, NULL);
-diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
-index 0971185..d0e3ff6 100644
---- a/fs/lustre/llite/rw26.c
-+++ b/fs/lustre/llite/rw26.c
-@@ -384,7 +384,7 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
- 			vio->u.write.vui_written += tot_bytes;
- 			result = tot_bytes;
- 		}
--		kfree(aio);
-+		cl_aio_free(aio);
- 	} else {
- 		result = -EIOCBQUEUED;
- 	}
-diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
-index 2f597d1..dcf940f 100644
---- a/fs/lustre/obdclass/cl_io.c
-+++ b/fs/lustre/obdclass/cl_io.c
-@@ -1106,6 +1106,13 @@ struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb)
- }
- EXPORT_SYMBOL(cl_aio_alloc);
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index 6c7659c..c6a077b 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -454,18 +454,16 @@ static int kiblnd_get_peer_info(struct lnet_ni *ni, int index,
  
-+void cl_aio_free(struct cl_dio_aio *aio)
-+{
-+	if (aio)
-+		kmem_cache_free(cl_dio_aio_kmem, aio);
-+}
-+EXPORT_SYMBOL(cl_aio_free);
+ static void kiblnd_del_peer_locked(struct kib_peer_ni *peer_ni)
+ {
+-	struct list_head *ctmp;
+-	struct list_head *cnxt;
++	struct kib_conn *cnxt;
+ 	struct kib_conn *conn;
+ 
+ 	if (list_empty(&peer_ni->ibp_conns)) {
+ 		kiblnd_unlink_peer_locked(peer_ni);
+ 	} else {
+-		list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
+-			conn = list_entry(ctmp, struct kib_conn, ibc_list);
+-
++		list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
++					 ibc_list)
+ 			kiblnd_close_conn_locked(conn, 0);
+-		}
 +
- /**
-  * Indicate that transfer of a single page completed.
-  */
-@@ -1143,8 +1150,7 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
- 		 * If anchor->csi_aio is set, we are responsible for freeing
- 		 * memory here rather than when cl_sync_io_wait() completes.
- 		 */
--		if (aio)
--			kmem_cache_free(cl_dio_aio_kmem, aio);
-+		cl_aio_free(aio);
+ 		/* NB closing peer_ni's last conn unlinked it. */
  	}
- }
- EXPORT_SYMBOL(cl_sync_io_note);
+ 	/*
+@@ -952,13 +950,11 @@ void kiblnd_destroy_conn(struct kib_conn *conn)
+ int kiblnd_close_peer_conns_locked(struct kib_peer_ni *peer_ni, int why)
+ {
+ 	struct kib_conn *conn;
+-	struct list_head *ctmp;
+-	struct list_head *cnxt;
++	struct kib_conn *cnxt;
+ 	int count = 0;
+ 
+-	list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
+-		conn = list_entry(ctmp, struct kib_conn, ibc_list);
+-
++	list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
++				 ibc_list) {
+ 		CDEBUG(D_NET, "Closing conn -> %s, version: %x, reason: %d\n",
+ 		       libcfs_nid2str(peer_ni->ibp_nid),
+ 		       conn->ibc_version, why);
+@@ -974,13 +970,11 @@ int kiblnd_close_stale_conns_locked(struct kib_peer_ni *peer_ni,
+ 				    int version, u64 incarnation)
+ {
+ 	struct kib_conn *conn;
+-	struct list_head *ctmp;
+-	struct list_head *cnxt;
++	struct kib_conn *cnxt;
+ 	int count = 0;
+ 
+-	list_for_each_safe(ctmp, cnxt, &peer_ni->ibp_conns) {
+-		conn = list_entry(ctmp, struct kib_conn, ibc_list);
+-
++	list_for_each_entry_safe(conn, cnxt, &peer_ni->ibp_conns,
++				 ibc_list) {
+ 		if (conn->ibc_version == version &&
+ 		    conn->ibc_incarnation == incarnation)
+ 			continue;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 2c670a33..ba2f46f 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1982,15 +1982,12 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ kiblnd_abort_txs(struct kib_conn *conn, struct list_head *txs)
+ {
+ 	LIST_HEAD(zombies);
+-	struct list_head *tmp;
+-	struct list_head *nxt;
++	struct kib_tx *nxt;
+ 	struct kib_tx *tx;
+ 
+ 	spin_lock(&conn->ibc_lock);
+ 
+-	list_for_each_safe(tmp, nxt, txs) {
+-		tx = list_entry(tmp, struct kib_tx, tx_list);
+-
++	list_for_each_entry_safe(tx, nxt, txs, tx_list) {
+ 		if (txs == &conn->ibc_active_txs) {
+ 			LASSERT(!tx->tx_queued);
+ 			LASSERT(tx->tx_waiting || tx->tx_sending);
 -- 
 1.8.3.1
