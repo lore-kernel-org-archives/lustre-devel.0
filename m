@@ -1,92 +1,131 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Fri, 24 Jul 2020 12:44:47 +0000
-Subject: [lustre-devel] /usr/bin/fakeroot: debian/rules: Permission
- denied - Building Lustre client (v2.13.53)
-In-Reply-To: <CAKVGuZYWmGswLZMAzLh1xQ=B872SwddyKt8dFGO6BynW63sQew@mail.gmail.com>
-References: <CAKVGuZYWmGswLZMAzLh1xQ=B872SwddyKt8dFGO6BynW63sQew@mail.gmail.com>
-Message-ID: <E9DF4E52-8874-41CF-AD89-07FBFA678FBF@ddn.com>
+From: Spitz, Cory James <cory.spitz@hpe.com>
+Date: Fri, 24 Jul 2020 21:47:42 +0000
+Subject: [lustre-devel] git packfile
+In-Reply-To: <7288E2CB-A8C3-4B37-AF4B-291EED278833@cray.com>
+References: <30534141-20CF-43C3-BA49-0149AF7CEFE6@cray.com>
+ <61FFBC77-CF2E-4EDC-9060-BF9EBF7B27D0@whamcloud.com>
+ <66BF972C-4BD3-4AD7-88A5-DDDF8D1CC988@amazon.com>
+ <FA8580F0-1439-4901-B6E3-3E2138410675@whamcloud.com>
+ <5D50C124-1325-447C-9CEB-B91646B49E5E@amazon.com>
+ <7288E2CB-A8C3-4B37-AF4B-291EED278833@cray.com>
+Message-ID: <A29FEE1A-DEF4-4BF0-9773-743500F0E798@hpe.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hopefully you understand this already but just in case.- 2.13.53 is a development build and not intended for production usage. You should be able to build Ubuntu 18.04 clients for 2.12.x releases.
-
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Ankit Ladhania <ankit@tripock.com>
-Date: Friday, July 24, 2020 at 2:45 AM
-To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: [lustre-devel] /usr/bin/fakeroot: debian/rules: Permission denied - Building Lustre client (v2.13.53)
-
-
 Hi,
-We are installing the Lustre Client (v2.13.53) on Ubuntu 18.04 (linux header: 5.4.0-42-generic)
-While doing `make debs` we are getting below error:
 
-make[1]: Leaving directory '/home/zeblok/lustre-release'
+Strangely this git packfile issue has come back recently.  I was able to workaround it again by just checking out and fetching a few times.  I found this stack overflow mention about it: https://stackoverflow.com/questions/11401434/git-packfile-claims-to-have-more-objects-inaccessable , but my local git was newer than the version mentioned there.  HPE is also having this problem for an automated checkout of git.whamcloud.com with a much, much older git implementation, but the workaround for re-fetching git.whamcloud.com is not working for us there.  Does anyone know more?
 
- dpkg-genbuildinfo
+I tried `git gc` in my local checkout and it seemed fine.  I'd like the automated checkout to try `git gc` too.  I'm not a git expert, do we just need to run this garbage collection on the 'remote' repo too?
 
- dpkg-genchanges  >../lustre_2.13.53-1_amd64.changes
+Thanks,
+-Cory
 
-dpkg-genchanges: warning: package lustre-server-utils in control file but not in files list
+?On 3/25/19, 10:17 PM, "lustre-devel on behalf of Cory Spitz" <lustre-devel-bounces at lists.lustre.org on behalf of spitzcor@cray.com> wrote:
 
-dpkg-genchanges: warning: package lustre-resource-agents in control file but not in files list
+    I ended up checking out a few different branches and then going back to master.  At that point, the pull seemed to be OK.
 
-dpkg-genchanges: warning: package lustre-client-modules-dkms in control file but not in files list
+    We did also experience this once in our 'official' Cray pull from upstream, but the problem went away there too after some fiddling.  I'm not sure what is making it come and go.
 
-dpkg-genchanges: info: including full source code in upload
+    Aur?lien and Andreas, thank you both for your input.  I'll keep an eye out for it and try the workaround again if it pops back up.
 
- dpkg-source -I.git -I*.out[0-9]* -I*.swp --after-build lustre-release
+    -Cory
 
-dpkg-buildpackage: info: full upload; Debian-native package (full source is included)
+    -- 
 
-~/lustre-release/debian/tmp/modules-deb ~/lustre-release
+    On 3/25/19, 12:22 PM, "Degremont, Aurelien" <degremoa@amazon.com> wrote:
 
-Removing old /home/zeblok/lustre-release/debian/tmp/modules-deb/usr_src/modules/lustre/ tree
+        It depends.
+        It persisted for a while. Now, I do not see them anymore. I don't know what changed in-between.
 
-Extracting the package tarball, /usr/src/lustre.tar.bz2, please wait...
 
-/usr/bin/fakeroot: 175: /usr/bin/fakeroot: debian/rules: Permission denied
+        Le 25/03/2019 11:02, ? Andreas Dilger ? <adilger@whamcloud.com> a ?crit :
 
-/usr/bin/fakeroot: 175: /usr/bin/fakeroot: debian/rules: Permission denied
+            On Mar 25, 2019, at 03:47, Degremont, Aurelien <degremoa@amazon.com> wrote:
+            > 
+            > I'm facing similar problem than Cory, times to times.
+            > I did not track the detailed error messages but, for example, here are the errors I got when running 'git fetch' on a directory where only git://git.whamcloud.com/fs/lustre-release.git is declared. I did not update the repo for few days/weeks.
+            > 
+            > remote: warning: packfile ./objects/pack/pack-2b5d1356632dfdbfd86c2d36e529a0a8af47f9af.pack cannot be accessed
+            > remote: error: refs/changes/47/33547/4 does not point to a valid object!
+            > remote: warning: packfile ./objects/pack/pack-d2307b0367688a7b6599e36453a20e02d6a0302e.pack cannot be accessed
+            > remote: error: refs/changes/47/33547/5 does not point to a valid object!
+            > remote: warning: packfile ./objects/pack/pack-69f40cb9d10db9a97f6df59c80a6279f808b9d5d.pack cannot be accessed
+            > remote: error: refs/changes/47/33547/6 does not point to a valid object!
+            > remote: warning: packfile ./objects/pack/pack-090b03d5723083bb4a1e7b524bc83dc9de504f17.pack cannot be accessed
+            > remote: error: refs/changes/47/33547/7 does not point to a valid object!
+            > remote: warning: packfile ./objects/pack/pack-0397e40c8813c5601975c99c94afed5ddfbbf1dc.pack cannot be accessed
+            > remote: error: refs/changes/47/33547/8 does not point to a valid object!
+            > remote: warning: packfile ./objects/pack/pack-a20995b7160fa2708c42f05111b39126a96b9bd4.pack cannot be accessed
+            > remote: warning: packfile ./objects/pack/pack-765a1f16499228e6910765c218733cfb8852e953.pack cannot be accessed
+            > 
+            > This problem started few months ago.
 
-BUILD FAILED!
+            If you do a fetch on the same tree again right away does the error persist or go away?
 
-See /home/zeblok/lustre-release/debian/tmp/modules-deb/var_cache_modass/lustre.buildlog.5.4.0-42-generic.1595583181 for details.
+            Cheers, Andreas
 
-mv: cannot stat '../lustre-dev__*.deb': No such file or directory
+            > Le 25/03/2019 07:05, ? lustre-devel au nom de Andreas Dilger ? <lustre-devel-bounces at lists.lustre.org au nom de adilger@whamcloud.com> a ?crit :
+            > 
+            >    On Mar 22, 2019, at 09:59, Cory Spitz <spitzcor@cray.com> wrote:
+            >> 
+            >> Hello.
+            >> 
+            >> I?ve occasionally seen errors like the following when pulling upstream master:
+            >> 
+            >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+            >> remote: error: refs/changes/47/5347/9 does not point to a valid object!        
+            >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+            >> remote: error: refs/changes/47/7247/23 does not point to a valid object!        
+            >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+            >> remote: error: refs/changes/47/7747/14 does not point to a valid object!        
+            >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed     
+            >> 
+            >> Other clones/checkouts seem to be OK.  Has anyone else seen this?  It seems that this has something to do with Gerrit changes.  I just did a clone of master and I never set things up to my knowledge to pull all of these refs.  Anyone have a workaround (besides a fresh clone) or any tips?
+            > 
+            >    Cory, does this happen repeatedly, or just one time?  There are definitely errors that are generated because the master-next branch is "rewound" every time that Oleg lands those patches to master.
+            > 
+            >    It is a bit strange about the changes that are referenced above.  https://review.whamcloud.com/7247 and https://review.whamcloud.com/5347 were landed 5 years ago, so it is unlikely that anything related to them was changed recently.  Looking at the changes in Gerrit they appear to be OK.
+            > 
+            >    Cheers, Andreas
+            >    ---
+            >    Andreas Dilger
+            >    Principal Lustre Architect
+            >    Whamcloud
+            > 
+            > 
+            > 
+            > 
+            > 
+            > 
+            > 
+            >    _______________________________________________
+            >    lustre-devel mailing list
+            >    lustre-devel at lists.lustre.org
+            >    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+            > 
+            > 
 
-mv: cannot stat '../lustre-source__all.deb': No such file or directory
+            Cheers, Andreas
+            ---
+            Andreas Dilger
+            Principal Lustre Architect
+            Whamcloud
 
-mv: cannot stat '../lustre-iokit__*.deb': No such file or directory
 
-mv: cannot stat '../lustre-tests__*.deb': No such file or directory
 
-mv: cannot stat '../lustre-*-utils__*.deb': No such file or directory
 
-mv: cannot stat '../lustre_.dsc': No such file or directory
 
-mv: cannot stat '../lustre__*.changes': No such file or directory
 
-mv: cannot stat '../lustre_.tar.gz': No such file or directory
 
-mv: cannot stat '../lustre-*-modules-5.4.0-42-generic__*.deb': No such file or directory
 
-autoMakefile:1190: recipe for target 'debs' failed
 
-make: *** [debs] Error 1
 
-Also tried doing 'chmod a+x debian/rules' but with no progress.
 
-Not able to understand why this is breaking, any help is highly appreciated.
-
-Regards,
-Ankit Ladhania
-IN: +91 933 444 2209
-US:  +1 (256) 203-0077
-Skype: ankit.ladhania
-[Image removed by sender.]
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200724/053ffcb3/attachment.html>
+    _______________________________________________
+    lustre-devel mailing list
+    lustre-devel at lists.lustre.org
+    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
