@@ -1,109 +1,220 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 11 Aug 2020 08:20:15 -0400
-Subject: [lustre-devel] [PATCH 19/23] lnet: Allow duplicate nets in ip2nets
- syntax
+Date: Tue, 11 Aug 2020 08:20:00 -0400
+Subject: [lustre-devel] [PATCH 04/23] lustre: mdc: create mdc_acl.c
 In-Reply-To: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
 References: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1597148419-20629-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1597148419-20629-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-Before the MR feature was implemented, it was not possible to
-configure multiple interfaces on the same LNet, so the ip2nets
-syntax did not allow for this. Now that we have MR feature, we should
-allow it to be configured via ip2nets syntax. e.g.
+This new C file contains acl related code so it can be
+conditionally compiled.
 
-o2ib(ib0) 10.10.10.1
-o2ib(ib1) 10.10.10.2
+Also remove conditional code around the call to mdc_unpack_acl(), as
+those tests are already performed inside mdc_unpack_acl().
 
-A test is added for configuring LNet with kernel ip2nets parameter.
+This removes all #ifdef of CONFIG_LUSTRE_FS_POSIX_ACL from C files in
+'mdc'.
 
-setup_netns() refactored to facilitate the new test.
-
-cleanup_lnet() is modified to check whether lnet module is loaded
-before attempting lnetctl lnet unconfigured otherwise sanity-lnet.sh
-could exit with rc 234 on cleanup.
-
-HPE-bug-id: LUS-9046
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13734
-Lustre-commit: 6203ed821ffac ("LU-13734 lnet: Allow duplicate nets in ip2nets syntax")
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/39227
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
+Lustre-commit: 896ff00276afd ("LU-9679 mdc: create mdc_acl.c")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39292
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/config.c | 36 ++++--------------------------------
- 1 file changed, 4 insertions(+), 32 deletions(-)
+ fs/lustre/mdc/Makefile       |  1 +
+ fs/lustre/mdc/mdc_acl.c      | 64 ++++++++++++++++++++++++++++++++++++++++++++
+ fs/lustre/mdc/mdc_internal.h | 10 +++++++
+ fs/lustre/mdc/mdc_request.c  | 61 +++++------------------------------------
+ 4 files changed, 81 insertions(+), 55 deletions(-)
+ create mode 100644 fs/lustre/mdc/mdc_acl.c
 
-diff --git a/net/lnet/lnet/config.c b/net/lnet/lnet/config.c
-index 9f36c82..6ddd9d6 100644
---- a/net/lnet/lnet/config.c
-+++ b/net/lnet/lnet/config.c
-@@ -349,10 +349,10 @@ struct lnet_net *
+diff --git a/fs/lustre/mdc/Makefile b/fs/lustre/mdc/Makefile
+index 2cbc641..1ac97ee 100644
+--- a/fs/lustre/mdc/Makefile
++++ b/fs/lustre/mdc/Makefile
+@@ -3,3 +3,4 @@ ccflags-y += -I$(srctree)/$(src)/../include
+ obj-$(CONFIG_LUSTRE_FS) += mdc.o
+ mdc-y := mdc_changelog.o mdc_request.o mdc_reint.o mdc_lib.o mdc_locks.o lproc_mdc.o
+ mdc-y += mdc_dev.o
++mdc-$(CONFIG_LUSTRE_FS_POSIX_ACL) += mdc_acl.o
+diff --git a/fs/lustre/mdc/mdc_acl.c b/fs/lustre/mdc/mdc_acl.c
+new file mode 100644
+index 0000000..6814045
+--- /dev/null
++++ b/fs/lustre/mdc/mdc_acl.c
+@@ -0,0 +1,64 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++#include <lustre_acl.h>
++
++#include "mdc_internal.h"
++
++int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
++{
++	struct req_capsule *pill = &req->rq_pill;
++	struct mdt_body	*body = md->body;
++	struct posix_acl *acl;
++	void *buf;
++	int rc;
++
++	/* for ACL, it's possible that FLACL is set but aclsize is zero.
++	 * only when aclsize != 0 there's an actual segment for ACL
++	 * in reply buffer.
++	 */
++	if (!body->mbo_aclsize) {
++		md->posix_acl = NULL;
++		return 0;
++	}
++
++	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
++	if (!buf)
++		return -EPROTO;
++
++	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
++	if (IS_ERR_OR_NULL(acl)) {
++		rc = acl ? PTR_ERR(acl) : 0;
++		CERROR("convert xattr to acl: %d\n", rc);
++		return rc;
++	}
++
++	rc = posix_acl_valid(&init_user_ns, acl);
++	if (rc) {
++		CERROR("validate acl: %d\n", rc);
++		posix_acl_release(acl);
++		return rc;
++	}
++
++	md->posix_acl = acl;
++	return 0;
++}
+diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
+index b7ccc58..a1fb5d9 100644
+--- a/fs/lustre/mdc/mdc_internal.h
++++ b/fs/lustre/mdc/mdc_internal.h
+@@ -156,6 +156,16 @@ static inline int mdc_prep_elc_req(struct obd_export *exp,
+ 				 count);
+ }
+ 
++#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
++int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md);
++#else
++static inline
++int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
++{
++	return 0;
++}
++#endif
++
+ static inline unsigned long hash_x_index(u64 hash, int hash64)
  {
- 	struct lnet_net *net;
+ 	if (BITS_PER_LONG == 32 && hash64)
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index cacc58b..f2bca8e 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -508,46 +508,6 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
+ 	return rc;
+ }
  
--	if (!lnet_net_unique(net_id, net_list, NULL)) {
--		CERROR("Duplicate net %s. Ignore\n",
--		       libcfs_net2str(net_id));
--		return NULL;
-+	if (!lnet_net_unique(net_id, net_list, &net)) {
-+		CDEBUG(D_NET, "Returning duplicate net %p %s\n", net,
-+		       libcfs_net2str(net->net_id));
-+		return net;
+-#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+-static int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
+-{
+-	struct req_capsule *pill = &req->rq_pill;
+-	struct mdt_body	*body = md->body;
+-	struct posix_acl *acl;
+-	void *buf;
+-	int rc;
+-
+-	if (!body->mbo_aclsize)
+-		return 0;
+-
+-	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
+-
+-	if (!buf)
+-		return -EPROTO;
+-
+-	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
+-	if (!acl)
+-		return 0;
+-
+-	if (IS_ERR(acl)) {
+-		rc = PTR_ERR(acl);
+-		CERROR("convert xattr to acl: %d\n", rc);
+-		return rc;
+-	}
+-
+-	rc = posix_acl_valid(&init_user_ns, acl);
+-	if (rc) {
+-		CERROR("validate acl: %d\n", rc);
+-		posix_acl_release(acl);
+-		return rc;
+-	}
+-
+-	md->posix_acl = acl;
+-	return 0;
+-}
+-#else
+-#define mdc_unpack_acl(req, md) 0
+-#endif
+ 
+ static int mdc_get_lustre_md(struct obd_export *exp,
+ 			     struct ptlrpc_request *req,
+@@ -658,21 +618,12 @@ static int mdc_get_lustre_md(struct obd_export *exp,
  	}
+ 	rc = 0;
  
- 	net = kzalloc(sizeof(*net), GFP_NOFS);
-@@ -1450,12 +1450,8 @@ struct lnet_ni *
- 	struct list_head *t;
- 	struct list_head *t2;
- 	struct lnet_text_buf *tb;
--	struct lnet_text_buf *tb2;
--	u32 net1;
--	u32 net2;
- 	int len;
- 	int count;
--	int dup;
- 	int rc;
- 
- 	if (lnet_str2tbs_sep(&raw_entries, ip2nets) < 0) {
-@@ -1494,30 +1490,6 @@ struct lnet_ni *
- 		if (rc < 0)
- 			break;
- 
--		dup = 0;
--		list_for_each_entry(tb, &current_nets, ltb_list) {
--			net1 = lnet_netspec2net(tb->ltb_text);
--			LASSERT(net1 != LNET_NIDNET(LNET_NID_ANY));
--
--			list_for_each_entry(tb2, &matched_nets, ltb_list) {
--				net2 = lnet_netspec2net(tb2->ltb_text);
--				LASSERT(net2 != LNET_NIDNET(LNET_NID_ANY));
--
--				if (net1 == net2) {
--					dup = 1;
--					break;
--				}
--			}
--
--			if (dup)
--				break;
+-	if (md->body->mbo_valid & OBD_MD_FLACL) {
+-		/* for ACL, it's possible that FLACL is set but aclsize is zero.
+-		 * only when aclsize != 0 there's an actual segment for ACL
+-		 * in reply buffer.
+-		 */
+-		if (md->body->mbo_aclsize) {
+-			rc = mdc_unpack_acl(req, md);
+-			if (rc)
+-				goto out;
+-#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
+-		} else {
+-			md->posix_acl = NULL;
+-#endif
 -		}
--
--		if (dup) {
--			lnet_free_text_bufs(&current_nets);
--			continue;
--		}
--
- 		list_for_each_safe(t, t2, &current_nets) {
- 			tb = list_entry(t, struct lnet_text_buf, ltb_list);
+-	}
++	/* for ACL, it's possible that FLACL is set but aclsize is zero.
++	 * only when aclsize != 0 there's an actual segment for ACL
++	 * in reply buffer.
++	 */
++	if (md->body->mbo_valid & OBD_MD_FLACL)
++		rc = mdc_unpack_acl(req, md);
  
+ out:
+ 	if (rc)
 -- 
 1.8.3.1
