@@ -1,67 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 11 Aug 2020 08:20:08 -0400
-Subject: [lustre-devel] [PATCH 12/23] lustre: sysfs: error-check value
- stored in jobid_var
+Date: Tue, 11 Aug 2020 08:20:01 -0400
+Subject: [lustre-devel] [PATCH 05/23] lustre: llite: Remove mutex on dio read
 In-Reply-To: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
 References: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1597148419-20629-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1597148419-20629-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Patrick Farrell <farr0186@gmail.com>
 
-The jobid_var sysfs attribute only has 3 meaningful values.
-Other values cause lustre_get_jobid() to return an error
-which is uniformly ignored.
+DIO reads in Lustre are protected by Lustre range locking
+and do not need the inode mutex.  This code was removed
+in LU-1669, the range lock was added for DIO reads in
+LU-6227, and then the mutex was accidentally re-introduced
+in LU-6260.
 
-To improve usability and resilience, check that the value
-written is acceptable before storing it.
+Remove it again.
 
+Fixes: fde7ac1942f5 ("lustre: llite: add support for direct IO api changes")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13196
+Lustre-commit: 5bc1fe092cba0 ("LU-13196 llite: Remove mutex on dio read")
+Signed-off-by: Patrick Farrell <farr0186@gmail.com>
+Reviewed-on: https://review.whamcloud.com/37419
+Reviewed-by: Wang Shilong <wshilong@whamcloud.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/obd_sysfs.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ fs/lustre/llite/rw26.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/fs/lustre/obdclass/obd_sysfs.c b/fs/lustre/obdclass/obd_sysfs.c
-index cb2f0a9..5fc638f 100644
---- a/fs/lustre/obdclass/obd_sysfs.c
-+++ b/fs/lustre/obdclass/obd_sysfs.c
-@@ -225,16 +225,26 @@ static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
- 			       const char *buffer,
- 			       size_t count)
- {
-+	static const char * const valid[] = {
-+		JOBSTATS_DISABLE,
-+		JOBSTATS_PROCNAME_UID,
-+		JOBSTATS_NODELOCAL,
-+		JOBSTATS_SESSION,
-+		NULL
-+	};
-+	int i;
-+
- 	if (!count || count > JOBSTATS_JOBID_VAR_MAX_LEN)
- 		return -EINVAL;
+diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
+index b3802cf..7010fe8 100644
+--- a/fs/lustre/llite/rw26.c
++++ b/fs/lustre/llite/rw26.c
+@@ -328,13 +328,6 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	LASSERT(aio);
+ 	LASSERT(aio->cda_iocb == iocb);
  
--	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
+-	/* 0. Need locking between buffered and direct access. and race with
+-	 *    size changing by concurrent truncates and writes.
+-	 * 1. Need inode mutex to operate transient pages.
+-	 */
+-	if (rw == READ)
+-		inode_lock(inode);
 -
--	memcpy(obd_jobid_var, buffer, count);
-+	for (i = 0; valid[i]; i++)
-+		if (sysfs_streq(buffer, valid[i]))
-+			break;
-+	if (!valid[i])
-+		return -EINVAL;
+ 	while (iov_iter_count(iter)) {
+ 		struct ll_dio_pages pvec = { .ldp_aio = aio };
+ 		struct page **pages;
+@@ -406,9 +399,6 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 		result = -EIOCBQUEUED;
+ 	}
  
--	/* Trim the trailing '\n' if any */
--	if (obd_jobid_var[count - 1] == '\n')
--		obd_jobid_var[count - 1] = 0;
-+	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
-+	strcpy(obd_jobid_var, valid[i]);
- 
- 	return count;
+-	if (rw == READ)
+-		inode_unlock(inode);
+-
+ 	return result;
  }
+ 
 -- 
 1.8.3.1
