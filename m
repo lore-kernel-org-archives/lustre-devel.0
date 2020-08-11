@@ -1,220 +1,185 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 11 Aug 2020 08:20:00 -0400
-Subject: [lustre-devel] [PATCH 04/23] lustre: mdc: create mdc_acl.c
+Date: Tue, 11 Aug 2020 08:20:04 -0400
+Subject: [lustre-devel] [PATCH 08/23] lustre: sec: encryption support for
+ DoM files
 In-Reply-To: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
 References: <1597148419-20629-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1597148419-20629-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1597148419-20629-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-This new C file contains acl related code so it can be
-conditionally compiled.
+On client side, data read from DoM files do not go through the OSC
+layer. So implement file decryption in ll_dom_finish_open() right
+after file data has been put in cache pages.
+On server side, DoM file size needs to be properly set on MDT when
+content is encrypted. Pages are full of encrypted data, but inode size
+must be apparent, clear text object size.
+For reads of DoM encrypted files to work proprely, we also need to
+make sure we send whole encryption units to client side.
+Also add sanity-sec test_50 to exercise encryption of DoM files.
 
-Also remove conditional code around the call to mdc_unpack_acl(), as
-those tests are already performed inside mdc_unpack_acl().
-
-This removes all #ifdef of CONFIG_LUSTRE_FS_POSIX_ACL from C files in
-'mdc'.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9679
-Lustre-commit: 896ff00276afd ("LU-9679 mdc: create mdc_acl.c")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/39292
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12275
+Lustre-commit: a71586d4ee8d6 ("LU-12275 sec: encryption support for DoM files")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/38702
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/Makefile       |  1 +
- fs/lustre/mdc/mdc_acl.c      | 64 ++++++++++++++++++++++++++++++++++++++++++++
- fs/lustre/mdc/mdc_internal.h | 10 +++++++
- fs/lustre/mdc/mdc_request.c  | 61 +++++------------------------------------
- 4 files changed, 81 insertions(+), 55 deletions(-)
- create mode 100644 fs/lustre/mdc/mdc_acl.c
+ fs/lustre/llite/crypto.c | 10 +++-------
+ fs/lustre/llite/file.c   | 20 +++++++++++++++++--
+ fs/lustre/llite/namei.c  | 52 ++++++++++++++++++++++++++++--------------------
+ 3 files changed, 51 insertions(+), 31 deletions(-)
 
-diff --git a/fs/lustre/mdc/Makefile b/fs/lustre/mdc/Makefile
-index 2cbc641..1ac97ee 100644
---- a/fs/lustre/mdc/Makefile
-+++ b/fs/lustre/mdc/Makefile
-@@ -3,3 +3,4 @@ ccflags-y += -I$(srctree)/$(src)/../include
- obj-$(CONFIG_LUSTRE_FS) += mdc.o
- mdc-y := mdc_changelog.o mdc_request.o mdc_reint.o mdc_lib.o mdc_locks.o lproc_mdc.o
- mdc-y += mdc_dev.o
-+mdc-$(CONFIG_LUSTRE_FS_POSIX_ACL) += mdc_acl.o
-diff --git a/fs/lustre/mdc/mdc_acl.c b/fs/lustre/mdc/mdc_acl.c
-new file mode 100644
-index 0000000..6814045
---- /dev/null
-+++ b/fs/lustre/mdc/mdc_acl.c
-@@ -0,0 +1,64 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 for more details (a copy is included
-+ * in the LICENSE file that accompanied this code).
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-+ *
-+ * GPL HEADER END
-+ */
-+#include <lustre_acl.h>
-+
-+#include "mdc_internal.h"
-+
-+int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
-+{
-+	struct req_capsule *pill = &req->rq_pill;
-+	struct mdt_body	*body = md->body;
-+	struct posix_acl *acl;
-+	void *buf;
-+	int rc;
-+
-+	/* for ACL, it's possible that FLACL is set but aclsize is zero.
-+	 * only when aclsize != 0 there's an actual segment for ACL
-+	 * in reply buffer.
-+	 */
-+	if (!body->mbo_aclsize) {
-+		md->posix_acl = NULL;
-+		return 0;
-+	}
-+
-+	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
-+	if (!buf)
-+		return -EPROTO;
-+
-+	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
-+	if (IS_ERR_OR_NULL(acl)) {
-+		rc = acl ? PTR_ERR(acl) : 0;
-+		CERROR("convert xattr to acl: %d\n", rc);
-+		return rc;
-+	}
-+
-+	rc = posix_acl_valid(&init_user_ns, acl);
-+	if (rc) {
-+		CERROR("validate acl: %d\n", rc);
-+		posix_acl_release(acl);
-+		return rc;
-+	}
-+
-+	md->posix_acl = acl;
-+	return 0;
-+}
-diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
-index b7ccc58..a1fb5d9 100644
---- a/fs/lustre/mdc/mdc_internal.h
-+++ b/fs/lustre/mdc/mdc_internal.h
-@@ -156,6 +156,16 @@ static inline int mdc_prep_elc_req(struct obd_export *exp,
- 				 count);
- }
+diff --git a/fs/lustre/llite/crypto.c b/fs/lustre/llite/crypto.c
+index 83ed316..d37f0a9 100644
+--- a/fs/lustre/llite/crypto.c
++++ b/fs/lustre/llite/crypto.c
+@@ -31,17 +31,13 @@
  
-+#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
-+int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md);
-+#else
-+static inline
-+int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
-+{
-+	return 0;
-+}
-+#endif
-+
- static inline unsigned long hash_x_index(u64 hash, int hash64)
+ static int ll_get_context(struct inode *inode, void *ctx, size_t len)
  {
- 	if (BITS_PER_LONG == 32 && hash64)
-diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
-index cacc58b..f2bca8e 100644
---- a/fs/lustre/mdc/mdc_request.c
-+++ b/fs/lustre/mdc/mdc_request.c
-@@ -508,46 +508,6 @@ static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	return rc;
+-	struct dentry *dentry;
++	struct dentry *dentry = d_find_any_alias(inode);
+ 	int rc;
+ 
+-	if (hlist_empty(&inode->i_dentry))
+-		return -ENODATA;
+-
+-	hlist_for_each_entry(dentry, &inode->i_dentry, d_u.d_alias)
+-		break;
+-
+ 	rc = __vfs_getxattr(dentry, inode, LL_XATTR_NAME_ENCRYPTION_CONTEXT,
+ 			    ctx, len);
++	if (dentry)
++		dput(dentry);
+ 
+ 	/* used as encryption unit size */
+ 	if (S_ISREG(inode->i_mode))
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 757950f..7d00728 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -429,8 +429,10 @@ int ll_file_release(struct inode *inode, struct file *file)
+ 
+ static inline int ll_dom_readpage(void *data, struct page *page)
+ {
++	struct inode *inode = page2inode(page);
+ 	struct niobuf_local *lnb = data;
+ 	void *kaddr;
++	int rc = 0;
+ 
+ 	kaddr = kmap_atomic(page);
+ 	memcpy(kaddr, lnb->lnb_data, lnb->lnb_len);
+@@ -440,9 +442,22 @@ static inline int ll_dom_readpage(void *data, struct page *page)
+ 	flush_dcache_page(page);
+ 	SetPageUptodate(page);
+ 	kunmap_atomic(kaddr);
++
++	if (inode && IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode)) {
++		if (!llcrypt_has_encryption_key(inode))
++			CDEBUG(D_SEC, "no enc key for " DFID "\n",
++			       PFID(ll_inode2fid(inode)));
++		/* decrypt only if page is not empty */
++		else if (memcmp(page_address(page),
++				page_address(ZERO_PAGE(0)),
++				PAGE_SIZE) != 0)
++			rc = llcrypt_decrypt_pagecache_blocks(page,
++							      PAGE_SIZE,
++							      0);
++	}
+ 	unlock_page(page);
+ 
+-	return 0;
++	return rc;
  }
  
--#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
--static int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
--{
--	struct req_capsule *pill = &req->rq_pill;
--	struct mdt_body	*body = md->body;
--	struct posix_acl *acl;
--	void *buf;
--	int rc;
--
--	if (!body->mbo_aclsize)
--		return 0;
--
--	buf = req_capsule_server_sized_get(pill, &RMF_ACL, body->mbo_aclsize);
--
--	if (!buf)
--		return -EPROTO;
--
--	acl = posix_acl_from_xattr(&init_user_ns, buf, body->mbo_aclsize);
--	if (!acl)
--		return 0;
--
--	if (IS_ERR(acl)) {
--		rc = PTR_ERR(acl);
--		CERROR("convert xattr to acl: %d\n", rc);
--		return rc;
--	}
--
--	rc = posix_acl_valid(&init_user_ns, acl);
--	if (rc) {
--		CERROR("validate acl: %d\n", rc);
--		posix_acl_release(acl);
--		return rc;
--	}
--
--	md->posix_acl = acl;
--	return 0;
--}
--#else
--#define mdc_unpack_acl(req, md) 0
--#endif
+ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+@@ -481,7 +496,8 @@ void ll_dom_finish_open(struct inode *inode, struct ptlrpc_request *req,
+ 	 * buffer, in both cases total size should be equal to the file size.
+ 	 */
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	if (rnb->rnb_offset + rnb->rnb_len != body->mbo_dom_size) {
++	if (rnb->rnb_offset + rnb->rnb_len != body->mbo_dom_size &&
++	    !(inode && IS_ENCRYPTED(inode))) {
+ 		CERROR("%s: server returns off/len %llu/%u but size %llu\n",
+ 		       ll_i2sbi(inode)->ll_fsname, rnb->rnb_offset,
+ 		       rnb->rnb_len, body->mbo_dom_size);
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 3fbcbbd..a268c93 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -629,6 +629,36 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 		if (rc)
+ 			return rc;
  
- static int mdc_get_lustre_md(struct obd_export *exp,
- 			     struct ptlrpc_request *req,
-@@ -658,21 +618,12 @@ static int mdc_get_lustre_md(struct obd_export *exp,
- 	}
- 	rc = 0;
++		/* If encryption context was returned by MDT, put it in
++		 * inode now to save an extra getxattr and avoid deadlock.
++		 */
++		if (body->mbo_valid & OBD_MD_ENCCTX) {
++			encctx = req_capsule_server_get(pill, &RMF_FILE_ENCCTX);
++			encctxlen = req_capsule_get_size(pill,
++							 &RMF_FILE_ENCCTX,
++							 RCL_SERVER);
++
++			if (encctxlen) {
++				CDEBUG(D_SEC,
++				       "server returned encryption ctx for " DFID "\n",
++				       PFID(ll_inode2fid(inode)));
++				rc = ll_xattr_cache_insert(inode,
++							   LL_XATTR_NAME_ENCRYPTION_CONTEXT,
++							   encctx, encctxlen);
++				if (rc) {
++					CWARN("%s: cannot set enc ctx for " DFID ": rc = %d\n",
++					      ll_i2sbi(inode)->ll_fsname,
++					      PFID(ll_inode2fid(inode)), rc);
++				} else if (encrypt) {
++					rc = llcrypt_get_encryption_info(inode);
++					if (rc)
++						CDEBUG(D_SEC,
++						       "cannot get enc info for " DFID ": rc = %d\n",
++						       PFID(ll_inode2fid(inode)), rc);
++				}
++			}
++		}
++
+ 		if (it->it_op & IT_OPEN)
+ 			ll_dom_finish_open(inode, request, it);
  
--	if (md->body->mbo_valid & OBD_MD_FLACL) {
--		/* for ACL, it's possible that FLACL is set but aclsize is zero.
--		 * only when aclsize != 0 there's an actual segment for ACL
--		 * in reply buffer.
+@@ -674,28 +704,6 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 				      rc);
+ 		}
+ 
+-		/* If encryption context was returned by MDT, put it in
+-		 * inode now to save an extra getxattr and avoid deadlock.
 -		 */
--		if (md->body->mbo_aclsize) {
--			rc = mdc_unpack_acl(req, md);
--			if (rc)
--				goto out;
--#ifdef CONFIG_LUSTRE_FS_POSIX_ACL
--		} else {
--			md->posix_acl = NULL;
--#endif
+-		if (body->mbo_valid & OBD_MD_ENCCTX) {
+-			encctx = req_capsule_server_get(pill, &RMF_FILE_ENCCTX);
+-			encctxlen = req_capsule_get_size(pill,
+-							 &RMF_FILE_ENCCTX,
+-							 RCL_SERVER);
+-
+-			if (encctxlen) {
+-				CDEBUG(D_SEC,
+-				       "server returned encryption ctx for " DFID "\n",
+-				       PFID(ll_inode2fid(inode)));
+-				rc = ll_xattr_cache_insert(inode,
+-							   LL_XATTR_NAME_ENCRYPTION_CONTEXT,
+-							   encctx, encctxlen);
+-				if (rc)
+-					CWARN("%s: cannot set enc ctx for " DFID ": rc = %d\n",
+-					      ll_i2sbi(inode)->ll_fsname,
+-					      PFID(ll_inode2fid(inode)), rc);
+-			}
 -		}
--	}
-+	/* for ACL, it's possible that FLACL is set but aclsize is zero.
-+	 * only when aclsize != 0 there's an actual segment for ACL
-+	 * in reply buffer.
-+	 */
-+	if (md->body->mbo_valid & OBD_MD_FLACL)
-+		rc = mdc_unpack_acl(req, md);
+ 	}
  
- out:
- 	if (rc)
+ 	alias = ll_splice_alias(inode, *de);
 -- 
 1.8.3.1
