@@ -1,36 +1,147 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Tue, 18 Aug 2020 22:31:10 +0000
-Subject: [lustre-devel] Whamcloud Test Infrastructure relocation
-In-Reply-To: <9543A1DC-C0D5-4A8A-81B6-507F858B1A01@ddn.com>
-References: <7C961E6A-472B-4E2F-90B4-AECB558095A5@ddn.com>
- <9543A1DC-C0D5-4A8A-81B6-507F858B1A01@ddn.com>
-Message-ID: <0DB525D1-10BA-406C-A43C-C470529E3865@ddn.com>
+From: Spitz, Cory James <cory.spitz@hpe.com>
+Date: Fri, 21 Aug 2020 04:22:31 +0000
+Subject: [lustre-devel] git packfile
+In-Reply-To: <A29FEE1A-DEF4-4BF0-9773-743500F0E798@hpe.com>
+References: <30534141-20CF-43C3-BA49-0149AF7CEFE6@cray.com>
+ <61FFBC77-CF2E-4EDC-9060-BF9EBF7B27D0@whamcloud.com>
+ <66BF972C-4BD3-4AD7-88A5-DDDF8D1CC988@amazon.com>
+ <FA8580F0-1439-4901-B6E3-3E2138410675@whamcloud.com>
+ <5D50C124-1325-447C-9CEB-B91646B49E5E@amazon.com>
+ <7288E2CB-A8C3-4B37-AF4B-291EED278833@cray.com>
+ <A29FEE1A-DEF4-4BF0-9773-743500F0E798@hpe.com>
+Message-ID: <764A0DD7-241A-4E72-9CAE-61048C92943F@hpe.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Core services are back online in their new location.
+Hi, I'm still regularly seeing "remote: aborting due to possible repository corruption on the remote side".  Is anyone else?
 
-From: Peter Jones <pjones@whamcloud.com>
-Date: Thursday, August 13, 2020 at 8:40 AM
-To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: Whamcloud Test Infrastructure relocation
+I've tried multiple versions of git including recent versions.  I thought `git gc` would help, but it does not.  Is anyone else having this problem with git://git.whamcloud.com/fs/lustre-release.git ?
 
-Hi there
+Thanks,
+-Cory
 
-As mentioned on recent LWG calls, the Whamcloud test infrastructure is moving to a new data center later today so there will be a multiple day outage of some services.
 
-JIRA, the wiki and gerrit will not be affected but Jenkins, autotest and maloo will be unavailable.
+?On 7/24/20, 4:48 PM, "lustre-devel on behalf of Spitz, Cory James" <lustre-devel-bounces at lists.lustre.org on behalf of cory.spitz@hpe.com> wrote:
 
-We?ll send an update when service is restored (likely to be early next week).
+    Hi,
 
-Patches submitted during the outage will be processed once the service resumes which may result in a slight backlog until this clears.
+    Strangely this git packfile issue has come back recently.  I was able to workaround it again by just checking out and fetching a few times.  I found this stack overflow mention about it: https://stackoverflow.com/questions/11401434/git-packfile-claims-to-have-more-objects-inaccessable  , but my local git was newer than the version mentioned there.  HPE is also having this problem for an automated checkout of git.whamcloud.com with a much, much older git implementation, but the workaround for re-fetching git.whamcloud.com is not working for us there.  Does anyone know more?
 
-Sorry for any inconvenience.
+    I tried `git gc` in my local checkout and it seemed fine.  I'd like the automated checkout to try `git gc` too.  I'm not a git expert, do we just need to run this garbage collection on the 'remote' repo too?
 
-Peter
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200818/42e8e352/attachment.html>
+    Thanks,
+    -Cory
+
+    On 3/25/19, 10:17 PM, "lustre-devel on behalf of Cory Spitz" <lustre-devel-bounces at lists.lustre.org on behalf of spitzcor@cray.com> wrote:
+
+        I ended up checking out a few different branches and then going back to master.  At that point, the pull seemed to be OK.
+
+        We did also experience this once in our 'official' Cray pull from upstream, but the problem went away there too after some fiddling.  I'm not sure what is making it come and go.
+
+        Aur?lien and Andreas, thank you both for your input.  I'll keep an eye out for it and try the workaround again if it pops back up.
+
+        -Cory
+
+        -- 
+
+        On 3/25/19, 12:22 PM, "Degremont, Aurelien" <degremoa@amazon.com> wrote:
+
+            It depends.
+            It persisted for a while. Now, I do not see them anymore. I don't know what changed in-between.
+
+
+            Le 25/03/2019 11:02, ? Andreas Dilger ? <adilger@whamcloud.com> a ?crit :
+
+                On Mar 25, 2019, at 03:47, Degremont, Aurelien <degremoa@amazon.com> wrote:
+                > 
+                > I'm facing similar problem than Cory, times to times.
+                > I did not track the detailed error messages but, for example, here are the errors I got when running 'git fetch' on a directory where only git://git.whamcloud.com/fs/lustre-release.git is declared. I did not update the repo for few days/weeks.
+                > 
+                > remote: warning: packfile ./objects/pack/pack-2b5d1356632dfdbfd86c2d36e529a0a8af47f9af.pack cannot be accessed
+                > remote: error: refs/changes/47/33547/4 does not point to a valid object!
+                > remote: warning: packfile ./objects/pack/pack-d2307b0367688a7b6599e36453a20e02d6a0302e.pack cannot be accessed
+                > remote: error: refs/changes/47/33547/5 does not point to a valid object!
+                > remote: warning: packfile ./objects/pack/pack-69f40cb9d10db9a97f6df59c80a6279f808b9d5d.pack cannot be accessed
+                > remote: error: refs/changes/47/33547/6 does not point to a valid object!
+                > remote: warning: packfile ./objects/pack/pack-090b03d5723083bb4a1e7b524bc83dc9de504f17.pack cannot be accessed
+                > remote: error: refs/changes/47/33547/7 does not point to a valid object!
+                > remote: warning: packfile ./objects/pack/pack-0397e40c8813c5601975c99c94afed5ddfbbf1dc.pack cannot be accessed
+                > remote: error: refs/changes/47/33547/8 does not point to a valid object!
+                > remote: warning: packfile ./objects/pack/pack-a20995b7160fa2708c42f05111b39126a96b9bd4.pack cannot be accessed
+                > remote: warning: packfile ./objects/pack/pack-765a1f16499228e6910765c218733cfb8852e953.pack cannot be accessed
+                > 
+                > This problem started few months ago.
+
+                If you do a fetch on the same tree again right away does the error persist or go away?
+
+                Cheers, Andreas
+
+                > Le 25/03/2019 07:05, ? lustre-devel au nom de Andreas Dilger ? <lustre-devel-bounces at lists.lustre.org au nom de adilger@whamcloud.com> a ?crit :
+                > 
+                >    On Mar 22, 2019, at 09:59, Cory Spitz <spitzcor@cray.com> wrote:
+                >> 
+                >> Hello.
+                >> 
+                >> I?ve occasionally seen errors like the following when pulling upstream master:
+                >> 
+                >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+                >> remote: error: refs/changes/47/5347/9 does not point to a valid object!        
+                >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+                >> remote: error: refs/changes/47/7247/23 does not point to a valid object!        
+                >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed        
+                >> remote: error: refs/changes/47/7747/14 does not point to a valid object!        
+                >> remote: warning: packfile ./objects/pack/pack-8a0ac446942c02bf656a79a2d7fa79d33f1fa4e2.pack cannot be accessed     
+                >> 
+                >> Other clones/checkouts seem to be OK.  Has anyone else seen this?  It seems that this has something to do with Gerrit changes.  I just did a clone of master and I never set things up to my knowledge to pull all of these refs.  Anyone have a workaround (besides a fresh clone) or any tips?
+                > 
+                >    Cory, does this happen repeatedly, or just one time?  There are definitely errors that are generated because the master-next branch is "rewound" every time that Oleg lands those patches to master.
+                > 
+                >    It is a bit strange about the changes that are referenced above.  https://review.whamcloud.com/7247  and https://review.whamcloud.com/5347  were landed 5 years ago, so it is unlikely that anything related to them was changed recently.  Looking at the changes in Gerrit they appear to be OK.
+                > 
+                >    Cheers, Andreas
+                >    ---
+                >    Andreas Dilger
+                >    Principal Lustre Architect
+                >    Whamcloud
+                > 
+                > 
+                > 
+                > 
+                > 
+                > 
+                > 
+                >    _______________________________________________
+                >    lustre-devel mailing list
+                >    lustre-devel at lists.lustre.org
+                >    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org 
+                > 
+                > 
+
+                Cheers, Andreas
+                ---
+                Andreas Dilger
+                Principal Lustre Architect
+                Whamcloud
+
+
+
+
+
+
+
+
+
+
+
+        _______________________________________________
+        lustre-devel mailing list
+        lustre-devel at lists.lustre.org
+        http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org 
+
+    _______________________________________________
+    lustre-devel mailing list
+    lustre-devel at lists.lustre.org
+    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org 
