@@ -1,55 +1,40 @@
-From: NeilBrown <neilb@suse.de>
-Date: Wed, 02 Sep 2020 10:36:24 +1000
-Subject: [lustre-devel] Error checking for llapi_hsm_action_progress().
-In-Reply-To: <3df93cf2-1a94-f7bf-e073-29bf0c8c985a@cea.fr>
-References: <87pn77qx60.fsf@notabene.neil.brown.name>
- <2659fe05-9cd7-afd3-e1ce-c1726129e354@cea.fr>
- <87mu2aqpnp.fsf@notabene.neil.brown.name>
- <3df93cf2-1a94-f7bf-e073-29bf0c8c985a@cea.fr>
-Message-ID: <87imcxxbef.fsf@notabene.neil.brown.name>
+From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
+Date: Thu, 17 Sep 2020 17:09:20 +0200
+Subject: [lustre-devel] [LAD'20] Registration & agenda
+Message-ID: <e6af3f0b-5d85-0f48-4957-5aedbd569a3d@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Sep 01 2020, quentin.bouget at cea.fr wrote:
->
-> Ideally, there would be a standard data structure that automatically 
-> merges overlapping/contiguous extents.
-> But I don't know any, and I don't think it is worth coding one from scratch.
->
+Dear Lustre community,
 
-An interval tree is close enough that it would take .. uhmm....
+Registration for LAD'20 is now open! And a draft of the agenda is 
+available on the event's website <https://www.eofs.eu/events/lad20>.
 
- while ((overlap = interval_iter_first(
-                        &crp->crp_root,
- 			node->start == 0 ? 0 : node->start - 1,
-                        node->end == LUSTRE_EOF ? LUSTRE_EOF : node->end + 1))
-        != NULL) {
-	node->start = min(node->start, overlap->start);
-        node->end = max(node->end, overlap->end);
-        interval_remove(node, &crp->crp_root);
- }
- interval_insert(node, &crp->crp_root);
+LAD'20 is a virtual event. To ensure maximum coverage, each session is 
+broadcast once at 8AM (UTC), and another time at 4PM (UTC).
+This is why there are two registration links: one for the "morning"/#1 
+session 
+<https://zoom.us/webinar/register/5016002711948/WN_99ynkxvaTse1V5OSE1vuvw>, 
+and another one for the "afternoon"/#2 session 
+<https://zoom.us/webinar/register/6016002712219/WN_MPj_qU7NQc6xOJjkxAnyAQ>.
 
-... 10 lines of code to merge overlapping regions.
+Once you register on Zoom, you will receive an invitation to the chat 
+platform which we will use for Q&As.
+We send those invites manually, so expect a delay of a few days (a week 
+at most).
 
-Maybe I'll do that.
+By the way! Even though the submission deadline has now passed, we are 
+still looking for a few more presentations.
+If you are interested, post a summary of your talk here 
+<https://easychair.org/conferences/?conf=lad20>. Submission guidelines 
+are available in the call for paper <https://easychair.org/cfp/lad20>.
 
-I get the general impression that while people don't see it as very
-important to keep track of the reported ranges, they would probably feel
-a little happier if we kept track than if we didn't.
-Reporting errors on overlaps is definitely out, but merging overlaps
-is widely seen as sensible.
+Cheers,
+Quentin
 
-Thanks everyone for the feedback.
-
-NeilBrown
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 853 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200902/5a48ce37/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200917/990a46a4/attachment.html>
