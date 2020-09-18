@@ -1,157 +1,82 @@
-From: Nathan Rutman <nrutman@gmail.com>
-Date: Fri, 18 Sep 2020 10:33:46 -0700
-Subject: [lustre-devel] Error checking for llapi_hsm_action_progress().
-Message-ID: <CAA4iDz6wy1J+qv3WA4NtYSLWD0zMHTxTtD9Np3BpDNtfBz4MQA@mail.gmail.com>
+From: Cheremencev, Sergey <sergey.cheremencev@hpe.com>
+Date: Fri, 18 Sep 2020 19:17:32 +0000
+Subject: [lustre-devel] lfs usage with OST pool quota flags
+In-Reply-To: <108068A0-8A57-481F-BC8B-F9F913DC3428@hpe.com>
+References: <108068A0-8A57-481F-BC8B-F9F913DC3428@hpe.com>
+Message-ID: <60AAD02C-7000-4364-9140-94950557B3E0@hpe.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-As I've presented before, I really think Lustre should get out of the
-business of tracking HSM requests and progress completely for scalability
-reasons. External tools should do their thing, and simply let Lustre know
-when to atomically change the file's layout (released, restored, migrated,
-mirrored, etc). (All this work is in the "externalized coordinator" and
-"hsm as layout" patches up at WC.)
+Hello, Gian-Carlo DeFazio.
 
-Anyhow, to that end, I vote in favor of resolving by removal this
-apparently unused feature. Liblustre could silently drop the extent info
-for a trivial "fix".
+?The struct lquota_entry (lqe) now has 2 edquot flags,  lqe_edquot and lge_edquot.
+Does lqe_edquot still represent the QMT?s current knowledge about whether or not
+an entity has exceeded a quota for the pool associated with the lqe, or do the
+lge_edquot flags need to be checked as well to make this determination??
+
+I think you shouldn?t care about this if you write something for usermode utils.
+But if you are interesting In details I would try to explain. Each id(user/group/project) is still described by lqe.
+lqe that describes all data targets in a system is called ?global lqe?. This lqe has a pointer to array of entries that describe each OST state(lqeg_arr).
+So now we can have different edquot(lge_edquot) for each target. In a system without pools all lge_edquot in array are always equal and also equal with lqe->lqe_edquot.
+Each Pool Quotas has its own lqe per id. Pool Quotas lqes don?t have pointer to lqe_global_array. These lqes represent state (edquot, qunit, limits) only OSTs from the pool.
+So, each id has one global lqe and one lqe per pool where it has quota limits.
+When QMT get quota acquire request from an OST, it finds global lqe and ?pool? lqes(only pools that include this OST). It goes through these lqes to decide if edquot or new qunit should be set.
+If yes, it also reseeds lqeg_array.
+
+?There is now a ?pool option. Can this flag be used in conjunction with the default value flags (-U|-G|-P)??
+default Pool Quotas feature is under review - https://review.whamcloud.com/#/c/39873/ (LU-13952).
+
+If your code will interact with pool quotas, please add me as reviewer.
+
+Thanks,
+Sergey
+From: "Spitz, Cory James" <cory.spitz@hpe.com>
+Date: Friday, September 18, 2020 at 12:58 AM
+To: "Defazio, Gian-Carlo" <defazio1@llnl.gov>, "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>, "Cheremencev, Sergey" <sergey.cheremencev@hpe.com>
+Subject: Re: [lustre-devel] lfs usage with OST pool quota flags
+
+Hello, Gian-Carlo DeFazio.
+
+Sergey Chermencev is the developer who implemented OST Pool Quotas.  I?ve copied him so that he may answer your questions in more detail.  For now, I can say that you can use the following as resources:
+
+https://opensfs.org/wp-content/uploads/2019/07/LUG2019-Introducing_Pool_Quotas-Spitz.pdf
+https://vimeo.com/showcase/6042401/video/342817244
+
+And yes, you can use the --pool option in conjunction with the default value flags.  See slide 11 from the referenced pdf as an example.
+
+> Is that already happening? I see that there?s LUDOC-467 to add OST pool quotas to the manual
+Yes, https://review.whamcloud.com/#/c/38414 is for it, but it hasn?t landed yet.
+
+-Cory
 
 
-My understanding of the different use cases was:
+On 8/31/20, 1:29 PM, "lustre-devel on behalf of Defazio, Gian-Carlo" <lustre-devel-bounces at lists.lustre.org<mailto:lustre-devel-bounces@lists.lustre.org> on behalf of defazio1 at llnl.gov<mailto:defazio1@llnl.gov>> wrote:
 
-- Copytool I/O could be done in parallel and acknowledge write range
-in any order.
+I?m planning to add a feature to lfs-quota (a relatively quick check for EDQUOT)
+and I have some questions about how the new OST pool quota feature will change things
+with regards to how the quota system works internally and how the lfs-quota options will change.
 
-- Having a map of what have been copied and what haven't been was done
-thinking of implementing partial restore in the future. I'm not sure
-when this feature will be implemented it will really need this from
-the coordinator.
+For how the system actually works internally:
+The struct lquota_entry (lqe) now has 2 edquot flags,  lqe_edquot and lge_edquot.
+Does lqe_edquot still represent the QMT?s current knowledge about whether or not
+an entity has exceeded a quota for the pool associated with the lqe, or do the
+lge_edquot flags need to be checked as well to make this determination?
 
-You can verify some existing copytools in case some of them
-acknowledge I/O with a specific pattern:
+For how lfs-quota works:
+There is now a ?pool option. Can this flag be used in conjunction with the default value flags
+(-U|-G|-P)? Such as
+lfs quota -U ?pool qpool1 /mnt/lustre
+To check the default user quota values for OST pool qpool1?
 
-- posix copytool in lustre source
+I?ll need to update lfs-quota.1, lfs-setquota.1, and the lfs.c help section for my feature, but since
+the flag I add will have to interact with the ?pool flag in some cases, I also need to update those files
+for the OST pool quotas. Is that already happening? I see that there?s LUDOC-467 to add OST pool quotas to the manual.
 
-- S3 copytool Lemur (https://github.com/whamcloud/lemur)
-
-- TSM copytools (https://github.com/tstibor/ltsm, and Simon linked
-this one recently: https://github.com/guilbaults/ct_tsm/)
-
-I would be in favor of not raising an error if acknowledging overlaps
-an existing extent.
-
-Aur?lien
-
-?Le 01/09/2020 03:28, ? lustre-devel au nom de NeilBrown ?
-<lustre-devel-bounces@lists.lustre.org
-<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org> au nom
-de neilb at suse.de
-<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>> a
-?crit :
-
-    CAUTION: This email originated from outside of the organization.
-Do not click links or open attachments unless you can confirm the
-sender and know the content is safe.
-
-    "code deleted in code debugged" is my preferred outcome.  I haven't
-
-    heard anyone clamouring to keep the current behaviour, so I'm leaning
-
-    more in that direction.
-
-    Thanks,
-
-    NeilBrown
-
-    On Mon, Aug 31 2020, Joseph Benjamin Evans wrote:
-
-    > I don't think anything is actually monitoring or using the
-results of those extents, specifically.  "bytes copied" would be
-equally useful to the end user, I'd think.  Others may have better
-data on real-world usage, though.  So this might be a "code deleted is
-code debugged" situation.
-
-    >
-
-    > -Ben
-
-    >
-
-    > On 8/31/20, 12:03 AM, "lustre-devel on behalf of NeilBrown"
-<lustre-devel-bounces@lists.lustre.org
-<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org> on
-behalf of neilb at suse.de
-<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>> wrote:
-
-    >
-
-    >
-
-    >
-
-    >     I have a question about llapi_hsm_action_progress().  The
-documentation
-
-    >     says that every interval sent "must" be unique, and must not overlap
-
-    >     (which not exactly the same as 'unique').  The code (on server side)
-
-    >     only partially enforces this.  It causes any request for an empty
-
-    >     interval (start>end) to fail, but otherwise accepts any
-interval.  If it
-
-    >     gets two identical intervals (not just overlapping, but identical), it
-
-    >     ignores the second.  This seems weird.
-
-    >
-
-    >     It would make some sense to just accept any interval - all it does is
-
-    >     sum the lengths, and use this to report status, so no corruption would
-
-    >     result.  It would also make sense to return an error if an interval
-
-    >     overlaps any previous interval, as this violates the spec.  It might
-
-    >     make sense to accept any interval, but only count the
-overlapped length
-
-    >     once.  But the current behaviour of only ignoring exact duplicates is
-
-    >     weird.  I tried removing that check, but there is a test
-(hsm_test 108)
-
-    >     which checks for repeating identical intervals.
-
-    >
-
-    >     I want to clean up this code as I'm converting all users of the lustre
-
-    >     interval-tree to use the upstream-linux interval tree code.
-What should
-
-    >     I do?
-
-    >
-
-    >     Should I remove test 108 because it is only testing one particular
-
-    >     corner case, or should I improve the code to handle all overlaps
-
-    >     consistently?  Would it be OK to fail an overlap (I'd need to change
-
-    >     test 108), it must they be quietly accepted?
-
-    >
-
-    >     Thanks,
-
-    >     NeilBrown
+Thanks,
+Gian-Carlo DeFazio
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200918/36b186f4/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20200918/74b4acab/attachment.html>
