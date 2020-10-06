@@ -1,91 +1,89 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  5 Oct 2020 20:06:10 -0400
-Subject: [lustre-devel] [PATCH 31/42] lustre: clio: don't call
- aio_complete() in lustre upon errors
+Date: Mon,  5 Oct 2020 20:06:08 -0400
+Subject: [lustre-devel] [PATCH 29/42] lustre: lov: discard unused
+ lov_dump_lmm* functions
 In-Reply-To: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
 References: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1601942781-24950-32-git-send-email-jsimmons@infradead.org>
+Message-ID: <1601942781-24950-30-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-For older kernels VFS will call aio_complete() if ret is
-not -EIOCBQUEUED, this could happen when we don't pass user
-buffer as page alignment or some other errors happen in Lustre.
+lov_dump_lmm_v3() is never used, so remove it.
 
-So in Lustre, we need be careful to handle this case to avoid double
-aio_complete() called. Newer kernels don't have this issue but
-apply this change to keep in sync with OpenSFS tree.
+So mark lov_lsm_pack_v1v3() and lov_lsm_pack_foreign() as static.
 
-Fixes: fde7ac1 ("lustre: clio: AIO support for direct IO")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13900
-Lustre-commit: 2fb8444b5a6369 ("LU-13900 clio: don't call aio_complete() in lustre upon errors")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/39636
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Yingjin Qian <qian@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
+Lustre-commit: c7d0d63b5191c6 ("LU-6142 lov: discard unused lov_dump_lmm* functions")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39378
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h | 1 +
- fs/lustre/llite/file.c        | 7 +++++++
- fs/lustre/obdclass/cl_io.c    | 3 ++-
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ fs/lustre/lov/lov_internal.h |  1 -
+ fs/lustre/lov/lov_pack.c     | 17 ++++-------------
+ 2 files changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index e849f23..56200d2 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -2572,6 +2572,7 @@ struct cl_dio_aio {
- 	struct cl_page_list	cda_pages;
- 	struct kiocb		*cda_iocb;
- 	ssize_t			cda_bytes;
-+	unsigned int		cda_no_aio_complete:1;
- };
+diff --git a/fs/lustre/lov/lov_internal.h b/fs/lustre/lov/lov_internal.h
+index 5f5f98e..202e4b5 100644
+--- a/fs/lustre/lov/lov_internal.h
++++ b/fs/lustre/lov/lov_internal.h
+@@ -308,7 +308,6 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, void *buf,
+ int lov_free_memmd(struct lov_stripe_md **lsmp);
  
- /** @} cl_sync_io */
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index babd24d..1d2ab11 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -1669,6 +1669,13 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
- 	}
+ void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm);
+-void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm);
+ void lov_dump_lmm_common(int level, void *lmmp);
  
- 	if (io->ci_aio) {
-+		/*
-+		 * VFS will call aio_complete() if no -EIOCBQUEUED
-+		 * is returned for AIO, so we can not call aio_complete()
-+		 * in our end_io().
-+		 */
-+		if (rc != -EIOCBQUEUED)
-+			io->ci_aio->cda_no_aio_complete = 1;
- 		/**
- 		 * Drop one extra reference so that end_io() could be
- 		 * called for this IO context, we could call it after
-diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
-index 1564d9f..aa3cb17 100644
---- a/fs/lustre/obdclass/cl_io.c
-+++ b/fs/lustre/obdclass/cl_io.c
-@@ -1087,7 +1087,7 @@ static void cl_aio_end(const struct lu_env *env, struct cl_sync_io *anchor)
- 		cl_page_put(env, page);
- 	}
- 
--	if (!is_sync_kiocb(aio->cda_iocb) &&
-+	if (!is_sync_kiocb(aio->cda_iocb) && !aio->cda_no_aio_complete &&
- 	    aio->cda_iocb->ki_complete)
- 		aio->cda_iocb->ki_complete(aio->cda_iocb,
- 					   ret ?: aio->cda_bytes, 0);
-@@ -1108,6 +1108,7 @@ struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb)
- 				       cl_aio_end);
- 		cl_page_list_init(&aio->cda_pages);
- 		aio->cda_iocb = iocb;
-+		aio->cda_no_aio_complete = 0;
- 	}
- 	return aio;
+ /* lov_ea.c */
+diff --git a/fs/lustre/lov/lov_pack.c b/fs/lustre/lov/lov_pack.c
+index a6a68b7..d200a62 100644
+--- a/fs/lustre/lov/lov_pack.c
++++ b/fs/lustre/lov/lov_pack.c
+@@ -92,15 +92,6 @@ void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm)
+ 			     le16_to_cpu(lmm->lmm_stripe_count));
  }
+ 
+-void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
+-{
+-	lov_dump_lmm_common(level, lmm);
+-	CDEBUG_LIMIT(level, "pool_name " LOV_POOLNAMEF "\n",
+-		     lmm->lmm_pool_name);
+-	lov_dump_lmm_objects(level, lmm->lmm_objects,
+-			     le16_to_cpu(lmm->lmm_stripe_count));
+-}
+-
+ /**
+  * Pack LOV striping metadata for disk storage format (in little
+  * endian byte order).
+@@ -109,8 +100,8 @@ void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
+  * then return the size needed. If @buf_size is too small then
+  * return -ERANGE. Otherwise return the size of the result.
+  */
+-ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
+-			  size_t buf_size)
++static ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
++				 size_t buf_size)
+ {
+ 	struct lov_ost_data_v1 *lmm_objects;
+ 	struct lov_mds_md_v1 *lmmv1 = buf;
+@@ -162,8 +153,8 @@ ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
+ 	return lmm_size;
+ }
+ 
+-ssize_t lov_lsm_pack_foreign(const struct lov_stripe_md *lsm, void *buf,
+-			     size_t buf_size)
++static ssize_t lov_lsm_pack_foreign(const struct lov_stripe_md *lsm, void *buf,
++				    size_t buf_size)
+ {
+ 	struct lov_foreign_md *lfm = buf;
+ 	size_t lfm_size;
 -- 
 1.8.3.1
