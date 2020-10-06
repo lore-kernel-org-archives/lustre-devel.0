@@ -1,391 +1,369 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  5 Oct 2020 20:06:07 -0400
-Subject: [lustre-devel] [PATCH 28/42] lustre: ldlm: don't use a locks
- without l_ast_data
+Date: Mon,  5 Oct 2020 20:06:13 -0400
+Subject: [lustre-devel] [PATCH 34/42] lustre: ldlm: pool fixes
 In-Reply-To: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
 References: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1601942781-24950-29-git-send-email-jsimmons@infradead.org>
+Message-ID: <1601942781-24950-35-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alexey Lyashkov <alexey.lyashkov@hpe.com>
+From: Vitaly Fertman <c17818@cray.com>
 
-Partially initialized lock (without l_ast_data to be init)
-caused a fail with blocking ast, as discard from page cache
-skipped, and stale data will read later with fast read.
-Slow read have chance to attach this lock to right IO, but
-it don?t true always, so that should disabled, until lock
-will have l_ast_data set always for DoM and Lock Ahead locks.
+At the time the client side recalc period was increased up to 10secs
+the grant & cancel rates started showing the speed not in seconds but
+in tens of seconds.
 
-HPE-bugid: LUS-8750
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13645
-Lustre-commit: a6798c5806088d ("LU-13645 ldlm: don't use a locks without l_ast_data")
-Signed-off-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-on: https://review.whamcloud.com/39318
+At the pool initialization time, the server side recalc job should not
+be delayed on client's recalc period.
+
+It may happen an NS time is significant and comparable (or even more)
+than the recalc period of the next NS (all the following NS's) in the
+list. If the time has been already spent on the next NS, it does not
+mean we want to double the delay for the original NS and recalc after
+next N secs.
+
+Make lock volume factor more fine grained (default is 100 now vs the
+original 1): it is likely to cancel locks on clients twice faster than
+server requested is too fast.
+
+Protect missed pl_server_lock_volume update by the pool lock.
+
+Replace ktime_get_real_seconds with ktime_get_seconds for the recal
+interval.
+
+HPE-bug-id: LUS-8678
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11518
+Lustre-commit: 1806d6e8291758a ("LU-11518 ldlm: pool fixes")
+Signed-off-by: Vitaly Fertman <c17818@cray.com>
+Reviewed-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+Tested-by: Alexander Lezhoev <c17454@cray.com>
+Reviewed-on: https://review.whamcloud.com/39563
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Vitaly Fertman <vitaly.fertman@hpe.com>
+Reviewed-by: Gu Zheng <gzheng@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_dlm.h | 17 +++++++++++------
- fs/lustre/include/lustre_osc.h |  4 ++++
- fs/lustre/ldlm/ldlm_lock.c     | 15 ++++++++-------
- fs/lustre/mdc/mdc_dev.c        | 22 +++++++++++++++-------
- fs/lustre/mdc/mdc_locks.c      |  5 ++---
- fs/lustre/osc/osc_cache.c      |  2 +-
- fs/lustre/osc/osc_internal.h   |  3 ++-
- fs/lustre/osc/osc_lock.c       | 12 +++++++++---
- fs/lustre/osc/osc_object.c     |  2 +-
- fs/lustre/osc/osc_request.c    | 11 +++++++----
- 10 files changed, 60 insertions(+), 33 deletions(-)
+ fs/lustre/include/lustre_dlm.h |   4 +-
+ fs/lustre/ldlm/ldlm_pool.c     | 129 +++++++++++++++++++++++++++--------------
+ fs/lustre/ldlm/ldlm_request.c  |   2 +-
+ 3 files changed, 88 insertions(+), 47 deletions(-)
 
 diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index e2a7b6b..871d4ff 100644
+index 682035a..bc6785f 100644
 --- a/fs/lustre/include/lustre_dlm.h
 +++ b/fs/lustre/include/lustre_dlm.h
-@@ -821,6 +821,12 @@ struct ldlm_lock {
- #endif
- };
- 
-+enum ldlm_match_flags {
-+	LDLM_MATCH_UNREF	= BIT(0),
-+	LDLM_MATCH_AST		= BIT(1),
-+	LDLM_MATCH_AST_ANY	= BIT(2),
-+};
-+
- /**
-  * Describe the overlap between two locks.  itree_overlap_cb data.
+@@ -250,8 +250,8 @@ struct ldlm_pool {
+ 	u64			pl_server_lock_volume;
+ 	/** Current biggest client lock volume. Protected by pl_lock. */
+ 	u64			pl_client_lock_volume;
+-	/** Lock volume factor. SLV on client is calculated as following:
+-	 *  server_slv * lock_volume_factor.
++	/** Lock volume factor, shown in percents in procfs, but internally
++	 *  Client SLV calculated as: server_slv * lock_volume_factor >> 8.
+ 	 */
+ 	atomic_t		pl_lock_volume_factor;
+ 	/** Time when last SLV from server was obtained. */
+diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+index 9e2a006..c37948a 100644
+--- a/fs/lustre/ldlm/ldlm_pool.c
++++ b/fs/lustre/ldlm/ldlm_pool.c
+@@ -209,13 +209,13 @@ static inline int ldlm_pool_t2gsp(unsigned int t)
+  *
+  * \pre ->pl_lock is locked.
   */
-@@ -831,8 +837,7 @@ struct ldlm_match_data {
- 	union ldlm_policy_data	*lmd_policy;
- 	u64			 lmd_flags;
- 	u64			 lmd_skip_flags;
--	int			 lmd_unref;
--	bool			 lmd_has_ast_data;
-+	enum ldlm_match_flags	 lmd_match;
- };
- 
- /**
-@@ -1172,6 +1177,7 @@ void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh,
- void ldlm_lock_fail_match_locked(struct ldlm_lock *lock);
- void ldlm_lock_allow_match(struct ldlm_lock *lock);
- void ldlm_lock_allow_match_locked(struct ldlm_lock *lock);
-+
- enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 					 u64 flags, u64 skip_flags,
- 					 const struct ldlm_res_id *res_id,
-@@ -1179,18 +1185,17 @@ enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 					 union ldlm_policy_data *policy,
- 					 enum ldlm_mode mode,
- 					 struct lustre_handle *lh,
--					 int unref);
-+					 enum ldlm_match_flags match_flags);
- static inline enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns,
- 					     u64 flags,
- 					     const struct ldlm_res_id *res_id,
- 					     enum ldlm_type type,
- 					     union ldlm_policy_data *policy,
- 					     enum ldlm_mode mode,
--					     struct lustre_handle *lh,
--					     int unref)
-+					     struct lustre_handle *lh)
+-static void ldlm_pool_recalc_stats(struct ldlm_pool *pl)
++static void ldlm_pool_recalc_stats(struct ldlm_pool *pl, timeout_t period)
  {
- 	return ldlm_lock_match_with_skip(ns, flags, 0, res_id, type, policy,
--					 mode, lh, unref);
-+					 mode, lh, 0);
- }
- struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 			       struct ldlm_match_data *data);
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index 3956ab4..24cfec8 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -244,6 +244,10 @@ enum osc_dap_flags {
- 	 * Return the lock even if it is being canceled.
+ 	int grant_plan = pl->pl_grant_plan;
+ 	u64 slv = pl->pl_server_lock_volume;
+ 	int granted = atomic_read(&pl->pl_granted);
+-	int grant_rate = atomic_read(&pl->pl_grant_rate);
+-	int cancel_rate = atomic_read(&pl->pl_cancel_rate);
++	int grant_rate = atomic_read(&pl->pl_grant_rate) / period;
++	int cancel_rate = atomic_read(&pl->pl_cancel_rate) / period;
+ 
+ 	lprocfs_counter_add(pl->pl_stats, LDLM_POOL_SLV_STAT,
+ 			    slv);
+@@ -254,10 +254,10 @@ static void ldlm_cli_pool_pop_slv(struct ldlm_pool *pl)
+  */
+ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
+ {
+-	time64_t recalc_interval_sec;
++	timeout_t recalc_interval_sec;
+ 	int ret;
+ 
+-	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
++	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
+ 	if (recalc_interval_sec < pl->pl_recalc_period)
+ 		return 0;
+ 
+@@ -265,7 +265,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
+ 	/*
+ 	 * Check if we need to recalc lists now.
  	 */
- 	OSC_DAP_FL_CANCELING = BIT(1),
-+	/**
-+	 * check ast data is present, requested to cancel cb
-+	 */
-+	OSC_DAP_FL_AST	     = BIT(2),
- };
- 
- /*
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index 7fda7b8..f5dedc9 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -1074,7 +1074,7 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	    !(data->lmd_flags & LDLM_FL_CBPENDING))
- 		return false;
- 
--	if (!data->lmd_unref && ldlm_is_cbpending(lock) &&
-+	if (!(data->lmd_match & LDLM_MATCH_UNREF) && ldlm_is_cbpending(lock) &&
- 	    !lock->l_readers && !lock->l_writers)
- 		return false;
- 
-@@ -1084,11 +1084,12 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	/* When we search for ast_data, we are not doing a traditional match,
- 	 * so we don't worry about IBITS or extent matching.
+-	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
++	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
+ 	if (recalc_interval_sec < pl->pl_recalc_period) {
+ 		spin_unlock(&pl->pl_lock);
+ 		return 0;
+@@ -292,7 +292,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
+ 	 * Time of LRU resizing might be longer than period,
+ 	 * so update after LRU resizing rather than before it.
  	 */
--	if (data->lmd_has_ast_data) {
-+	if (data->lmd_match & (LDLM_MATCH_AST | LDLM_MATCH_AST_ANY)) {
- 		if (!lock->l_ast_data)
- 			return false;
+-	pl->pl_recalc_time = ktime_get_real_seconds();
++	pl->pl_recalc_time = ktime_get_seconds();
+ 	lprocfs_counter_add(pl->pl_stats, LDLM_POOL_TIMING_STAT,
+ 			    recalc_interval_sec);
+ 	spin_unlock(&pl->pl_lock);
+@@ -321,7 +321,9 @@ static int ldlm_cli_pool_shrink(struct ldlm_pool *pl,
+ 	/*
+ 	 * Make sure that pool knows last SLV and Limit from obd.
+ 	 */
++	spin_lock(&pl->pl_lock);
+ 	ldlm_cli_pool_pop_slv(pl);
++	spin_unlock(&pl->pl_lock);
  
--		goto matched;
-+		if (data->lmd_match & LDLM_MATCH_AST_ANY)
-+			goto matched;
+ 	spin_lock(&ns->ns_lock);
+ 	unused = ns->ns_nr_unused;
+@@ -341,23 +343,25 @@ static int ldlm_cli_pool_shrink(struct ldlm_pool *pl,
+ /**
+  * Pool recalc wrapper. Will call either client or server pool recalc callback
+  * depending what pool @pl is used.
++ *
++ * Returns	time in seconds for the next recalc of this pool
+  */
+-static int ldlm_pool_recalc(struct ldlm_pool *pl)
++static timeout_t ldlm_pool_recalc(struct ldlm_pool *pl)
+ {
+-	u32 recalc_interval_sec;
++	timeout_t recalc_interval_sec;
+ 	int count;
+ 
+-	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
++	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
+ 	if (recalc_interval_sec > 0) {
+ 		spin_lock(&pl->pl_lock);
+-		recalc_interval_sec = ktime_get_real_seconds() -
++		recalc_interval_sec = ktime_get_seconds() -
+ 				      pl->pl_recalc_time;
+ 
+ 		if (recalc_interval_sec > 0) {
+ 			/*
+-			 * Update pool statistics every 1s.
++			 * Update pool statistics every recalc interval.
+ 			 */
+-			ldlm_pool_recalc_stats(pl);
++			ldlm_pool_recalc_stats(pl, recalc_interval_sec);
+ 
+ 			/*
+ 			 * Zero out all rates and speed for the last period.
+@@ -374,20 +378,7 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
+ 				    count);
  	}
  
- 	match = lock->l_req_mode;
-@@ -1121,7 +1122,7 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	 * We match if we have existing lock with same or wider set
- 	 * of bits.
- 	 */
--	if (!data->lmd_unref && LDLM_HAVE_MASK(lock, GONE))
-+	if (!(data->lmd_match & LDLM_MATCH_UNREF) && LDLM_HAVE_MASK(lock, GONE))
- 		return false;
- 
- 	if (!equi(data->lmd_flags & LDLM_FL_LOCAL_ONLY, ldlm_is_local(lock)))
-@@ -1273,7 +1274,8 @@ enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 					 enum ldlm_type type,
- 					 union ldlm_policy_data *policy,
- 					 enum ldlm_mode mode,
--					 struct lustre_handle *lockh, int unref)
-+					 struct lustre_handle *lockh,
-+					 enum ldlm_match_flags match_flags)
- {
- 	struct ldlm_match_data data = {
- 		.lmd_old	= NULL,
-@@ -1282,8 +1284,7 @@ enum ldlm_mode ldlm_lock_match_with_skip(struct ldlm_namespace *ns,
- 		.lmd_policy	= policy,
- 		.lmd_flags	= flags,
- 		.lmd_skip_flags	= skip_flags,
--		.lmd_unref	= unref,
--		.lmd_has_ast_data = false,
-+		.lmd_match	= match_flags,
- 	};
- 	struct ldlm_resource *res;
- 	struct ldlm_lock *lock;
-diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
-index d6d98ae..329371b 100644
---- a/fs/lustre/mdc/mdc_dev.c
-+++ b/fs/lustre/mdc/mdc_dev.c
-@@ -92,14 +92,16 @@ int mdc_dom_lock_match(const struct lu_env *env, struct obd_export *exp,
- 		       struct ldlm_res_id *res_id, enum ldlm_type type,
- 		       union ldlm_policy_data *policy, enum ldlm_mode mode,
- 		       u64 *flags, struct osc_object *obj,
--		       struct lustre_handle *lockh, int unref)
-+		       struct lustre_handle *lockh,
-+		       enum ldlm_match_flags match_flags)
- {
- 	struct obd_device *obd = exp->exp_obd;
- 	u64 lflags = *flags;
- 	enum ldlm_mode rc;
- 
--	rc = ldlm_lock_match(obd->obd_namespace, lflags,
--			     res_id, type, policy, mode, lockh, unref);
-+	rc = ldlm_lock_match_with_skip(obd->obd_namespace, lflags, 0,
-+				       res_id, type, policy, mode, lockh,
-+				       match_flags);
- 	if (rc == 0 || lflags & LDLM_FL_TEST_LOCK)
- 		return rc;
- 
-@@ -139,6 +141,7 @@ struct ldlm_lock *mdc_dlmlock_at_pgoff(const struct lu_env *env,
- 	struct ldlm_lock *lock = NULL;
- 	enum ldlm_mode mode;
- 	u64 flags;
-+	enum ldlm_match_flags match_flags = 0;
- 
- 	fid_build_reg_res_name(lu_object_fid(osc2lu(obj)), resname);
- 	mdc_lock_build_policy(env, policy);
-@@ -147,6 +150,12 @@ struct ldlm_lock *mdc_dlmlock_at_pgoff(const struct lu_env *env,
- 	if (dap_flags & OSC_DAP_FL_TEST_LOCK)
- 		flags |= LDLM_FL_TEST_LOCK;
- 
-+	if (dap_flags & OSC_DAP_FL_AST)
-+		match_flags |= LDLM_MATCH_AST;
-+
-+	if (dap_flags & OSC_DAP_FL_CANCELING)
-+		match_flags |= LDLM_MATCH_UNREF;
-+
- again:
- 	/* Next, search for already existing extent locks that will cover us */
- 	/* If we're trying to read, we also search for an existing PW lock.  The
-@@ -155,8 +164,7 @@ struct ldlm_lock *mdc_dlmlock_at_pgoff(const struct lu_env *env,
- 	 */
- 	mode = mdc_dom_lock_match(env, osc_export(obj), resname, LDLM_IBITS,
- 				  policy, LCK_PR | LCK_PW | LCK_GROUP, &flags,
--				  obj, &lockh,
--				  dap_flags & OSC_DAP_FL_CANCELING);
-+				  obj, &lockh, match_flags);
- 	if (mode) {
- 		lock = ldlm_handle2lock(&lockh);
- 		/* RACE: the lock is cancelled so let's try again */
-@@ -184,7 +192,7 @@ static bool mdc_check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
- 
- 		/* refresh non-overlapped index */
- 		tmp = mdc_dlmlock_at_pgoff(env, osc, index,
--					   OSC_DAP_FL_TEST_LOCK);
-+					   OSC_DAP_FL_TEST_LOCK | OSC_DAP_FL_AST);
- 		if (tmp) {
- 			info->oti_fn_index = CL_PAGE_EOF;
- 			LDLM_LOCK_PUT(tmp);
-@@ -692,7 +700,7 @@ int mdc_enqueue_send(const struct lu_env *env, struct obd_export *exp,
- 	 * such locks should be skipped.
- 	 */
- 	mode = ldlm_lock_match(obd->obd_namespace, match_flags, res_id,
--			       einfo->ei_type, policy, mode, &lockh, 0);
-+			       einfo->ei_type, policy, mode, &lockh);
- 	if (mode) {
- 		struct ldlm_lock *matched;
- 
-diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
-index 2d623ff..72ee070 100644
---- a/fs/lustre/mdc/mdc_locks.c
-+++ b/fs/lustre/mdc/mdc_locks.c
-@@ -146,7 +146,7 @@ enum ldlm_mode mdc_lock_match(struct obd_export *exp, u64 flags,
- 	/* LU-4405: Clear bits not supported by server */
- 	policy->l_inodebits.bits &= exp_connect_ibits(exp);
- 	rc = ldlm_lock_match(class_exp2obd(exp)->obd_namespace, flags,
--			     &res_id, type, policy, mode, lockh, 0);
-+			     &res_id, type, policy, mode, lockh);
- 	return rc;
+-	recalc_interval_sec = pl->pl_recalc_time - ktime_get_real_seconds() +
+-			      pl->pl_recalc_period;
+-	if (recalc_interval_sec <= 0) {
+-		/* DEBUG: should be re-removed after LU-4536 is fixed */
+-		CDEBUG(D_DLMTRACE,
+-		       "%s: Negative interval(%ld), too short period(%ld)\n",
+-		       pl->pl_name, (long)recalc_interval_sec,
+-		       (long)pl->pl_recalc_period);
+-
+-		/* Prevent too frequent recalculation. */
+-		recalc_interval_sec = 1;
+-	}
+-
+-	return recalc_interval_sec;
++	return pl->pl_recalc_time + pl->pl_recalc_period;
  }
  
-@@ -1185,8 +1185,7 @@ static int mdc_finish_intent_lock(struct obd_export *exp,
+ /*
+@@ -421,6 +412,7 @@ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ 	int granted, grant_rate, cancel_rate;
+ 	int grant_speed, lvf;
+ 	struct ldlm_pool *pl = m->private;
++	timeout_t period;
+ 	u64 slv, clv;
+ 	u32 limit;
  
- 		memcpy(&old_lock, lockh, sizeof(*lockh));
- 		if (ldlm_lock_match(NULL, LDLM_FL_BLOCK_GRANTED, NULL,
--				    LDLM_IBITS, &policy, LCK_NL,
--				    &old_lock, 0)) {
-+				    LDLM_IBITS, &policy, LCK_NL, &old_lock)) {
- 			ldlm_lock_decref_and_cancel(lockh,
- 						    it->it_lock_mode);
- 			memcpy(lockh, &old_lock, sizeof(old_lock));
-diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
-index c7aaabb..ddf6fb1 100644
---- a/fs/lustre/osc/osc_cache.c
-+++ b/fs/lustre/osc/osc_cache.c
-@@ -3216,7 +3216,7 @@ static bool check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+@@ -429,8 +421,11 @@ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ 	clv = pl->pl_client_lock_volume;
+ 	limit = atomic_read(&pl->pl_limit);
+ 	granted = atomic_read(&pl->pl_granted);
+-	grant_rate = atomic_read(&pl->pl_grant_rate);
+-	cancel_rate = atomic_read(&pl->pl_cancel_rate);
++	period = ktime_get_seconds() - pl->pl_recalc_time;
++	if (period <= 0)
++		period = 1;
++	grant_rate = atomic_read(&pl->pl_grant_rate) / period;
++	cancel_rate = atomic_read(&pl->pl_cancel_rate) / period;
+ 	grant_speed = grant_rate - cancel_rate;
+ 	lvf = atomic_read(&pl->pl_lock_volume_factor);
+ 	spin_unlock(&pl->pl_lock);
+@@ -439,7 +434,7 @@ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ 		      "  SLV: %llu\n"
+ 		      "  CLV: %llu\n"
+ 		      "  LVF: %d\n",
+-		      pl->pl_name, slv, clv, lvf);
++		      pl->pl_name, slv, clv, (lvf * 100) >> 8);
  
- 		/* refresh non-overlapped index */
- 		tmp = osc_dlmlock_at_pgoff(env, osc, index,
--					   OSC_DAP_FL_TEST_LOCK);
-+					   OSC_DAP_FL_TEST_LOCK | OSC_DAP_FL_AST);
- 		if (tmp) {
- 			u64 end = tmp->l_policy_data.l_extent.end;
- 			/* Cache the first-non-overlapped index so as to skip
-diff --git a/fs/lustre/osc/osc_internal.h b/fs/lustre/osc/osc_internal.h
-index 6bec6bf..fc3ca8a 100644
---- a/fs/lustre/osc/osc_internal.h
-+++ b/fs/lustre/osc/osc_internal.h
-@@ -68,7 +68,8 @@ int osc_match_base(const struct lu_env *env, struct obd_export *exp,
- 		   struct ldlm_res_id *res_id, enum ldlm_type type,
- 		   union ldlm_policy_data *policy, enum ldlm_mode mode,
- 		   u64 *flags, struct osc_object *obj,
--		   struct lustre_handle *lockh, int unref);
-+		   struct lustre_handle *lockh,
-+		   enum ldlm_match_flags match_flags);
+ 	seq_printf(m, "  GR:  %d\n  CR:  %d\n  GS:  %d\n"
+ 		      "  G:   %d\n  L:   %d\n",
+@@ -457,11 +452,15 @@ static ssize_t grant_speed_show(struct kobject *kobj, struct attribute *attr,
+ 	struct ldlm_pool *pl = container_of(kobj, struct ldlm_pool,
+ 					    pl_kobj);
+ 	int grant_speed;
++	timeout_t period;
  
- int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
- 		      obd_enqueue_update_f upcall, void *cookie,
-diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
-index 27495e3..ed9f0a0 100644
---- a/fs/lustre/osc/osc_lock.c
-+++ b/fs/lustre/osc/osc_lock.c
-@@ -579,8 +579,7 @@ int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
- 	matchdata.lmd_mode = &mode;
- 	matchdata.lmd_policy = &policy;
- 	matchdata.lmd_flags = LDLM_FL_TEST_LOCK | LDLM_FL_CBPENDING;
--	matchdata.lmd_unref = 1;
--	matchdata.lmd_has_ast_data = true;
-+	matchdata.lmd_match = LDLM_MATCH_UNREF | LDLM_MATCH_AST_ANY;
+ 	spin_lock(&pl->pl_lock);
+ 	/* serialize with ldlm_pool_recalc */
+-	grant_speed = atomic_read(&pl->pl_grant_rate) -
+-			atomic_read(&pl->pl_cancel_rate);
++	period = ktime_get_seconds() - pl->pl_recalc_time;
++	if (period <= 0)
++		period = 1;
++	grant_speed = (atomic_read(&pl->pl_grant_rate) -
++		       atomic_read(&pl->pl_cancel_rate)) / period;
+ 	spin_unlock(&pl->pl_lock);
+ 	return sprintf(buf, "%d\n", grant_speed);
+ }
+@@ -477,6 +476,9 @@ static ssize_t grant_speed_show(struct kobject *kobj, struct attribute *attr,
+ LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(server_lock_volume, u64);
+ LUSTRE_RO_ATTR(server_lock_volume);
  
- 	LDLM_LOCK_GET(dlmlock);
- 
-@@ -1267,6 +1266,7 @@ struct ldlm_lock *osc_obj_dlmlock_at_pgoff(const struct lu_env *env,
- 	struct ldlm_lock *lock = NULL;
- 	enum ldlm_mode mode;
- 	u64 flags;
-+	enum ldlm_match_flags match_flags = 0;
- 
- 	ostid_build_res_name(&obj->oo_oinfo->loi_oi, resname);
- 	osc_index2policy(policy, osc2cl(obj), index, index);
-@@ -1276,6 +1276,12 @@ struct ldlm_lock *osc_obj_dlmlock_at_pgoff(const struct lu_env *env,
- 	if (dap_flags & OSC_DAP_FL_TEST_LOCK)
- 		flags |= LDLM_FL_TEST_LOCK;
- 
-+	if (dap_flags & OSC_DAP_FL_AST)
-+		match_flags |= LDLM_MATCH_AST;
++LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(client_lock_volume, u64);
++LUSTRE_RO_ATTR(client_lock_volume);
 +
-+	if (dap_flags & OSC_DAP_FL_CANCELING)
-+		match_flags |= LDLM_MATCH_UNREF;
+ LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(limit, atomic);
+ LDLM_POOL_SYSFS_WRITER_NOLOCK_STORE(limit, atomic);
+ LUSTRE_RW_ATTR(limit);
+@@ -490,16 +492,56 @@ static ssize_t grant_speed_show(struct kobject *kobj, struct attribute *attr,
+ LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(grant_rate, atomic);
+ LUSTRE_RO_ATTR(grant_rate);
+ 
+-LDLM_POOL_SYSFS_READER_NOLOCK_SHOW(lock_volume_factor, atomic);
+-LDLM_POOL_SYSFS_WRITER_NOLOCK_STORE(lock_volume_factor, atomic);
++static ssize_t lock_volume_factor_show(struct kobject *kobj,
++				       struct attribute *attr,
++				       char *buf)
++{
++	struct ldlm_pool *pl = container_of(kobj, struct ldlm_pool, pl_kobj);
++	unsigned long tmp;
 +
++	tmp = (atomic_read(&pl->pl_lock_volume_factor) * 100) >> 8;
++	return sprintf(buf, "%lu\n", tmp);
++}
++
++static ssize_t lock_volume_factor_store(struct kobject *kobj,
++					struct attribute *attr,
++					const char *buffer,
++					size_t count)
++{
++	struct ldlm_pool *pl = container_of(kobj, struct ldlm_pool, pl_kobj);
++	unsigned long tmp;
++	int rc;
++
++	rc = kstrtoul(buffer, 10, &tmp);
++	if (rc < 0)
++		return rc;
++
++	tmp = (tmp << 8) / 100;
++	atomic_set(&pl->pl_lock_volume_factor, tmp);
++
++	return count;
++}
+ LUSTRE_RW_ATTR(lock_volume_factor);
+ 
++static ssize_t recalc_time_show(struct kobject *kobj,
++				struct attribute *attr,
++				char *buf)
++{
++	struct ldlm_pool *pl = container_of(kobj, struct ldlm_pool, pl_kobj);
++
++	return scnprintf(buf, PAGE_SIZE, "%llu\n",
++			ktime_get_seconds() - pl->pl_recalc_time);
++}
++LUSTRE_RO_ATTR(recalc_time);
++
+ /* These are for pools in /sys/fs/lustre/ldlm/namespaces/.../pool */
+ static struct attribute *ldlm_pl_attrs[] = {
+ 	&lustre_attr_grant_speed.attr,
+ 	&lustre_attr_grant_plan.attr,
+ 	&lustre_attr_recalc_period.attr,
+ 	&lustre_attr_server_lock_volume.attr,
++	&lustre_attr_client_lock_volume.attr,
++	&lustre_attr_recalc_time.attr,
+ 	&lustre_attr_limit.attr,
+ 	&lustre_attr_granted.attr,
+ 	&lustre_attr_cancel_rate.attr,
+@@ -625,8 +667,8 @@ int ldlm_pool_init(struct ldlm_pool *pl, struct ldlm_namespace *ns,
+ 
+ 	spin_lock_init(&pl->pl_lock);
+ 	atomic_set(&pl->pl_granted, 0);
+-	pl->pl_recalc_time = ktime_get_real_seconds();
+-	atomic_set(&pl->pl_lock_volume_factor, 1);
++	pl->pl_recalc_time = ktime_get_seconds();
++	atomic_set(&pl->pl_lock_volume_factor, 1 << 8);
+ 
+ 	atomic_set(&pl->pl_grant_rate, 0);
+ 	atomic_set(&pl->pl_cancel_rate, 0);
+@@ -867,7 +909,7 @@ static void ldlm_pools_recalc(struct work_struct *ws)
+ 	struct ldlm_namespace *ns;
+ 	struct ldlm_namespace *ns_old = NULL;
+ 	/* seconds of sleep if no active namespaces */
+-	time64_t time = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
++	timeout_t delay = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
+ 	int nr;
+ 
  	/*
- 	 * It is fine to match any group lock since there could be only one
- 	 * with a uniq gid and it conflicts with all other lock modes too
-@@ -1283,7 +1289,7 @@ struct ldlm_lock *osc_obj_dlmlock_at_pgoff(const struct lu_env *env,
- again:
- 	mode = osc_match_base(env, osc_export(obj), resname, LDLM_EXTENT,
- 			      policy, LCK_PR | LCK_PW | LCK_GROUP, &flags,
--			      obj, &lockh, dap_flags & OSC_DAP_FL_CANCELING);
-+			      obj, &lockh, match_flags);
- 	if (mode != 0) {
- 		lock = ldlm_handle2lock(&lockh);
- 		/* RACE: the lock is cancelled so let's try again */
-diff --git a/fs/lustre/osc/osc_object.c b/fs/lustre/osc/osc_object.c
-index 1f7ff24..9a0fc54 100644
---- a/fs/lustre/osc/osc_object.c
-+++ b/fs/lustre/osc/osc_object.c
-@@ -275,7 +275,7 @@ static int osc_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	mode = ldlm_lock_match(exp->exp_obd->obd_namespace,
- 			       LDLM_FL_BLOCK_GRANTED | LDLM_FL_LVB_READY,
- 			       &resid, LDLM_EXTENT, &policy,
--			       LCK_PR | LCK_PW, &lockh, 0);
-+			       LCK_PR | LCK_PW, &lockh);
- 	if (mode) { /* lock is cached on client */
- 		if (mode != LCK_PR) {
- 			ldlm_lock_addref(&lockh, LCK_PR);
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 53f87ea..8a8a624 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -2723,7 +2723,7 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 	if (intent != 0)
- 		match_flags |= LDLM_FL_BLOCK_GRANTED;
- 	mode = ldlm_lock_match(obd->obd_namespace, match_flags, res_id,
--			       einfo->ei_type, policy, mode, &lockh, 0);
-+			       einfo->ei_type, policy, mode, &lockh);
- 	if (mode) {
- 		struct ldlm_lock *matched;
+@@ -933,11 +975,8 @@ static void ldlm_pools_recalc(struct work_struct *ws)
+ 		 * After setup is done - recalc the pool.
+ 		 */
+ 		if (!skip) {
+-			time64_t ttime = ldlm_pool_recalc(&ns->ns_pool);
+-
+-			if (ttime < time)
+-				time = ttime;
+-
++			delay = min(delay,
++				    ldlm_pool_recalc(&ns->ns_pool));
+ 			ldlm_namespace_put(ns);
+ 		}
+ 	}
+@@ -945,12 +984,14 @@ static void ldlm_pools_recalc(struct work_struct *ws)
+ 	/* Wake up the blocking threads from time to time. */
+ 	ldlm_bl_thread_wakeup();
  
-@@ -2830,7 +2830,8 @@ int osc_match_base(const struct lu_env *env, struct obd_export *exp,
- 		   struct ldlm_res_id *res_id, enum ldlm_type type,
- 		   union ldlm_policy_data *policy, enum ldlm_mode mode,
- 		   u64 *flags, struct osc_object *obj,
--		   struct lustre_handle *lockh, int unref)
-+		   struct lustre_handle *lockh,
-+		   enum ldlm_match_flags match_flags)
+-	schedule_delayed_work(&ldlm_recalc_pools, time * HZ);
++	schedule_delayed_work(&ldlm_recalc_pools, delay * HZ);
+ }
+ 
+ static int ldlm_pools_thread_start(void)
  {
- 	struct obd_device *obd = exp->exp_obd;
- 	u64 lflags = *flags;
-@@ -2853,8 +2854,10 @@ int osc_match_base(const struct lu_env *env, struct obd_export *exp,
- 	rc = mode;
- 	if (mode == LCK_PR)
- 		rc |= LCK_PW;
--	rc = ldlm_lock_match(obd->obd_namespace, lflags,
--			     res_id, type, policy, rc, lockh, unref);
+-	schedule_delayed_work(&ldlm_recalc_pools, 0);
++	time64_t delay = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
 +
-+	rc = ldlm_lock_match_with_skip(obd->obd_namespace, lflags, 0,
-+				       res_id, type, policy, rc, lockh,
-+				       match_flags);
- 	if (!rc || lflags & LDLM_FL_TEST_LOCK)
- 		return rc;
++	schedule_delayed_work(&ldlm_recalc_pools, delay);
  
+ 	return 0;
+ }
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index c235915..a8d6df1 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -1388,7 +1388,7 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+ 	lvf = ldlm_pool_get_lvf(pl);
+ 	la = div_u64(ktime_to_ns(ktime_sub(cur, lock->l_last_used)),
+ 		     NSEC_PER_SEC);
+-	lv = lvf * la * ns->ns_nr_unused;
++	lv = lvf * la * ns->ns_nr_unused >> 8;
+ 
+ 	/* Inform pool about current CLV to see it via debugfs. */
+ 	ldlm_pool_set_clv(pl, lv);
 -- 
 1.8.3.1
