@@ -1,89 +1,59 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  5 Oct 2020 20:06:08 -0400
-Subject: [lustre-devel] [PATCH 29/42] lustre: lov: discard unused
- lov_dump_lmm* functions
+Date: Mon,  5 Oct 2020 20:05:47 -0400
+Subject: [lustre-devel] [PATCH 08/42] lustre: llite: return -ENODATA if no
+ default layout
 In-Reply-To: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
 References: <1601942781-24950-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1601942781-24950-30-git-send-email-jsimmons@infradead.org>
+Message-ID: <1601942781-24950-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-lov_dump_lmm_v3() is never used, so remove it.
+Don't return -ENOENT if fetching the default layout from the root
+directory fails.  Otherwise, "lfs find" will print an error message
+for every directory scanned in the filesystem:
 
-So mark lov_lsm_pack_v1v3() and lov_lsm_pack_foreign() as static.
+     lfs find: /myth/tmp does not exist: No such file or directory
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: c7d0d63b5191c6 ("LU-6142 lov: discard unused lov_dump_lmm* functions")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/39378
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+Fixes: 96377f5b2ad6 ("lustre: llite: fetch default layout for a directory")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13687
+Lustre-commit: 7fb17eb7b7e60 ("LU-13687 llite: return -ENODATA if no default layout")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/39200
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
 Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_internal.h |  1 -
- fs/lustre/lov/lov_pack.c     | 17 ++++-------------
- 2 files changed, 4 insertions(+), 14 deletions(-)
+ fs/lustre/llite/dir.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_internal.h b/fs/lustre/lov/lov_internal.h
-index 5f5f98e..202e4b5 100644
---- a/fs/lustre/lov/lov_internal.h
-+++ b/fs/lustre/lov/lov_internal.h
-@@ -308,7 +308,6 @@ struct lov_stripe_md *lov_unpackmd(struct lov_obd *lov, void *buf,
- int lov_free_memmd(struct lov_stripe_md **lsmp);
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index c2a75ce..262aea0 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -710,10 +710,13 @@ int ll_dir_getstripe_default(struct inode *inode, void **plmm, int *plmm_size,
+ 	rc = ll_dir_get_default_layout(inode, (void **)&lmm, &lmm_size,
+ 				       &req, valid, 0);
+ 	if (rc == -ENODATA && !fid_is_root(ll_inode2fid(inode)) &&
+-	    !(valid & (OBD_MD_MEA|OBD_MD_DEFAULT_MEA)) && root_request)
+-		rc = ll_dir_get_default_layout(inode, (void **)&lmm, &lmm_size,
+-					       &root_req, valid,
+-					       GET_DEFAULT_LAYOUT_ROOT);
++	    !(valid & (OBD_MD_MEA|OBD_MD_DEFAULT_MEA)) && root_request) {
++		int rc2 = ll_dir_get_default_layout(inode, (void **)&lmm,
++						    &lmm_size, &root_req, valid,
++						    GET_DEFAULT_LAYOUT_ROOT);
++		if (rc2 == 0)
++			rc = 0;
++	}
  
- void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm);
--void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm);
- void lov_dump_lmm_common(int level, void *lmmp);
- 
- /* lov_ea.c */
-diff --git a/fs/lustre/lov/lov_pack.c b/fs/lustre/lov/lov_pack.c
-index a6a68b7..d200a62 100644
---- a/fs/lustre/lov/lov_pack.c
-+++ b/fs/lustre/lov/lov_pack.c
-@@ -92,15 +92,6 @@ void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm)
- 			     le16_to_cpu(lmm->lmm_stripe_count));
- }
- 
--void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
--{
--	lov_dump_lmm_common(level, lmm);
--	CDEBUG_LIMIT(level, "pool_name " LOV_POOLNAMEF "\n",
--		     lmm->lmm_pool_name);
--	lov_dump_lmm_objects(level, lmm->lmm_objects,
--			     le16_to_cpu(lmm->lmm_stripe_count));
--}
--
- /**
-  * Pack LOV striping metadata for disk storage format (in little
-  * endian byte order).
-@@ -109,8 +100,8 @@ void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
-  * then return the size needed. If @buf_size is too small then
-  * return -ERANGE. Otherwise return the size of the result.
-  */
--ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
--			  size_t buf_size)
-+static ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
-+				 size_t buf_size)
- {
- 	struct lov_ost_data_v1 *lmm_objects;
- 	struct lov_mds_md_v1 *lmmv1 = buf;
-@@ -162,8 +153,8 @@ ssize_t lov_lsm_pack_v1v3(const struct lov_stripe_md *lsm, void *buf,
- 	return lmm_size;
- }
- 
--ssize_t lov_lsm_pack_foreign(const struct lov_stripe_md *lsm, void *buf,
--			     size_t buf_size)
-+static ssize_t lov_lsm_pack_foreign(const struct lov_stripe_md *lsm, void *buf,
-+				    size_t buf_size)
- {
- 	struct lov_foreign_md *lfm = buf;
- 	size_t lfm_size;
+ 	*plmm = lmm;
+ 	*plmm_size = lmm_size;
 -- 
 1.8.3.1
