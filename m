@@ -1,43 +1,74 @@
-From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
-Date: Fri, 9 Oct 2020 10:38:19 +0200
-Subject: [lustre-devel] [LAD'20] Only a few days left to register
-Message-ID: <db85f610-2d5c-eb03-1cce-ad35bb623648@cea.fr>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 19 Oct 2020 00:57:39 +0100 (BST)
+Subject: [lustre-devel] sec: O_DIRECT for encrypted file crashes Linux client
+Message-ID: <alpine.LFD.2.21.2010190019040.21280@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Dear Lustre Community,
 
-LAD starts Tuesday, next week!
+I have ported patch https://review.whamcloud.com/38967 which is 
+"lustre: sec: O_DIRECT for encrypted file". The big difference is that for 
+the Linux client we are using the native fscrypto layer. In my testing I'm 
+seeing:
 
-If you have not yet registered to either the "morning" session 
-<https://zoom.us/webinar/register/5016002711948/WN_99ynkxvaTse1V5OSE1vuvw> 
-(8AM UTC), or the "afternoon" one 
-<https://zoom.us/webinar/register/6016002712219/WN_MPj_qU7NQc6xOJjkxAnyAQ> 
-(4PM UTC), please do so as soon as possible.
+2020-10-18 15:26:49 [ 4462.081809][T14012] Lustre: DEBUG MARKER: == sanity 
+test 56w: check lfs_migrate -c stripe_count works 
+========================================== 15:26:49 (1603049209)
+2020-10-18 15:26:52 [ 4464.514691][T30281] BUG: kernel NULL pointer 
+dereference, address: 0000000000000048
+2020-10-18 15:26:52 [ 4464.524282][T30281] #PF: supervisor read access in 
+kernel mode
+2020-10-18 15:26:52 [ 4464.532011][T30281] #PF: error_code(0x0000) - 
+not-present page
+2020-10-18 15:26:52 [ 4464.539709][T30281] PGD 80000007edcce067 P4D 
+80000007edcce067 PUD 7f1306067 PMD 0
+2020-10-18 15:26:52 [ 4464.549144][T30281] Oops: 0000 [#1] PREEMPT SMP PTI
+2020-10-18 15:26:52 [ 4464.555851][T30281] CPU: 0 PID: 30281 Comm: 
+ptlrpcd_00_04 Tainted: G        W         5.7.0-rc7+ #1
+2020-10-18 15:26:52 [ 4464.566720][T30281] Hardware name: Supermicro Super 
+Server/To be filled by O.E.M., BIOS 2.0b 08/12/2016
+2020-10-18 15:26:52 [ 4464.577932][T30281] RIP: 
+0010:mempool_free+0x12/0x80
+2020-10-18 15:26:52 [ 4464.584690][T30281] Code: 60 e8 ff cc cc cc cc cc 
+0f 1f 44 00 00 e9 86 a3 08 00 66 0f 1f 44 00 00 0f 1f 44 00 00 55 48 85 ff 
+48 89 fd 53 74 1a 48 89 f3 <8b> 46 48 39 46 4c 7c 12 48 8b 73 58 48 8b 43 
+68 48 89 ef 5b 5d ff
+2020-10-18 15:26:52 [ 4464.607734][T30281] RSP: 0018:ffffc9002414fcc0 
+EFLAGS: 00010282
+2020-10-18 15:26:52 [ 4464.615423][T30281] RAX: ffff8887d44fb5e0 RBX: 
+0000000000000000 RCX: 0000000000000000
+2020-10-18 15:26:52 [ 4464.625013][T30281] RDX: ffff888845abb780 RSI: 
+0000000000000000 RDI: ffffea001f553340
+2020-10-18 15:26:52 [ 4464.634577][T30281] RBP: ffffea001f553340 R08: 
+0000000000000000 R09: 0000000000000000
+2020-10-18 15:26:52 [ 4464.644109][T30281] R10: 0000000000000000 R11: 
+000000000000000f R12: 0000000000000000
+2020-10-18 15:26:52 [ 4464.653614][T30281] R13: ffff8887d736c9f0 R14: 
+0000000000000010 R15: ffff888845abb780
+2020-10-18 15:26:52 [ 4464.663095][T30281] FS:  0000000000000000(0000) 
+GS:ffff88885e600000(0000) knlGS:0000000000000000
+2020-10-18 15:26:52 [ 4464.673521][T30281] CS:  0010 DS: 0000 ES: 0000 
+CR0: 0000000080050033
+2020-10-18 15:26:52 [ 4464.681579][T30281] CR2: 0000000000000048 CR3: 
+00000007cf9fa004 CR4: 00000000001606f0
+2020-10-18 15:26:52 [ 4464.691015][T30281] Call Trace:
+2020-10-18 15:26:52 [ 4464.695751][T30281]  brw_interpret+0xac/0xa60 [osc]
+2020-10-18 15:26:52 [ 4464.702190][T30281]  ? _raw_spin_unlock+0x29/0x50
+2020-10-18 15:26:52 [ 4464.708490][T30281]  ptlrpc_check_set+0x329/0x1790 
+[ptlrpc]
+2020-10-18 15:26:52 [ 4464.715599][T30281]  ptlrpcd_check+0x411/0x460 
+[ptlrpc]
+2020-10-18 15:26:52 [ 4464.722318][T30281]  ptlrpcd+0x278/0x300 [ptlrpc]
+2020-10-18 15:26:52 [ 4464.728463][T30281]  ? remove_wait_queue+0x60/0x60
+2020-10-18 15:26:52 [ 4464.734667][T30281]  kthread+0x12a/0x170
+2020-10-18 15:26:52 [ 4464.739993][T30281]  ? ptlrpcd_check+0x460/0x460 
+[ptlrpc]
+2020-10-18 15:26:52 [ 4464.746745][T30281]  ? kthread_bind+0x10/0x10
+2020-10-18 15:26:52 [ 4464.752431][T30281]  ret_from_fork+0x24/0x30
 
-The agenda is available on the event's website 
-<https://www.eofs.eu/events/lad20>.
-
-Note that only half of those who registered on Zoom also accepted our 
-invitation to our chat platform <https://lad20.zulipchat.com> (ie. Zulip).
-Access to the chat platform is arguably the point of LAD'20.
-Otherwise, you may just as well wait for us to publish the presentations 
-on our youtube channel 
-<https://www.youtube.com/channel/UCvuKgIQS1QMyomnkVTNQX8w>.
-
-If you did not receive your invitation, please reach out to us at 
-lad at eofs.eu (but do check your spam folder first ;-])
-
-"See" you soon,
-Quentin
-
-PS: Do *not* wait until Tuesday to register! The invites to the chat 
-platform are sent manually, and we are unlikely to closely monitor 
-registrations during the event itself.
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20201009/cdd44176/attachment.html>
+Neil I suspect you might see this as well once this patch is ported to 
+your tree. Any idea why this would break? I haven't dugged down into it 
+yet.
