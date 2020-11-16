@@ -1,112 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 15 Nov 2020 19:59:39 -0500
-Subject: [lustre-devel] [PATCH 06/28] lustre: use memalloc_nofs_save() for
- GFP_NOFS kvmalloc allocations.
+Date: Sun, 15 Nov 2020 19:59:38 -0500
+Subject: [lustre-devel] [PATCH 05/28] lnet: o2ib: raise bind cap before
+ resolving address
 In-Reply-To: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
 References: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1605488401-981-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1605488401-981-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.de>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-The allocation of lo_sub should be GFP_NOFS as it can happen in support
-of write-out, and should allow vmalloc as the array can be as much as
-2000 pointers (16K).
-So change it to kvmalloc_array() and use memalloc_nofs_save() as
-GFP_NOFS doesn't work in kvmalloc_array().
+In kiblnd_resolve_addr(), ensure that the current task has
+CAP_NET_BIND_SERVICE before calling rdma_resolve_addr() with a
+protected source port.
 
-The allocation in echo_client passes GFP_NOFS to kvmalloc_array()
-which causes it to map directly to kmalloc_array().
-So use memalloc_nofs_save() there too.
-
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: NeilBrown <neilb@suse.de>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14006
+Lustre-commit: 1e4bd16acfa26a ("LU-14006 o2ib: raise bind cap before resolving address")
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/40127
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_object.c      | 13 +++++++------
- fs/lustre/obdecho/echo_client.c |  7 ++++++-
- 2 files changed, 13 insertions(+), 7 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 38 +++++++++++++++++++++++++++++++++----
+ 1 file changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index 7285276..0762cc5 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -38,6 +38,7 @@
- 
- #define DEBUG_SUBSYSTEM S_LOV
- 
-+#include <linux/sched/mm.h>
- #include "lov_cl_internal.h"
- 
- static inline struct lov_device *lov_object_dev(struct lov_object *obj)
-@@ -207,6 +208,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 	struct cl_object_conf *subconf = &lti->lti_stripe_conf;
- 	struct lu_fid *ofid = &lti->lti_fid;
- 	struct cl_object *stripe;
-+	unsigned int flags;
- 	int result;
- 	int psz, sz;
- 	int i;
-@@ -214,8 +216,10 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 	spin_lock_init(&r0->lo_sub_lock);
- 	r0->lo_nr = lse->lsme_stripe_count;
- 
--	r0->lo_sub = kcalloc(r0->lo_nr, sizeof(r0->lo_sub[0]),
--			     GFP_KERNEL);
-+	flags = memalloc_nofs_save();
-+	r0->lo_sub = kvmalloc_array(r0->lo_nr, sizeof(r0->lo_sub[0]),
-+				    GFP_KERNEL | __GFP_ZERO);
-+	memalloc_nofs_restore(flags);
- 	if (!r0->lo_sub)
- 		return -ENOMEM;
- 
-@@ -335,10 +339,7 @@ static void lov_fini_raid0(const struct lu_env *env,
- {
- 	struct lov_layout_raid0 *r0 = &lle->lle_raid0;
- 
--	if (r0->lo_sub) {
--		kvfree(r0->lo_sub);
--		r0->lo_sub = NULL;
--	}
-+	kvfree(r0->lo_sub);
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index ba2f46f..b642162 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1219,14 +1219,17 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	spin_unlock(&conn->ibc_lock);
  }
  
- static int lov_print_raid0(const struct lu_env *env, void *cookie,
-diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
-index a52e0362..3bee0c2 100644
---- a/fs/lustre/obdecho/echo_client.c
-+++ b/fs/lustre/obdecho/echo_client.c
-@@ -34,6 +34,7 @@
- #define DEBUG_SUBSYSTEM S_ECHO
+-static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+-			       struct sockaddr_in *srcaddr,
+-			       struct sockaddr_in *dstaddr,
+-			       int timeout_ms)
++static int
++kiblnd_resolve_addr_cap(struct rdma_cm_id *cmid,
++			struct sockaddr_in *srcaddr,
++			struct sockaddr_in *dstaddr,
++			int timeout_ms)
+ {
+ 	unsigned short port;
+ 	int rc;
  
- #include <linux/highmem.h>
-+#include <linux/sched/mm.h>
- #include <obd.h>
- #include <obd_support.h>
- #include <obd_class.h>
-@@ -1369,6 +1370,7 @@ static int echo_client_prep_commit(const struct lu_env *env,
- 	struct niobuf_remote rnb;
- 	u64 off;
- 	u64 npages, tot_pages;
-+	unsigned int flags;
- 	int i, ret = 0, brw_flags = 0;
- 
- 	if (count <= 0 || (count & (~PAGE_MASK)) != 0)
-@@ -1377,8 +1379,11 @@ static int echo_client_prep_commit(const struct lu_env *env,
- 	npages = batch >> PAGE_SHIFT;
- 	tot_pages = count >> PAGE_SHIFT;
- 
-+	flags = memalloc_nofs_save();
- 	lnb = kvmalloc_array(npages, sizeof(*lnb),
--			     GFP_NOFS | __GFP_ZERO);
-+			     GFP_KERNEL | __GFP_ZERO);
-+	memalloc_nofs_restore(flags);
++	LASSERT(capable(CAP_NET_BIND_SERVICE));
 +
- 	if (!lnb) {
- 		ret = -ENOMEM;
- 		goto out;
+ 	/* allow the port to be reused */
+ 	rc = rdma_set_reuseaddr(cmid, 1);
+ 	if (rc) {
+@@ -1256,6 +1259,33 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	return rc;
+ }
+ 
++static int
++kiblnd_resolve_addr(struct rdma_cm_id *cmid,
++		    struct sockaddr_in *srcaddr,
++		    struct sockaddr_in *dstaddr,
++		    int timeout_ms)
++{
++	const struct cred *old_creds = NULL;
++	struct cred *new_creds;
++	int rc;
++
++	if (!capable(CAP_NET_BIND_SERVICE)) {
++		new_creds = prepare_creds();
++		if (!new_creds)
++			return -ENOMEM;
++
++		cap_raise(new_creds->cap_effective, CAP_NET_BIND_SERVICE);
++		old_creds = override_creds(new_creds);
++	}
++
++	rc = kiblnd_resolve_addr_cap(cmid, srcaddr, dstaddr, timeout_ms);
++
++	if (old_creds)
++		revert_creds(old_creds);
++
++	return rc;
++}
++
+ static void
+ kiblnd_connect_peer(struct kib_peer_ni *peer_ni)
+ {
 -- 
 1.8.3.1
