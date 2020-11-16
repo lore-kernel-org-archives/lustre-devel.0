@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 15 Nov 2020 20:00:00 -0500
-Subject: [lustre-devel] [PATCH 27/28] lustre: sec: require enc key in case
- of O_CREAT only
+Date: Sun, 15 Nov 2020 19:59:58 -0500
+Subject: [lustre-devel] [PATCH 25/28] lustre: sec: restrict fallocate on
+ encrypted files
 In-Reply-To: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
 References: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1605488401-981-28-git-send-email-jsimmons@infradead.org>
+Message-ID: <1605488401-981-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,56 +13,45 @@ To: lustre-devel@lists.lustre.org
 
 From: Sebastien Buisson <sbuisson@ddn.com>
 
-In ll_atomic_open(), do not return -ENOKEY when trying to open
-either a directory or a file without the encryption key, unless
-O_CREAT flag is specified.
-Indeed, listing directory content is allowed even without the key.
-And in case of regular file, ll_file_open() already checks for the
-presence of an encryption key.
+For now, ll_fallocate only supports standard preallocation.
+Anyway, encrypted inodes can't handle collapse range or zero range or
+insert range since we would need to re-encrypt blocks with a different
+IV or XTS tweak (which are based on the logical block number).
+So make sure we return -EOPNOTSUPP in this case, like what ext4 does.
 
-Improve sanity-sec test_54 to verify this is working properly.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13975
-Lustre-commit: f6daee15b2c8ec ("LU-13975 sec: require enc key in case of O_CREAT only")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12275
+Lustre-commit: a7870fb9568bf ("LU-12275 sec: restrict fallocate on encrypted files")
 Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/39983
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/39220
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/namei.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ fs/lustre/llite/file.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index da6b729..b24f097 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -1113,18 +1113,19 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
- 	it->it_flags &= ~MDS_OPEN_FL_INTERNAL;
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 4a3c534..02cc2d6 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -4927,6 +4927,17 @@ long ll_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
+ 	struct inode *inode = filp->f_path.dentry->d_inode;
  
- 	if (ll_sbi_has_encrypt(ll_i2sbi(dir)) && IS_ENCRYPTED(dir)) {
--		/* we know that we are going to create a regular file because
-+		/* in case of create, this is going to be a regular file because
- 		 * we set S_IFREG bit on it->it_create_mode above
- 		 */
- 		rc = llcrypt_get_encryption_info(dir);
- 		if (rc)
- 			goto out_release;
--		if (!llcrypt_has_encryption_key(dir)) {
--			rc = -ENOKEY;
--			goto out_release;
-+		if (open_flags & O_CREAT) {
-+			if (!llcrypt_has_encryption_key(dir)) {
-+				rc = -ENOKEY;
-+				goto out_release;
-+			}
-+			encrypt = true;
- 		}
--		encrypt = true;
--		rc = 0;
- 	}
- 
- 	OBD_FAIL_TIMEOUT(OBD_FAIL_LLITE_CREATE_FILE_PAUSE2, cfs_fail_val);
+ 	/*
++	 * Encrypted inodes can't handle collapse range or zero range or insert
++	 * range since we would need to re-encrypt blocks with a different IV or
++	 * XTS tweak (which are based on the logical block number).
++	 * Similar to what ext4 does.
++	 */
++	if (IS_ENCRYPTED(inode) &&
++	    (mode & (FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE |
++		     FALLOC_FL_ZERO_RANGE)))
++		return -EOPNOTSUPP;
++
++	/*
+ 	 * Only mode == 0 (which is standard prealloc) is supported now.
+ 	 * Punch is not supported yet.
+ 	 */
 -- 
 1.8.3.1
