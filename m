@@ -1,98 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 15 Nov 2020 19:59:40 -0500
-Subject: [lustre-devel] [PATCH 07/28] lnet: o2iblnd: Don't retry indefinitely
+Date: Sun, 15 Nov 2020 19:59:37 -0500
+Subject: [lustre-devel] [PATCH 04/28] lustre: llite: ASSERTION(
+ last_oap_count > 0 ) failed
 In-Reply-To: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
 References: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1605488401-981-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1605488401-981-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-If peer is down don't retry indefinitely. Use the retry_count
-parameter to restrict the number of retries. After which the
-connection fails and error is propagated up.
+Punch uses o_blocks to send end of a region. So it
+can be mixed with real blocks count on error.
 
-This prevents long timeouts when mounting a file system with
-nodes which might have their NIDs configured in the FS, but the
-nodes have been taken offline.
+Update blocks count only on success.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13972
-Lustre-commit: 7c8ad11ef08f0f ("LU-13972 o2iblnd: Don't retry indefinitely")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/39981
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
+HPE-bug-id: LUS-7407
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13992
+Lustre-commit: a56fefc535677b ("LU-13992 llite: ASSERTION( last_oap_count > 0 ) failed")
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Andrew Perepechko <c17827@cray.com>
+Reviewed-by: Alexander Boyko <c17825@cray.com>
+Reviewed-on: https://review.whamcloud.com/40050
+Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Arshad Hussain <arshad.super@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.h           | 2 ++
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c        | 9 +++++++++
- net/lnet/klnds/o2iblnd/o2iblnd_modparams.c | 2 +-
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ fs/lustre/osc/osc_io.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 9a2fb42..9b2f043 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -626,6 +626,8 @@ struct kib_peer_ni {
- 	unsigned char		ibp_races;
- 	/* # consecutive reconnection attempts to this peer_ni */
- 	unsigned int		ibp_reconnected;
-+	/* number of total active retries */
-+	unsigned int		ibp_retries;
- 	/* errno on closing this peer_ni */
- 	int			ibp_error;
- 	/* max map_on_demand */
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index b642162..9de733d 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -2181,6 +2181,9 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	/* connection established */
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
+index 7ec059a..6121f39 100644
+--- a/fs/lustre/osc/osc_io.c
++++ b/fs/lustre/osc/osc_io.c
+@@ -691,14 +691,16 @@ void osc_io_setattr_end(const struct lu_env *env,
+ 	if (cl_io_is_trunc(io)) {
+ 		u64 size = io->u.ci_setattr.sa_attr.lvb_size;
  
-+	/* reset retry count */
-+	peer_ni->ibp_retries = 0;
-+
- 	conn->ibc_last_send = ktime_get();
- 	kiblnd_set_conn_state(conn, IBLND_CONN_ESTABLISHED);
- 	kiblnd_peer_alive(peer_ni);
-@@ -2631,6 +2634,11 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 		goto out;
- 	}
+-		cl_object_attr_lock(obj);
+-		if (oa->o_valid & OBD_MD_FLBLOCKS) {
+-			attr->cat_blocks = oa->o_blocks;
+-			cl_valid |= CAT_BLOCKS;
+-		}
++		if (result == 0) {
++			cl_object_attr_lock(obj);
++			if (oa->o_valid & OBD_MD_FLBLOCKS) {
++				attr->cat_blocks = oa->o_blocks;
++				cl_valid |= CAT_BLOCKS;
++			}
  
-+	if (peer_ni->ibp_retries > *kiblnd_tunables.kib_retry_count) {
-+		reason = "retry count exceeded due to no listener";
-+		goto out;
-+	}
-+
- 	switch (why) {
- 	default:
- 		reason = "Unknown";
-@@ -2688,6 +2696,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 		break;
- 
- 	case IBLND_REJECT_INVALID_SRV_ID:
-+		peer_ni->ibp_retries++;
- 		reason = "invalid service id";
- 		break;
- 	}
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-index 73ad22d..029c9fb 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-@@ -93,7 +93,7 @@
- 
- static int retry_count = 5;
- module_param(retry_count, int, 0644);
--MODULE_PARM_DESC(retry_count, "Retransmissions when no ACK received");
-+MODULE_PARM_DESC(retry_count, "Number of times to retry connection operations");
- 
- static int rnr_retry_count = 6;
- module_param(rnr_retry_count, int, 0644);
+-		cl_object_attr_update(env, obj, attr, cl_valid);
+-		cl_object_attr_unlock(obj);
++			cl_object_attr_update(env, obj, attr, cl_valid);
++			cl_object_attr_unlock(obj);
++		}
+ 		osc_trunc_check(env, io, oio, size);
+ 		osc_cache_truncate_end(env, oio->oi_trunc);
+ 		oio->oi_trunc = NULL;
 -- 
 1.8.3.1
