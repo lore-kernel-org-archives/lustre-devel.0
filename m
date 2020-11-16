@@ -1,162 +1,278 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 15 Nov 2020 19:59:35 -0500
-Subject: [lustre-devel] [PATCH 02/28] lustre: llite: disable statahead_agl
- for sanity test_56ra
+Date: Sun, 15 Nov 2020 19:59:50 -0500
+Subject: [lustre-devel] [PATCH 17/28] lustre: ptlrpc: decrease time between
+ reconnection
 In-Reply-To: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
 References: <1605488401-981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1605488401-981-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1605488401-981-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Alexander Boyko <alexander.boyko@hpe.com>
 
-The sanity test_56ra can fail because statahead_agl can cause extra
-glimpse request.
+When a connection get a timeout or get an error reply from a sever,
+the next attempt happens after PING_INTERVAL. It is equal to
+obd_timeout/4. When a first reconnection fails, a second go to
+failover pair. And a third connection go to a original server.
+Only 3 reconnection before server evicts client base on blocking
+ast timeout. Some times a first failed and the last is a bit late,
+so client is evicted. It is better to try reconnect with a timeout
+equal to a connection request deadline, it would increase a number
+of attempts in 5 times for a large obd_timeout. For example,
+    obd_timeout=200
+     - [ 1597902357, CONNECTING ]
+     - [ 1597902357, FULL ]
+     - [ 1597902422, DISCONN ]
+     - [ 1597902422, CONNECTING ]
+     - [ 1597902433, DISCONN ]
+     - [ 1597902473, CONNECTING ]
+     - [ 1597902473, DISCONN ] <- ENODEV from a failover pair
+     - [ 1597902523, CONNECTING ]
+     - [ 1597902539, DISCONN ]
 
-If a stat() systemcall is made after an AGL glimpse request is sent,
-but before the reply has been received, the code handling the stat
-cannot see that glimpse request and so will send another.  This
-elevates the number of requests counted.
+The patch adds a logic to wakeup pinger for failed connection request
+with ETIMEDOUT or ENODEV. It adds imp_next_ping processing for
+ptlrpc_pinger_main() time_to_next_wake calculation, and fixes setting
+of imp_next_ping value.
 
-There is a parameter (statahead_agl) which make it easy to disable the
-AGL, but it isn't implemented properly.  Specifically, inodes can
-still be added to the sai_agls list when agl is disabled.  They will
-never be removed, which causes an assertion to fail.
-
-To clean this up, remove the sai_agl_valid flag, and use a test on
-sai_task being non-NULL instead.  Also check agl_should_run() while
-locked against ->sai_task changing, and before adding anything
-to lli_agl_list.
-
-We don't need the 'added' variable.  It is perfectly OK to wake_up the
-sai_agl_task *before* adding to the list as long is that is all done
-under the lock.  The task will wait for the lock before checking the
-list, so it won't see it being empty.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13017
-Lustre-commit: 3e04c4f0757c22 ("LU-13017 tests: disable statahead_agl for sanity test_56ra")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/39667
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-by: Yingjin Qian <qian@ddn.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+HPE-bug-id: LUS-8520
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14031
+Lustre-commit: de8ed5f19f0413 ("LU-14031 ptlrpc: decrease time between reconnection")
+Signed-off-by: Alexander Boyko <alexander.boyko@hpe.com>
+Reviewed-on: https://review.whamcloud.com/40244
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
+Reviewed-by: Vitaly Fertman <vitaly.fertman@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h |  1 -
- fs/lustre/llite/statahead.c      | 31 +++++++++++++------------------
- 2 files changed, 13 insertions(+), 19 deletions(-)
+ fs/lustre/ptlrpc/events.c |  5 ++++
+ fs/lustre/ptlrpc/import.c | 36 ++++++++++++++++++++++-
+ fs/lustre/ptlrpc/niobuf.c |  2 --
+ fs/lustre/ptlrpc/pinger.c | 73 ++++++++++++++++++++++++++++++-----------------
+ 4 files changed, 87 insertions(+), 29 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 0bd6795..9d988aac 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -1398,7 +1398,6 @@ struct ll_statahead_info {
- 	unsigned int	    sai_ls_all:1,   /* "ls -al", do stat-ahead for
- 					     * hidden entries
- 					     */
--				sai_agl_valid:1,/* AGL is valid for the dir */
- 				sai_in_readpage:1;/* statahead in readdir() */
- 	wait_queue_head_t	sai_waitq;      /* stat-ahead wait queue */
- 	struct task_struct     *sai_task;       /* stat-ahead thread */
-diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
-index 895e496..a7d3a43 100644
---- a/fs/lustre/llite/statahead.c
-+++ b/fs/lustre/llite/statahead.c
-@@ -129,7 +129,7 @@ static inline int sa_hash(int val)
- static inline int agl_should_run(struct ll_statahead_info *sai,
- 				 struct inode *inode)
- {
--	return (inode && S_ISREG(inode->i_mode) && sai->sai_agl_valid);
-+	return inode && S_ISREG(inode->i_mode) && sai->sai_agl_task;
- }
+diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
+index 0943612..fe33600 100644
+--- a/fs/lustre/ptlrpc/events.c
++++ b/fs/lustre/ptlrpc/events.c
+@@ -59,6 +59,11 @@ void request_out_callback(struct lnet_event *ev)
  
- /* statahead window is full */
-@@ -424,7 +424,6 @@ static void ll_agl_add(struct ll_statahead_info *sai,
- {
- 	struct ll_inode_info *child = ll_i2info(inode);
- 	struct ll_inode_info *parent = ll_i2info(sai->sai_dentry->d_inode);
--	int added = 0;
+ 	DEBUG_REQ(D_NET, req, "type %d, status %d", ev->type, ev->status);
  
- 	spin_lock(&child->lli_agl_lock);
- 	if (child->lli_agl_index == 0) {
-@@ -433,18 +432,20 @@ static void ll_agl_add(struct ll_statahead_info *sai,
++	/* Do not update imp_next_ping for connection request */
++	if (lustre_msg_get_opc(req->rq_reqmsg) !=
++	    req->rq_import->imp_connect_op)
++		ptlrpc_pinger_sending_on_import(req->rq_import);
++
+ 	sptlrpc_request_out_callback(req);
  
- 		LASSERT(list_empty(&child->lli_agl_list));
+ 	spin_lock(&req->rq_lock);
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index 4e573cd..21ce593 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -1037,7 +1037,6 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+ 		 */
+ 		imp->imp_force_reconnect = ptlrpc_busy_reconnect(rc);
+ 		spin_unlock(&imp->imp_lock);
+-		ptlrpc_maybe_ping_import_soon(imp);
+ 		goto out;
+ 	}
  
--		igrab(inode);
- 		spin_lock(&parent->lli_agl_lock);
--		if (list_empty(&sai->sai_agls))
--			added = 1;
--		list_add_tail(&child->lli_agl_list, &sai->sai_agls);
-+		/* Re-check under the lock */
-+		if (agl_should_run(sai, inode)) {
-+			if (list_empty(&sai->sai_agls))
-+				wake_up_process(sai->sai_agl_task);
-+			igrab(inode);
-+			list_add_tail(&child->lli_agl_list, &sai->sai_agls);
-+		} else {
-+			child->lli_agl_index = 0;
+@@ -1303,6 +1302,8 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+ 
+ 	if (rc) {
+ 		bool inact = false;
++		time64_t now = ktime_get_seconds();
++		time64_t next_connect;
+ 
+ 		import_set_state_nolock(imp, LUSTRE_IMP_DISCON);
+ 		if (rc == -EACCES) {
+@@ -1344,7 +1345,28 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+ 				import_set_state_nolock(imp, LUSTRE_IMP_CLOSED);
+ 				inact = true;
+ 			}
++		} else if (rc == -ENODEV || rc == -ETIMEDOUT) {
++			/* ENODEV means there is no service, force reconnection
++			 * to a pair if attempt happen ptlrpc_next_reconnect
++			 * before now. ETIMEDOUT could be set during network
++			 * error and do not guarantee request deadline happened.
++			 */
++			struct obd_import_conn *conn;
++			time64_t reconnect_time;
++
++			/* Same as ptlrpc_next_reconnect, but in past */
++			reconnect_time = now - INITIAL_CONNECT_TIMEOUT;
++			list_for_each_entry(conn, &imp->imp_conn_list,
++					    oic_item) {
++				if (conn->oic_last_attempt <= reconnect_time) {
++					imp->imp_force_verify = 1;
++					break;
++				}
++			}
+ 		}
++
++		next_connect = imp->imp_conn_current->oic_last_attempt +
++			       (request->rq_deadline - request->rq_sent);
+ 		spin_unlock(&imp->imp_lock);
+ 
+ 		if (inact)
+@@ -1353,6 +1375,18 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+ 		if (rc == -EPROTO)
+ 			return rc;
+ 
++		/* adjust imp_next_ping to request deadline + 1 and reschedule
++		 * a pinger if import lost processing during CONNECTING or far
++		 * away from request deadline. It could happen when connection
++		 * was initiated outside of pinger, like
++		 * ptlrpc_set_import_discon().
++		 */
++		if (!imp->imp_force_verify && (imp->imp_next_ping <= now ||
++		    imp->imp_next_ping > next_connect)) {
++			imp->imp_next_ping = max(now, next_connect) + 1;
++			ptlrpc_pinger_wake_up();
 +		}
- 		spin_unlock(&parent->lli_agl_lock);
- 	} else {
- 		spin_unlock(&child->lli_agl_lock);
- 	}
++
+ 		ptlrpc_maybe_ping_import_soon(imp);
+ 
+ 		CDEBUG(D_HA, "recovery of %s on %s failed (%d)\n",
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index 924b9c4..a1e6581 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -701,8 +701,6 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	request->rq_deadline = request->rq_sent + request->rq_timeout +
+ 			       ptlrpc_at_get_net_latency(request);
+ 
+-	ptlrpc_pinger_sending_on_import(imp);
 -
--	if (added > 0)
--		wake_up_process(sai->sai_agl_task);
+ 	DEBUG_REQ(D_INFO, request, "send flags=%x",
+ 		  lustre_msg_get_flags(request->rq_reqmsg));
+ 	rc = ptl_send_buf(&request->rq_req_md_h,
+diff --git a/fs/lustre/ptlrpc/pinger.c b/fs/lustre/ptlrpc/pinger.c
+index e23ba3c..178153c 100644
+--- a/fs/lustre/ptlrpc/pinger.c
++++ b/fs/lustre/ptlrpc/pinger.c
+@@ -108,6 +108,21 @@ static bool ptlrpc_check_import_is_idle(struct obd_import *imp)
+ 	return true;
  }
  
- /* allocate sai */
-@@ -936,7 +937,6 @@ static void ll_stop_agl(struct ll_statahead_info *sai)
++static void ptlrpc_update_next_ping(struct obd_import *imp, int soon)
++{
++#ifdef CONFIG_LUSTRE_FS_PINGER
++	time64_t time = soon ? PING_INTERVAL_SHORT : PING_INTERVAL;
++
++	if (imp->imp_state == LUSTRE_IMP_DISCON) {
++		time64_t dtime = max_t(time64_t, CONNECTION_SWITCH_MIN,
++				  AT_OFF ? 0 :
++				  at_get(&imp->imp_at.iat_net_latency));
++		time = min(time, dtime);
++	}
++	imp->imp_next_ping = ktime_get_seconds() + time;
++#endif
++}
++
+ static int ptlrpc_ping(struct obd_import *imp)
+ {
+ 	struct ptlrpc_request *req;
+@@ -125,26 +140,17 @@ static int ptlrpc_ping(struct obd_import *imp)
  
- 	sai->sai_agl_task = NULL;
- 	spin_lock(&plli->lli_agl_lock);
--	sai->sai_agl_valid = 0;
- 	while ((clli = list_first_entry_or_null(&sai->sai_agls,
- 						struct ll_inode_info,
- 						lli_agl_list)) != NULL) {
-@@ -967,16 +967,11 @@ static void ll_start_agl(struct dentry *parent, struct ll_statahead_info *sai)
- 				      plli->lli_opendir_pid);
- 	if (IS_ERR(task)) {
- 		CERROR("can't start ll_agl thread, rc: %ld\n", PTR_ERR(task));
--		sai->sai_agl_valid = 0;
- 		return;
- 	}
+ 	DEBUG_REQ(D_INFO, req, "pinging %s->%s",
+ 		  imp->imp_obd->obd_uuid.uuid, obd2cli_tgt(imp->imp_obd));
++	/* Updating imp_next_ping early, it allows pinger_check_timeout to
++	 * see an actual time for next awake. request_out_callback update
++	 * happens at another thread, and ptlrpc_pinger_main may sleep
++	 * already.
++	 */
++	ptlrpc_update_next_ping(imp, 0);
+ 	ptlrpcd_add_req(req);
  
- 	sai->sai_agl_task = task;
--	LASSERT(sai->sai_agl_valid == 1);
- 	atomic_inc(&ll_i2sbi(d_inode(parent))->ll_agl_total);
--	spin_lock(&plli->lli_agl_lock);
--	sai->sai_agl_valid = 1;
--	spin_unlock(&plli->lli_agl_lock);
- 	/* Get an extra reference that the thread holds */
- 	ll_sai_get(d_inode(parent));
+ 	return 0;
+ }
  
-@@ -1569,7 +1564,6 @@ static int start_statahead_thread(struct inode *dir, struct dentry *dentry,
- 	}
+-static void ptlrpc_update_next_ping(struct obd_import *imp, int soon)
+-{
+-#ifdef CONFIG_LUSTRE_FS_PINGER
+-	time64_t time = soon ? PING_INTERVAL_SHORT : PING_INTERVAL;
+-
+-	if (imp->imp_state == LUSTRE_IMP_DISCON) {
+-		time64_t dtime = max_t(time64_t, CONNECTION_SWITCH_MIN,
+-				  AT_OFF ? 0 :
+-				  at_get(&imp->imp_at.iat_net_latency));
+-		time = min(time, dtime);
+-	}
+-	imp->imp_next_ping = ktime_get_seconds() + time;
+-#endif
+-}
+-
+ static inline int imp_is_deactive(struct obd_import *imp)
+ {
+ 	return (imp->imp_deactive ||
+@@ -153,17 +159,32 @@ static inline int imp_is_deactive(struct obd_import *imp)
  
- 	sai->sai_ls_all = (first == LS_FIRST_DOT_DE);
--	sai->sai_agl_valid = agl;
+ static inline time64_t ptlrpc_next_reconnect(struct obd_import *imp)
+ {
+-	if (imp->imp_server_timeout)
+-		return ktime_get_seconds() + (obd_timeout >> 1);
+-	else
+-		return ktime_get_seconds() + obd_timeout;
++	return ktime_get_seconds() + INITIAL_CONNECT_TIMEOUT;
+ }
  
- 	/*
- 	 * if current lli_opendir_key was deauthorized, or dir re-opened by
-@@ -1643,10 +1637,11 @@ static inline bool ll_statahead_started(struct inode *dir, bool agl)
+-static time64_t pinger_check_timeout(time64_t time)
++static timeout_t pinger_check_timeout(time64_t time)
+ {
+-	time64_t timeout = PING_INTERVAL;
++	timeout_t timeout = PING_INTERVAL;
++	timeout_t next_timeout;
++	time64_t now;
++	struct list_head *iter;
++	struct obd_import *imp;
++
++	mutex_lock(&pinger_mutex);
++	now = ktime_get_seconds();
++	/* Process imports to find a nearest next ping */
++	list_for_each(iter, &pinger_imports) {
++		imp = list_entry(iter, struct obd_import, imp_pinger_chain);
++		if (!imp->imp_pingable || imp->imp_next_ping < now)
++			continue;
++		next_timeout = imp->imp_next_ping - now;
++		/* make sure imp_next_ping in the future from time */
++		if (next_timeout > (now - time) && timeout > next_timeout)
++			timeout = next_timeout;
++	}
++	mutex_unlock(&pinger_mutex);
  
- 	spin_lock(&lli->lli_sa_lock);
- 	sai = lli->lli_sai;
--	if (sai && sai->sai_agl_valid != agl)
-+	if (sai && (sai->sai_agl_task != NULL) != agl)
- 		CDEBUG(D_READA,
- 		       "%s: Statahead AGL hint changed from %d to %d\n",
--		       ll_i2sbi(dir)->ll_fsname, sai->sai_agl_valid, agl);
-+		       ll_i2sbi(dir)->ll_fsname,
-+		       sai->sai_agl_task != NULL, agl);
- 	spin_unlock(&lli->lli_sa_lock);
+-	return time + timeout - ktime_get_seconds();
++	return timeout - (now - time);
+ }
  
- 	return !!sai;
+ static bool ir_up;
+@@ -245,7 +266,8 @@ static void ptlrpc_pinger_process_import(struct obd_import *imp,
+ 
+ static void ptlrpc_pinger_main(struct work_struct *ws)
+ {
+-	time64_t this_ping, time_after_ping, time_to_next_wake;
++	time64_t this_ping, time_after_ping;
++	timeout_t time_to_next_wake;
+ 	struct obd_import *imp;
+ 
+ 	do {
+@@ -276,9 +298,8 @@ static void ptlrpc_pinger_main(struct work_struct *ws)
+ 		 * we will SKIP the next ping at next_ping, and the
+ 		 * ping will get sent 2 timeouts from now!  Beware.
+ 		 */
+-		CDEBUG(D_INFO, "next wakeup in %lld (%lld)\n",
+-		       time_to_next_wake,
+-		       this_ping + PING_INTERVAL);
++		CDEBUG(D_INFO, "next wakeup in %d (%lld)\n",
++		       time_to_next_wake, this_ping + PING_INTERVAL);
+ 	} while (time_to_next_wake <= 0);
+ 
+ 	queue_delayed_work(pinger_wq, &ping_work,
 -- 
 1.8.3.1
