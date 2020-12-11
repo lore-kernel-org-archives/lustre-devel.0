@@ -1,115 +1,39 @@
-Return-Path: <SRS0=9sss=FO=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=0Ngw=FP=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_HELO_NONE,
-	SPF_PASS autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=BAYES_00,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91574C433FE
-	for <lustre-devel@archiver.kernel.org>; Thu, 10 Dec 2020 04:01:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AD25C433FE
+	for <lustre-devel@archiver.kernel.org>; Fri, 11 Dec 2020 04:04:36 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4929523BA7
-	for <lustre-devel@archiver.kernel.org>; Thu, 10 Dec 2020 04:01:29 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4929523BA7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=whamcloud.com
+	by mail.kernel.org (Postfix) with ESMTPS id ED05F23ED0
+	for <lustre-devel@archiver.kernel.org>; Fri, 11 Dec 2020 04:04:35 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED05F23ED0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4DD3721F93F;
-	Wed,  9 Dec 2020 20:01:28 -0800 (PST)
-Received: from NAM10-MW2-obe.outbound.protection.outlook.com
- (mail-mw2nam10on2046.outbound.protection.outlook.com [40.107.94.46])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 76F1C21F930
- for <lustre-devel@lists.lustre.org>; Wed,  9 Dec 2020 20:01:26 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=ZYwni14n7hgsDeM4kgewzsXzMEmtmtJiBMH5wO3cVEKJlAb4d8vdxKYuxnRqLR08YeNMQlO7I7B39j5zkM974lMBJfxelVQFLtVQ39KHbqkkjE3/o0PYpEPpCHEjkqx1zYSqrq0K2edhumY0zeITyTKbYQrDCSpHRRnziuXxtOZx1Dt9CGnnlyrvM4KwSFn6jZL2MZuLYZqUI4Ycsu+/stApIadFLsfrsVN7Xw2EgtiIXjFxPoiQtSCGLbpkkec9YlSlrOEpYgy2Kxo/2+gjNsqAgE3PBTu59E6J9UXkwiYvV8rfHMkqRa9hWu/mV9woWTF73t2vnJIuzMd1P6Dyew==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=YSBaXDr6uk4lea2BDcBMYGAGpJZVfWycyQSC39eOg6Q=;
- b=HNT5I/abrG9bYZqJfW5gsAfoCo0GFnKKADFjwXFgdSObtr1qKEJdQ5GGGr29C0zhF3mPUucOxuwEJBN4juNYy3wI7ZB/+cYEuP9Q4fNnBW4rwZuT9y3vEMNg31lNNrD9O60fVKYfF1KoDZ72W2fPkgRTdN6o3E29TEkjFzZ674R33zzVrhXM+F3TwmOOzWU7PdV7mig0wM8Yt9G0PrgznNTdHuhywkpWuXP/YC2J95q1LKyzOHVDmimt68/uGYGhElljokGiewq2umNVYdT1rJg+Xommmte0+fjOob51wlqeaR1rvFBUX0Sqlajz3t7Cxeek/oTHf1bH4EGssfva2w==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=YSBaXDr6uk4lea2BDcBMYGAGpJZVfWycyQSC39eOg6Q=;
- b=xsNnloqBlL6bs1NzaxUG+CJu+Zn0usiAKOj9ffTo62zdP6JkLNK2pLzRp9oNLlf7txiySEPEu5M0ksUGGdYumKnJZaJ/WUJXYzjoA2Bus41XbpLvxbV8WkQ2x3YqjPBST2XH7RDdW2NfJ5P0NAKw+NANpNF85hiwHxpGEPMOLdw=
-Received: from DM6PR19MB4373.namprd19.prod.outlook.com (2603:10b6:5:2bf::12)
- by DM5PR1901MB2166.namprd19.prod.outlook.com (2603:10b6:4:a1::33) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.3632.17; Thu, 10 Dec
- 2020 04:01:23 +0000
-Received: from DM6PR19MB4373.namprd19.prod.outlook.com
- ([fe80::c11d:9ff2:cb40:4299]) by DM6PR19MB4373.namprd19.prod.outlook.com
- ([fe80::c11d:9ff2:cb40:4299%6]) with mapi id 15.20.3632.017; Thu, 10 Dec 2020
- 04:01:23 +0000
-From: Oleg Drokin <green@whamcloud.com>
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5BB2821F72A;
+	Thu, 10 Dec 2020 20:04:35 -0800 (PST)
+Received: from mx2.suse.de (mx2.suse.de [195.135.220.15])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B28F621F64E
+ for <lustre-devel@lists.lustre.org>; Thu, 10 Dec 2020 20:04:33 -0800 (PST)
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.221.27])
+ by mx2.suse.de (Postfix) with ESMTP id 47C92AB91;
+ Fri, 11 Dec 2020 04:04:32 +0000 (UTC)
+From: NeilBrown <neilb@suse.de>
 To: Lustre Development List <lustre-devel@lists.lustre.org>
-Thread-Topic: New tag 2.13.57
-Thread-Index: AQHWzqkfiTHy3Mcl0UaQ3VnopanEqw==
-Date: Thu, 10 Dec 2020 04:01:23 +0000
-Message-ID: <8C5E0E92-697E-40EA-AA98-54FDE21F0AB7@whamcloud.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: lists.lustre.org; dkim=none (message not signed)
- header.d=none;lists.lustre.org; dmarc=none action=none
- header.from=whamcloud.com;
-x-originating-ip: [73.108.6.160]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: a58a3404-53e5-41c7-bd5b-08d89cc0428c
-x-ms-traffictypediagnostic: DM5PR1901MB2166:
-x-microsoft-antispam-prvs: <DM5PR1901MB2166C2F24439DE7AF31ACBD5ACCB0@DM5PR1901MB2166.namprd19.prod.outlook.com>
-x-ms-oob-tlc-oobclassifiers: OLM:1751;
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: 6FItpoGZuaAi1i53mRTmBf6FmqOnXvPDcvexDchH9z8GlhDzgmnXhoPLpRQTZWstSJvJkz6XiSmjkcnPlzxahbnDMZexuWh0bV3dT1X6Saf8M/vVGN6KBoamBGNHwqKVtRwOkW9SByIp98q0fcA80hdiQFMVnyC4ZvBjxB1080UniKoKz7AIGBVX05CscaACvhqRXljJNe7Duga+M946wpEq3FvjKVbyIYuJfmNu4L0gtndTpViLhY6xDHnpUdUxJBY+pAHRzmKxamJkMjZ7e04bp6iFN394WBzcs4MPCrBwdtt+39zGxRrM3RFZHZhX+mIeg7s32b/B2CTDD8+3wuILSUY8gRziP87ihwHiLx6gnZO9XlEsWjYssFXdA0MG
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:DM6PR19MB4373.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(4636009)(136003)(366004)(346002)(376002)(8936002)(508600001)(66476007)(36756003)(5660300002)(83380400001)(7116003)(66946007)(6916009)(2906002)(71200400001)(6506007)(86362001)(66556008)(26005)(186003)(76116006)(64756008)(66446008)(91956017)(6486002)(33656002)(8676002)(6512007)(2616005)(45980500001);
- DIR:OUT; SFP:1101; 
-x-ms-exchange-antispam-messagedata: =?utf-8?B?QXdTMHppRWRxbGJBVTFCdkRPSGUrL1RsWS9tLzcyNkVJdXlnT09UUno5Y3Vk?=
- =?utf-8?B?Z3QrTjZYVlZ2VjJPSkZXcitRc1crNnRsR29rOHZrSWNtbDV1UEVoZ2lmSmM4?=
- =?utf-8?B?cnd2QmJQdnljdzFXRk4vVHE3blRURUlYR0F5WXg3UW9ibkJQVFBJR2JRcHZP?=
- =?utf-8?B?dXFxTGZ3ejFSU1VGOVoyU0xySGljTXJrYUJtWTRKR1VUcVpvbHlXdXdOU01X?=
- =?utf-8?B?OFMyN2dsQlpWZEdqWm1xdHJNcUVnWHNDbTJMelhIMEhsL1FzbHVMOWYzbjZV?=
- =?utf-8?B?ZU4ycFMyS2VyMzdVL3lOaGd4ekR5a0x1LzQ4L2FtK0Q1aFhmMFdOenBUaWRX?=
- =?utf-8?B?Vjh2anFNRjJCWGtCUFdwOTdHV1VGVy9sNHdtaHR4T2syMXRJWjd1czVmV0VK?=
- =?utf-8?B?OVhwWExpRlhrbmd0cWoybmUrS2EwcGZ0Yllvei95a1J0ZC8xYUNaUFdzOEZK?=
- =?utf-8?B?RzlIUzN3QzNRRG5wdXJQMityS0NIclQ4SmxZL3A2T0hDa20vTzNsWmpnNEFG?=
- =?utf-8?B?M3ZKNEYxbDFweHMvQWZ2OHI2dTNXeGZmdDJBc2NQUkhTVUZENHp3L1c4aEQy?=
- =?utf-8?B?SnJ4WEZZYzJUTWFkNjJuWDNEVkcrbWtaa3hEYm1LTVBxcFVDUG5aT244eklk?=
- =?utf-8?B?ZXN1OE1HdFEvVHFyWExGcm54OExmd1pXeThMalFpZGZQek9IN1NmcnBUTkJV?=
- =?utf-8?B?b09ramkxOFFGczhJWENuV1RxRmYwT2daZ2ZpT1lzREJ2ZjBRKzFxdVF0V2tL?=
- =?utf-8?B?RXpVenlXc2taMG0wZysyRXFwM1BLNkVaTW9NVVBkOGl4RFczam92enZVV1NJ?=
- =?utf-8?B?citMS0ZuTzVONWNRdnpHMm0yb2FTRGxWODd6VUdCK0xVTjREMWxhQWl6VENG?=
- =?utf-8?B?M0xUMDRtRWxrTStWV1RIQkp0ekFxN2NDbWE0K2dOZUtvQ3Q1MkdJRVo3azU2?=
- =?utf-8?B?QTlKZ1V2LzdaaW9wUnhnUlFrMVhYb1Nrb3F2dGsrcy90eVRuM1dPeUV2cTNY?=
- =?utf-8?B?ejZGNk1pREYrVGh5cVgydlQvRDd4VHI5aHJ1ZmFrQW1DOGZ5TDN0alROTlFR?=
- =?utf-8?B?UktGL21jUHRjNVZuS3k2T2tJdUc5K3dNNVp3VEEremNscmVvdDE3VDdoZGdv?=
- =?utf-8?B?WnZCZ2JJbU55VXRXcjhYZWw1WUs1c3NYb2ZBWHRUN2QraUZ3cHdGcFdFU3N0?=
- =?utf-8?B?UDJkK08zYjJ1QURjNDVpeXVjQnA0VWxjbmlKWlJTa0VUYnJpVGhmNC9mQTVB?=
- =?utf-8?B?Wld4UllKd25VN204NGFaT3FkbFBNSURyM0dyOVR5akw4S1ZZR0RhaWZPU0sy?=
- =?utf-8?Q?EznsWCJhl+Cc1FtjpiEnJuuWBXC5lidWEt?=
-x-ms-exchange-transport-forked: True
-Content-ID: <67D0FA009159764C9465BD05AED32236@namprd19.prod.outlook.com>
+Date: Fri, 11 Dec 2020 15:04:23 +1100
+Message-ID: <87o8j1j8e0.fsf@notabene.neil.brown.name>
 MIME-Version: 1.0
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: DM6PR19MB4373.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: a58a3404-53e5-41c7-bd5b-08d89cc0428c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Dec 2020 04:01:23.6292 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: KLMe7EBcf0viejalXDK6qa+E3GY0TRbLSmFMRwSPkx4cDGq8nSqq1sL1bnr8xhw1
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM5PR1901MB2166
-Subject: [lustre-devel] New tag 2.13.57
+Subject: [lustre-devel] An alternate approach to preparing lustre for
+ upstream submission
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -122,203 +46,184 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: multipart/mixed; boundary="===============7537849023780759856=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-SGVsbG8hDQoNCiAgIEEgbmV3IHRhZyAyLjEzLjU3IHdhcyBjcmVhdGVkIGluIEx1c3RyZSBtYXN0
-ZXIgZGV2ZWxvcG1lbnQgYnJhbmNoLg0KDQogICBIZXJl4oCZcyB0aGUgY2hhbmdlbG9nOg0KQWwg
-VmlybyAoMSk6DQogICAgICBMVS0xMzc0NSBsbGl0ZTogc3dpdGNoIGdlbmVyaWNfZmlsZV9zcGxp
-Y2VfcmVhZCgpIHRvIHVzZSBvZiAtPnJlYWRfaXRlcigpDQoNCkFsZXggWmh1cmF2bGV2ICgxMik6
-DQogICAgICBMVS0xMzYzNiBvc2Q6IGNyZWF0ZSBhZ2VudCBpbm9kZSB3aXRoIGV4cGxpY2l0IG93
-bmVyDQogICAgICBMVS0xNDA1MCB1dGlsczogZml4IGZyYWN0aW9uIG91dHB1dCBsb2dpYw0KICAg
-ICAgTFUtMTQwMzcgb3NkOiB0cmFjayBjb21taXQgY2IgaW4gZmxpZ2h0DQogICAgICBMVS0xNDA5
-MyBwdGxycGM6IHJlZGVmaW5lIHVvcF9wYXJhbXNfb2ZmIHRvIHN1cHBvcnQgZ2NjMTANCiAgICAg
-IExVLTE0MTAyIHRlc3RzOiBhZGQgYSBwYXVzZSBpbiBvcGVuLWNsb3NlIGluIHNhbml0eS8xNjBs
-DQogICAgICBMVS0xNDAwOSBvc2Q6IG1pc3NpbmcgbGRpc2tmc19odHJlZV91bmxvY2soKQ0KICAg
-ICAgTFUtMTQwNTIgb2ZkOiBzdXBwb3J0IGZvciBtdWx0aXBsZSBhY2Nlc3MgcmVhZGVycw0KICAg
-ICAgTFUtMTMxOTUgb2JkY2xhc3M6IHNob3cgRklEIGZvciBjb3JydXB0ZWQgbGxvZw0KICAgICAg
-TFUtMTMxNTkgb3NkOiBvc2QtemZzIHRvIHJlbGVhc2UgaW5kZXggYmFjayBzdHJ1Y3R1cmVzDQog
-ICAgICBMVS0xNDE0MCBvc2Q6IGRvbid0IHBhbmljIG1lZXRpbmcgT0kgZHVwcw0KICAgICAgTFUt
-MTMxNzAgb3NkOiBwb3NpdGl2ZSBsb29rdXAgc2hvdWxkbid0IHJldHVybiBhbiBlcnJvcg0KICAg
-ICAgTFUtMTQxNTQgbGRpc2tmczogZ2NjMTAgc3VwcG9ydA0KDQpBbGV4YW5kZXIgQm95a28gKDQp
-Og0KICAgICAgTFUtMTQwMzEgcHRscnBjOiByZW1vdmUgdW51c2VkIGNvZGUgYXQgcGluZ2VyDQog
-ICAgICBMVS0xNDAzMSBwdGxycGM6IGRlY3JlYXNlIHRpbWUgYmV0d2VlbiByZWNvbm5lY3Rpb24N
-CiAgICAgIExVLTEyOTU2IGxkbG06IGZpeCBocnRpbWVyIHVzaW5nDQogICAgICBMVS0xNDAzMSB0
-ZXN0czogY2hlY2sgY2xpZW50IHJlY29ubmVjdA0KDQpBbGV4YW5kZXIgWmFyb2NoZW50c2V2ICgx
-KToNCiAgICAgIExVLTExMjkwIGxkbG06IHBhZ2UgZGlzY2FyZCBzcGVlZHVwDQoNCkFtaW4gVG9v
-dG9vbmNoaWFuICgyKToNCiAgICAgIExVLTE0MDEwIGJ1aWxkOiBBZGQgbWlzc2luZyBkZXBzIGZv
-ciBka21zIGNsaWVudA0KICAgICAgTFUtMTQwMTAgYnVpbGQ6IEVuc3VyZSBka21zIGluc3RhbGxz
-IGFsbCBMdXN0cmUgbW9kdWxlcw0KDQpBbWlyIFNoZWhhdGEgKDIpOg0KICAgICAgTFUtMTM5NzIg
-bzJpYmxuZDogRG9uJ3QgcmV0cnkgaW5kZWZpbml0ZWx5DQogICAgICBMVS0xNDAxNiBsaWJjZnM6
-IHVzZSBhdG9taWM2NF90IGZvciBsaWJjZnNfa21lbQ0KDQpBbmRyZWFzIERpbGdlciAoMTApOg0K
-ICAgICAgTFUtMTE1NDggbGxpdGU6IGluY3JlYXNlIHJlYWRhaGVhZCBkZWZhdWx0IHZhbHVlcw0K
-ICAgICAgTFUtMTI5MzEgbGliY2ZzOiBza2lwIGNmc190aW1lX3NlY29uZHMoKSBpbmRpcmVjdGlv
-bg0KICAgICAgTFUtMTI1NDIgb3NkOiBjb25zb2xpZGF0ZSBSQ1UgaGFuZGxpbmcNCiAgICAgIExV
-LTEzNzQ1IHRlc3RzOiBza2lwIHNhbml0eSB0ZXN0XzQyNiBmb3IgNC4xOCsNCiAgICAgIExVLTEz
-NjY1IHRlc3RzOiBza2lwIHNhbml0eSBzdWJ0ZXN0cyBmb3IgbmV3IGZlYXR1cmVzDQogICAgICBM
-VS0xNDA2MSB1dGlsczogcHJlZmVyIG1vdW50aW5nIHdpdGggc3BlY2lmaWVkIGZzdHlwZQ0KICAg
-ICAgTFUtOTMwIHV0aWxzOiBkb2N1bWVudCAnbGZzIGdldHN0cmlwZSAtTicgb3B0aW9uDQogICAg
-ICBMVS0xMzM5MCB0ZXN0czogYWRkIGRlYnVnZ2luZyB0byBzYW5pdHkgdGVzdF82NW4NCiAgICAg
-IExVLTEzOTgwIG9zZC1sZGlza2ZzOiBwcmludCBsYWJlbCBpbnN0ZWFkIG9mIGRldmljZQ0KICAg
-ICAgTFUtNTg1NSB0ZXN0czogZW5hYmxlIHNraXBwZWQgc2FuaXR5LWxmc2NrIERORSBaRlMgdGVz
-dHMNCg0KQW5kcmV3IFBlcmVwZWNoa28gKDIpOg0KICAgICAgTFUtMTM4MjIgcHRscnBjOiBmaXhl
-cyBmb3IgUkNVLXJlbGF0ZWQgc3RhbGxzDQogICAgICBMVS0xMjM1MyBsZGlza2ZzOiBzcGVlZHVw
-IHF1b3RhIGpvdXJuYWxsaW5nDQoNCkFuZHJpeSBTa3VseXNoICg2KToNCiAgICAgIExVLTEzOTky
-IGxsaXRlOiBBU1NFUlRJT04oIGxhc3Rfb2FwX2NvdW50ID4gMCApIGZhaWxlZA0KICAgICAgTFUt
-MTM5ODkgbGRsbTogQkwgQVNUIHZzIGZhaWxlZCBsb2NrIGVucXVldWUgcmFjZQ0KICAgICAgTFUt
-MTM5ODggbWR0OiBBU1NFUlRJT04oIWx1c3RyZV9oYW5kbGVfaXNfdXNlZCgmbGgtPm1saF9yZWdf
-bGgpKSBmYWlsZWQNCiAgICAgIExVLTEzOTg3IGxkbG06IERvbid0IHJlLWVucXVldWUgZ2xpbXBz
-ZSBsb2NrIG9uIHJlYWQNCiAgICAgIExVLTEzOTkwIGxkbG06IGxkbG1fZmxvY2tfZGVhZGxvY2so
-KSBBU1NFUlRJT04ocmVxICE9IGxvY2spIGZhaWxlZA0KICAgICAgTFUtMTM5OTQgbGRsbTogb3Nj
-X29iamVjdF9hc3RfY2xlYXIoKSBpcyBjYWxsZWQgZm9yIG1kYyBvYmplY3Qgb24gZXZpY3Rpb24N
-Cg0KQXJzaGFkIEh1c3NhaW4gKDMpOg0KICAgICAgTFUtMTM2OTkgbWR0OiBJbXByb3ZlIG1lc3Nh
-Z2UgcmVwb3J0aW5nIGZvciBtZHRfaWRlbnRpdHkuYw0KICAgICAgTFUtMTM3NjUgb3NkLWxkaXNr
-ZnM6IEV4dGVuZCBjcmVkaXQgY29ycmVjdGx5IGZvciBmYWxsb2NhdGUNCiAgICAgIExVLTEzNzY1
-IG9zZC1sZGlza2ZzOiBSZW5hbWUgZHRfZGVjbGFyZV9mYWxsb2MgdG8gZHRfZGVjbGFyZV9mYWxs
-b2NhdGUNCg0KQXVyZWxpZW4gRGVncmVtb250ICgzKToNCiAgICAgIExVLTEzOTg0IHB0bHJwYzog
-dGhyb3R0bGUgUlBDIHJlc2VuZCBpZiBuZXR3b3JrIGVycm9yDQogICAgICBMVS0xNDA1NyBwdGxy
-cGM6IGRvbid0IGxvZyBjb25uZWN0aW9uICdyZXN0b3JlZCcgaW5hcHByb3ByaWF0ZWx5DQogICAg
-ICBMVS0xNDA3MyBwdGxycGM6IHJlbW92ZSBkZWJ1Z2dpbmcgYXNzZXJ0IHVzaW5nIHNlZ21lbnRf
-ZXEoKQ0KDQpCb2JpIEphbSAoMSk6DQogICAgICBMVS0xNDA0MiBsbGl0ZTogZG9uJ3QgY2hlY2sg
-bGF5b3V0IGluZm8gZm9yIHBhZ2UgZGlzY2FyZA0KDQpCcmlhbiBCZWhsZW5kb3JmICgyKToNCiAg
-ICAgIExVLTEzOTQ2IGJ1aWxkOiBPcGVuWkZTIDIuMCBjb21wYXRpYmlsaXR5DQogICAgICBMVS0x
-NzQyIG8yaWJsbmQ6ICdUaW1lZCBvdXQgdHgnIGVycm9yIG1lc3NhZ2UNCg0KQ2hyaXMgSG9ybiAo
-Nyk6DQogICAgICBMVS0xNDA4MyBidWlsZDogRG9uJ3Qgb3ZlcndyaXRlIEtCVUlMRF9FWFRSQV9T
-WU1CT0xTDQogICAgICBMVS0xMzU3MSBsbmV0OiBDb3JyZWN0IGhhbmRsaW5nIG9mIE5FVFdPUktf
-VElNRU9VVCBzdGF0dXMNCiAgICAgIExVLTEzODM3IGxuZXQ6IEludHJvZHVjZSBjb25zdGFudCBm
-b3IgbmV0IElEIG9mIExORVRfTklEX0FOWQ0KICAgICAgTFUtMTM1NzEgbG5kOiBVc2UgTkVUV09S
-S19USU1FT1VUIGZvciB0eHMgb24gaWJwX3R4X3F1ZXVlDQogICAgICBMVS0xMzU3MSBsbmQ6IFVz
-ZSBORVRXT1JLX1RJTUVPVVQgZm9yIHNvbWUgY29ubiBmYWlsdXJlcw0KICAgICAgTFUtMTM1Njkg
-bG5ldDogSW50cm9kdWNlIGxuZXRfcmVjb3ZlcnlfbGltaXQgcGFyYW1ldGVyDQogICAgICBMVS0x
-MzU2OSBsbmV0OiBBZGQgbG5ldF9yZWNvdmVyeV9saW1pdCB0byBsbmV0Y3RsDQoNCkN5cmlsIEJv
-cmRhZ2UgKDIpOg0KICAgICAgTFUtMTA3MjggdXRpbHM6IGZpeCBzdHIgbGVuZ3RoIGluIGVycm9y
-IHN0cmluZw0KICAgICAgTFUtMTM3MjggdXRpbHM6IGFkZCBtaXNzaW5nIGdsb2JhbCBwYXJhbWV0
-ZXJzDQoNCkRvbWluaXF1ZSBNYXJ0aW5ldCAoMSk6DQogICAgICBMVS0xMDI2MiBtZHQ6IG1kdF9y
-ZWludF9vcGVuOiBjaGVjayBFRVhJU1Qgd2l0aG91dCBsb2NrDQoNCkVsZW5hIEdyeWF6bm92YSAo
-MSk6DQogICAgICBMVS0xMzk0OCB0ZXN0czogbG9hZCBtb2R1bGVzIGFmdGVyIHJlYm9vdF9ub2Rl
-DQoNCkV0aWVubmUgQVVKQU1FUyAoMyk6DQogICAgICBMVS0xMzA1NiB1dGlsczogRGVmYXVsdCBN
-R1MgZGV2aWNlIGxsb2dfcHJpbnQvbGxvZ19jYXRsaXN0DQogICAgICBMVS0xMzg0NSB1dGlsczog
-UXVvdGEgaWQgMHhGRkZGRkZGRiBpcyBpbnZhbGlkDQogICAgICBMVS0xMzc0NiB1dGlsczogY2hl
-Y2sgYXJndW1lbnQgbG9nbmFtZSBwcmVzZW5jZSBpbiBsbG9nX3ByaW50DQoNCkhvbmdjaGFvIFpo
-YW5nICgzKToNCiAgICAgIExVLTEyMjMyIHRlc3Q6IGNhbGwgZHRfc3luYyBhZnRlciBkZA0KICAg
-ICAgTFUtMTM3MTkgbG92OiBkb2Vzbid0IGNoZWNrIGxvdl9yZWZjb3VudA0KICAgICAgTFUtMTI1
-NDYgbWR0OiBhYm9ydCByZWNvdmVyeSBiZXR3ZWVuIE1EVHMNCg0KSmFtZXMgTnVuZXogKDEpOg0K
-ICAgICAgTFUtMTAwNTkgdGVzdHM6IHNhbml0eW4gMzJhIGVycm9yIG1lc3NhZ2VzDQoNCkphbWVz
-IFNpbW1vbnMgKDEpOg0KICAgICAgTFUtMTM3NDAgYnVpbGQ6IGFubm91bmNlIFVidW50dTIwIHN1
-cHBvcnQNCg0KSmVhbi1ZdmVzIFZFVCAoMSk6DQogICAgICBMVS0xMzg5MSB1dGlsczogZml4IG1l
-bW9yeSBsZWFrIGluIGxsYXBpX2xhZHZpc2UoKQ0KDQpKaWFuIFl1ICgxMik6DQogICAgICBMVS0x
-MzkxOSBrZXJuZWw6IGtlcm5lbCB1cGRhdGUgUkhFTDcuOCBbMy4xMC4wLTExMjcuMTkuMS5lbDdd
-DQogICAgICBMVS0xMzU5MCBrZXJuZWw6IG5ldyBrZXJuZWwgW1JIRUwgNy45IDMuMTAuMC0xMTYw
-LjIuMS5lbDddDQogICAgICBMVS0xMzU5MCBrZXJuZWw6IFJIRUwgNy45IHNlcnZlciBzdXBwb3J0
-DQogICAgICBMVS0xMzk2MSBrZXJuZWw6IGtlcm5lbCB1cGRhdGUgUkhFTDguMiBbNC4xOC4wLTE5
-My4xOS4xLmVsOF8yXQ0KICAgICAgTFUtMTQwMjkga2VybmVsOiBuZXcga2VybmVsIFtTTEVTMTUg
-U1AyIDUuMy4xOC0yNC4yNC4xXQ0KICAgICAgTFUtMTM5NDkgYnVpbGQ6IGFkZCBhdXRvZ2VuLnNo
-IGludG8gZGlzdHJpYnV0aW9uIHRhcmJhbGwNCiAgICAgIExVLTE0MTE2IGF1dG9jb25mOiBjaGVj
-ayBpZiBERVMzIGVuY3R5cGUgaXMgc3VwcG9ydGVkDQogICAgICBMVS0xMzgzOSBrZXJuZWw6IG5l
-dyBrZXJuZWwgW1JIRUwgOC4zIDQuMTguMC0yNDAuMS4xLmVsOF8zXQ0KICAgICAgTFUtMTQwNzcg
-a2VybmVsOiBrZXJuZWwgdXBkYXRlIFNMRVMxNSBTUDEgWzQuMTIuMTQtMTk3LjY0LjFdDQogICAg
-ICBMVS0xNDEyOSBrZXJuZWw6IGtlcm5lbCB1cGRhdGUgUkhFTDcuOSBbMy4xMC4wLTExNjAuNi4x
-LmVsN10NCiAgICAgIExVLTE0MTcwIGJ1aWxkOiBVcGRhdGUgWkZTIHZlcnNpb24gdG8gMi4wLjAN
-CiAgICAgIExVLTEzODM5IGtlcm5lbDogUkhFTCA4LjMgc2VydmVyIHN1cHBvcnQNCg0KSm9obiBM
-LiBIYW1tb25kICgxMSk6DQogICAgICBMVS0xNDAwNiBvMmliOiByYWlzZSBiaW5kIGNhcCBiZWZv
-cmUgcmVzb2x2aW5nIGFkZHJlc3MNCiAgICAgIExVLTE0MDEyIGxvZDogcHJvcGVybHkgaW5pdGlh
-bGl6ZSBsY20gaW4gbG9kX2xheW91dF9jb252ZXJ0KCkNCiAgICAgIExVLTE0MDY3IHRlc3Q6IHNr
-aXAgY29tcGlsZSB0ZXN0cyBvbiBhYXJjaDY0DQogICAgICBMVS0xMzc0NSB0ZXN0czogc2tpcCBz
-YW5pdHkgdGVzdF80MjYgZm9yIDQuMTUrDQogICAgICBMVS0xNDA0OSB1dGlsczogbWFuYWdlIHRo
-cmVhZCByZXNvdXJjZXMgaW4gYWxyX2JhdGNoX3ByaW50KCkNCiAgICAgIExVLTE0MDUxIHV0aWxz
-OiBmbHVzaCBhbHIgYmF0Y2ggZmlsZSBpbiB0aHJlYWQNCiAgICAgIExVLTEyNjMyIGhzbTogd2Fp
-dCBsb25nZXIgaW4gc2FuaXR5LWhzbSB0ZXN0XzkwKCkNCiAgICAgIExVLTE0MDUzIHV0aWxzOiBk
-ZXRlY3QgaGFuZ3VwIGluIG9mZF9hY2Nlc3NfbG9nX3JlYWRlcg0KICAgICAgTFUtMTQxMzYgdXRp
-bHM6IGNvcnJlY3QgZXJyb3IgbWVzc2FnZSBpbiBsZnMgbWlycm9yIGV4dGVuZA0KICAgICAgTFUt
-MTQwNTQgdXRpbHM6IGFkZCAtLWV4aXQtb24tY2xvc2UgdG8gb2ZkX2FjY2Vzc19sb2dfcmVhZGVy
-DQogICAgICBMVS0xNDA0MyBsZnM6IHVzZSBidWZmZXJlZCBJTyBpbiBtaXJyb3IgZXh0ZW5kDQoN
-CktpcmlsbCBNYWxraW4gKDEpOg0KICAgICAgTFUtMTM2NTEgaHNtOiBjYWxsIGhzbV9maW5kX2Nv
-bXBhdGlibGVfY2IoKSBvbmx5IGZvciBjYW5jZWwNCg0KTGFpIFNpeWFvICgxMSk6DQogICAgICBM
-VS0xMzUxMSBvYmRjbGFzczogZG9uJ3QgaW5pdGlhbGl6ZSBvYmogZm9yIHplcm8gRklEDQogICAg
-ICBMVS0xMzk4MyBsbGl0ZTogcm1kaXIgcmVsZWFzZXMgaW5vZGUgb24gY2xpZW50DQogICAgICBM
-VS0xMDc1MyBvc2QtemZzOiBpbml0aWFsaXplIG9iaiBhdHRyIGNvcnJlY3RseQ0KICAgICAgTFUt
-MTM4MjQgdGVzdDogdGVzdCBzYW5pdHkgMjMwcSB3aXRoIGZld2VyIGZpbGVzIG9uIFpGUw0KICAg
-ICAgTFUtMTM0MzcgbWRjOiByZW1vdGUgb2JqZWN0IHN1cHBvcnQgZ2V0YXR0ciBmcm9tIGNhY2hl
-DQogICAgICBMVS0xMzQzNyBsbGl0ZTogcGFzcyBuYW1lIGluIGdldGF0dHIgYnkgRklEDQogICAg
-ICBMVS0xMTYzMSBtZGQ6IG1pZ3JhdGUgc3ltbGluayBmb3IgY3Jvc3MtTURUIHJlbmFtZQ0KICAg
-ICAgTFUtMTM2NjYgbG9kOiB1cGRhdGUgLmRvX2luZGV4X29wcyBvbiBsYXlvdXQgZGV0YWNoDQog
-ICAgICBMVS0xMjk2MCBsb2Q6IGRvbid0IHNldCBpbmRleCBmb3IgMm5kIHN0cmlwZSBpZiBzcGVj
-aWZpYw0KICAgICAgTFUtMTQxMDUgbGZzY2s6IGRvbid0IExCVUcoKSBvbiBkaXNrIGRhdGENCiAg
-ICAgIExVLTE0MTcyIGxtdjogb3B0aW1pemUgZGlyIHNoYXJkIHJldmFsaWRhdGUNCg0KTWlraGFp
-bCBQZXJzaGluICg1KToNCiAgICAgIExVLTE0MDcwIHRndDogY2hlY2sgb2JkX3JlY292ZXJpbmcg
-aW4gdGd0X2Jyd191bmxvY2soKQ0KICAgICAgTFUtMTA4MTAgcHRscnBjOiBpbnRyb2R1Y2UgT1NU
-X1NFRUsgUlBDDQogICAgICBMVS0xMDgxMCBjbGlvOiBTRUVLX0hPTEUvU0VFS19EQVRBIG9uIGNs
-aWVudCBzaWRlDQogICAgICBMVS0xMDgxMCB0ZXN0OiB0ZXN0IGxzZWVrIHN1cHBvcnQgaW4gdG9v
-bHMNCiAgICAgIExVLTEzNTQzIGx1c3RyZTogdXBkYXRlICpwb3MgaW4gc2VxX2ZpbGUgLm5leHQg
-ZnVuY3Rpb25zDQoNCk1pbmggRGllcCAoMik6DQogICAgICBMVS0xMjIxNCBidWlsZDogZml4IHN1
-c2UgcmVxdWlyZSBrcmI1DQogICAgICBMVS0xNDAzNiBidWlsZDogZml4IGxidWlsZCBmb3IgTU9G
-RUQgNS4xDQoNCk1yIE5laWxCcm93biAoMTApOg0KICAgICAgTFUtMTM5NzcgdGVzdHM6IGZpeCBm
-bG9hdCBjb21wYXJpc29uIGluIHNhbml0eSB0ZXN0XzI1NWENCiAgICAgIExVLTEzMDA2IGpvYmlk
-OiBlbmhhbmNlIHRlc3RzIHRvIGNoZWNrIHBlci1zZXNzaW9uIGpvYmlkcy4NCiAgICAgIExVLTEz
-MDE3IHRlc3RzOiBkaXNhYmxlIHN0YXRhaGVhZF9hZ2wgZm9yIHNhbml0eSB0ZXN0XzU2cmENCiAg
-ICAgIExVLTEzOTgxIHRlc3RzOiB1c2UgJFRSVU5DQVRFIGNvbnNpc3RlbnRseSBhbmQgY29ycmVj
-dGx5Lg0KICAgICAgTFUtMTM5ODIgdGVzdHM6IGZpeCBpbmZpbml0ZSBsb29wIGluIHNhbml0eSB0
-ZXN0XzE4NGMNCiAgICAgIExVLTEzOTg1IGx1c3RyZTogc2VxX2ZpbGUgLm5leHQgZnVuY3Rpb25z
-IG11c3QgdXBkYXRlICpwb3MNCiAgICAgIExVLTEzOTg2IHRhcmdldDogZml4IHBvc3NpYmxlIGxp
-dmVsb29wIGluIGRpc3RyaWJ1dGVfdHhuIHRoZA0KICAgICAgTFUtMTQwNzMgYnVpbGQ6IGZpeCBh
-dXRvY29uZiB0ZXN0IGZvciBjbGVhbl9iZGV2X2FsaWFzZXMoKQ0KICAgICAgTFUtMTM3ODMgYnVp
-bGQ6IEZpeCBMQl9MSU5VWF9WRVJTSU9OIHJ1bGUgZm9yIHY1LjgNCiAgICAgIExVLTEzMTUzIGxp
-YjogZml4IGxsYXBpX2dldF92ZXJzaW9uX3N0cmluZw0KDQpPbGFmIEZhYWxhbmQgKDQpOg0KICAg
-ICAgTFUtMTM3MDkgdGVzdHM6IHRlc3QgbGZzIG1rZGlyIC1jIHdpdGhvdXQgLWkNCiAgICAgIExV
-LTE0MTA5IGRvYzogbG5ldGN0bCBtYW5wYWdlIG1pc3NpbmcgaW1wb3J0IGFuZCBleHBvcnQgb3B0
-aW9ucw0KICAgICAgTFUtMTQxMjUgb2JkY2xhc3M6IGFkZCBncmFudCBmaWVsZHMgdG8gZXhwb3J0
-IHByb2NmaWxlDQogICAgICBMVS0xNDEyNSBvc2M6IHByZXZlbnQgb3ZlcmZsb3cgb2Ygb19kcm9w
-cGVkDQoNCk9sZWcgRHJva2luICg4KToNCiAgICAgIExVLTE0MDY5IGxkbG06IEZpeCB1bmJvdW5k
-ZWQgT0JEX0ZBSUxfTERMTV9DQU5DRUxfQkxfQ0JfUkFDRSB3YWl0DQogICAgICBMVS0xMzY5MiBs
-ZGxtOiBFbnN1cmUgd2UgcmVwcm9jZXNzIHRoZSByZXNvdXJjZSBvbiBhc3QgZXJyb3INCiAgICAg
-IExVLTEzMTgyIGxsaXRlOiBBdm9pZCBldGVybmVsIHJldHJ5IGxvb3BzIHdpdGggTUFQX1BPUFVM
-QVRFDQogICAgICBMVS0xNDAyNyBsZGxtOiBEbyBub3Qgd2FpdCBmb3IgbG9jayByZXBsYXkgc2Vu
-ZGluZyBpZiBpbXBvcnQgZHNjb25uZWN0ZWQNCiAgICAgIExVLTE0MDI3IGxkbG06IERvIG5vdCBo
-YW5nIGlmIHJlY292ZXJ5IHJlc3RhcnRlZCBkdXJpbmcgbG9jayByZXBsYXkNCiAgICAgIExVLTE0
-MDI0IG9mZDogQXZvaWQgdXNlIGFmdGVyIGZyZWUgaW4gb2ZkX2luY29uc2lzdGVuY3lfdmVyaWZp
-Y2F0aW9uX21haW4NCiAgICAgIExVLTEyNTY0IGxpYmNmczogVXNlIHZmcmVlX2F0b21pYyBpbnN0
-ZWFkIG9mIHZmcmVlDQogICAgICBOZXcgdGFnIDIuMTMuNTcNCg0KUWlhbiBZaW5namluICgxKToN
-CiAgICAgIExVLTEzODI2IHV0aWxzOiBmaXggY29tcGF0aWJpbGl0eSBmb3IgTExfSU9DX01EQ19H
-RVRJTkZPDQoNClNlYmFzdGllbiBCdWlzc29uICg4KToNCiAgICAgIExVLTEzNDk4IHNlYzogZml4
-IGNyZWRlbnRpYWxzIHdpdGggbm9kZW1hcCBhbmQgU1NLDQogICAgICBMVS0xMzk3NSBzZWM6IHJl
-cXVpcmUgZW5jIGtleSBpbiBjYXNlIG9mIE9fQ1JFQVQgb25seQ0KICAgICAgTFUtMTM0OTggZ3Nz
-OiB1cGRhdGUgc2VxdWVuY2UgaW4gY2FzZSBvZiB0YXJnZXQgZGlzY29ubmVjdA0KICAgICAgTFUt
-MTM3NDAgdGVzdHM6IGltcHJvdmUgc2FuaXR5LXNlYyB0ZXN0XzQ1DQogICAgICBMVS0xMzQ5OCB0
-ZXN0czogcmVtb3ZlIHRlc3RzIGZyb20gQUxXQVlTX0VYQ0VQVCB3aXRoIFNTSw0KICAgICAgTFUt
-MTQwNDUgc2VjOiBmaXggT19ESVJFQ1QgYW5kIGVuY3J5cHRlZCBmaWxlcw0KICAgICAgTFUtMTQw
-OTUgZ3NzOiB1c2UgaGxpc3RfdW5oYXNoZWQoKSBpbnN0ZWFkIG9mIC0+bmV4dA0KICAgICAgTFUt
-MTM0NzQgZ3NzOiBkbyBub3QgcmV0dXJuIC1FUkVTVEFSVCB3aGVuIGdzcyBycGMgdGltZXMgb3V0
-DQoNClNlYmFzdGllbiBQaWVjaHVyc2tpICgyKToNCiAgICAgIExVLTEzNjgzIGxmczogcmV0dXJu
-IC1FTk9FTlQgd2hlbiBpbnZva2VkIG9uIG5vbi1leGlzdGluZyBmaWxlDQogICAgICBMVS0xNDE1
-OSBidWlsZDogZml4IGdjYzggd2FybmluZ3Mgb24ga3RocmVhZF9ydW4gY2FsbHMNCg0KU2VyZ2V5
-IENoZXJlbWVuY2V2ICg0KToNCiAgICAgIExVLTEzOTIwIGhzbTogcHJvY2VzcyBoc21fYWN0aW9u
-cyBvbmx5IGFmdGVyIG1kZCBzZXR1cA0KICAgICAgTFUtMTM4MTAgdGVzdHM6IGluY3JlYXNlIGxp
-bWl0IGZvciAxZw0KICAgICAgTFUtMTM4MTcgcXVvdGE6IHByaW50IGVycm9yIHdoZW4gcG9vbCBp
-cyBhYnNlbnQNCiAgICAgIExVLTE0MDcxIGRvYzogbGZzIHNldHF1b3RhL3F1b3RhIGRvYyBmb3Ig
-UFENCg0KU2VyZ3VlaSBTbWlybm92ICgyKToNCiAgICAgIExVLTEzNzAxIHV0aWxzOiBmaXggdXNh
-Z2Ugb2YgZ2V0b3B0X2xvbmcgaW4gcG9ydGFscw0KICAgICAgTFUtMTM5OTggdGVzdHM6IHNhbml0
-eW4gdGVzdF8xMDQgaW5jb3JyZWN0IE1EVCB0aW1lcyBzaG93bg0KDQpTaGF1biBUYW5jaGVmZiAo
-Mik6DQogICAgICBMVS0xNDAyMCBsZGlza2ZzOiBTVVNFIDE1IFNQMiBhbmQgbWFpbmxpbmUgNS40
-LjIxIGFuZCBuZXdlcg0KICAgICAgTFUtMTMzNDQgZ3NzOiBVcGRhdGUgY3J5cHRvIHRvIHVzZSBz
-eW5jX3NrY2lwaGVyDQoNClZpdGFseSBGZXJ0bWFuICgyKToNCiAgICAgIExVLTEzNjQ1IGxkbG06
-IGdyb3VwIGxvY2tzIGZvciBET00gSUJJVCBsb2NrDQogICAgICBMVS0xMzY0NSBsZGxtOiBleHRy
-YSBjaGVja3MgZm9yIERPTSBsb2Nrcw0KDQpWbGFkaW1pciBTYXZlbGlldiAoMSk6DQogICAgICBM
-VS0xMzYxNCBsZGxtOiByZXZlcnQgTFUtMTE3NjINCg0KV2FuZyBTaGlsb25nICg5KToNCiAgICAg
-IExVLTg0NjUgdGVzdHM6IGVuYWJsZSBwZnNjayBpZiBwb3NzaWJsZQ0KICAgICAgTFUtMTM3NDUg
-dGVzdDogYWRkIHNwbGljZSB0ZXN0IGZvciBsdXN0cmUNCiAgICAgIExVLTE0MTE1IGxvZDogZml4
-IHRvIHNldCBpbmhlcml0IGZsYWcgZm9yIHN0cmlwZSBkaXJlY3Ryb3kNCiAgICAgIExVLTE0MTMx
-IG9zZC1sZGlza2ZzOiByZWR1Y2UgY3JlZGl0cyBmb3Igb3ZlcndyaXR0aW5nDQogICAgICBMVS0x
-NDA3MiBsbGl0ZTogZml4IGNsaWVudCBldmljaXRpb24gd2l0aCBESU8NCiAgICAgIExVLTE0MDQz
-IGxsaXRlOiBhbGxvdyBESU8gd2l0aCB1bmFsaWduZWQgSU8gY291bnQNCiAgICAgIExVLTE0MTM0
-IG9zZC1sZGlza2ZzOiByZWR1Y2UgY3JlZGl0cyBmb3IgbmV3IHdyaXRpbmcNCiAgICAgIExVLTk1
-NTUgcXVvdGE6IGRmIHNob3VsZCByZXR1cm4gcHJvamlkLXNwZWNpZmljIHZhbHVlcw0KICAgICAg
-TFUtMTM2NjkgbGxpdGU6IHRyeSB0byBpbXByb3ZlIG1tYXAgcGVyZm9ybWFuY2UNCg0KWWFuZyBT
-aGVuZyAoNCk6DQogICAgICBMVS0xNDAzOSBvYmRjbGFzczogc2V0IExBX1RZUEUgd2hlbiB1cGRh
-dGVfbG9nIGluaXQNCiAgICAgIExVLTE0MTMwIG9zYzogc2tpcCAwIHJvdyBmb3IgcnBjX3N0YXRz
-DQogICAgICBMVS0xMzM2OCBsbmV0OiBkaXNjYXJkIHRoZSBjYWxsYmFjaw0KICAgICAgTFUtMTQx
-NTUgbWRjOiBhdm9pZCBlYXNpemUgc2V0IHRvIDANCg0KX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX18KbHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdApsdXN0cmUt
-ZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwpodHRwOi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5j
-Z2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmcK
+--===============7537849023780759856==
+Content-Type: multipart/signed; boundary="=-=-=";
+	micalg=pgp-sha256; protocol="application/pgp-signature"
+
+--=-=-=
+Content-Type: text/plain
+
+
+Hi,
+ I've been exploring an alternate approach to preparing lustre code for
+ upstream submission.
+
+ As you probably know, the approach we have been following is based on
+ the code that was removed from 'drivers/staging' a couple of years ago.
+ I reverted that removal patch and have ported all the relevant patches
+ from lustre "master" across to that tree, as well as other cleanups and
+ fixes.
+
+ A problem with this approach is that I find that I don't trust it.
+ I've found multiple examples of patches being ported across
+ incorrectly, of patches being missed, and of bugs introduced while the
+ code was in drivers/staging.
+ I've found and fixed a lot of issues.  I doubt that I've found them
+ all.
+ While I do some testing of this code, as does James, it is minimal
+ compared to the testing done on lustre/master.  And as we should all
+ remember: untested code is buggy code.
+
+ People who use lustre don't only want correctness and performance, they
+ want confidence, and I'm not confident of this code.
+
+ My alternate approach is to use the code straight out of lustre/master,
+ transformed to match upstream requirements by a relatively simple
+ script.  There is clearly still room for the script to introduce
+ problems, but it is much less likely and any problems introduced are
+ less likely to go unnoticed.
+
+ I have written such a script, based largely on sed, unifdef, and spatch
+ (the latter from the coccinelle project).
+
+ Not all changes that I want can be achieved with these tools so I also
+ have a collection of patches to lustre which hopefully will be
+ submitted in due course.  Many are the same sorts of cleanups that I've
+ been submitting for a while.  Others are a bit different.  For example
+ I add a lot more "#ifdef HAVE_SERVER_SUPPORT" preprocessor directives
+ so that "unifdef" can strip out more server-only code.  I've also added
+ some "#ifndef UPSTREAM_LINUX" directives to remove code that cannot go
+ upstream, like the code for extracting a jobid from the environment.
+
+ You can see my current lustre tree at
+   https://github.com/neilbrown/lustre/tree/lustre-next
+ This contains 119 patches on top of master, some of which have already
+ been submitted to gerrit, others could be easily, others need a lot of
+ work first.
+ The last patch adds the "copy-client" script.
+
+ In
+   https://github.com/neilbrown/linux/tree/lustre/lustre-next
+ you can find a very recent linux/master tree with two patches added.
+ The first was auto-generated by the script from lustre/lustre-next.
+ The second fixes some compile errors with fscrypt() (though it may
+ actually break the code, I don't know).
+
+ Note that the copied LNET code is TCP-only.  I left out the o2ib code
+ as I don't think we need that for the first code drop.
+
+ Apart from providing the code mentioned above, this little project has
+ also helped me form a clearer picture of what needs to be done before
+ upstream submission is worth attempting.  My list includes:
+
+ - IPv6 support.  I have a lot of patches which add support for extended
+   NIDs which can store IPv6 addresses.  There is more to be done here
+   (and thanks to Andreas for his review which I haven't responded to
+   yet).
+   One awkwardness in the conversion that I haven't addressed at all yet
+   is ptlrpc/nodemap_range.c.  This allows a range of IP address to have
+   a particular nodemap.  This might make sense for IPv4, but makes
+   somewhat less sense for IPv6.
+   I'm storing IPv6 addresses in network-byte-order (which is the normal
+   way to store addresses), and that make ranges particularly cumbersome.
+   One idea is to use netmasks rather than ranges to define subsets, for
+   IPv6 at least.
+
+ - fscrypt.  There is a comment in lustre-core.m4 which suggests that
+    lustre does not support file name encryption, and so cannot use
+    the fscrypt support in Linux.  If I understand that correctly, then
+    this needs to be rectified.
+
+ - I want to deprecate libcfs as there isn't anywhere convenient to put
+   it - as a whole - in the linux kernel. It currently contains a
+   mixture of things:
+   = back-compat code, which Linux obviously doesn't needed
+
+   - workitem.c and hash.c which are being replaced by
+     workqueue and rhashables
+
+   - cpt code, which is largely used by lnet, so can go in lnet/lnet
+
+   - heap tree, which can go in lustre/ptlrpc as it is only used by nrs.
+
+   - fail.c error injection.  It would be nice to convert lustre to
+     use the error-injection in linux/lib.  This is a completely
+     different user-space interface management.
+     Is the current interface seen as a "stable api", or is it only
+     used by lustre/tests (which can obviously be changed).
+
+   - tracefile/debug.  I think this should be changed to use
+     tracepoints. I believe the capabilities are similar, though the
+     details are different.  I think I've raised this before and had an
+     explanation of why people aren't keen.  Maybe it is time to revisit
+     that.
+     LU-8980 was closed "Won't Fix" with no explanatory comment...
+
+   - libcfs_string - I've converted nearly all of this to use
+     functionality already in Linux.  Only cfs_str2mask() remains.
+
+   - adler32 - hopefully this can be copied to crypto/ in linux.
+
+ - move stuff out of /proc
+    I understand that part of this is statistics, which don't fit in
+    debugfs as that is root-only, and don't fit in /sys at that is
+    one-value-per-file.
+    Firstly I'd like to resolve everything that is not stats.
+    James has a netlink proposal for stats.
+    NFS uses /proc/self/mountstats to present stats info.
+
+ I plan to create some jira issues to cover:
+  - moving code out of libcfs
+  - fault injection
+  - adding more HAVE_SERVER_SUPPORT and UPSTREAM_LINUX directives
+
+ and start submitting some of the patches I have, and work on some more.
+
+ I'll probably keep my existing linux-lustre tree (based on
+ drivers/staging) up to date, as there is still valuable stuff in there
+ to be ported across, and being able to 'diff' the two (with filtering)
+ helps.
+
+ Thoughts?
+
+Thanks,
+NeilBrown
+
+--=-=-=
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQJCBAEBCAAsFiEEG8Yp69OQ2HB7X0l6Oeye3VZigbkFAl/S78kOHG5laWxiQHN1
+c2UuZGUACgkQOeye3VZigbm90w/+PNftF52Hb6eJyHBLWtPQ7uceyFGUhrnDhZYB
+DuIxUpdU6vaq/vdNSPBhqEIPzqbdgtuMROhYiIigZGDMRGByz7UFxqf3fZP2TvvU
+5n5NFn2+8qKyr3CuN7FssZcRxTVQ28/OB3yR/TyGHJLx8bNJN2AsY4jdzQmS4Dbe
+HJZbQWGUQ7DEmiuAtNY3e5ma1E+m2MUat/sbwHYb51u4kFjJ1+wWzlvHBMzozkMm
+d33u5ZFg+V/6TTXje31tjxtkbH1vC2R8SiPDo/EbRNDjp3t45r6N7LWsKFtzuGAU
+kFIkKfpblKu5DUvs97+gA4z/ImEFWkH7oXSoQLM/nzjUWopH2tqeV3u/7ISbrv9T
+DmNWvR1N9Il5c6pW3+Pn4Hdo8u54xysbWIdKcFXEGFxUDqXFoKVZ0R/XsCnNak/f
+c+Girc4Gs9BMHaxH7txmSlVym7VzmZPT703c6s5VgJ+PZFzJiGLEj4DT7O+RYXCk
+qRjRC48m31NnD0mBj7ccyNUVH+kBWwDz1HTM53hX/PqU4bFtG3g9bIP0rennAFb2
+k+uQe8+8YNz0XrVFMtrFrZih7Od70+FNGpClgAThooYrdiBJg6TovmSdGYUmVGEw
+cBrcmcM/1JHm9GUC4gIkNq0fpnT9qVRSY3R9Iv3sCFWjl58UdJgzb2NcOvx1zv1t
+zI+c+1Y=
+=5mC1
+-----END PGP SIGNATURE-----
+--=-=-=--
+
+--===============7537849023780759856==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel@lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============7537849023780759856==--
