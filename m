@@ -1,41 +1,70 @@
-Return-Path: <SRS0=8FdJ=GH=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=ZQfw=GJ=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=BAYES_00,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,
-	URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=0.2 required=3.0 tests=BAYES_00,DKIM_ADSP_ALL,
+	DKIM_INVALID,DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,
+	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5807CC433DB
-	for <lustre-devel@archiver.kernel.org>; Mon,  4 Jan 2021 05:32:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2820BC433E0
+	for <lustre-devel@archiver.kernel.org>; Wed,  6 Jan 2021 09:33:56 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32BA0207B7
-	for <lustre-devel@archiver.kernel.org>; Mon,  4 Jan 2021 05:32:43 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32BA0207B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	by mail.kernel.org (Postfix) with ESMTPS id B10D02310B
+	for <lustre-devel@archiver.kernel.org>; Wed,  6 Jan 2021 09:33:55 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B10D02310B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=amazon.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6D10021F2C1;
-	Sun,  3 Jan 2021 21:32:43 -0800 (PST)
-Received: from mx2.suse.de (mx2.suse.de [195.135.220.15])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8FF7521F1CC
- for <lustre-devel@lists.lustre.org>; Sun,  3 Jan 2021 21:32:41 -0800 (PST)
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.221.27])
- by mx2.suse.de (Postfix) with ESMTP id 42223AD11;
- Mon,  4 Jan 2021 05:32:40 +0000 (UTC)
-From: NeilBrown <neilb@suse.de>
-To: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 04 Jan 2021 16:32:34 +1100
-In-Reply-To: <53FA16ED-D466-43C4-9958-6AE9452FA351@whamcloud.com>
-References: <87o8j1j8e0.fsf@notabene.neil.brown.name>
- <53FA16ED-D466-43C4-9958-6AE9452FA351@whamcloud.com>
-Message-ID: <87y2h9jmh9.fsf@notabene.neil.brown.name>
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id DBD3321CB58;
+	Wed,  6 Jan 2021 01:33:54 -0800 (PST)
+Received: from smtp-fw-2101.amazon.com (smtp-fw-2101.amazon.com [72.21.196.25])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 303CD21CA68
+ for <lustre-devel@lists.lustre.org>; Wed,  6 Jan 2021 01:33:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
+ t=1609925633; x=1641461633;
+ h=from:to:date:message-id:references:in-reply-to:
+ mime-version:subject;
+ bh=OQqV8s0aC7T0Q0M5a7b42ndiOmcxgjLkCKB8cmM3D4Y=;
+ b=WRUPh7k8Ck3cVgCeUEfbJ2mZciSawMqZSh2QKcS6UoJImwGD3snoHOUA
+ FaCKuBOSqXRw5GnO9QNG/8xA36geyVg5mfTanxDZ6HO324PpxqZi3MBKe
+ yHbaRir4vO8FpPbfOKa4zsUz6KZoWzn8JwO9YfMnX/IW2XxKfI93HbPLa U=;
+X-IronPort-AV: E=Sophos;i="5.78,479,1599523200"; d="scan'208,217";a="73117558"
+Thread-Topic: [lustre-devel] o2iblnd/socklnd security
+Received: from iad12-co-svc-p1-lb1-vlan3.amazon.com (HELO
+ email-inbound-relay-2c-87a10be6.us-west-2.amazon.com) ([10.43.8.6])
+ by smtp-border-fw-out-2101.iad2.amazon.com with ESMTP;
+ 06 Jan 2021 09:33:44 +0000
+Received: from EX13D21EUA003.ant.amazon.com
+ (pdx1-ws-svc-p6-lb9-vlan2.pdx.amazon.com [10.236.137.194])
+ by email-inbound-relay-2c-87a10be6.us-west-2.amazon.com (Postfix) with ESMTPS
+ id D2E79A1777; Wed,  6 Jan 2021 09:33:43 +0000 (UTC)
+Received: from EX13D21EUA004.ant.amazon.com (10.43.165.59) by
+ EX13D21EUA003.ant.amazon.com (10.43.165.39) with Microsoft SMTP Server (TLS)
+ id 15.0.1497.2; Wed, 6 Jan 2021 09:33:42 +0000
+Received: from EX13D21EUA004.ant.amazon.com ([10.43.165.59]) by
+ EX13D21EUA004.ant.amazon.com ([10.43.165.59]) with mapi id 15.00.1497.010;
+ Wed, 6 Jan 2021 09:33:42 +0000
+From: "Degremont, Aurelien" <degremoa@amazon.com>
+To: Amir Shehata <amir.shehata.whamcloud@gmail.com>, Lustre Development List
+ <lustre-devel@lists.lustre.org>
+Thread-Index: AQHW47kVuUd/usg+iUKI51tU/HY9o6oaZ1wA
+Date: Wed, 6 Jan 2021 09:33:42 +0000
+Message-ID: <7826A5FF-2C3C-4B6A-88A5-A4C6123F390C@amazon.com>
+References: <CAAqp6i0+WcOhW8cOYZSrZu+UMAgaDMA=zZnfbtJW--Nk9PQ44A@mail.gmail.com>
+In-Reply-To: <CAAqp6i0+WcOhW8cOYZSrZu+UMAgaDMA=zZnfbtJW--Nk9PQ44A@mail.gmail.com>
+Accept-Language: fr-FR, en-US
+Content-Language: fr-FR
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.43.166.254]
 MIME-Version: 1.0
-Subject: Re: [lustre-devel] An alternate approach to preparing lustre for
- upstream submission
+Subject: Re: [lustre-devel] o2iblnd/socklnd security
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -48,75 +77,142 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============6120984811531540405=="
+Content-Type: multipart/mixed; boundary="===============5400312488862274464=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============6120984811531540405==
-Content-Type: multipart/signed; boundary="=-=-=";
-	micalg=pgp-sha256; protocol="application/pgp-signature"
+--===============5400312488862274464==
+Content-Language: fr-FR
+Content-Type: multipart/alternative;
+	boundary="_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_"
 
---=-=-=
-Content-Type: text/plain
+--_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
+QmFzZWQgb24gbXkgZXhwZXJpZW5jZSwgcGVvcGxlIHVzdWFsbHkgZW5mb3JjZWQgcHJpdmlsZWdl
+ZCBwb3J0cyAodGhpcyBpcyBkZWZhdWx0IGFueXdheSwgbm8/KQ0KSSBvbmx5IHNlZSBjb21wbGV4
+IHNldHVwcyB3aGVyZSB0aGlzIGNvdWxkIGJlIGEgcHJvYmxlbSBmb3IgYWRtaW4sIGJ1dCB3aGF0
+IHByb2JsZW0gdGhpcyBvcHRpb24gaXMgY2F1c2luZyB0byB5b3U/DQoNCllvdSBzaG91bGQgcHJv
+YmFibHkgc2VuZCB0aGF0IHRvIGx1c3RyZS1kaXNjdXNzIGlmIHlvdSB3YW50IHRvIGhhdmUgYSBz
+aW1wbGUgc3VydmV5IG9mIHdoYXQgcGVvcGxlIGFyZSB1c2luZy4NCg0KRGUgOiBsdXN0cmUtZGV2
+ZWwgPGx1c3RyZS1kZXZlbC1ib3VuY2VzQGxpc3RzLmx1c3RyZS5vcmc+IGF1IG5vbSBkZSBBbWly
+IFNoZWhhdGEgPGFtaXIuc2hlaGF0YS53aGFtY2xvdWRAZ21haWwuY29tPg0KRGF0ZSA6IG1lcmNy
+ZWRpIDYgamFudmllciAyMDIxIMOgIDAwOjE4DQrDgCA6IEx1c3RyZSBEZXZlbG9wbWVudCBMaXN0
+IDxsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NCk9iamV0IDogW0VYVEVSTkFMXSBbbHVz
+dHJlLWRldmVsXSBvMmlibG5kL3NvY2tsbmQgc2VjdXJpdHkNCg0KDQpDQVVUSU9OOiBUaGlzIGVt
+YWlsIG9yaWdpbmF0ZWQgZnJvbSBvdXRzaWRlIG9mIHRoZSBvcmdhbml6YXRpb24uIERvIG5vdCBj
+bGljayBsaW5rcyBvciBvcGVuIGF0dGFjaG1lbnRzIHVubGVzcyB5b3UgY2FuIGNvbmZpcm0gdGhl
+IHNlbmRlciBhbmQga25vdyB0aGUgY29udGVudCBpcyBzYWZlLg0KDQoNCkhpLA0KDQpDdXJyZW50
+bHkgbzJpYmxuZCBoYXMgdHdvIHBhcmFtZXRlcnMNCg0KdXNlX3ByaXZpbGVnZWRfcG9ydCBhbmQg
+cmVxdWlyZV9wcml2aWxlZ2VkX3BvcnQgdG8gY29udHJvbCB0aGUgcG9ydCByYW5nZSB0byB1c2Uu
+IFRoZXkgY29udHJvbCB3aGV0aGVyIHRvIHVzZS9hY2NlcHQgYSBwcml2aWxlZ2VkIHBvcnQgKDEg
+LTEwMjMpIG9yIGFueSBwb3J0Lg0KDQpTaW1pbGFybHkgc29ja2xuZCBoYXMgYSBzaW1pbGFyIHBh
+cmFtZXRlcjogYWNjZXB0X3R5cGUuIElmIHNldCB0byAiYWxsIiB0aGVuIGFueSBwb3J0IHJhbmdl
+IGlzIGFjY2VwdGVkIG90aGVyd2lzZSwgb25seSBhIHByaXZpbGVnZWQgcG9ydCBpcyBhY2NlcHRl
+ZC4NCg0KSSdtIHRyeWluZyB0byBnZXQgYSBiZXR0ZXIgaWRlYSBvZiBob3cgdGhlc2UgYXJlIGJl
+aW5nIHVzZWQgb24gc2l0ZXMuIEFuZCBpZiBzbyBkbyBzaXRlcyB2YWx1ZSB0aGlzIGxldmVsIG9m
+IGNvbnRyb2w/IElFIGRvIHRoZXNlIHBhcmFtZXRlcnMgcHJvdmlkZSBhIGxldmVsIG9mIHNlY3Vy
+aXR5IHdoaWNoIGlzIGRlZW1lZCB2YWx1YWJsZT8NCg0KdGhhbmtzDQphbWlyDQo=
 
-Hi Andreas,
- thanks for your thorough review.
+--_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <C1E5C46233BAD34B997C4990F16108E9@amazon.com>
+Content-Transfer-Encoding: base64
 
- I've created
+PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
+bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
+dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
+dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
+dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
+dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
+bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
+ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
+IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
+IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQovKiBTdHlsZSBEZWZpbml0aW9ucyAqLw0KcC5Nc29Ob3Jt
+YWwsIGxpLk1zb05vcm1hbCwgZGl2Lk1zb05vcm1hbA0KCXttYXJnaW46MGNtOw0KCWZvbnQtc2l6
+ZToxMS4wcHQ7DQoJZm9udC1mYW1pbHk6IkNhbGlicmkiLHNhbnMtc2VyaWY7fQ0Kc3Bhbi5FbWFp
+bFN0eWxlMjANCgl7bXNvLXN0eWxlLXR5cGU6cGVyc29uYWwtcmVwbHk7DQoJZm9udC1mYW1pbHk6
+IkNhbGlicmkiLHNhbnMtc2VyaWY7DQoJY29sb3I6d2luZG93dGV4dDt9DQouTXNvQ2hwRGVmYXVs
+dA0KCXttc28tc3R5bGUtdHlwZTpleHBvcnQtb25seTsNCglmb250LXNpemU6MTAuMHB0O30NCkBw
+YWdlIFdvcmRTZWN0aW9uMQ0KCXtzaXplOjYxMi4wcHQgNzkyLjBwdDsNCgltYXJnaW46NzAuODVw
+dCA3MC44NXB0IDcwLjg1cHQgNzAuODVwdDt9DQpkaXYuV29yZFNlY3Rpb24xDQoJe3BhZ2U6V29y
+ZFNlY3Rpb24xO30NCi0tPjwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keSBsYW5nPSJGUiIgbGluaz0i
+IzA1NjNDMSIgdmxpbms9IiM5NTRGNzIiIHN0eWxlPSJ3b3JkLXdyYXA6YnJlYWstd29yZCI+DQo8
+ZGl2IGNsYXNzPSJXb3JkU2VjdGlvbjEiPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFu
+Zz0iRU4tVVMiIHN0eWxlPSJtc28tZmFyZWFzdC1sYW5ndWFnZTpFTi1VUyI+QmFzZWQgb24gbXkg
+ZXhwZXJpZW5jZSwgcGVvcGxlIHVzdWFsbHkgZW5mb3JjZWQgcHJpdmlsZWdlZCBwb3J0cyAodGhp
+cyBpcyBkZWZhdWx0IGFueXdheSwgbm8/KTxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNz
+PSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3Vh
+Z2U6RU4tVVMiPkkgb25seSBzZWUgY29tcGxleCBzZXR1cHMgd2hlcmUgdGhpcyBjb3VsZCBiZSBh
+IHByb2JsZW0gZm9yIGFkbWluLCBidXQgd2hhdCBwcm9ibGVtIHRoaXMgb3B0aW9uIGlzIGNhdXNp
+bmcgdG8geW91PzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxz
+cGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3VhZ2U6RU4tVVMiPjxvOnA+
+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9
+IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3VhZ2U6RU4tVVMiPllvdSBzaG91bGQgcHJv
+YmFibHkgc2VuZCB0aGF0IHRvIGx1c3RyZS1kaXNjdXNzIGlmIHlvdSB3YW50IHRvIGhhdmUgYSBz
+aW1wbGUgc3VydmV5IG9mIHdoYXQgcGVvcGxlIGFyZSB1c2luZy48bzpwPjwvbzpwPjwvc3Bhbj48
+L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9Im1zby1m
+YXJlYXN0LWxhbmd1YWdlOkVOLVVTIj48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8ZGl2
+IHN0eWxlPSJib3JkZXI6bm9uZTtib3JkZXItdG9wOnNvbGlkICNCNUM0REYgMS4wcHQ7cGFkZGlu
+ZzozLjBwdCAwY20gMGNtIDBjbSI+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2lu
+LWxlZnQ6MzUuNHB0Ij48Yj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjEyLjBwdDtjb2xvcjpibGFj
+ayI+RGUmbmJzcDs6DQo8L3NwYW4+PC9iPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTIuMHB0O2Nv
+bG9yOmJsYWNrIj5sdXN0cmUtZGV2ZWwgJmx0O2x1c3RyZS1kZXZlbC1ib3VuY2VzQGxpc3RzLmx1
+c3RyZS5vcmcmZ3Q7IGF1IG5vbSBkZSBBbWlyIFNoZWhhdGEgJmx0O2FtaXIuc2hlaGF0YS53aGFt
+Y2xvdWRAZ21haWwuY29tJmd0Ozxicj4NCjxiPkRhdGUmbmJzcDs6IDwvYj5tZXJjcmVkaSA2IGph
+bnZpZXIgMjAyMSDDoCAwMDoxODxicj4NCjxiPsOAJm5ic3A7OiA8L2I+THVzdHJlIERldmVsb3Bt
+ZW50IExpc3QgJmx0O2x1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnJmd0Ozxicj4NCjxiPk9i
+amV0Jm5ic3A7OiA8L2I+W0VYVEVSTkFMXSBbbHVzdHJlLWRldmVsXSBvMmlibG5kL3NvY2tsbmQg
+c2VjdXJpdHk8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwv
+cD4NCjwvZGl2Pg0KPGRpdj4NCjx0YWJsZSBjbGFzcz0iTXNvTm9ybWFsVGFibGUiIGJvcmRlcj0i
+MCIgY2VsbHNwYWNpbmc9IjAiIGNlbGxwYWRkaW5nPSIwIiB3aWR0aD0iNjI1IiBzdHlsZT0id2lk
+dGg6NDY4LjhwdDttYXJnaW4tbGVmdDozNS40cHQ7Ym9yZGVyLWNvbGxhcHNlOmNvbGxhcHNlIj4N
+Cjx0Ym9keT4NCjx0ciBzdHlsZT0iaGVpZ2h0OjE1LjI1cHQiPg0KPHRkIHdpZHRoPSI2MjUiIHZh
+bGlnbj0idG9wIiBzdHlsZT0id2lkdGg6NDY4LjhwdDtib3JkZXI6c29saWQgI0VEN0QzMSAxLjVw
+dDtwYWRkaW5nOjBjbSA1LjRwdCAwY20gNS40cHQ7aGVpZ2h0OjE1LjI1cHQiPg0KPHA+PHN0cm9u
+Zz48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q2FsaWJyaSZxdW90OyxzYW5zLXNlcmlm
+O2NvbG9yOmJsYWNrO2JhY2tncm91bmQ6I0ZGRkY5OSI+Q0FVVElPTjwvc3Bhbj48L3N0cm9uZz48
+c3BhbiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dyb3VuZDojRkZGRjk5Ij46IFRoaXMgZW1haWwg
+b3JpZ2luYXRlZCBmcm9tIG91dHNpZGUgb2YgdGhlIG9yZ2FuaXphdGlvbi4gRG8gbm90IGNsaWNr
+IGxpbmtzIG9yIG9wZW4gYXR0YWNobWVudHMgdW5sZXNzDQogeW91IGNhbiBjb25maXJtIHRoZSBz
+ZW5kZXIgYW5kIGtub3cgdGhlIGNvbnRlbnQgaXMgc2FmZS48L3NwYW4+PG86cD48L286cD48L3A+
+DQo8L3RkPg0KPC90cj4NCjwvdGJvZHk+DQo8L3RhYmxlPg0KPC9kaXY+DQo8cCBjbGFzcz0iTXNv
+Tm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvcD4N
+CjxkaXY+DQo8ZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4t
+bGVmdDozNS40cHQiPkhpLDxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+PG86cD4mbmJzcDs8L286cD48
+L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxl
+ZnQ6MzUuNHB0Ij5DdXJyZW50bHkgbzJpYmxuZCBoYXMgdHdvIHBhcmFtZXRlcnM8bzpwPjwvbzpw
+PjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4t
+bGVmdDozNS40cHQiPjxvOnA+Jm5ic3A7PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xh
+c3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+dXNlX3ByaXZpbGVnZWRf
+cG9ydCBhbmQgcmVxdWlyZV9wcml2aWxlZ2VkX3BvcnQgdG8gY29udHJvbCB0aGUgcG9ydCByYW5n
+ZSB0byB1c2UuIFRoZXkgY29udHJvbCB3aGV0aGVyIHRvIHVzZS9hY2NlcHQgYSBwcml2aWxlZ2Vk
+IHBvcnQgKDEgLTEwMjMpIG9yIGFueSBwb3J0LjxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2
+Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+PG86cD4m
+bmJzcDs8L286cD48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
+ZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij5TaW1pbGFybHkgc29ja2xuZCBoYXMgYSBzaW1pbGFyIHBh
+cmFtZXRlcjogYWNjZXB0X3R5cGUuIElmIHNldCB0byAmcXVvdDthbGwmcXVvdDsgdGhlbiBhbnkg
+cG9ydCByYW5nZSBpcyBhY2NlcHRlZCBvdGhlcndpc2UsIG9ubHkgYSBwcml2aWxlZ2VkIHBvcnQg
+aXMgYWNjZXB0ZWQuPG86cD48L286cD48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNv
+Tm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvcD4N
+CjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4tbGVmdDoz
+NS40cHQiPkknbSB0cnlpbmcgdG8gZ2V0IGEgYmV0dGVyIGlkZWEgb2YgaG93IHRoZXNlIGFyZSBi
+ZWluZyB1c2VkIG9uIHNpdGVzLiBBbmQgaWYgc28gZG8gc2l0ZXMgdmFsdWUgdGhpcyBsZXZlbCBv
+ZiBjb250cm9sPyBJRSBkbyB0aGVzZSBwYXJhbWV0ZXJzIHByb3ZpZGUgYSBsZXZlbCBvZiBzZWN1
+cml0eSB3aGljaCBpcyBkZWVtZWQgdmFsdWFibGU/PG86cD48L286cD48L3A+DQo8L2Rpdj4NCjxk
+aXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpw
+PiZuYnNwOzwvbzpwPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0
+eWxlPSJtYXJnaW4tbGVmdDozNS40cHQiPnRoYW5rczxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8
+ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+YW1p
+cjxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2JvZHk+
+DQo8L2h0bWw+DQo=
 
-  LU-14291 - Improve use of HAVE_SERVER_SUPPORT and others for
-    Linux-kernel client
-  LU-14290 - Convert fault-injection framework to match the model using
-    in linux
-  LU-14289 - Restrict libcfs to compatibility code only
-  LU-14288 - Enhance nodemap ranges to work better with IPv6
+--_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_--
 
- With respect to CDEBUG(), while no-one else may have stated a
- requirement to remove CDEBUG() for upstream submission, it is something
- that I personally feel strongly about.
- It isn't CDEBUG itself that is the problem, it is the back-end code for
- gathering the logs and writing them out.  I wouldn't feel comfortable
- submitting that code upstream.  This is the ring-buffer code that you
- mentioned.
-
- While tracepoint are often quite verbose code-wise as you suggest, I
- don't think they have to be.  I think (without actually having tried
- it) that trace_printk() can be used to crate an alternate CDEBUG()
- macro, so that all the CDEBUG() calls can be left unchanged.
- Converting some or all of these to more traditional tracepoints could
- be done later as the need or desire arose.  I will see if I can make
- this work in due course.
-
- I'm looking forward to the 2.14.0 release :-)
-
-Thanks,
-NeilBrown
-
---=-=-=
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQJCBAEBCAAsFiEEG8Yp69OQ2HB7X0l6Oeye3VZigbkFAl/yqHIOHG5laWxiQHN1
-c2UuZGUACgkQOeye3VZigbnKog//ZrIHQIJ3wuRn0amKfzSlfPm6ma5+smdIqWnh
-zUvKdovweSx47no9KlFDluBzstAglRTvknctLyLTsgwJ2BFcd7yRQ7qbWzyM/EOX
-JftrvGBMj8soGNYcQmTne0WMX5FvXe6umeqakYbyb0/AQ8S9BcyhERCUZdnObT3g
-Crj6UcANQwgz6G1lte1rf1hMVBQ4z3dn+Vh+20y3heeFZChgPrKtHhXvM00IA14a
-EGwZ6Ww9qXn79XwTUW+azynxGhMtGI7Cftts0QZ4OyzQt3nUB4Ba9ameivL0E+zr
-iel4428CFJdb+6uMPHLp2Bnwaw/KvxNw2mV96oiwOetgXARx04mwIEMX5gbnMKX1
-V3Z334S5Z/DgX8RmmI9sACIjc6EIDW3K8brKNOMsPxZphxfi62T4X3DdiPZp6L1W
-c66d6L3KkH0gLpSa0nNV/JnSlNiwCxnATaBhYma1c5S4rv8Dv8DCaL4tmbYgtPTY
-euX4g05e/J9iGllgAj2LUJ3KYsE22Sbi6uMulsU16xMvZ+Lpw3sAt5mbXlzUbKxM
-j0XJf7//Zu8K5suy8K5oMRlcIY1LKh0cd9gIP1zA1PyQpoYXG5ovtK1+99MQE0FC
-7KMmEJkygaf4Rxwe954cJ4a5zeqAJkw1PLUjTCLIx5IV4imHFMiXbFYJ97pVWv7A
-QwNFQ7I=
-=f9cV
------END PGP SIGNATURE-----
---=-=-=--
-
---===============6120984811531540405==
+--===============5400312488862274464==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -127,4 +223,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============6120984811531540405==--
+--===============5400312488862274464==--
