@@ -1,70 +1,61 @@
-Return-Path: <SRS0=ZQfw=GJ=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=fXOm=GL=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=0.2 required=3.0 tests=BAYES_00,DKIM_ADSP_ALL,
-	DKIM_INVALID,DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no
-	autolearn_force=no version=3.4.0
+X-Spam-Level: **
+X-Spam-Status: No, score=2.5 required=3.0 tests=BAYES_00,DKIM_ADSP_CUSTOM_MED,
+	DKIM_INVALID,DKIM_SIGNED,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2820BC433E0
-	for <lustre-devel@archiver.kernel.org>; Wed,  6 Jan 2021 09:33:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05186C433DB
+	for <lustre-devel@archiver.kernel.org>; Fri,  8 Jan 2021 19:44:42 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B10D02310B
-	for <lustre-devel@archiver.kernel.org>; Wed,  6 Jan 2021 09:33:55 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B10D02310B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=amazon.com
+	by mail.kernel.org (Postfix) with ESMTPS id 8C0A423A79
+	for <lustre-devel@archiver.kernel.org>; Fri,  8 Jan 2021 19:44:41 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C0A423A79
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id DBD3321CB58;
-	Wed,  6 Jan 2021 01:33:54 -0800 (PST)
-Received: from smtp-fw-2101.amazon.com (smtp-fw-2101.amazon.com [72.21.196.25])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 303CD21CA68
- for <lustre-devel@lists.lustre.org>; Wed,  6 Jan 2021 01:33:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
- t=1609925633; x=1641461633;
- h=from:to:date:message-id:references:in-reply-to:
- mime-version:subject;
- bh=OQqV8s0aC7T0Q0M5a7b42ndiOmcxgjLkCKB8cmM3D4Y=;
- b=WRUPh7k8Ck3cVgCeUEfbJ2mZciSawMqZSh2QKcS6UoJImwGD3snoHOUA
- FaCKuBOSqXRw5GnO9QNG/8xA36geyVg5mfTanxDZ6HO324PpxqZi3MBKe
- yHbaRir4vO8FpPbfOKa4zsUz6KZoWzn8JwO9YfMnX/IW2XxKfI93HbPLa U=;
-X-IronPort-AV: E=Sophos;i="5.78,479,1599523200"; d="scan'208,217";a="73117558"
-Thread-Topic: [lustre-devel] o2iblnd/socklnd security
-Received: from iad12-co-svc-p1-lb1-vlan3.amazon.com (HELO
- email-inbound-relay-2c-87a10be6.us-west-2.amazon.com) ([10.43.8.6])
- by smtp-border-fw-out-2101.iad2.amazon.com with ESMTP;
- 06 Jan 2021 09:33:44 +0000
-Received: from EX13D21EUA003.ant.amazon.com
- (pdx1-ws-svc-p6-lb9-vlan2.pdx.amazon.com [10.236.137.194])
- by email-inbound-relay-2c-87a10be6.us-west-2.amazon.com (Postfix) with ESMTPS
- id D2E79A1777; Wed,  6 Jan 2021 09:33:43 +0000 (UTC)
-Received: from EX13D21EUA004.ant.amazon.com (10.43.165.59) by
- EX13D21EUA003.ant.amazon.com (10.43.165.39) with Microsoft SMTP Server (TLS)
- id 15.0.1497.2; Wed, 6 Jan 2021 09:33:42 +0000
-Received: from EX13D21EUA004.ant.amazon.com ([10.43.165.59]) by
- EX13D21EUA004.ant.amazon.com ([10.43.165.59]) with mapi id 15.00.1497.010;
- Wed, 6 Jan 2021 09:33:42 +0000
-From: "Degremont, Aurelien" <degremoa@amazon.com>
-To: Amir Shehata <amir.shehata.whamcloud@gmail.com>, Lustre Development List
- <lustre-devel@lists.lustre.org>
-Thread-Index: AQHW47kVuUd/usg+iUKI51tU/HY9o6oaZ1wA
-Date: Wed, 6 Jan 2021 09:33:42 +0000
-Message-ID: <7826A5FF-2C3C-4B6A-88A5-A4C6123F390C@amazon.com>
-References: <CAAqp6i0+WcOhW8cOYZSrZu+UMAgaDMA=zZnfbtJW--Nk9PQ44A@mail.gmail.com>
-In-Reply-To: <CAAqp6i0+WcOhW8cOYZSrZu+UMAgaDMA=zZnfbtJW--Nk9PQ44A@mail.gmail.com>
-Accept-Language: fr-FR, en-US
-Content-Language: fr-FR
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-exchange-transport-fromentityheader: Hosted
-x-originating-ip: [10.43.166.254]
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3EB8B21CADD;
+	Fri,  8 Jan 2021 11:44:40 -0800 (PST)
+Received: from mail-yb1-f181.google.com (mail-yb1-f181.google.com
+ [209.85.219.181])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 601C021C9A3
+ for <lustre-devel@lists.lustre.org>; Fri,  8 Jan 2021 11:44:38 -0800 (PST)
+Received: by mail-yb1-f181.google.com with SMTP id b64so10411234ybg.7
+ for <lustre-devel@lists.lustre.org>; Fri, 08 Jan 2021 11:44:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:from:date:message-id:subject:to;
+ bh=0B+/s2oO0fRpqqr0mluBhQcWrCRw7NUhEw5uvpsFlsk=;
+ b=TO+tPXnt9s+yavpqpqDGWPuLRWuGCw96P5wUwNBLo7gGGw/oxcIp2z2XfvBUsZDTLR
+ dZjlbz+keeXDXQE6qbPJV7dV7rpfHbwKwMA7/kZE2bkyTGPKQ2JsxrHhtJpgGfnJqjw7
+ wTSwqoQBtI/afiaoF9x4HG6nLtDGBi1yH39r/t7Dpv0aewONRQKKnvDKvv9tE8hF6Wcl
+ 2xMyPZ+x1xqeunzb9IkAkljIy6PKjRBuKG57mOlSVNUa0H1RF8NFcJfbkd96nVGmvHuF
+ LQ/uAwg83Pv4ESkCPWDR2VaBF2w64wfSkZCMWzQsN1eR+fnsfH45kpRHGn64r0FaGXL3
+ Q/jw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
+ bh=0B+/s2oO0fRpqqr0mluBhQcWrCRw7NUhEw5uvpsFlsk=;
+ b=CbyG6TRZLwLXO8hgxxAEkxb+YhZQ1HRj/s5/EHJC/BO08NDwJNRtH1F01lPDGdYM1V
+ bXXiGwAWXVkTLYGOJP1D4a6DZbMuNy4YkNBNLRJShVGhzktEBaUtgsDvxKAcJpT7C+7T
+ mHuEeygIsehDihOgOWFvD8swFNoXNkKES3/jTyHbFw1rvKffG3LfbkD312PYGll0L5J/
+ 501JUlONUMx0BZUr8oLG9zlJ6gnZzAKD29MWj0xGW7Jg906kXDTzyRALZrshKlxa96nm
+ L9PHMkzFlzId6GvWeYc1WdU6ON4Z+txrW2hujrtk6APcV87NR/yUHC27SS70qV2dCzoF
+ Zdgw==
+X-Gm-Message-State: AOAM531Kr2HriqtyLEkZZZAEmlOyvx62sade6lEaJRQDEuqq/txgSJLm
+ aBWvyO0YRZ/Lhg+S2A6tiuUBV01F1BwIWBlmQtkRRj7Ohe4SKA==
+X-Google-Smtp-Source: ABdhPJzAR25LbUvaAz5gqPWNjNjHUtA2tN98WL/bdYBCObyo7X3cA9nGHydgFdjftV6DE+tbQXaL0TE7JHI79Jw2RHs=
+X-Received: by 2002:a25:5e42:: with SMTP id s63mr8485705ybb.202.1610135077218; 
+ Fri, 08 Jan 2021 11:44:37 -0800 (PST)
 MIME-Version: 1.0
-Subject: Re: [lustre-devel] o2iblnd/socklnd security
+From: Nathan Rutman <nrutman@gmail.com>
+Date: Fri, 8 Jan 2021 11:44:26 -0800
+Message-ID: <CAA4iDz6+c4Qthf+aEYZf+7gugX_1mqoSucaB1RTrE2DkU6P1VQ@mail.gmail.com>
+To: lustre-devel@lists.lustre.org
+Subject: [lustre-devel] modern precreate
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -77,142 +68,134 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============5400312488862274464=="
+Content-Type: multipart/mixed; boundary="===============8998494049013725095=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============5400312488862274464==
-Content-Language: fr-FR
-Content-Type: multipart/alternative;
-	boundary="_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_"
+--===============8998494049013725095==
+Content-Type: multipart/alternative; boundary="000000000000516fb205b868c908"
 
---_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+--000000000000516fb205b868c908
+Content-Type: text/plain; charset="UTF-8"
 
-QmFzZWQgb24gbXkgZXhwZXJpZW5jZSwgcGVvcGxlIHVzdWFsbHkgZW5mb3JjZWQgcHJpdmlsZWdl
-ZCBwb3J0cyAodGhpcyBpcyBkZWZhdWx0IGFueXdheSwgbm8/KQ0KSSBvbmx5IHNlZSBjb21wbGV4
-IHNldHVwcyB3aGVyZSB0aGlzIGNvdWxkIGJlIGEgcHJvYmxlbSBmb3IgYWRtaW4sIGJ1dCB3aGF0
-IHByb2JsZW0gdGhpcyBvcHRpb24gaXMgY2F1c2luZyB0byB5b3U/DQoNCllvdSBzaG91bGQgcHJv
-YmFibHkgc2VuZCB0aGF0IHRvIGx1c3RyZS1kaXNjdXNzIGlmIHlvdSB3YW50IHRvIGhhdmUgYSBz
-aW1wbGUgc3VydmV5IG9mIHdoYXQgcGVvcGxlIGFyZSB1c2luZy4NCg0KRGUgOiBsdXN0cmUtZGV2
-ZWwgPGx1c3RyZS1kZXZlbC1ib3VuY2VzQGxpc3RzLmx1c3RyZS5vcmc+IGF1IG5vbSBkZSBBbWly
-IFNoZWhhdGEgPGFtaXIuc2hlaGF0YS53aGFtY2xvdWRAZ21haWwuY29tPg0KRGF0ZSA6IG1lcmNy
-ZWRpIDYgamFudmllciAyMDIxIMOgIDAwOjE4DQrDgCA6IEx1c3RyZSBEZXZlbG9wbWVudCBMaXN0
-IDxsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NCk9iamV0IDogW0VYVEVSTkFMXSBbbHVz
-dHJlLWRldmVsXSBvMmlibG5kL3NvY2tsbmQgc2VjdXJpdHkNCg0KDQpDQVVUSU9OOiBUaGlzIGVt
-YWlsIG9yaWdpbmF0ZWQgZnJvbSBvdXRzaWRlIG9mIHRoZSBvcmdhbml6YXRpb24uIERvIG5vdCBj
-bGljayBsaW5rcyBvciBvcGVuIGF0dGFjaG1lbnRzIHVubGVzcyB5b3UgY2FuIGNvbmZpcm0gdGhl
-IHNlbmRlciBhbmQga25vdyB0aGUgY29udGVudCBpcyBzYWZlLg0KDQoNCkhpLA0KDQpDdXJyZW50
-bHkgbzJpYmxuZCBoYXMgdHdvIHBhcmFtZXRlcnMNCg0KdXNlX3ByaXZpbGVnZWRfcG9ydCBhbmQg
-cmVxdWlyZV9wcml2aWxlZ2VkX3BvcnQgdG8gY29udHJvbCB0aGUgcG9ydCByYW5nZSB0byB1c2Uu
-IFRoZXkgY29udHJvbCB3aGV0aGVyIHRvIHVzZS9hY2NlcHQgYSBwcml2aWxlZ2VkIHBvcnQgKDEg
-LTEwMjMpIG9yIGFueSBwb3J0Lg0KDQpTaW1pbGFybHkgc29ja2xuZCBoYXMgYSBzaW1pbGFyIHBh
-cmFtZXRlcjogYWNjZXB0X3R5cGUuIElmIHNldCB0byAiYWxsIiB0aGVuIGFueSBwb3J0IHJhbmdl
-IGlzIGFjY2VwdGVkIG90aGVyd2lzZSwgb25seSBhIHByaXZpbGVnZWQgcG9ydCBpcyBhY2NlcHRl
-ZC4NCg0KSSdtIHRyeWluZyB0byBnZXQgYSBiZXR0ZXIgaWRlYSBvZiBob3cgdGhlc2UgYXJlIGJl
-aW5nIHVzZWQgb24gc2l0ZXMuIEFuZCBpZiBzbyBkbyBzaXRlcyB2YWx1ZSB0aGlzIGxldmVsIG9m
-IGNvbnRyb2w/IElFIGRvIHRoZXNlIHBhcmFtZXRlcnMgcHJvdmlkZSBhIGxldmVsIG9mIHNlY3Vy
-aXR5IHdoaWNoIGlzIGRlZW1lZCB2YWx1YWJsZT8NCg0KdGhhbmtzDQphbWlyDQo=
+Riffing on something Andreas said in a lustre-discuss thread, I'm
+hoping someone can correct my understanding of how precreate works
+currently.
 
---_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_
-Content-Type: text/html; charset="utf-8"
-Content-ID: <C1E5C46233BAD34B997C4990F16108E9@amazon.com>
-Content-Transfer-Encoding: base64
+Olden days:
 
-PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
-bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
-dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
-dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
-dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
-dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
-bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
-ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
-IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
-IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQovKiBTdHlsZSBEZWZpbml0aW9ucyAqLw0KcC5Nc29Ob3Jt
-YWwsIGxpLk1zb05vcm1hbCwgZGl2Lk1zb05vcm1hbA0KCXttYXJnaW46MGNtOw0KCWZvbnQtc2l6
-ZToxMS4wcHQ7DQoJZm9udC1mYW1pbHk6IkNhbGlicmkiLHNhbnMtc2VyaWY7fQ0Kc3Bhbi5FbWFp
-bFN0eWxlMjANCgl7bXNvLXN0eWxlLXR5cGU6cGVyc29uYWwtcmVwbHk7DQoJZm9udC1mYW1pbHk6
-IkNhbGlicmkiLHNhbnMtc2VyaWY7DQoJY29sb3I6d2luZG93dGV4dDt9DQouTXNvQ2hwRGVmYXVs
-dA0KCXttc28tc3R5bGUtdHlwZTpleHBvcnQtb25seTsNCglmb250LXNpemU6MTAuMHB0O30NCkBw
-YWdlIFdvcmRTZWN0aW9uMQ0KCXtzaXplOjYxMi4wcHQgNzkyLjBwdDsNCgltYXJnaW46NzAuODVw
-dCA3MC44NXB0IDcwLjg1cHQgNzAuODVwdDt9DQpkaXYuV29yZFNlY3Rpb24xDQoJe3BhZ2U6V29y
-ZFNlY3Rpb24xO30NCi0tPjwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keSBsYW5nPSJGUiIgbGluaz0i
-IzA1NjNDMSIgdmxpbms9IiM5NTRGNzIiIHN0eWxlPSJ3b3JkLXdyYXA6YnJlYWstd29yZCI+DQo8
-ZGl2IGNsYXNzPSJXb3JkU2VjdGlvbjEiPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFu
-Zz0iRU4tVVMiIHN0eWxlPSJtc28tZmFyZWFzdC1sYW5ndWFnZTpFTi1VUyI+QmFzZWQgb24gbXkg
-ZXhwZXJpZW5jZSwgcGVvcGxlIHVzdWFsbHkgZW5mb3JjZWQgcHJpdmlsZWdlZCBwb3J0cyAodGhp
-cyBpcyBkZWZhdWx0IGFueXdheSwgbm8/KTxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNz
-PSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3Vh
-Z2U6RU4tVVMiPkkgb25seSBzZWUgY29tcGxleCBzZXR1cHMgd2hlcmUgdGhpcyBjb3VsZCBiZSBh
-IHByb2JsZW0gZm9yIGFkbWluLCBidXQgd2hhdCBwcm9ibGVtIHRoaXMgb3B0aW9uIGlzIGNhdXNp
-bmcgdG8geW91PzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxz
-cGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3VhZ2U6RU4tVVMiPjxvOnA+
-Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9
-IkVOLVVTIiBzdHlsZT0ibXNvLWZhcmVhc3QtbGFuZ3VhZ2U6RU4tVVMiPllvdSBzaG91bGQgcHJv
-YmFibHkgc2VuZCB0aGF0IHRvIGx1c3RyZS1kaXNjdXNzIGlmIHlvdSB3YW50IHRvIGhhdmUgYSBz
-aW1wbGUgc3VydmV5IG9mIHdoYXQgcGVvcGxlIGFyZSB1c2luZy48bzpwPjwvbzpwPjwvc3Bhbj48
-L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9Im1zby1m
-YXJlYXN0LWxhbmd1YWdlOkVOLVVTIj48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8ZGl2
-IHN0eWxlPSJib3JkZXI6bm9uZTtib3JkZXItdG9wOnNvbGlkICNCNUM0REYgMS4wcHQ7cGFkZGlu
-ZzozLjBwdCAwY20gMGNtIDBjbSI+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2lu
-LWxlZnQ6MzUuNHB0Ij48Yj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjEyLjBwdDtjb2xvcjpibGFj
-ayI+RGUmbmJzcDs6DQo8L3NwYW4+PC9iPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTIuMHB0O2Nv
-bG9yOmJsYWNrIj5sdXN0cmUtZGV2ZWwgJmx0O2x1c3RyZS1kZXZlbC1ib3VuY2VzQGxpc3RzLmx1
-c3RyZS5vcmcmZ3Q7IGF1IG5vbSBkZSBBbWlyIFNoZWhhdGEgJmx0O2FtaXIuc2hlaGF0YS53aGFt
-Y2xvdWRAZ21haWwuY29tJmd0Ozxicj4NCjxiPkRhdGUmbmJzcDs6IDwvYj5tZXJjcmVkaSA2IGph
-bnZpZXIgMjAyMSDDoCAwMDoxODxicj4NCjxiPsOAJm5ic3A7OiA8L2I+THVzdHJlIERldmVsb3Bt
-ZW50IExpc3QgJmx0O2x1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnJmd0Ozxicj4NCjxiPk9i
-amV0Jm5ic3A7OiA8L2I+W0VYVEVSTkFMXSBbbHVzdHJlLWRldmVsXSBvMmlibG5kL3NvY2tsbmQg
-c2VjdXJpdHk8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0i
-TXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwv
-cD4NCjwvZGl2Pg0KPGRpdj4NCjx0YWJsZSBjbGFzcz0iTXNvTm9ybWFsVGFibGUiIGJvcmRlcj0i
-MCIgY2VsbHNwYWNpbmc9IjAiIGNlbGxwYWRkaW5nPSIwIiB3aWR0aD0iNjI1IiBzdHlsZT0id2lk
-dGg6NDY4LjhwdDttYXJnaW4tbGVmdDozNS40cHQ7Ym9yZGVyLWNvbGxhcHNlOmNvbGxhcHNlIj4N
-Cjx0Ym9keT4NCjx0ciBzdHlsZT0iaGVpZ2h0OjE1LjI1cHQiPg0KPHRkIHdpZHRoPSI2MjUiIHZh
-bGlnbj0idG9wIiBzdHlsZT0id2lkdGg6NDY4LjhwdDtib3JkZXI6c29saWQgI0VEN0QzMSAxLjVw
-dDtwYWRkaW5nOjBjbSA1LjRwdCAwY20gNS40cHQ7aGVpZ2h0OjE1LjI1cHQiPg0KPHA+PHN0cm9u
-Zz48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q2FsaWJyaSZxdW90OyxzYW5zLXNlcmlm
-O2NvbG9yOmJsYWNrO2JhY2tncm91bmQ6I0ZGRkY5OSI+Q0FVVElPTjwvc3Bhbj48L3N0cm9uZz48
-c3BhbiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dyb3VuZDojRkZGRjk5Ij46IFRoaXMgZW1haWwg
-b3JpZ2luYXRlZCBmcm9tIG91dHNpZGUgb2YgdGhlIG9yZ2FuaXphdGlvbi4gRG8gbm90IGNsaWNr
-IGxpbmtzIG9yIG9wZW4gYXR0YWNobWVudHMgdW5sZXNzDQogeW91IGNhbiBjb25maXJtIHRoZSBz
-ZW5kZXIgYW5kIGtub3cgdGhlIGNvbnRlbnQgaXMgc2FmZS48L3NwYW4+PG86cD48L286cD48L3A+
-DQo8L3RkPg0KPC90cj4NCjwvdGJvZHk+DQo8L3RhYmxlPg0KPC9kaXY+DQo8cCBjbGFzcz0iTXNv
-Tm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvcD4N
-CjxkaXY+DQo8ZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4t
-bGVmdDozNS40cHQiPkhpLDxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
-Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+PG86cD4mbmJzcDs8L286cD48
-L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxl
-ZnQ6MzUuNHB0Ij5DdXJyZW50bHkgbzJpYmxuZCBoYXMgdHdvIHBhcmFtZXRlcnM8bzpwPjwvbzpw
-PjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4t
-bGVmdDozNS40cHQiPjxvOnA+Jm5ic3A7PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xh
-c3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+dXNlX3ByaXZpbGVnZWRf
-cG9ydCBhbmQgcmVxdWlyZV9wcml2aWxlZ2VkX3BvcnQgdG8gY29udHJvbCB0aGUgcG9ydCByYW5n
-ZSB0byB1c2UuIFRoZXkgY29udHJvbCB3aGV0aGVyIHRvIHVzZS9hY2NlcHQgYSBwcml2aWxlZ2Vk
-IHBvcnQgKDEgLTEwMjMpIG9yIGFueSBwb3J0LjxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2
-Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+PG86cD4m
-bmJzcDs8L286cD48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
-ZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij5TaW1pbGFybHkgc29ja2xuZCBoYXMgYSBzaW1pbGFyIHBh
-cmFtZXRlcjogYWNjZXB0X3R5cGUuIElmIHNldCB0byAmcXVvdDthbGwmcXVvdDsgdGhlbiBhbnkg
-cG9ydCByYW5nZSBpcyBhY2NlcHRlZCBvdGhlcndpc2UsIG9ubHkgYSBwcml2aWxlZ2VkIHBvcnQg
-aXMgYWNjZXB0ZWQuPG86cD48L286cD48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNv
-Tm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvcD4N
-CjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4tbGVmdDoz
-NS40cHQiPkknbSB0cnlpbmcgdG8gZ2V0IGEgYmV0dGVyIGlkZWEgb2YgaG93IHRoZXNlIGFyZSBi
-ZWluZyB1c2VkIG9uIHNpdGVzLiBBbmQgaWYgc28gZG8gc2l0ZXMgdmFsdWUgdGhpcyBsZXZlbCBv
-ZiBjb250cm9sPyBJRSBkbyB0aGVzZSBwYXJhbWV0ZXJzIHByb3ZpZGUgYSBsZXZlbCBvZiBzZWN1
-cml0eSB3aGljaCBpcyBkZWVtZWQgdmFsdWFibGU/PG86cD48L286cD48L3A+DQo8L2Rpdj4NCjxk
-aXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibWFyZ2luLWxlZnQ6MzUuNHB0Ij48bzpw
-PiZuYnNwOzwvbzpwPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0
-eWxlPSJtYXJnaW4tbGVmdDozNS40cHQiPnRoYW5rczxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8
-ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdpbi1sZWZ0OjM1LjRwdCI+YW1p
-cjxvOnA+PC9vOnA+PC9wPg0KPC9kaXY+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2JvZHk+
-DQo8L2h0bWw+DQo=
+MDS would ask each OST for a set of precreated objects via a MDT->OST
+RPC. These have to be cleaned up during recovery, hence a cap. These
+were used up as MDS assigned them to layouts, and so MDS has to go
+back and get more, even for 0-length files.
 
---_000_7826A5FF2C3C4B6A88A5A4C6123F390Camazoncom_--
+Modern days, Lustre 2.5+:
 
---===============5400312488862274464==
+MDT doesn't hold a pool of OST objects but instead takes an OST fid
+range from a FLD server instead. Each MD object has a mapping with an
+eventual OST object by this fid. The OST side just holds a small
+number of anonymous objects and assigns the fid to an object when any
+operation is executed without an existing FID->inode mapping on the
+OST.There is no more precreate RPC necessary, since OSTs maintain
+their own pool of anonymous objects and only use them up when data is
+actually written, and can create more when running low. There is no
+recovery cleanup needed on the OSTs.
+In this case, there should be no performance difference between create
+and mknod except for the FLD operation, and the number of OSTs should
+not matter for create rates.
+
+Is my understanding wrong? It clearly must be, since Andreas is still
+talking OST_CREATE rpc and recovery implications, and we do see a
+performance difference with mknod and creating files with layouts.
+
+[lustre-discuss] Improving file create performance with larger create_count)
+
+The max_create_count is between 32 and 20000 (for protocol recovery
+reasons, since unused precreated objects are destroyed during
+recovery, and we put a cap on how many objects could be destroyed to
+avoid badness in case of a bug) so this is already at the maximum.
+You should be able to increase the create_count to 20000 as well.
+However, this value is "auto tuned" based on how long it takes the OSS
+to create the requested objects.  If the OST_CREATE RPC takes too long
+then the MDS will ask for fewer objects next time.
+> * Is there a theoretical down side to pre-creating more objects?  (MDS or OSS memory usage?  Longer mount times? slower e2fsck?)
+> A bit slower e2fsck, but compared to the total filesystem size this is minor.  The biggest issue is that the old precreated objects will be destroyed during MDS-OSS recovery and new ones created.
+
+--000000000000516fb205b868c908
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><pre style=3D"white-space:pre-wrap;color:rgb(0,0,0)"><h1 s=
+tyle=3D"white-space:normal"><span style=3D"font-weight:normal"><font size=
+=3D"2" style=3D""></font></span></h1></pre><pre style=3D"white-space:pre-wr=
+ap"><font color=3D"#000000" style=3D"background-color:rgb(255,255,255)" fac=
+e=3D"arial, sans-serif">Riffing on something Andreas said in a lustre-discu=
+ss thread, I&#39;m hoping someone can correct my understanding of how precr=
+eate works currently.</font></pre><pre style=3D"white-space:pre-wrap"><font=
+ color=3D"#000000" style=3D"background-color:rgb(255,255,255)" face=3D"aria=
+l, sans-serif">Olden days: </font></pre><pre style=3D"white-space:pre-wrap"=
+><font color=3D"#000000" style=3D"background-color:rgb(255,255,255)" face=
+=3D"arial, sans-serif">MDS would ask each OST for a set of precreated objec=
+ts via a MDT-&gt;OST RPC. These have to be cleaned up during recovery, henc=
+e a cap. These were used up as MDS assigned them to layouts, and so MDS has=
+ to go back and get more, even for 0-length files.</font></pre><pre style=
+=3D"white-space:pre-wrap"><font color=3D"#000000" style=3D"background-color=
+:rgb(255,255,255)" face=3D"arial, sans-serif">Modern days, Lustre 2.5+:</fo=
+nt></pre><pre style=3D"white-space:pre-wrap"><span style=3D"box-sizing:inhe=
+rit;font-variant-ligatures:common-ligatures;white-space:normal;background-c=
+olor:rgb(255,255,255)"><font color=3D"#000000" style=3D"" face=3D"arial, sa=
+ns-serif">MDT doesn&#39;t hold a pool of OST objects but instead takes an O=
+ST fid range from a FLD server instead. Each MD object has a mapping with a=
+n eventual OST object by this fid. The OST side just holds a small number o=
+f anonymous objects and assigns the fid to an object when any operation is =
+executed without an existing FID-&gt;inode mapping on the OST.</font></span=
+><span class=3D"gmail-c-mrkdwn__br" style=3D"box-sizing:inherit;display:blo=
+ck;height:8px;font-variant-ligatures:common-ligatures;white-space:normal"><=
+/span><font color=3D"#000000" style=3D"background-color:rgb(255,255,255)" f=
+ace=3D"arial, sans-serif"><span style=3D"box-sizing:inherit;font-variant-li=
+gatures:common-ligatures;white-space:normal">There is no more precreate RPC=
+ necessary, since OSTs maintain their own pool of anonymous objects and onl=
+y use them up when data is actually written, and can create more when runni=
+ng low. There is no recovery cleanup needed on the OSTs.=C2=A0</span><br st=
+yle=3D"box-sizing:inherit;font-variant-ligatures:common-ligatures;white-spa=
+ce:normal"><span style=3D"box-sizing:inherit;font-variant-ligatures:common-=
+ligatures;white-space:normal">In this case, there should be no performance =
+difference between create and mknod except for the FLD operation, and the n=
+umber of OSTs should not matter for create rates.</span></font></pre><pre s=
+tyle=3D""><font color=3D"#000000" face=3D"arial, sans-serif"><span style=3D=
+"font-variant-ligatures:common-ligatures;white-space:normal">Is my understa=
+nding wrong? It clearly must be, since Andreas is still talking OST_CREATE =
+rpc and recovery implications, and we do see a performance difference with =
+mknod and creating files with layouts.<br></span></font><span class=3D"gmai=
+l-c-mrkdwn__br" style=3D"white-space:normal;box-sizing:inherit;display:bloc=
+k;height:8px;font-variant-ligatures:common-ligatures"></span><span class=3D=
+"gmail-c-mrkdwn__br" style=3D"white-space:normal;box-sizing:inherit;display=
+:block;height:8px;font-variant-ligatures:common-ligatures"><br></span></pre=
+><pre style=3D"white-space:pre-wrap;color:rgb(0,0,0)"><blockquote class=3D"=
+gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(20=
+4,204,204);padding-left:1ex">[lustre-discuss] Improving file create perform=
+ance with larger create_count)<span style=3D"font-family:Arial,Helvetica,sa=
+ns-serif">=C2=A0</span><span style=3D"font-family:Arial,Helvetica,sans-seri=
+f">=C2=A0</span></blockquote><blockquote class=3D"gmail_quote" style=3D"mar=
+gin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1=
+ex">The max_create_count is between 32 and 20000 (for protocol recovery rea=
+sons, since unused precreated objects are destroyed during recovery, and we=
+ put a cap on how many objects could be destroyed to avoid badness in case =
+of a bug) so this is already at the maximum.  You should be able to increas=
+e the create_count to 20000 as well. However, this value is &quot;auto tune=
+d&quot; based on how long it takes the OSS to create the requested objects.=
+  If the OST_CREATE RPC takes too long then the MDS will ask for fewer obje=
+cts next time.
+* Is there a theoretical down side to pre-creating more objects?  (MDS or O=
+SS memory usage?  Longer mount times? slower e2fsck?)
+A bit slower e2fsck, but compared to the total filesystem size this is mino=
+r.  The biggest issue is that the old precreated objects will be destroyed =
+during MDS-OSS recovery and new ones created.</blockquote></pre><br class=
+=3D"gmail-Apple-interchange-newline"></div>
+
+--000000000000516fb205b868c908--
+
+--===============8998494049013725095==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -223,4 +206,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============5400312488862274464==--
+--===============8998494049013725095==--
