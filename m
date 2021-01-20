@@ -1,4 +1,4 @@
-Return-Path: <SRS0=SMzG=GW=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=mxas=GX=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: **
@@ -7,56 +7,55 @@ X-Spam-Status: No, score=2.5 required=3.0 tests=BAYES_00,DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,SPF_HELO_NONE,
 	SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB3DAC433E0
-	for <lustre-devel@archiver.kernel.org>; Tue, 19 Jan 2021 19:40:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65449C433E0
+	for <lustre-devel@archiver.kernel.org>; Wed, 20 Jan 2021 08:53:19 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6252923105
-	for <lustre-devel@archiver.kernel.org>; Tue, 19 Jan 2021 19:40:58 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6252923105
+	by mail.kernel.org (Postfix) with ESMTPS id 01C4322C9E
+	for <lustre-devel@archiver.kernel.org>; Wed, 20 Jan 2021 08:53:18 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01C4322C9E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9DB8121FC01;
-	Tue, 19 Jan 2021 11:40:57 -0800 (PST)
-Received: from mail-wm1-f48.google.com (mail-wm1-f48.google.com
- [209.85.128.48])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2CBCD21FBB8
- for <lustre-devel@lists.lustre.org>; Tue, 19 Jan 2021 11:40:56 -0800 (PST)
-Received: by mail-wm1-f48.google.com with SMTP id v184so816499wma.1
- for <lustre-devel@lists.lustre.org>; Tue, 19 Jan 2021 11:40:56 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0C39021F76D;
+	Wed, 20 Jan 2021 00:53:18 -0800 (PST)
+Received: from mail-lj1-f175.google.com (mail-lj1-f175.google.com
+ [209.85.208.175])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 03BA421F753
+ for <lustre-devel@lists.lustre.org>; Wed, 20 Jan 2021 00:53:16 -0800 (PST)
+Received: by mail-lj1-f175.google.com with SMTP id e7so25151486ljg.10
+ for <lustre-devel@lists.lustre.org>; Wed, 20 Jan 2021 00:53:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:from:date:message-id:subject:to;
- bh=2levCexlLb2ez732rNV4VsGngEdmvpDVkC1+pUEoxcs=;
- b=SzrHRMakUiPNIy46ODH7KzBboyyOT/AbCBa1bgCNgbiYgmGeDtGjqSr0StNV00UIoR
- 6TfMwrJhcAqppRL/Fq4N1kC0jYWF1sRmwJmQ0KPKJf/voKuaVGvgnFRYXHQb/T75DYbr
- S9+82ryQWjHa02M3Q4QcZV7wd6bdCF6xPVw7Vtb2bIAb9fML9rWLIrieQq5tsMfAi0af
- 6qAAoWNYhpFjeNCU7IPUQ/86VyL3UsVLL5WWrIspChIrE1kF0UaMgrAEjGDocF+UFFla
- LqbSDM3bhTk9fwFq4BoKpV2eSJog20hwFzbcZRD9BAcKxS3/MMCzIt3tZH/HK+WAHpQ+
- +KjQ==
+ bh=8XspzKd613IXhqaH2DkkFEnB2whF0KhAeoL97uPNWtY=;
+ b=P3tOLNGeF2Y3PoWU/ZEiSa66IfBfOIrfYMqJUMxpQB6nyOM32JLLWr++df2/BJza90
+ 1woUWtevP17Py6+XFipfhEkT79UAUDWVeCUoHcCpDo1C9MT54THR9c+At2DLl3urtCDf
+ sl9Z8i0g3gqUVOhARVEA1qNYIUldhCVMTt2brpBWw8YecPdEEnkZxa8snn9WH1R/3Kkn
+ usBiACY9XXN5g1+Xe/SMw9eMpiRkQ8gXTPuvpdJcJxMEdmCv2D5C4SlQ8N2UwusfR9T5
+ ZBOwQ1d4MnR83mCSeGm9+95vExsJDAAAwwcROi2l+VUdd0jWnkqOW2X5pWE05lGd3pc4
+ 3yYQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
- bh=2levCexlLb2ez732rNV4VsGngEdmvpDVkC1+pUEoxcs=;
- b=FkyYvkZs5nTaDBEv0Vis9p75EfrxAbedndhziGm+d2kQAcgZqdZK1ZpJb8+kckRZ02
- rqA/5eZaImCqBRP3LTeFsQR56/06ScBPKufeX+7/CjjvD+TXOYvYY51kWVWsSxzGrtDo
- XL2YjYfCYwveZTR2jVgfq9VXk/uoENc4tM/AyL1QEkzbrtNWzDazp9xIkovtV0WS+L2o
- a1KGtlwVai7yv6vwxslMh7k3DevxgClL3dekskkOMsyyMEpwNDOxHWBC4UQf1cOiGYpN
- ELjDALPrexTk6PnqswidUQdT0Fk52hrAedZpohKlFwHb177M9r3x+nhN5GJDC7irUPfA
- 0CVg==
-X-Gm-Message-State: AOAM533+vZAUSTxU++Nn3E9fJuxXGZeoBmZK7n2DPTeaNkicUObsr9F1
- PzIsF4tP7sKTfqAd/B/NXBVgw1Rh8QylE09MqCj0eCvMdNg=
-X-Google-Smtp-Source: ABdhPJy8UZhQh+mUCWps5++1VEXU6Pw4YgyLL+ED+vrwADgrd5yL0HktFHY9VmvgfeEF6XbOlmr4BBBdX+bOvaonxww=
-X-Received: by 2002:a1c:ba83:: with SMTP id k125mr1060139wmf.5.1611085254264; 
- Tue, 19 Jan 2021 11:40:54 -0800 (PST)
+ bh=8XspzKd613IXhqaH2DkkFEnB2whF0KhAeoL97uPNWtY=;
+ b=Eu8GR2OHeJFHhhtq/KFJ+IgAJ85/tJnY+qKqnF8zGz+yKbbuIaBidLrNs19Yn7g9Zz
+ MbsyGNoGbW9gLmEEgB/3LQ1GpOBNosrGTTY/Cafg3JjL5NcZTeSYLMP4D09C3TOnuLnt
+ ElPfajXFWrBoZyu+15YZErw5PVyLI1qjxGHdSBw1vSSJthuljt9e0+GtEGhVM3uO0ksx
+ dCP0HwxRkhzQAxwc2rDP7C31M266h2GtYS35r/Bm8tk/FzYEnFGi+jjJ8MMIJ7Nn/T7s
+ g137jf4ag0dazT4n53NrXeCd1lylhUVFsVA5jF/ubxJmnzSeWYICttzJDVkGTgluhOL0
+ YduA==
+X-Gm-Message-State: AOAM531mrBKLK4BPHq3swssu5r3bO+fb5JKawDWTwnUKyb6G8ZnV91Vw
+ E57v8+I6ZaOLWRayUD2ALPkXMf2hYoWcOE5Dty6Hf7EB
+X-Google-Smtp-Source: ABdhPJxIJPinw1hNFjHQQaa00lxYYanfWhNaxmCU/dsuefBjquBeXn3MxPsXoBjAtbfEJLdXbEMehw79o74YQNbr0iI=
+X-Received: by 2002:a2e:86d2:: with SMTP id n18mr2575462ljj.398.1611132794012; 
+ Wed, 20 Jan 2021 00:53:14 -0800 (PST)
 MIME-Version: 1.0
-From: Sudheendra Sampath <sudheendra.sampath@gmail.com>
-Date: Tue, 19 Jan 2021 11:40:18 -0800
-Message-ID: <CABnqofyTN6Cr8JaMgeoke5TWG9j0JL_vMq03YPd8sYuRHXfqcw@mail.gmail.com>
+From: pankaj sharma <vashist.pankaj@gmail.com>
+Date: Wed, 20 Jan 2021 14:23:03 +0530
+Message-ID: <CAN9a52DQnLrH7yd+mxjVtc2AmTvydpM_uzVZXqzErCha+91vHg@mail.gmail.com>
 To: lustre-devel@lists.lustre.org
-Subject: [lustre-devel] Getting client UUID from transaction code
- (osd_trans_create) - osd-zfs
+Subject: [lustre-devel] Magnum I/O GPU direct
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -69,43 +68,31 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============3347216266836981785=="
+Content-Type: multipart/mixed; boundary="===============4281050508587116980=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============3347216266836981785==
-Content-Type: multipart/alternative; boundary="000000000000488b6505b94604ac"
+--===============4281050508587116980==
+Content-Type: multipart/alternative; boundary="000000000000df85a205b9511548"
 
---000000000000488b6505b94604ac
+--000000000000df85a205b9511548
 Content-Type: text/plain; charset="UTF-8"
 
 Hi,
 
-When I have multiple 'remote' clients writing data, I am trying to find a
-way to recognize which client data I am writing to the underlying storage.
+I want to know is Magnum I/O GPU direct support is available in Lustre.
 
-Appreciate if anyone in this list can point me in the right direction to
-access remote client UUID.
+Regards,
+Pankaj Sharma
 
-Thanks,
-
-Sudheendra Sampath
-
---000000000000488b6505b94604ac
+--000000000000df85a205b9511548
 Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
 
-<div dir=3D"ltr">Hi,<div><br></div><div>When I have multiple &#39;remote&#3=
-9; clients writing data, I am trying to find a way to recognize which clien=
-t data I am writing to the underlying storage.</div><div><br></div><div><di=
-v>Appreciate if anyone in this list can point=C2=A0me in the right directio=
-n to access remote client UUID.</div><div><br></div><div>Thanks,</div><div =
-dir=3D"ltr" class=3D"gmail_signature" data-smartmail=3D"gmail_signature"><b=
-r>Sudheendra Sampath</div></div></div>
+<div dir="ltr">Hi,<div><br></div><div>I want to know is Magnum I/O GPU direct support is available in Lustre.</div><div><br></div><div>Regards,</div><div>Pankaj Sharma</div></div>
 
---000000000000488b6505b94604ac--
+--000000000000df85a205b9511548--
 
---===============3347216266836981785==
+--===============4281050508587116980==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -116,4 +103,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============3347216266836981785==--
+--===============4281050508587116980==--
