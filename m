@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC776C433DB
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADB41C433E0
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:29 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 12CC323A57
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:26 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12CC323A57
+	by mail.kernel.org (Postfix) with ESMTPS id 6624C23A57
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:29 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6624C23A57
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E713521FCCE;
-	Thu, 21 Jan 2021 09:17:20 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9DD9321FD95;
+	Thu, 21 Jan 2021 09:17:22 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 65FA821FA40
- for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:08 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1BE3121FBB4
+ for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:11 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 35DD21008050;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 525B91008062;
  Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 320A71B49B; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+ id 5194A1B49D; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 21 Jan 2021 12:16:31 -0500
-Message-Id: <1611249422-556-9-git-send-email-jsimmons@infradead.org>
+Date: Thu, 21 Jan 2021 12:16:41 -0500
+Message-Id: <1611249422-556-19-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
 References: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 08/39] lustre: osc: prevent overflow of
- o_dropped
+Subject: [lustre-devel] [PATCH 18/39] lnet: Introduce lnet_recovery_limit
+ parameter
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,62 +50,64 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Chris Horn <chris.horn@hpe.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Olaf Faaland <faaland1@llnl.gov>
+From: Chris Horn <chris.horn@hpe.com>
 
-In osc_announce_cached(), prevent o_dropped from overflowing.
-Necessary because o_dropped AKA o_misc is 32 bits, but cl_lost_grant
-is 64 bits.
+This parameter controls how long LNet will attempt to recover an
+unhealthy interface.
 
-Add a CDEBUG call so we can tell whether this happened.
+Defaults to 0 to indicate indefinite recovery. This maintains the
+current behavior.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14125
-Lustre-commit: 82e9a11056a552 ("LU-14125 osc: prevent overflow of o_dropped")
-Signed-off-by: Olaf Faaland <faaland1@llnl.gov>
-Reviewed-on: https://review.whamcloud.com/40659
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+HPE-bug-id: LUS-9109
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13569
+Lustre-commit: a2e61838f8de89 ("LU-13569 lnet: Introduce lnet_recovery_limit parameter")
+Signed-off-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-on: https://review.whamcloud.com/39716
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/osc/osc_request.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ include/linux/lnet/lib-lnet.h | 1 +
+ net/lnet/lnet/api-ni.c        | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index f225ccd..4a4b5ef 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -754,11 +754,21 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
- 				    ~(PTLRPC_MAX_BRW_SIZE * 4UL));
- 	}
- 	oa->o_grant = cli->cl_avail_grant + cli->cl_reserved_grant;
--	oa->o_dropped = cli->cl_lost_grant;
--	cli->cl_lost_grant = 0;
-+	/* o_dropped AKA o_misc is 32 bits, but cl_lost_grant is 64 bits */
-+	if (cli->cl_lost_grant > INT_MAX) {
-+		CDEBUG(D_CACHE,
-+		       "%s: avoided o_dropped overflow: cl_lost_grant %lu\n",
-+		       cli_name(cli), cli->cl_lost_grant);
-+		oa->o_dropped = INT_MAX;
-+	} else {
-+		oa->o_dropped = cli->cl_lost_grant;
-+	}
-+	cli->cl_lost_grant -= oa->o_dropped;
- 	spin_unlock(&cli->cl_loi_list_lock);
--	CDEBUG(D_CACHE, "dirty: %llu undirty: %u dropped %u grant: %llu\n",
--	       oa->o_dirty, oa->o_undirty, oa->o_dropped, oa->o_grant);
-+	CDEBUG(D_CACHE,
-+	       "%s: dirty: %llu undirty: %u dropped %u grant: %llu cl_lost_grant %lu\n",
-+	       cli_name(cli), oa->o_dirty, oa->o_undirty, oa->o_dropped,
-+	       oa->o_grant, cli->cl_lost_grant);
- }
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index d349f06..927ca44 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -476,6 +476,7 @@ struct lnet_ni *
+ extern unsigned int lnet_numa_range;
+ extern unsigned int lnet_health_sensitivity;
+ extern unsigned int lnet_recovery_interval;
++extern unsigned int lnet_recovery_limit;
+ extern unsigned int lnet_peer_discovery_disabled;
+ extern unsigned int lnet_drop_asym_route;
+ extern unsigned int router_sensitivity_percentage;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 03473bf..322b25d 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -112,6 +112,11 @@ static int recovery_interval_set(const char *val,
+ MODULE_PARM_DESC(lnet_recovery_interval,
+ 		 "Interval to recover unhealthy interfaces in seconds");
  
- void osc_update_next_shrink(struct client_obd *cli)
++unsigned int lnet_recovery_limit;
++module_param(lnet_recovery_limit, uint, 0644);
++MODULE_PARM_DESC(lnet_recovery_limit,
++		 "How long to attempt recovery of unhealthy peer interfaces in seconds. Set to 0 to allow indefinite recovery");
++
+ static int lnet_interfaces_max = LNET_INTERFACES_MAX_DEFAULT;
+ static int intf_max_set(const char *val, const struct kernel_param *kp);
+ module_param_call(lnet_interfaces_max, intf_max_set, param_get_int,
 -- 
 1.8.3.1
 
