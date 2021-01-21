@@ -7,36 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0AFC9C433DB
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:18:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 632B4C433E0
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:18:18 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A998523A5A
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:18:14 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A998523A5A
+	by mail.kernel.org (Postfix) with ESMTPS id 04D8923A5A
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:18:17 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04D8923A5A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 86FF221FE70;
-	Thu, 21 Jan 2021 09:17:47 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id C6F7221FE79;
+	Thu, 21 Jan 2021 09:17:48 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 617C721FCAD
- for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:16 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1B05221FC17
+ for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:12 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 91D151008496;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5FFCB1008482;
  Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 909EF1B49B; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+ id 5E52D1B49C; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 21 Jan 2021 12:17:01 -0500
-Message-Id: <1611249422-556-39-git-send-email-jsimmons@infradead.org>
+Date: Thu, 21 Jan 2021 12:16:45 -0500
+Message-Id: <1611249422-556-23-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
 References: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 38/39] lustre: lov: correctly set OST obj size
+Subject: [lustre-devel] [PATCH 22/39] lustre: uapi: fix compatibility for
+ LL_IOC_MDC_GETINFO
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -56,286 +57,168 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Bobi Jam <bobijam@whamcloud.com>
+From: Qian Yingjin <qian@ddn.com>
 
-When extends a PFL file to a size locating at a boundary of a stripe
-in a component, the truncate won't set the size of the OST object
-in the prior stripe.
+The landed patch "lustre: som: integrate LSOM with lfs find"
+uses "LL_IOC_MDC_GETINFO_OLD", so while the IOCTL number/structs
+are ABI compatible, it is not API compatible and applications
+using for the header including the definition LL_IOC_MDC_GETINFO
+is broken.
 
-This patch record the prior stripe in
-lov_layout_raid0::lo_trunc_stripeno and add the stripe in the
-truncate IO and enqueue the lock covering it.
+This patch defines versioned IOCTL number: LL_IOC_MDC_GETINFO_V1,
+LL_IOC_MDC_GETINFO_V2. Then we can use the explicitly versioned
+constrants everywhere for the in-tree code, and declare
+LL_IOC_MDC_GETINFO in a compatible way, but external applications
+can select the version that they want explicitly.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14128
-Lustre-commit: 98015004516cad ("LU-14128 lov: correctly set OST obj size")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/40581
+And this patch does the same fix for IOC_MDC_GETFILEINFO.
+
+Fixes: 9b5e45e7275e ("lustre: som: integrate LSOM with lfs find")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13826
+Lustre-commit: 449c648793d2fc ("LU-13826 utils: fix compatibility for LL_IOC_MDC_GETINFO")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/40858
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lov/lov_cl_internal.h |  5 +++
- fs/lustre/lov/lov_internal.h    |  1 +
- fs/lustre/lov/lov_io.c          | 97 +++++++++++++++++++++++++++++++++++------
- fs/lustre/lov/lov_lock.c        | 31 +++++++++----
- fs/lustre/lov/lov_object.c      |  1 +
- fs/lustre/lov/lov_offset.c      |  2 +-
- 6 files changed, 114 insertions(+), 23 deletions(-)
+ fs/lustre/llite/dir.c                   | 34 ++++++++++++++++-----------------
+ include/uapi/linux/lustre/lustre_user.h | 14 ++++++--------
+ 2 files changed, 23 insertions(+), 25 deletions(-)
 
-diff --git a/fs/lustre/lov/lov_cl_internal.h b/fs/lustre/lov/lov_cl_internal.h
-index 7128224..f86176a 100644
---- a/fs/lustre/lov/lov_cl_internal.h
-+++ b/fs/lustre/lov/lov_cl_internal.h
-@@ -176,6 +176,11 @@ struct lov_comp_layout_entry_ops {
- struct lov_layout_raid0 {
- 	unsigned int		lo_nr;
- 	/**
-+	 * record the stripe no before the truncate size, used for setting OST
-+	 * object size for truncate. LU-14128.
-+	 */
-+	int			lo_trunc_stripeno;
-+	/**
- 	 * When this is true, lov_object::lo_attr contains
- 	 * valid up to date attributes for a top-level
- 	 * object. This field is reset to 0 when attributes of
-diff --git a/fs/lustre/lov/lov_internal.h b/fs/lustre/lov/lov_internal.h
-index 202e4b5..5d726fd 100644
---- a/fs/lustre/lov/lov_internal.h
-+++ b/fs/lustre/lov/lov_internal.h
-@@ -264,6 +264,7 @@ int lov_merge_lvb_kms(struct lov_stripe_md *lsm, int index,
- 		      struct ost_lvb *lvb, u64 *kms_place);
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index db620ce..c42cff7 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -1634,10 +1634,10 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		return ll_obd_statfs(inode, (void __user *)arg);
+ 	case LL_IOC_LOV_GETSTRIPE:
+ 	case LL_IOC_LOV_GETSTRIPE_NEW:
+-	case LL_IOC_MDC_GETINFO:
+-	case LL_IOC_MDC_GETINFO_OLD:
+-	case IOC_MDC_GETFILEINFO:
+-	case IOC_MDC_GETFILEINFO_OLD:
++	case LL_IOC_MDC_GETINFO_V1:
++	case LL_IOC_MDC_GETINFO_V2:
++	case IOC_MDC_GETFILEINFO_V1:
++	case IOC_MDC_GETFILEINFO_V2:
+ 	case IOC_MDC_GETFILESTRIPE: {
+ 		struct ptlrpc_request *request = NULL;
+ 		struct ptlrpc_request *root_request = NULL;
+@@ -1652,8 +1652,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		struct lu_fid __user *fidp = NULL;
+ 		int lmmsize;
  
- /* lov_offset.c */
-+u64 stripe_width(struct lov_stripe_md *lsm, unsigned int index);
- u64 lov_stripe_size(struct lov_stripe_md *lsm, int index, u64 ost_size,
- 		    int stripeno);
- int lov_stripe_offset(struct lov_stripe_md *lsm, int index, u64 lov_off,
-diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
-index d4a0c9d..daceab0 100644
---- a/fs/lustre/lov/lov_io.c
-+++ b/fs/lustre/lov/lov_io.c
-@@ -752,6 +752,24 @@ static u64 lov_offset_mod(u64 val, int delta)
- 	return val;
- }
- 
-+static int lov_io_add_sub(const struct lu_env *env, struct lov_io *lio,
-+			  struct lov_io_sub *sub, u64 start, u64 end)
-+{
-+	int rc;
-+
-+	end = lov_offset_mod(end, 1);
-+	lov_io_sub_inherit(sub, lio, start, end);
-+	rc = cl_io_iter_init(sub->sub_env, &sub->sub_io);
-+	if (rc != 0) {
-+		cl_io_iter_fini(sub->sub_env, &sub->sub_io);
-+		return rc;
-+	}
-+
-+	list_add_tail(&sub->sub_linkage, &lio->lis_active);
-+
-+	return rc;
-+}
-+
- static int lov_io_iter_init(const struct lu_env *env,
- 			    const struct cl_io_slice *ios)
- {
-@@ -768,10 +786,13 @@ static int lov_io_iter_init(const struct lu_env *env,
- 	lov_foreach_io_layout(index, lio, &ext) {
- 		struct lov_layout_entry *le = lov_entry(lio->lis_object, index);
- 		struct lov_layout_raid0 *r0 = &le->lle_raid0;
-+		bool tested_trunc_stripe = false;
- 		int stripe;
- 		u64 start;
- 		u64 end;
- 
-+		r0->lo_trunc_stripeno = -1;
-+
- 		CDEBUG(D_VFSTRACE, "component[%d] flags %#x\n",
- 		       index, lsm->lsm_entries[index]->lsme_flags);
- 		if (!lsm_entry_inited(lsm, index)) {
-@@ -801,28 +822,76 @@ static int lov_io_iter_init(const struct lu_env *env,
- 				continue;
- 			}
- 
--			end = lov_offset_mod(end, 1);
-+			if (cl_io_is_trunc(ios->cis_io) &&
-+			    !tested_trunc_stripe) {
-+				int prev;
-+				u64 tr_start;
-+
-+				prev = (stripe == 0) ? r0->lo_nr - 1 :
-+						       stripe - 1;
-+				/**
-+				 * Only involving previous stripe if the
-+				 * truncate in this component is at the
-+				 * beginning of this stripe.
-+				 */
-+				tested_trunc_stripe = true;
-+				if (ext.e_start <
-+				    lsm->lsm_entries[index]->lsme_extent.e_start) {
-+					/* need previous stripe involvement */
-+					r0->lo_trunc_stripeno = prev;
-+				} else {
-+					tr_start = ext.e_start;
-+					tr_start = lov_do_div64(tr_start,
-+								stripe_width(lsm, index));
-+					/* tr_start %= stripe_swidth */
-+					if (tr_start == stripe * lsm->lsm_entries[index]->lsme_stripe_size)
-+						r0->lo_trunc_stripeno = prev;
-+				}
-+			}
-+
-+			/* if the last stripe is the trunc stripeno */
-+			if (r0->lo_trunc_stripeno == stripe)
-+				r0->lo_trunc_stripeno = -1;
-+
- 			sub = lov_sub_get(env, lio,
- 					  lov_comp_index(index, stripe));
--			if (IS_ERR(sub)) {
--				rc = PTR_ERR(sub);
--				break;
--			}
-+			if (IS_ERR(sub))
-+				return PTR_ERR(sub);
- 
--			lov_io_sub_inherit(sub, lio, start, end);
--			rc = cl_io_iter_init(sub->sub_env, &sub->sub_io);
--			if (rc) {
--				cl_io_iter_fini(sub->sub_env, &sub->sub_io);
-+			rc = lov_io_add_sub(env, lio, sub, start, end);
-+			if (rc)
- 				break;
-+		}
-+		if (rc != 0)
-+			break;
-+
-+		if (r0->lo_trunc_stripeno != -1) {
-+			stripe = r0->lo_trunc_stripeno;
-+			if (unlikely(!r0->lo_sub[stripe])) {
-+				r0->lo_trunc_stripeno = -1;
-+				continue;
- 			}
-+			sub = lov_sub_get(env, lio,
-+					  lov_comp_index(index, stripe));
-+			if (IS_ERR(sub))
-+				return PTR_ERR(sub);
- 
--			CDEBUG(D_VFSTRACE, "shrink: %d [%llu, %llu)\n",
--			       stripe, start, end);
-+			/**
-+			 * the prev sub could be used by another truncate, we'd
-+			 * skip it. LU-14128 happends when expand truncate +
-+			 * read get wrong kms.
-+			 */
-+			if (!list_empty(&sub->sub_linkage)) {
-+				r0->lo_trunc_stripeno = -1;
-+				continue;
-+			}
- 
--			list_add_tail(&sub->sub_linkage, &lio->lis_active);
-+			(void)lov_stripe_intersects(lsm, index, stripe, &ext,
-+						    &start, &end);
-+			rc = lov_io_add_sub(env, lio, sub, start, end);
-+			if (rc != 0)
-+				break;
+-		if (cmd == IOC_MDC_GETFILEINFO_OLD ||
+-		    cmd == IOC_MDC_GETFILEINFO ||
++		if (cmd == IOC_MDC_GETFILEINFO_V1 ||
++		    cmd == IOC_MDC_GETFILEINFO_V2 ||
+ 		    cmd == IOC_MDC_GETFILESTRIPE) {
+ 			filename = ll_getname((const char __user *)arg);
+ 			if (IS_ERR(filename))
+@@ -1675,10 +1675,10 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			goto out_req;
  		}
--		if (rc)
--			break;
- 	}
- 	return rc;
- }
-diff --git a/fs/lustre/lov/lov_lock.c b/fs/lustre/lov/lov_lock.c
-index 7dae13f..c79f728 100644
---- a/fs/lustre/lov/lov_lock.c
-+++ b/fs/lustre/lov/lov_lock.c
-@@ -111,6 +111,7 @@ static int lov_sublock_init(const struct lu_env *env,
-  * through already created sub-locks (possibly shared with other top-locks).
+ 
+-		if (rc == -ENODATA && (cmd == IOC_MDC_GETFILEINFO ||
+-				       cmd == LL_IOC_MDC_GETINFO ||
+-				       cmd == IOC_MDC_GETFILEINFO_OLD ||
+-				       cmd == LL_IOC_MDC_GETINFO_OLD)) {
++		if (rc == -ENODATA && (cmd == IOC_MDC_GETFILEINFO_V1 ||
++				       cmd == LL_IOC_MDC_GETINFO_V1 ||
++				       cmd == IOC_MDC_GETFILEINFO_V2 ||
++				       cmd == LL_IOC_MDC_GETINFO_V2)) {
+ 			lmmsize = 0;
+ 			rc = 0;
+ 		}
+@@ -1690,8 +1690,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		    cmd == LL_IOC_LOV_GETSTRIPE ||
+ 		    cmd == LL_IOC_LOV_GETSTRIPE_NEW) {
+ 			lump = (struct lov_user_md __user *)arg;
+-		} else if (cmd == IOC_MDC_GETFILEINFO_OLD ||
+-			   cmd == LL_IOC_MDC_GETINFO_OLD){
++		} else if (cmd == IOC_MDC_GETFILEINFO_V1 ||
++			   cmd == LL_IOC_MDC_GETINFO_V1) {
+ 			struct lov_user_mds_data_v1 __user *lmdp;
+ 
+ 			lmdp = (struct lov_user_mds_data_v1 __user *)arg;
+@@ -1724,8 +1724,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			rc = -EOVERFLOW;
+ 		}
+ 
+-		if (cmd == IOC_MDC_GETFILEINFO_OLD ||
+-		    cmd == LL_IOC_MDC_GETINFO_OLD) {
++		if (cmd == IOC_MDC_GETFILEINFO_V1 ||
++		    cmd == LL_IOC_MDC_GETINFO_V1) {
+ 			lstat_t st = { 0 };
+ 
+ 			st.st_dev = inode->i_sb->s_dev;
+@@ -1748,8 +1748,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 				rc = -EFAULT;
+ 				goto out_req;
+ 			}
+-		} else if (cmd == IOC_MDC_GETFILEINFO ||
+-			   cmd == LL_IOC_MDC_GETINFO) {
++		} else if (cmd == IOC_MDC_GETFILEINFO_V2 ||
++			   cmd == LL_IOC_MDC_GETINFO_V2) {
+ 			struct statx stx = { 0 };
+ 			u64 valid = body->mbo_valid;
+ 
+@@ -1783,7 +1783,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			 * However, this whould be better decided by the MDS
+ 			 * instead of the client.
+ 			 */
+-			if (cmd == LL_IOC_MDC_GETINFO &&
++			if (cmd == LL_IOC_MDC_GETINFO_V2 &&
+ 			    ll_i2info(inode)->lli_lsm_md)
+ 				valid &= ~(OBD_MD_FLSIZE | OBD_MD_FLBLOCKS);
+ 
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 62c6952..835ffce 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -86,8 +86,6 @@
+ #define fstatat_f	fstatat
+ #endif
+ 
+-#define HAVE_LOV_USER_MDS_DATA
+-
+ #define LUSTRE_EOF 0xffffffffffffffffULL
+ 
+ /* for statfs() */
+@@ -384,10 +382,12 @@ struct ll_ioc_lease_id {
+ #define IOC_MDC_TYPE		'i'
+ #define IOC_MDC_LOOKUP		_IOWR(IOC_MDC_TYPE, 20, struct obd_device *)
+ #define IOC_MDC_GETFILESTRIPE	_IOWR(IOC_MDC_TYPE, 21, struct lov_user_md *)
+-#define IOC_MDC_GETFILEINFO_OLD	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data_v1 *)
+-#define IOC_MDC_GETFILEINFO	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data)
+-#define LL_IOC_MDC_GETINFO_OLD	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data_v1 *)
+-#define LL_IOC_MDC_GETINFO	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data)
++#define IOC_MDC_GETFILEINFO_V1	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data_v1 *)
++#define IOC_MDC_GETFILEINFO_V2	_IOWR(IOC_MDC_TYPE, 22, struct lov_user_mds_data)
++#define LL_IOC_MDC_GETINFO_V1	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data_v1 *)
++#define LL_IOC_MDC_GETINFO_V2	_IOWR(IOC_MDC_TYPE, 23, struct lov_user_mds_data)
++#define IOC_MDC_GETFILEINFO	IOC_MDC_GETFILEINFO_V1
++#define LL_IOC_MDC_GETINFO	LL_IOC_MDC_GETINFO_V1
+ 
+ #define MAX_OBD_NAME 128 /* If this changes, a NEW ioctl must be added */
+ 
+@@ -658,7 +658,6 @@ static inline __u32 lov_user_md_size(__u16 stripes, __u32 lmm_magic)
+  * use this.  It is unsafe to #define those values in this header as it
+  * is possible the application has already #included <sys/stat.h>.
   */
- static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
-+					  const struct cl_io *io,
- 					  const struct cl_object *obj,
- 					  struct cl_lock *lock)
- {
-@@ -135,10 +136,14 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
- 		struct lov_layout_raid0 *r0 = lov_r0(lov, index);
+-#ifdef HAVE_LOV_USER_MDS_DATA
+ #define lov_user_mds_data lov_user_mds_data_v2
+ struct lov_user_mds_data_v1 {
+ 	lstat_t lmd_st;			/* MDS stat struct */
+@@ -678,7 +677,6 @@ struct lov_user_mds_data_v3 {
+ 	lstat_t lmd_st;			/* MDS stat struct */
+ 	struct lov_user_md_v3 lmd_lmm;	/* LOV EA V3 user data */
+ } __attribute__((packed));
+-#endif
  
- 		for (i = 0; i < r0->lo_nr; i++) {
--			if (likely(r0->lo_sub[i]) && /* spare layout */
--			    lov_stripe_intersects(lov->lo_lsm, index, i,
--						  &ext, &start, &end))
--				nr++;
-+			if (likely(r0->lo_sub[i])) { /* spare layout */
-+				if (lov_stripe_intersects(lov->lo_lsm, index, i,
-+							  &ext, &start, &end))
-+					nr++;
-+				else if (cl_io_is_trunc(io) &&
-+					 r0->lo_trunc_stripeno == i)
-+					nr++;
-+			}
- 		}
- 	}
- 	/**
-@@ -160,12 +165,22 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
- 		for (i = 0; i < r0->lo_nr; ++i) {
- 			struct lov_lock_sub *lls = &lovlck->lls_sub[nr];
- 			struct cl_lock_descr *descr = &lls->sub_lock.cll_descr;
-+			bool intersect = false;
- 
--			if (unlikely(!r0->lo_sub[i]) ||
--			    !lov_stripe_intersects(lov->lo_lsm, index, i,
--						   &ext, &start, &end))
-+			if (unlikely(!r0->lo_sub[i]))
- 				continue;
- 
-+			intersect = lov_stripe_intersects(lov->lo_lsm, index, i,
-+							  &ext, &start, &end);
-+			if (intersect)
-+				goto init_sublock;
-+
-+			if (cl_io_is_trunc(io) && i == r0->lo_trunc_stripeno)
-+				goto init_sublock;
-+
-+			continue;
-+
-+init_sublock:
- 			LASSERT(!descr->cld_obj);
- 			descr->cld_obj = lovsub2cl(r0->lo_sub[i]);
- 			descr->cld_start = cl_index(descr->cld_obj, start);
-@@ -308,7 +323,7 @@ int lov_lock_init_composite(const struct lu_env *env, struct cl_object *obj,
- 	struct lov_lock *lck;
- 	int result = 0;
- 
--	lck = lov_lock_sub_init(env, obj, lock);
-+	lck = lov_lock_sub_init(env, io, obj, lock);
- 	if (!IS_ERR(lck))
- 		cl_lock_slice_add(lock, &lck->lls_cl, obj, &lov_lock_ops);
- 	else
-diff --git a/fs/lustre/lov/lov_object.c b/fs/lustre/lov/lov_object.c
-index 3fcd342..d9729c8 100644
---- a/fs/lustre/lov/lov_object.c
-+++ b/fs/lustre/lov/lov_object.c
-@@ -215,6 +215,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 
- 	spin_lock_init(&r0->lo_sub_lock);
- 	r0->lo_nr = lse->lsme_stripe_count;
-+	r0->lo_trunc_stripeno = -1;
- 
- 	flags = memalloc_nofs_save();
- 	r0->lo_sub = kvmalloc_array(r0->lo_nr, sizeof(r0->lo_sub[0]),
-diff --git a/fs/lustre/lov/lov_offset.c b/fs/lustre/lov/lov_offset.c
-index ca763af..2493331 100644
---- a/fs/lustre/lov/lov_offset.c
-+++ b/fs/lustre/lov/lov_offset.c
-@@ -37,7 +37,7 @@
- 
- #include "lov_internal.h"
- 
--static u64 stripe_width(struct lov_stripe_md *lsm, unsigned int index)
-+u64 stripe_width(struct lov_stripe_md *lsm, unsigned int index)
- {
- 	struct lov_stripe_md_entry *entry = lsm->lsm_entries[index];
- 
+ struct lmv_user_mds_data {
+ 	struct lu_fid	lum_fid;
 -- 
 1.8.3.1
 
