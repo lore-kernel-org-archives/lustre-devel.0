@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 002B0C433E6
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC776C433DB
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:27 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 957C323A57
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:23 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 957C323A57
+	by mail.kernel.org (Postfix) with ESMTPS id 12CC323A57
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:26 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12CC323A57
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4769C21FD67;
-	Thu, 21 Jan 2021 09:17:19 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E713521FCCE;
+	Thu, 21 Jan 2021 09:17:20 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 77B3321FA40
- for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:09 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 65FA821FA40
+ for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:08 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 422B91008054;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 35DD21008050;
  Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 3F078115B8; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+ id 320A71B49B; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 21 Jan 2021 12:16:35 -0500
-Message-Id: <1611249422-556-13-git-send-email-jsimmons@infradead.org>
+Date: Thu, 21 Jan 2021 12:16:31 -0500
+Message-Id: <1611249422-556-9-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
 References: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/39] lnet: lnd: Use NETWORK_TIMEOUT for
- some conn failures
+Subject: [lustre-devel] [PATCH 08/39] lustre: osc: prevent overflow of
+ o_dropped
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,53 +50,62 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Chris Horn <chris.horn@hpe.com>
+From: Olaf Faaland <faaland1@llnl.gov>
 
-For -EHOSTUNREACH and -ETIMEDOUT we cannot tell whether the
-connection failure was due to a problem with the remote or local NI,
-so we should return the LNET_MSG_STATUS_NETWORK_TIMEOUT to LNet in
-these cases.
+In osc_announce_cached(), prevent o_dropped from overflowing.
+Necessary because o_dropped AKA o_misc is 32 bits, but cl_lost_grant
+is 64 bits.
 
-HPE-bug-id: LUS-9342
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13571
-Lustre-commit: 12333c1fecc00e ("LU-13571 lnd: Use NETWORK_TIMEOUT for some conn failures")
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/39900
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Add a CDEBUG call so we can tell whether this happened.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14125
+Lustre-commit: 82e9a11056a552 ("LU-14125 osc: prevent overflow of o_dropped")
+Signed-off-by: Olaf Faaland <faaland1@llnl.gov>
+Reviewed-on: https://review.whamcloud.com/40659
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ fs/lustre/osc/osc_request.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 9766aa2..20d555f 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -2143,8 +2143,12 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	CNETERR("Deleting messages for %s: connection failed\n",
- 		libcfs_nid2str(peer_ni->ibp_nid));
- 
--	kiblnd_txlist_done(&zombies, error,
--			   LNET_MSG_STATUS_LOCAL_DROPPED);
-+	if (error == -EHOSTUNREACH || error == -ETIMEDOUT)
-+		kiblnd_txlist_done(&zombies, error,
-+				   LNET_MSG_STATUS_NETWORK_TIMEOUT);
-+	else
-+		kiblnd_txlist_done(&zombies, error,
-+				   LNET_MSG_STATUS_LOCAL_DROPPED);
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index f225ccd..4a4b5ef 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -754,11 +754,21 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+ 				    ~(PTLRPC_MAX_BRW_SIZE * 4UL));
+ 	}
+ 	oa->o_grant = cli->cl_avail_grant + cli->cl_reserved_grant;
+-	oa->o_dropped = cli->cl_lost_grant;
+-	cli->cl_lost_grant = 0;
++	/* o_dropped AKA o_misc is 32 bits, but cl_lost_grant is 64 bits */
++	if (cli->cl_lost_grant > INT_MAX) {
++		CDEBUG(D_CACHE,
++		       "%s: avoided o_dropped overflow: cl_lost_grant %lu\n",
++		       cli_name(cli), cli->cl_lost_grant);
++		oa->o_dropped = INT_MAX;
++	} else {
++		oa->o_dropped = cli->cl_lost_grant;
++	}
++	cli->cl_lost_grant -= oa->o_dropped;
+ 	spin_unlock(&cli->cl_loi_list_lock);
+-	CDEBUG(D_CACHE, "dirty: %llu undirty: %u dropped %u grant: %llu\n",
+-	       oa->o_dirty, oa->o_undirty, oa->o_dropped, oa->o_grant);
++	CDEBUG(D_CACHE,
++	       "%s: dirty: %llu undirty: %u dropped %u grant: %llu cl_lost_grant %lu\n",
++	       cli_name(cli), oa->o_dirty, oa->o_undirty, oa->o_dropped,
++	       oa->o_grant, cli->cl_lost_grant);
  }
  
- static void
+ void osc_update_next_shrink(struct client_obd *cli)
 -- 
 1.8.3.1
 
