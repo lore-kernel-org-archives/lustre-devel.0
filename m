@@ -2,39 +2,40 @@ Return-Path: <SRS0=NZgA=GY=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=BAYES_00,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,
-	URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.8 required=3.0 tests=BAYES_00,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA470C433E6
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 03:51:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67342C433DB
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:10 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 442FB2071C
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 03:51:49 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 442FB2071C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	by mail.kernel.org (Postfix) with ESMTPS id 087C023A57
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:09 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 087C023A57
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 36AC721EB73;
-	Wed, 20 Jan 2021 19:51:49 -0800 (PST)
-Received: from mx2.suse.de (mx2.suse.de [195.135.220.15])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B100721CBD9
- for <lustre-devel@lists.lustre.org>; Wed, 20 Jan 2021 19:51:46 -0800 (PST)
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.221.27])
- by mx2.suse.de (Postfix) with ESMTP id 7E23EABDA;
- Thu, 21 Jan 2021 03:51:45 +0000 (UTC)
-From: NeilBrown <neilb@suse.de>
-To: Sudheendra Sampath <sudheendra.sampath@gmail.com>,
- lustre-devel@lists.lustre.org
-Date: Thu, 21 Jan 2021 14:51:39 +1100
-In-Reply-To: <CABnqofw_6U0gV8_A3gMOpX=wYMEFH5A6Pdy833EQoAWE271eXw@mail.gmail.com>
-References: <CABnqofw_6U0gV8_A3gMOpX=wYMEFH5A6Pdy833EQoAWE271eXw@mail.gmail.com>
-Message-ID: <87o8hjhrqs.fsf@notabene.neil.brown.name>
-MIME-Version: 1.0
-Subject: Re: [lustre-devel] Isn't there a memory leak here !!!
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 43C1A21FAED;
+	Thu, 21 Jan 2021 09:17:09 -0800 (PST)
+Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 22F9A21FA40
+ for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:06 -0800 (PST)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 1E05D1005F1B;
+ Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id 17A69F0A5; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Thu, 21 Jan 2021 12:16:23 -0500
+Message-Id: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+Subject: [lustre-devel] [PATCH 00/39] lustre: update to latest OpenSFS
+ version as of Jan 21 2021
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -47,116 +48,168 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============6356328626188900435=="
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============6356328626188900435==
-Content-Type: multipart/signed; boundary="=-=-=";
-	micalg=pgp-sha256; protocol="application/pgp-signature"
+Update the Linux Lustre client to where the latest OpenSFS tree is at as of
+Jan 21, 2021. Please review.
 
---=-=-=
-Content-Type: text/plain
-Content-Transfer-Encoding: quoted-printable
+Alexander Zarochentsev (1):
+  lustre: ldlm: page discard speedup
 
-On Wed, Jan 20 2021, Sudheendra Sampath wrote:
+Andreas Dilger (1):
+  lustre: ldlm: don't compute sumsq for pool stats
 
-> Hi,
->
-> While doing transaction code analysis, I found the following in
-> lustre/target/tgt_lastrcvd.c.
->
->     552 int tgt_new_client_cb_add(struct thandle *th, struct obd_export
-> *exp)
->     553 {
->     554         struct tgt_new_client_callback  *ccb;
->     555         struct dt_txn_commit_cb         *dcb;
->     556         int                              rc;
->     557
-> *    558         OBD_ALLOC_PTR(ccb);*
->     559         if (ccb =3D=3D NULL)
->     560                 return -ENOMEM;
->     561
->     562         ccb->lncc_exp =3D class_export_cb_get(exp);
->     563
->     564         dcb =3D &ccb->lncc_cb;
->     565         dcb->dcb_func =3D tgt_cb_new_client;
->     566         INIT_LIST_HEAD(&dcb->dcb_linkage);
->     567         strlcpy(dcb->dcb_name, "tgt_cb_new_client",
-> sizeof(dcb->dcb_name));
->     568
->     569         rc =3D dt_trans_cb_add(th, dcb);
->     570         if (rc) {
->     571                 class_export_cb_put(exp);
-> *    572                 OBD_FREE_PTR(ccb);*
->     573         }
->     574         return rc;
->     575 }
->
-> OBD_FREE_PTR() is in the condition block which means that the expectation
-> is dt_trans_cb_add() returns something "!=3D 0".
->
-> From the code, osd_trans_cb_add() and osp_trans_cb_add() returns zero
-> value.  So, my point is OBD_FREE_PTR() should be outside the condition
-> block.
->
-> Please correct me if my understanding is incorrect.
+Andrew Perepechko (1):
+  lustre: ptlrpc: fixes for RCU-related stalls
 
-If dt_trans_cb_add() returns zero, then 'dcb' has been added to some
-list of transactions.  dcb is a pointer to a 'struct dt_txn_commit_cb'
-structure embedded inside 'ccb'.
+Andriy Skulysh (2):
+  lustre: ldlm: Don't re-enqueue glimpse lock on read
+  lustre: ldlm: osc_object_ast_clear() is called for mdc object on
+    eviction
 
-So when rc=3D=3D0, the memory allocated for ccb is now attached to a list of
-transactions, so it would be wrong to free it.  If the attachment
-(dt_trans_cb_add()) failed, then it needs to be freed.
+Bobi Jam (3):
+  lustre: llite: don't check layout info for page discard
+  lustre: lov: FIEMAP support for PFL and FLR file
+  lustre: lov: correctly set OST obj size
 
-So I think the code is correct as it stands.
+Chris Horn (5):
+  lnet: Correct handling of NETWORK_TIMEOUT status
+  lnet: Introduce constant for net ID of LNET_NID_ANY
+  lnet: lnd: Use NETWORK_TIMEOUT for txs on ibp_tx_queue
+  lnet: lnd: Use NETWORK_TIMEOUT for some conn failures
+  lnet: Introduce lnet_recovery_limit parameter
 
-Thanks,
-NeilBrown
+Etienne AUJAMES (1):
+  lustre: mdc: process changelogs_catalog from the oldest rec
 
+John L. Hammond (2):
+  lustre: llite: return EOPNOTSUPP if fallocate is not supported
+  lnet: use an unbound cred in kiblnd_resolve_addr()
 
->
-> --=20
-> Regards
->
-> Sudheendra Sampath
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel@lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Lai Siyao (1):
+  lustre: lmv: optimize dir shard revalidate
 
---=-=-=
-Content-Type: application/pgp-signature; name="signature.asc"
+Mikhail Pershin (3):
+  lustre: lov: fix SEEK_HOLE calcs at component end
+  lustre: dom: non-blocking enqueue for DOM locks
+  lustre: cksum: add lprocfs checksum support in MDC/MDT
 
------BEGIN PGP SIGNATURE-----
+Mr NeilBrown (1):
+  lnet: o2iblnd: remove FMR-pool support.
 
-iQJCBAEBCAAsFiEEG8Yp69OQ2HB7X0l6Oeye3VZigbkFAmAI+ksOHG5laWxiQHN1
-c2UuZGUACgkQOeye3VZigbmH8g/+JHbMGzdtjVgu4W4rzlVi7BwPJG6kcQAM20yI
-InkIlAXlCIP72Hny8cutk+fjf28g+VknBwuaWS+N4918UYtsyrrQYxf7Ri8PaVa1
-qLJ2MkpvEMd7DWn2LDQcIrq/Ka6/WrTTeCYiX5MMQBJT57WNn+irocPrM0mBuR/J
-yqZamEhSPNl0gQl8KCr+smSSx5hgb/k3eZlcVc2Jw650Qh8yis0AC9SF6S/JSNWe
-69e5vC/lhJZujKm3Fl6c8kiQ4VTrGDwAdHch+IycHLxYdvBe4fLvbYB54otsxvk2
-vK+FWRGF+HTtlOYVSXaItU5zk9yts2Vk+m6xgE624wZj9jc5SI2ZQMHFaWk/mbhl
-HuHg5aclQhaebRoabOypXXqYowTviRsnIabhf4eqLtvYHMhEX5J3ku3aRXw8disJ
-1hXM6kQBDAWbb+06cQ9XrzIGyQ2Q9O3FIFtvG4urKViiGdbwsfJ/UTLieKsutJ+P
-QC3vipAsiekwUV0IoumuiyEznBj2p7usy6OiR2WEBcxINDd1X248UltrMB+Mileh
-JARkwck51IB1ubnItDA2DBode1rUJO110Hv803H3gdsd5tacH3Kl+ni/6vLpNgyk
-SB4wzgl47VRCgRXGdcv08x75EWxgBg2KVYjXa7JBc3Mtsvu3TOFCDd9wHCIM/M8C
-gVsR+FM=
-=sHKw
------END PGP SIGNATURE-----
---=-=-=--
+Olaf Faaland (1):
+  lustre: osc: prevent overflow of o_dropped
 
---===============6356328626188900435==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Oleg Drokin (4):
+  lustre: ldlm: Do not wait for lock replay sending if import
+    dsconnected
+  lustre: ldlm: Do not hang if recovery restarted during lock replay
+  lustre: Use vfree_atomic instead of vfree
+  lustre: update version to 2.13.57
+
+Qian Yingjin (1):
+  lustre: uapi: fix compatibility for LL_IOC_MDC_GETINFO
+
+Sebastien Buisson (1):
+  lustre: llite: fiemap set flags for encrypted files
+
+Serguei Smirnov (2):
+  lnet: o2iblnd: retry qp creation with reduced queue depth
+  lnet: socklnd: announce deprecation of 'use_tcp_bonding'
+
+Wang Shilong (5):
+  lustre: llite: fix client evicition with DIO
+  lustre: llite: allow DIO with unaligned IO count
+  lustre: quota: df should return projid-specific values
+  lustre: llite: try to improve mmap performance
+  lustre: lov: instantiate components layout for fallocate
+
+Yang Sheng (4):
+  lustre: osc: skip 0 row for rpc_stats
+  lnet: discard the callback
+  lustre: mdc: avoid easize set to 0
+  lustre: ldlm: Use req_mode while lock cleanup
+
+ fs/lustre/include/cl_object.h             |   2 +-
+ fs/lustre/include/lustre_dlm.h            |   4 +-
+ fs/lustre/include/lustre_export.h         |   5 +
+ fs/lustre/include/lustre_net.h            |  15 +-
+ fs/lustre/include/lustre_osc.h            |   7 +-
+ fs/lustre/include/obd.h                   |   2 +-
+ fs/lustre/include/obd_class.h             |   3 +-
+ fs/lustre/ldlm/ldlm_flock.c               |   2 +-
+ fs/lustre/ldlm/ldlm_lib.c                 |   2 +-
+ fs/lustre/ldlm/ldlm_lock.c                |  16 +-
+ fs/lustre/ldlm/ldlm_pool.c                |  33 ++--
+ fs/lustre/ldlm/ldlm_request.c             |  75 ++++----
+ fs/lustre/llite/dir.c                     |  36 ++--
+ fs/lustre/llite/file.c                    |  35 +++-
+ fs/lustre/llite/llite_internal.h          |  19 ++
+ fs/lustre/llite/llite_lib.c               |  57 +++++-
+ fs/lustre/llite/lproc_llite.c             |  47 +++++
+ fs/lustre/llite/rw.c                      | 146 +++++++++++++--
+ fs/lustre/llite/rw26.c                    |  39 +++-
+ fs/lustre/llite/vvp_io.c                  |   8 +-
+ fs/lustre/lmv/lmv_intent.c                |  15 +-
+ fs/lustre/lmv/lmv_internal.h              |   1 -
+ fs/lustre/lmv/lmv_obd.c                   |   3 +-
+ fs/lustre/lov/lov_cl_internal.h           |   5 +
+ fs/lustre/lov/lov_internal.h              |   1 +
+ fs/lustre/lov/lov_io.c                    | 134 +++++++++++--
+ fs/lustre/lov/lov_lock.c                  |  31 ++-
+ fs/lustre/lov/lov_object.c                | 249 +++++++++++++++---------
+ fs/lustre/lov/lov_offset.c                |  10 +-
+ fs/lustre/mdc/lproc_mdc.c                 | 128 ++++++++++++-
+ fs/lustre/mdc/mdc_changelog.c             |   2 +-
+ fs/lustre/mdc/mdc_dev.c                   | 144 ++++++++------
+ fs/lustre/mdc/mdc_internal.h              |  10 +
+ fs/lustre/mdc/mdc_locks.c                 |  14 +-
+ fs/lustre/obdclass/lprocfs_status.c       |   1 +
+ fs/lustre/osc/lproc_osc.c                 |  12 +-
+ fs/lustre/osc/osc_cache.c                 |  48 +++--
+ fs/lustre/osc/osc_lock.c                  |   3 +
+ fs/lustre/osc/osc_object.c                |   2 +-
+ fs/lustre/osc/osc_request.c               |  57 +++---
+ fs/lustre/ptlrpc/client.c                 |  26 ++-
+ fs/lustre/ptlrpc/niobuf.c                 |   7 +-
+ fs/lustre/ptlrpc/sec.c                    |  21 ++-
+ fs/lustre/ptlrpc/sec_bulk.c               |   6 +-
+ fs/lustre/ptlrpc/sec_config.c             |  10 +-
+ fs/lustre/ptlrpc/sec_null.c               |  24 ++-
+ fs/lustre/ptlrpc/sec_plain.c              |  24 ++-
+ fs/lustre/ptlrpc/service.c                |  21 ++-
+ fs/lustre/ptlrpc/wiretest.c               |   3 +-
+ include/linux/lnet/api.h                  |   3 +-
+ include/linux/lnet/lib-lnet.h             |   2 +
+ include/linux/lnet/lib-types.h            |   1 +
+ include/uapi/linux/lnet/lnet-types.h      |   2 +
+ include/uapi/linux/lustre/lustre_fiemap.h |  30 ++-
+ include/uapi/linux/lustre/lustre_idl.h    |   8 +
+ include/uapi/linux/lustre/lustre_user.h   |  21 +--
+ include/uapi/linux/lustre/lustre_ver.h    |   4 +-
+ mm/vmalloc.c                              |   1 +
+ net/lnet/klnds/o2iblnd/o2iblnd.c          | 302 +++++++++++-------------------
+ net/lnet/klnds/o2iblnd/o2iblnd.h          |  12 +-
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c       | 102 ++++++----
+ net/lnet/lnet/api-ni.c                    |  13 +-
+ net/lnet/lnet/config.c                    |   8 +-
+ net/lnet/lnet/lib-md.c                    |  25 ++-
+ net/lnet/lnet/lib-move.c                  |   3 +-
+ net/lnet/lnet/lib-msg.c                   |   5 +
+ net/lnet/lnet/nidstrings.c                |   2 +-
+ net/lnet/lnet/peer.c                      |   2 +-
+ net/lnet/lnet/router.c                    |   6 +-
+ 69 files changed, 1434 insertions(+), 683 deletions(-)
+
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============6356328626188900435==--
