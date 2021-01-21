@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4B35C433DB
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 125D8C433E0
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:35 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7D5D723A57
-	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:32 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D5D723A57
+	by mail.kernel.org (Postfix) with ESMTPS id 9AEE623A59
+	for <lustre-devel@archiver.kernel.org>; Thu, 21 Jan 2021 17:17:34 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AEE623A59
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 743AC21FDAD;
-	Thu, 21 Jan 2021 09:17:24 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id ADF3021FDBE;
+	Thu, 21 Jan 2021 09:17:25 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9F39B21FA40
- for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:08 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8D9E321FBD8
+ for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 09:17:11 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 37D301008051;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 596CC1008064;
  Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 357001158C; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
+ id 57EC71B49F; Thu, 21 Jan 2021 12:17:05 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 21 Jan 2021 12:16:32 -0500
-Message-Id: <1611249422-556-10-git-send-email-jsimmons@infradead.org>
+Date: Thu, 21 Jan 2021 12:16:43 -0500
+Message-Id: <1611249422-556-21-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
 References: <1611249422-556-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 09/39] lustre: llite: fix client evicition
- with DIO
+Subject: [lustre-devel] [PATCH 20/39] lustre: lmv: optimize dir shard
+ revalidate
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Wang Shilong <wshilong@ddn.com>,
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,179 +58,189 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Wang Shilong <wshilong@ddn.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-We set lockless in file open if O_DIRECT flag is passed,
-however O_DIRECT flag could be cleared by
-fcntl(..., F_SETFL, ...).
+mdt_is_remote_object() will check whether child is directory shard
+if parent and child are on different MDTs, which needs to read LMV
+from disk, and hurt striped directory stat performance.
 
-Finally we comes to a case where buffer IO without lock
-held properly, and hit hang:
+This can be optimized, client can just set CROSS_REF flag to do a
+cross reference getattr, which avoids lots of checks.
 
-[<ffffffffc0d421ed>] osc_extent_wait+0x21d/0x7c0 [osc]
-[<ffffffffc0d44897>] osc_cache_wait_range+0x2e7/0x940 [osc]
-[<ffffffffc0d4585e>] osc_cache_writeback_range+0x96e/0xff0 [osc]
-[<ffffffffc0d31c45>] osc_lock_flush+0x195/0x290 [osc]
-[<ffffffffc0d31d7c>] osc_lock_lockless_cancel+0x3c/0xe0 [osc]
-[<ffffffffc081f488>] cl_lock_cancel+0x78/0x160 [obdclass]
-[<ffffffffc0cd8079>] lov_lock_cancel+0x99/0x190 [lov]
-[<ffffffffc081f488>] cl_lock_cancel+0x78/0x160 [obdclass]
-[<ffffffffc081f9a2>] cl_lock_release+0x52/0x140 [obdclass]
-[<ffffffffc08238a9>] cl_io_unlock+0x139/0x290 [obdclass]
-[<ffffffffc08242e8>] cl_io_loop+0xb8/0x200 [obdclass]
-[<ffffffffc0e1d36b>] ll_file_io_generic+0x91b/0xdf0 [lustre]
-[<ffffffffc0e1dd0c>] ll_file_aio_write+0x29c/0x6e0 [lustre]
-[<ffffffffc0e1e250>] ll_file_write+0x100/0x1c0 [lustre]
-[<ffffffffa984aa90>] vfs_write+0xc0/0x1f0
-[<ffffffffa984b8af>] SyS_write+0x7f/0xf0
-[<ffffffffa9d8eede>] system_call_fastpath+0x25/0x2a
-[<ffffffffffffffff>] 0xffffffffffffffff
-
-Lock cancel time out in the server side and client
-eviction happen.
-
-Fix this problem by testing O_DIRECT flag to decide if
-we could issue lockless IO.
-
-Fixes: bf18998820 ("lustre: clio: turn on lockless for some kind of IO")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14072
-Lustre-commit: f348437218d0b9 ("LU-14072 llite: fix client evicition with DIO")
-Signed-off-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-on: https://review.whamcloud.com/40389
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14172
+Lustre-commit: de47c7671f29b2 ("LU-14172 lmv: optimize dir shard revalidate")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/40863
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Gu Zheng <gzheng@ddn.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Yingjin Qian <qian@ddn.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h           | 2 +-
- fs/lustre/llite/file.c                  | 9 +++------
- fs/lustre/llite/rw.c                    | 4 ++--
- fs/lustre/llite/rw26.c                  | 6 +++---
- fs/lustre/llite/vvp_io.c                | 6 +++---
- include/uapi/linux/lustre/lustre_user.h | 1 -
- 6 files changed, 12 insertions(+), 16 deletions(-)
+ fs/lustre/include/obd.h                |  2 +-
+ fs/lustre/include/obd_class.h          |  3 +--
+ fs/lustre/llite/file.c                 |  4 ++--
+ fs/lustre/llite/llite_lib.c            |  4 ++--
+ fs/lustre/lmv/lmv_intent.c             | 15 ++++++++-------
+ fs/lustre/lmv/lmv_internal.h           |  1 -
+ fs/lustre/lmv/lmv_obd.c                |  3 +--
+ include/uapi/linux/lustre/lustre_idl.h |  7 +++++++
+ 8 files changed, 22 insertions(+), 17 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index e17385c0..d2cee34 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -1962,7 +1962,7 @@ struct cl_io {
- 	/**
- 	 * Ignore lockless and do normal locking for this io.
- 	 */
--				ci_ignore_lockless:1,
-+				ci_dio_lock:1,
- 	/**
- 	 * Set if we've tried all mirrors for this read IO, if it's not set,
- 	 * the read IO will check to-be-read OSCs' status, and make fast-switch
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index a017997..de62005 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -1033,7 +1033,7 @@ struct md_ops {
+ 
+ 	int (*free_lustre_md)(struct obd_export *, struct lustre_md *);
+ 
+-	int (*merge_attr)(struct obd_export *, const struct lu_fid *fid,
++	int (*merge_attr)(struct obd_export *exp,
+ 			  const struct lmv_stripe_md *lsm,
+ 			  struct cl_attr *attr, ldlm_blocking_callback);
+ 
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index 1ac9fcf..b441215 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -1460,7 +1460,6 @@ static inline int md_free_lustre_md(struct obd_export *exp,
+ }
+ 
+ static inline int md_merge_attr(struct obd_export *exp,
+-				const struct lu_fid *fid,
+ 				const struct lmv_stripe_md *lsm,
+ 				struct cl_attr *attr,
+ 				ldlm_blocking_callback cb)
+@@ -1471,7 +1470,7 @@ static inline int md_merge_attr(struct obd_export *exp,
+ 	if (rc)
+ 		return rc;
+ 
+-	return MDP(exp->exp_obd, merge_attr)(exp, fid, lsm, attr, cb);
++	return MDP(exp->exp_obd, merge_attr)(exp, lsm, attr, cb);
+ }
+ 
+ static inline int md_setxattr(struct obd_export *exp, const struct lu_fid *fid,
 diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index f7f917b..2b0ffad 100644
+index 2b0ffad..5d03fc3 100644
 --- a/fs/lustre/llite/file.c
 +++ b/fs/lustre/llite/file.c
-@@ -945,9 +945,6 @@ int ll_file_open(struct inode *inode, struct file *file)
+@@ -4708,8 +4708,8 @@ static int ll_merge_md_attr(struct inode *inode)
+ 		return 0;
  
- 	mutex_unlock(&lli->lli_och_mutex);
- 
--	/* lockless for direct IO so that it can do IO in parallel */
--	if (file->f_flags & O_DIRECT)
--		fd->fd_flags |= LL_FILE_LOCKLESS_IO;
- 	fd = NULL;
- 
- 	/* Must do this outside lli_och_mutex lock to prevent deadlock where
-@@ -1573,7 +1570,7 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
- 	ssize_t result = 0;
- 	int rc = 0;
- 	unsigned int retried = 0;
--	unsigned int ignore_lockless = 0;
-+	unsigned int dio_lock = 0;
- 	bool is_aio = false;
- 	struct cl_dio_aio *ci_aio = NULL;
- 
-@@ -1595,7 +1592,7 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
- 	io = vvp_env_thread_io(env);
- 	ll_io_init(io, file, iot == CIT_WRITE, args);
- 	io->ci_aio = ci_aio;
--	io->ci_ignore_lockless = ignore_lockless;
-+	io->ci_dio_lock = dio_lock;
- 	io->ci_ndelay_tried = retried;
- 
- 	if (cl_io_rw_init(env, io, iot, *ppos, count) == 0) {
-@@ -1675,7 +1672,7 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
- 		       *ppos, count, result);
- 		/* preserve the tried count for FLR */
- 		retried = io->ci_ndelay_tried;
--		ignore_lockless = io->ci_ignore_lockless;
-+		dio_lock = io->ci_dio_lock;
- 		goto restart;
+ 	down_read(&lli->lli_lsm_sem);
+-	rc = md_merge_attr(ll_i2mdexp(inode), &lli->lli_fid, lli->lli_lsm_md,
+-			   &attr, ll_md_blocking_ast);
++	rc = md_merge_attr(ll_i2mdexp(inode), lli->lli_lsm_md, &attr,
++			   ll_md_blocking_ast);
+ 	up_read(&lli->lli_lsm_sem);
+ 	if (rc)
+ 		return rc;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index c560492..570d51a 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -1521,8 +1521,8 @@ static int ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
  	}
  
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index 54f0b9a..da4a26d 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -1723,9 +1723,9 @@ int ll_readpage(struct file *file, struct page *vmpage)
- 	 */
- 	if (file->f_flags & O_DIRECT &&
- 	    lcc && lcc->lcc_type == LCC_RW &&
--	    !io->ci_ignore_lockless) {
-+	    !io->ci_dio_lock) {
- 		unlock_page(vmpage);
--		io->ci_ignore_lockless = 1;
-+		io->ci_dio_lock = 1;
- 		io->ci_need_restart = 1;
- 		return -ENOLCK;
- 	}
-diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
-index 1736e9a..605a326 100644
---- a/fs/lustre/llite/rw26.c
-+++ b/fs/lustre/llite/rw26.c
-@@ -538,12 +538,12 @@ static int ll_write_begin(struct file *file, struct address_space *mapping,
- 		}
+ 	/* validate the lsm */
+-	rc = md_merge_attr(ll_i2mdexp(inode), &lli->lli_fid, lli->lli_lsm_md,
+-			   attr, ll_md_blocking_ast);
++	rc = md_merge_attr(ll_i2mdexp(inode), lli->lli_lsm_md, attr,
++			   ll_md_blocking_ast);
+ 	if (!rc) {
+ 		if (md->body->mbo_valid & OBD_MD_FLNLINK)
+ 			md->body->mbo_nlink = attr->cat_nlink;
+diff --git a/fs/lustre/lmv/lmv_intent.c b/fs/lustre/lmv/lmv_intent.c
+index ad59b64..38b8c75 100644
+--- a/fs/lustre/lmv/lmv_intent.c
++++ b/fs/lustre/lmv/lmv_intent.c
+@@ -153,7 +153,6 @@ static int lmv_intent_remote(struct obd_export *exp, struct lookup_intent *it,
+ }
  
- 		/*
--		 * Direct read can fall back to buffered read, but DIO is done
-+		 * Direct write can fall back to buffered read, but DIO is done
- 		 * with lockless i/o, and buffered requires LDLM locking, so
- 		 * in this case we must restart without lockless.
+ int lmv_revalidate_slaves(struct obd_export *exp,
+-			  const struct lu_fid *pfid,
+ 			  const struct lmv_stripe_md *lsm,
+ 			  ldlm_blocking_callback cb_blocking,
+ 			  int extra_lock_flags)
+@@ -197,11 +196,14 @@ int lmv_revalidate_slaves(struct obd_export *exp,
+ 		 * which is not needed here.
  		 */
--		if (!io->ci_ignore_lockless) {
--			io->ci_ignore_lockless = 1;
-+		if (!io->ci_dio_lock) {
-+			io->ci_dio_lock = 1;
- 			io->ci_need_restart = 1;
- 			result = -ENOLCK;
- 			goto out;
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index d6ca267..8dbe835 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -557,11 +557,11 @@ static int vvp_io_rw_lock(const struct lu_env *env, struct cl_io *io,
- 	if (vio->vui_fd) {
- 		/* Group lock held means no lockless any more */
- 		if (vio->vui_fd->fd_flags & LL_FILE_GROUP_LOCKED)
--			io->ci_ignore_lockless = 1;
-+			io->ci_dio_lock = 1;
+ 		memset(op_data, 0, sizeof(*op_data));
+-		if (exp_connect_flags2(exp) & OBD_CONNECT2_GETATTR_PFID)
+-			op_data->op_fid1 = *pfid;
+-		else
+-			op_data->op_fid1 = fid;
++		op_data->op_fid1 = fid;
+ 		op_data->op_fid2 = fid;
++		/* shard revalidate only needs to fetch attributes and UPDATE
++		 * lock, which is similar to the bottom half of remote object
++		 * getattr, set this flag so that MDT skips checking whether
++		 * it's remote object.
++		 */
++		op_data->op_bias = MDS_CROSS_REF;
  
- 		if (ll_file_nolock(vio->vui_fd->fd_file) ||
--		    (vio->vui_fd->fd_flags & LL_FILE_LOCKLESS_IO &&
--		     !io->ci_ignore_lockless))
-+		    (vio->vui_fd->fd_file->f_flags & O_DIRECT &&
-+		     !io->ci_dio_lock))
- 			ast_flags |= CEF_NEVER;
- 	}
+ 		tgt = lmv_tgt(lmv, lsm->lsm_md_oinfo[i].lmo_mds);
+ 		if (!tgt) {
+@@ -495,8 +497,7 @@ static int lmv_intent_lookup(struct obd_export *exp,
+ 		 * during update_inode process (see ll_update_lsm_md)
+ 		 */
+ 		if (lmv_dir_striped(op_data->op_mea2)) {
+-			rc = lmv_revalidate_slaves(exp, &op_data->op_fid2,
+-						   op_data->op_mea2,
++			rc = lmv_revalidate_slaves(exp, op_data->op_mea2,
+ 						   cb_blocking,
+ 						   extra_lock_flags);
+ 			if (rc != 0)
+diff --git a/fs/lustre/lmv/lmv_internal.h b/fs/lustre/lmv/lmv_internal.h
+index 756fa27..e42b141 100644
+--- a/fs/lustre/lmv/lmv_internal.h
++++ b/fs/lustre/lmv/lmv_internal.h
+@@ -53,7 +53,6 @@ int lmv_fid_alloc(const struct lu_env *env, struct obd_export *exp,
+ 		  struct lu_fid *fid, struct md_op_data *op_data);
  
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index b0301e1..143b7d5 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -402,7 +402,6 @@ struct ll_ioc_lease_id {
- #define LL_FILE_GROUP_LOCKED	0x00000002
- #define LL_FILE_READAHEA	0x00000004
- #define LL_FILE_LOCKED_DIRECTIO 0x00000008 /* client-side locks with dio */
--#define LL_FILE_LOCKLESS_IO	0x00000010 /* server-side locks with cio */
- #define LL_FILE_FLOCK_WARNING	0x00000020 /* warned about disabled flock */
+ int lmv_revalidate_slaves(struct obd_export *exp,
+-			  const struct lu_fid *pfid,
+ 			  const struct lmv_stripe_md *lsm,
+ 			  ldlm_blocking_callback cb_blocking,
+ 			  int extra_lock_flags);
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index fa1dae5..d845118 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -3482,7 +3482,6 @@ static int lmv_quotactl(struct obd_device *unused, struct obd_export *exp,
+ }
  
- #define LOV_USER_MAGIC_V1	0x0BD10BD0
+ static int lmv_merge_attr(struct obd_export *exp,
+-			  const struct lu_fid *fid,
+ 			  const struct lmv_stripe_md *lsm,
+ 			  struct cl_attr *attr,
+ 			  ldlm_blocking_callback cb_blocking)
+@@ -3492,7 +3491,7 @@ static int lmv_merge_attr(struct obd_export *exp,
+ 	if (!lmv_dir_striped(lsm))
+ 		return 0;
+ 
+-	rc = lmv_revalidate_slaves(exp, fid, lsm, cb_blocking, 0);
++	rc = lmv_revalidate_slaves(exp, lsm, cb_blocking, 0);
+ 	if (rc < 0)
+ 		return rc;
+ 
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index f56b3c5..f953815 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1705,6 +1705,13 @@ struct mdt_rec_setattr {
+ 
+ enum mds_op_bias {
+ /*	MDS_CHECK_SPLIT		= 1 << 0, obsolete before 2.3.58 */
++	/* used for remote object getattr/open by name: in the original
++	 * getattr/open request, MDT found the object against name is on another
++	 * MDT, then packed FID and LOOKUP lock in reply and returned -EREMOTE,
++	 * and client knew it's a remote object, then set this flag in
++	 * getattr/open request and sent to the corresponding MDT to finish
++	 * getattr/open, which fetched attributes and UPDATE lock/opened file.
++	 */
+ 	MDS_CROSS_REF		= 1 << 1,
+ /*	MDS_VTX_BYPASS		= 1 << 2, obsolete since 2.3.54 */
+ 	MDS_PERM_BYPASS		= 1 << 3,
 -- 
 1.8.3.1
 
