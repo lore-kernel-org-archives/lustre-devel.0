@@ -1,112 +1,73 @@
-Return-Path: <SRS0=N6kG=GZ=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=ROYJ=G2=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=0.4 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
-	PDS_BAD_THREAD_QP_64,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=BAYES_00,DKIM_INVALID,
+	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,INCLUDES_CR_TRAILER,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,MIME_QP_LONG_LINE,SPF_HELO_NONE,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E3FEC433E0
-	for <lustre-devel@archiver.kernel.org>; Fri, 22 Jan 2021 07:14:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CBE7CC433DB
+	for <lustre-devel@archiver.kernel.org>; Sat, 23 Jan 2021 08:21:55 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1680122D50
-	for <lustre-devel@archiver.kernel.org>; Fri, 22 Jan 2021 07:14:45 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1680122D50
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=whamcloud.com
+	by mail.kernel.org (Postfix) with ESMTPS id 4CBE1233EF
+	for <lustre-devel@archiver.kernel.org>; Sat, 23 Jan 2021 08:21:55 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CBE1233EF
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=dilger.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9CEAD328E56;
-	Thu, 21 Jan 2021 23:14:44 -0800 (PST)
-Received: from NAM10-MW2-obe.outbound.protection.outlook.com
- (mail-mw2nam10on2063.outbound.protection.outlook.com [40.107.94.63])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A5F70328CA0
- for <lustre-devel@lists.lustre.org>; Thu, 21 Jan 2021 23:14:42 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=Ea0RKcoBn9A1cRhXAHrcAcIyMd/UwuyoCuYuDrKu+SE+2Ia7MXIpqClnaaqiu1XXuE9kUFMvBhKfvrmYS1MQh2pDXMRvA6NNZp1VuHpvFRhdFNrs1ORRri0E/pAXRXvipUcSEgF1D9d4ZxliW9woZ75+WPDsMHLIKN8BfX9Z/Dk5RjOUvIqhyMenr+cezVbM9mCkHvTA/AZbjxnr47ejLyc4VibgFKHZAtMWtejqZ3sij3deSjiF+lgLlxv4W4ugNOOfKFa5gaF6DRE8zJJCXC2oKZl+YYYKJA6akJhgW/TPbFYwQK0aUe7YrtD0BFfDA2TKF5GzcDYMwMMWvDGc/Q==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=FLW/jpFrgP0k+iAqAGhkD5E9NRODlmGsZfpE3lGJRNo=;
- b=EBT4rzijkwqj7sKj1GpUOCEmaIiKCPClh5dAg22rLMYzhgncXEVNOKBn+BwzBqLFFOUVrNTvbWukYqAPy2HktwMgLQxHnf7m86EGZmOfCzM3kjJN2WVgtghivZozEqGRtSThZaeFr5FG5bcGPB4GlRkl71hRQRYh4O7/+x35+uaz1k+xZ5IzmVe1Hx5Z1gobYTwKGDcUpEVdeTPPb906yUYENEuJk4satFhIPUOXupYWfhrQ+PWDarLGff6jD6gb8sOBzIsqeiVlFufE0lmGHL01xnMgz9IgVQu+P1HSnkRawZdGF7raiM+Yab//TIS04qocefXPoEJngyscgn3eZA==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=FLW/jpFrgP0k+iAqAGhkD5E9NRODlmGsZfpE3lGJRNo=;
- b=bfY2bjukTBLIA2uzhLfY6/Op11XGqO5ezrCPKLpe2EmTa6iW62fUQJZlPQ9qDjnkJqsiSuYzpvYixaF7NIeXsNvISahJlMYJLnN/lEJIxOeJty8DUOshwFA3G/Eb9Zs1ni67lK8qwKHPOGk6Hth2BgWIkrtT4zIadeT6Jg8FLy0=
-Received: from MN2PR19MB3662.namprd19.prod.outlook.com (2603:10b6:208:193::28)
- by BLAPR19MB4595.namprd19.prod.outlook.com (2603:10b6:208:299::10)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.3784.13; Fri, 22 Jan
- 2021 07:14:39 +0000
-Received: from MN2PR19MB3662.namprd19.prod.outlook.com
- ([fe80::944:8292:35d7:98ca]) by MN2PR19MB3662.namprd19.prod.outlook.com
- ([fe80::944:8292:35d7:98ca%7]) with mapi id 15.20.3784.012; Fri, 22 Jan 2021
- 07:14:39 +0000
-From: Andreas Dilger <adilger@whamcloud.com>
-To: James Simmons <jsimmons@casper.infradead.org>
-Thread-Topic: [lustre-devel] Using generic radix trees for large allocations
-Thread-Index: AQHW8CPbnCR3GC5dOUu/y014JPh8ZqozPDUA
-Date: Fri, 22 Jan 2021 07:14:39 +0000
-Message-ID: <C8588A51-61AD-41C4-A41E-9263CF66B1DF@whamcloud.com>
-References: <20210121183224.GA4134678@casper.infradead.org>
-In-Reply-To: <20210121183224.GA4134678@casper.infradead.org>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: casper.infradead.org; dkim=none (message not signed)
- header.d=none;casper.infradead.org; dmarc=none action=none
- header.from=whamcloud.com;
-x-originating-ip: [70.77.221.9]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: d6c5d350-12ba-4304-193c-08d8bea561be
-x-ms-traffictypediagnostic: BLAPR19MB4595:
-x-microsoft-antispam-prvs: <BLAPR19MB4595DAE3AA8D1FC63F7436DEA7A09@BLAPR19MB4595.namprd19.prod.outlook.com>
-x-ms-oob-tlc-oobclassifiers: OLM:10000;
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: pSkrz2XDqSfRlOZI8niTGYjGsK6aR2Iy4gFxjNVwQwSyoTb/gHZqHNOsb/ZzUwxc2+uL7f66AAl+sFJlpgU+Hw4sNJf37k6wuH0KMiAryVhIoj59Sns5tTXU2gRWT4n17FFMuXyGloG457fo1GKc/G5rgqqZk+F00qFjz9TF4GsmFOmvAVWsX0ygPJ+m4ClnMUpnUH00BOoJbogGi+50Aths1NcQlletY2MxgKq1o2/LvRRmkGyrdbs+EmsJMScSiOICJJBAFzNGGj0V8NRfqw1ROst2uA9XAiu6dl9uKZ14K8LX6tWkRM/6GX98z7qbVPV2ol+CHMCucdNwaJeZEUS/YSw9aTpPHFBTpEQ75MCW6w/aWs+Z1znLlMoV5a6+nwsPB8P0dG6Xxu1KxMGmxlQAJI7EHxoB+ddifIidOxkRcLLpm9hV9UExQG59qProiiaX7HPT7DMV3g8nUDg7us8LT79iDM/D/ZUfjPM6DuXW/BaiO6mksMSW1wbcLkcG4Qt6z6Tx+9fQrqGSqy/qLbpTtsSSaPpflfNXlYijlTrwTdqlReTMJlaQu5KCRX95CydOSiqGZuLt7lVElzu0dQ==
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MN2PR19MB3662.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(4636009)(366004)(39850400004)(376002)(396003)(346002)(136003)(6512007)(2906002)(166002)(2616005)(6506007)(21615005)(478600001)(8676002)(186003)(83380400001)(53546011)(26005)(6916009)(316002)(64756008)(66446008)(33656002)(966005)(71200400001)(6486002)(66476007)(91956017)(66556008)(4326008)(76116006)(66946007)(5660300002)(86362001)(36756003)(8936002)(13693001)(41533002)(45980500001);
- DIR:OUT; SFP:1101; 
-x-ms-exchange-antispam-messagedata: =?us-ascii?Q?sGHZTKYRoPdv3vs0Ay1wo7+IRKycP5HXKWu7MulQPdUkRL+v0fY1wpNG91RQ?=
- =?us-ascii?Q?5r/qA4SuZImtLhWXyBgUBZKcMfeaBK5kAg4x0r0Itrn7F772tPpLIIoTllw0?=
- =?us-ascii?Q?PaA++s0R/lRaRzIAiKxL3yTDAAGE81EB4pBore79bhzNvD2y86etoHj2D7fE?=
- =?us-ascii?Q?wWp6XkSUBU84ha+JLulDm63JFeek0Wi0MJiHmaXzpNWfv5b9V5TKKe6dwkk+?=
- =?us-ascii?Q?q2dnebYU9WX2IpemhbKzYo+mum2GBjJWFleSBMz8YxyYCcKmL1KIpFlZKgUA?=
- =?us-ascii?Q?3pjYNs+RYMwCUBYSrQy/XpqbfuI1i4ygPsGLiROB2PTVlj3SMA6v4BlTEqbZ?=
- =?us-ascii?Q?lfi60Zj0WuJfVx91CFioUBlq/npRqwyUdowV9CSqwoMJP8bHC1U0Y0FX1D5d?=
- =?us-ascii?Q?3oicYocSyW49hP8ojb4yx7bLWL3ASwPfYwJCCEgfQQ+27DDKV1DJBLBjcUMD?=
- =?us-ascii?Q?IcYsW4gnIokllOJbyMlXAmlVMTs9KuxK7uGUhlyiKE31FfNXSitv2N96iTzy?=
- =?us-ascii?Q?8+nnqCexfTN2hx+mcRJiyWCueizNFQEzNCuD//fW160wUrFsJByoQHdmM559?=
- =?us-ascii?Q?WLctFu3mEyN8CC6ijAUNeK9yucJlHS7fUbOsgwWAq3fuMXERRykzaMcYR2Bd?=
- =?us-ascii?Q?bY1qnoP4gtkVSfVQoIzcoD8l1aWmnz1EtCghEjJeQVTpo+bxUZyvfoQJS6QV?=
- =?us-ascii?Q?DcKgChEnILbfrdzzo8TT8YTir8diypKO2f+t4RmUX9WkfxjH2HmYpZFBzum3?=
- =?us-ascii?Q?t4+77kU3O1iV/PcRGJOW0TF8CagJMfDk2yD05Pk+HedHSysuDz7lZZZ9EByo?=
- =?us-ascii?Q?Wp5lk9MAjVWQaxEcyrJUJgPOJa6rCE5pj67AAz53HB79TnYnRs4huPDLUwdm?=
- =?us-ascii?Q?kbZZUWDuCp3NL75O5NvB2bPdbC8MhNmqQHLJrCEVvl+ksJETuhsOuw3avl4q?=
- =?us-ascii?Q?dj/NOEbH4Y+cREDg26SfUhthlDQpM/INFvn3kFfcPIl+bKiNji1g1jmzcL5W?=
- =?us-ascii?Q?ufNH?=
-x-ms-exchange-transport-forked: True
-MIME-Version: 1.0
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MN2PR19MB3662.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d6c5d350-12ba-4304-193c-08d8bea561be
-X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2021 07:14:39.0925 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: bGRUQOlzGixIuqaF74zQlmWSIVhB3KNsD6BGzc5hSpFBkVo+Wl8Zn0jqWyD53VMw
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BLAPR19MB4595
-Subject: Re: [lustre-devel] Using generic radix trees for large allocations
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7C75330BEE0;
+	Sat, 23 Jan 2021 00:21:54 -0800 (PST)
+Received: from mail-pg1-f169.google.com (mail-pg1-f169.google.com
+ [209.85.215.169])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0F97721F86A
+ for <lustre-devel@lists.lustre.org>; Sat, 23 Jan 2021 00:21:53 -0800 (PST)
+Received: by mail-pg1-f169.google.com with SMTP id g15so5435124pgu.9
+ for <lustre-devel@lists.lustre.org>; Sat, 23 Jan 2021 00:21:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=dilger-ca.20150623.gappssmtp.com; s=20150623;
+ h=content-transfer-encoding:from:mime-version:date:subject:message-id
+ :references:to;
+ bh=qCpuBlbcfn0ZdCit3cn2OhJv0O3UoX0a7lk0/CVTGkM=;
+ b=Q8v8JV3sBOUbW8S5SSUaXJ81QX6h8aijqfua5242MayDAI4jT04ZhxBYRNF2ypIEA4
+ /0N62Y0tkq30A1rcFn8WbUASc9vEi8zPTIxWppgXBdxWPPqNv8vOeq0ltaJQRt3ZmV0o
+ tqdNoAC1t9eyC5x5QQNPZBf+KzIY3/YRcXOjjpbvPIjpWSvYeH4yJXFnIymHoqXdZf1L
+ OZQeQc49l9+FVyWW/l5StBXWGm/q8GCg7lDVtUVFUuYYUtAd+9HSkeRFleKPpNNd6lLV
+ 2b6Gid1Fo+kosnDD5zwdu//h4B50c6quRHkWSQchL7mv8Ac28VlzhDOcHKzP1K9miKU0
+ inmQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:content-transfer-encoding:from:mime-version:date
+ :subject:message-id:references:to;
+ bh=qCpuBlbcfn0ZdCit3cn2OhJv0O3UoX0a7lk0/CVTGkM=;
+ b=hJ3IHVaoOCWyDP0zjJMyAZTPEQk70ywikuPEdX46Rfol4Mck0XIo3fVYAzObYvOvmy
+ AoEt0q7jy5ihz+s7mMxZoJLzUFCgEUZqT9hdtyAlZacY6xCIrn6yhTeY8ni3Ce4LAY6L
+ +c98k72eQdGnS4oCoRNTv8HzfgV/GIxKttod0zxsypwwO4EyZYmv98mh5fq3MCcgyj+L
+ Gwwho9TI1BxJsQJp7tz5CMIRd1kEtDe+SBYyFHyGUwZc25A7Z4ceCIi74Fw1RWa7WFYc
+ k8q0cOvx8oxFKqVGsjjuYoZxxwdVWUwq2Q2Lqn7vIm3Ig/5XRvNtHV5ksj1DCzc/hONJ
+ cnFw==
+X-Gm-Message-State: AOAM533RCDsBk2CpRtw5cdYl8rNDM7EzTHQ2thYzo0fj5ur1dgXp/YDv
+ gSNRzut6nHcUjh7DPhJt7dtmOkjnVU3OFqe/
+X-Google-Smtp-Source: ABdhPJyVfoptdEXp0CwrPkJSvs148VE1UB2QaXJKPleZ/uRJbgLoEBHKT4dvaQ7Drt3eCc1IJaLcHg==
+X-Received: by 2002:a63:1965:: with SMTP id 37mr8766885pgz.349.1611390112084; 
+ Sat, 23 Jan 2021 00:21:52 -0800 (PST)
+Received: from [192.168.10.175] (S01061cabc081bf83.cg.shawcable.net.
+ [70.77.221.9])
+ by smtp.gmail.com with ESMTPSA id l12sm11020119pjq.7.2021.01.23.00.21.51
+ for <lustre-devel@lists.lustre.org>
+ (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+ Sat, 23 Jan 2021 00:21:51 -0800 (PST)
+From: Andreas Dilger <adilger@dilger.ca>
+Mime-Version: 1.0 (1.0)
+Date: Sat, 23 Jan 2021 00:21:50 -0800
+Message-Id: <D7EB3901-2693-4F06-9827-EF3F04595521@dilger.ca>
+References: <20210122151536.7982-2-s.hauer@pengutronix.de>
+To: Lustre Development List <lustre-devel@lists.lustre.org>
+X-Mailer: iPhone Mail (18B92)
+Subject: [lustre-devel] Fwd: [PATCH 1/8] quota: Allow to pass mount path to
+ quotactl
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -119,311 +80,326 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre-devel <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============7847252238094375253=="
+Content-Type: multipart/mixed; boundary="===============7057999662320647493=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7847252238094375253==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_C8588A5161AD41C4A41E9263CF66B1DFwhamcloudcom_"
 
---_000_C8588A5161AD41C4A41E9263CF66B1DFwhamcloudcom_
-Content-Type: text/plain; charset="us-ascii"
+--===============7057999662320647493==
+Content-Type: multipart/alternative; boundary=Apple-Mail-0FCFF05D-544C-416C-BEB2-6069ED9717EB
+Content-Transfer-Encoding: 7bit
+
+
+--Apple-Mail-0FCFF05D-544C-416C-BEB2-6069ED9717EB
+Content-Type: text/plain;
+	charset=utf-8
 Content-Transfer-Encoding: quoted-printable
 
-On Jan 21, 2021, at 11:32, James Simmons <jsimmons@casper.infradead.org<mai=
-lto:jsimmons@casper.infradead.org>> wrote:
+FYI, I noticed this new patch submitted upstream.
 
- One of the challenging issues for very large scale file systems is the
-performance crash when you cross about 670 stripe count. This is due to
-the memory allocations going from kmalloc to vmalloc. Once you start to
-use vmalloc to allocate the ptlrpc message buffers all the allocating
-start to serialize on a global spinlock.
- Looking for a solution the best one I found so far have been using the
-generic radix tree API. You have to allocate a page worth of data at a
-time so its cluncky for use but I think we could make it work. What do
-you think?
-
-https://www.kernel.org/doc/html/latest/core-api/generic-radix-tree.html
-
-I think the first thing to figure out here is whether vmalloc() of the repl=
-y buffer is
-the problem for sure.  670 stripes is only a 16KB layout, which I'd think w=
-ould be
-handled by kmalloc() almost all of the time, unless memory is very fragment=
-ed.
-It would also be worthwhile to see if the __GFP_ZERO of this allocation is =
-a
-source of performance problems?  While I wouldn't recommend to disable this
-to start, at least checking if memset() shows up in the profile would be us=
-eful.
-
-I definitely recall some strangeness in the MDT reply code for very large r=
-eplies
-that may mean it is retrying the message if it is too large on the first se=
-nd.
-There are probably some improvements to commit v2_5_56_0-71-g006f258300
-"LU-3338 llite: Limit reply buffer size" to better chose the reply buffer s=
-ize if large
-layouts are commonly returned. I think it just bails and limits the layout =
-buffer to
-a max of PAGE_SIZE or similar, instead of having a better algorithm.
-
-
-In times gone by, we also had a patch to improve vmalloc() performance, but
-unfortunately they were rejected upstream because "we don't want developers
-using vmalloc() and if the performance is bad they will avoid it", or simil=
-ar.
-
-Now that kvmalloc() is a widey-used interface in the code, maybe improving
-vmalloc() performance is of interest again (i.e. removing the single global=
- lock)?
-One simple optimization was to linearly use the vmalloc address space from
-start to end, instead of trying to have a "smart" usage of the address spac=
-e.  It
-is 32TiB in size, so takes a while to exhaust (probably several days under =
-normal
-usage), so the first pass through is "free".
-
-
-It isn't clear to me what your goal with the radix tree is?  Do you intend =
-to replace
-vmalloc() usage in Lustre with a custom memory allocator based on this, or =
-is the
-goal to optimize the kernel vmalloc() allocation using the radix tree code?
-
-I think the use of a custom memory allocator in Lustre would be far more na=
-sty than
-lots of the things that are raised as objections to upstream inclusion, so =
-I think it
-would be a step backward.  Optimizing vmalloc() in upstream kernels (if cha=
-nges
-are accepted) would be a better use of time.  For the few sites that have m=
-any OSTs,
-they can afford a kernel patch on the client (likely they have a custom ker=
-nel from
-their system vendor anyway), and the other 99% of users will not need it.
-
-
-I think a more practical approach might be to have a pool of preallocated r=
-eply
-buffers (using vmalloc()) that is kept on the client.  That would avoid the=
- overhead
-of vmalloc/vfree each time, and not need intrusive code changes.  In the li=
-kely
-case of a small layout for a file (even if _some_ layouts are very large), =
-the saved
-RPC replay buffer can be kmalloc'd normally and copied over.  I don't think=
- there
-will be real-world workloads where a client is keeping thousands of differe=
-nt files
-open with huge layouts, so it is likely that the number of large buffers in=
- the reply
-pool will be relatively small.
+If it gets included upstream, there is a patch forward to allow the
+standard quota tools to query Lustre quota data.=20
 
 Cheers, Andreas
---
-Andreas Dilger
-Principal Lustre Architect
-Whamcloud
 
+Begin forwarded message:
 
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> Date: January 22, 2021 at 07:17:45 PST
+> To: linux-fsdevel@vger.kernel.org
+> Cc: Richard Weinberger <richard@nod.at>, linux-mtd@lists.infradead.org, ke=
+rnel@pengutronix.de, Jan Kara <jack@suse.com>, Sascha Hauer <s.hauer@pengutr=
+onix.de>
+> Subject: [PATCH 1/8] quota: Allow to pass mount path to quotactl
+>=20
+> =EF=BB=BFThis patch introduces the Q_PATH flag to the quotactl cmd argumen=
+t.
+> When given, the path given in the special argument to quotactl will
+> be the mount path where the filesystem is mounted, instead of a path
+> to the block device.
+> This is necessary for filesystems which do not have a block device as
+> backing store. Particularly this is done for upcoming UBIFS support.
+>=20
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> fs/quota/quota.c           | 66 ++++++++++++++++++++++++++++----------
+> include/uapi/linux/quota.h |  1 +
+> 2 files changed, 50 insertions(+), 17 deletions(-)
+>=20
+> diff --git a/fs/quota/quota.c b/fs/quota/quota.c
+> index 6d16b2be5ac4..f653b27a9a4e 100644
+> --- a/fs/quota/quota.c
+> +++ b/fs/quota/quota.c
+> @@ -17,6 +17,7 @@
+> #include <linux/capability.h>
+> #include <linux/quotaops.h>
+> #include <linux/types.h>
+> +#include <linux/mount.h>
+> #include <linux/writeback.h>
+> #include <linux/nospec.h>
+> #include "compat.h"
+> @@ -859,25 +860,10 @@ static bool quotactl_cmd_onoff(int cmd)
+>         (cmd =3D=3D Q_XQUOTAON) || (cmd =3D=3D Q_XQUOTAOFF);
+> }
+>=20
+> -/*
+> - * look up a superblock on which quota ops will be performed
+> - * - use the name of a block device to find the superblock thereon
+> - */
+> -static struct super_block *quotactl_block(const char __user *special, int=
+ cmd)
+> +static struct super_block *quotactl_sb(dev_t dev, int cmd)
+> {
+> -#ifdef CONFIG_BLOCK
+>    struct super_block *sb;
+> -    struct filename *tmp =3D getname(special);
+>    bool excl =3D false, thawed =3D false;
+> -    int error;
+> -    dev_t dev;
+> -
+> -    if (IS_ERR(tmp))
+> -        return ERR_CAST(tmp);
+> -    error =3D lookup_bdev(tmp->name, &dev);
+> -    putname(tmp);
+> -    if (error)
+> -        return ERR_PTR(error);
+>=20
+>    if (quotactl_cmd_onoff(cmd)) {
+>        excl =3D true;
+> @@ -901,12 +887,50 @@ static struct super_block *quotactl_block(const char=
+ __user *special, int cmd)
+>        goto retry;
+>    }
+>    return sb;
+> +}
+> +
+> +/*
+> + * look up a superblock on which quota ops will be performed
+> + * - use the name of a block device to find the superblock thereon
+> + */
+> +static struct super_block *quotactl_block(const char __user *special, int=
+ cmd)
+> +{
+> +#ifdef CONFIG_BLOCK
+> +    struct filename *tmp =3D getname(special);
+> +    int error;
+> +    dev_t dev;
+>=20
+> +    if (IS_ERR(tmp))
+> +        return ERR_CAST(tmp);
+> +    error =3D lookup_bdev(tmp->name, &dev);
+> +    putname(tmp);
+> +    if (error)
+> +        return ERR_PTR(error);
+> +
+> +    return quotactl_sb(dev, cmd);
+> #else
+>    return ERR_PTR(-ENODEV);
+> #endif
+> }
+>=20
+> +static struct super_block *quotactl_path(const char __user *special, int c=
+md)
+> +{
+> +    struct super_block *sb;
+> +    struct path path;
+> +    int error;
+> +
+> +    error =3D user_path_at(AT_FDCWD, special, LOOKUP_FOLLOW | LOOKUP_AUTO=
+MOUNT,
+> +               &path);
+> +    if (error)
+> +        return ERR_PTR(error);
+> +
+> +    sb =3D quotactl_sb(path.mnt->mnt_sb->s_dev, cmd);
+> +
+> +    path_put(&path);
+> +
+> +    return sb;
+> +}
+> +
+> /*
+>  * This is the system call interface. This communicates with
+>  * the user-level programs. Currently this only supports diskquota
+> @@ -920,6 +944,7 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const cha=
+r __user *, special,
+>    struct super_block *sb =3D NULL;
+>    struct path path, *pathp =3D NULL;
+>    int ret;
+> +    bool q_path;
+>=20
+>    cmds =3D cmd >> SUBCMDSHIFT;
+>    type =3D cmd & SUBCMDMASK;
+> @@ -927,6 +952,9 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const cha=
+r __user *, special,
+>    if (type >=3D MAXQUOTAS)
+>        return -EINVAL;
+>=20
+> +    q_path =3D cmds & Q_PATH;
+> +    cmds &=3D ~Q_PATH;
+> +
+>    /*
+>     * As a special case Q_SYNC can be called without a specific device.
+>     * It will iterate all superblocks that have quota enabled and call
+> @@ -951,7 +979,11 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const ch=
+ar __user *, special,
+>            pathp =3D &path;
+>    }
+>=20
+> -    sb =3D quotactl_block(special, cmds);
+> +    if (q_path)
+> +        sb =3D quotactl_path(special, cmds);
+> +    else
+> +        sb =3D quotactl_block(special, cmds);
+> +
+>    if (IS_ERR(sb)) {
+>        ret =3D PTR_ERR(sb);
+>        goto out;
+> diff --git a/include/uapi/linux/quota.h b/include/uapi/linux/quota.h
+> index f17c9636a859..e1787c0df601 100644
+> --- a/include/uapi/linux/quota.h
+> +++ b/include/uapi/linux/quota.h
+> @@ -71,6 +71,7 @@
+> #define Q_GETQUOTA 0x800007    /* get user quota structure */
+> #define Q_SETQUOTA 0x800008    /* set user quota structure */
+> #define Q_GETNEXTQUOTA 0x800009    /* get disk limits and usage >=3D ID */=
 
+> +#define Q_PATH     0x400000    /* quotactl special arg contains mount pat=
+h */
+>=20
+> /* Quota format type IDs */
+> #define    QFMT_VFS_OLD 1
+> --=20
+> 2.20.1
+>=20
 
-
-
-
---_000_C8588A5161AD41C4A41E9263CF66B1DFwhamcloudcom_
-Content-Type: text/html; charset="us-ascii"
-Content-ID: <44EC223C876F8743B8C7EB64DA24FDA7@namprd19.prod.outlook.com>
+--Apple-Mail-0FCFF05D-544C-416C-BEB2-6069ED9717EB
+Content-Type: text/html;
+	charset=utf-8
 Content-Transfer-Encoding: quoted-printable
 
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-</head>
-<body style=3D"word-wrap: break-word; -webkit-nbsp-mode: space; line-break:=
- after-white-space;" class=3D"">
-On Jan 21, 2021, at 11:32, James Simmons &lt;<a href=3D"mailto:jsimmons@cas=
-per.infradead.org" class=3D"">jsimmons@casper.infradead.org</a>&gt; wrote:<=
-br class=3D"">
-<div>
-<blockquote type=3D"cite" class=3D""><br class=3D"Apple-interchange-newline=
-">
-<div class=3D"">
-<div class=3D"">&nbsp;One of the challenging issues for very large scale fi=
-le systems is the<br class=3D"">
-performance crash when you cross about 670 stripe count. This is due to<br =
-class=3D"">
-the memory allocations going from kmalloc to vmalloc. Once you start to<br =
-class=3D"">
-use vmalloc to allocate the ptlrpc message buffers all the allocating<br cl=
-ass=3D"">
-start to serialize on a global spinlock.<br class=3D"">
-&nbsp;Looking for a solution the best one I found so far have been using th=
-e<br class=3D"">
-generic radix tree API. You have to allocate a page worth of data at a<br c=
-lass=3D"">
-time so its cluncky for use but I think we could make it work. What do<br c=
-lass=3D"">
-you think?<br class=3D"">
-<br class=3D"">
-<a href=3D"https://www.kernel.org/doc/html/latest/core-api/generic-radix-tr=
-ee.html" class=3D"">https://www.kernel.org/doc/html/latest/core-api/generic=
--radix-tree.html</a><br class=3D"">
-</div>
-</div>
-</blockquote>
-<br class=3D"">
-</div>
-<div>I think the first thing to figure out here is whether vmalloc() of the=
- reply buffer is</div>
-<div>the problem for sure. &nbsp;670 stripes is only a 16KB layout, which I=
-'d think would be</div>
-<div>handled by kmalloc() almost all of the time, unless memory is very fra=
-gmented.</div>
-<div>It would also be worthwhile to see if the __GFP_ZERO of this allocatio=
-n is a</div>
-<div>source of performance problems? &nbsp;While I wouldn't recommend to di=
-sable this</div>
-<div>to start, at least checking if memset() shows up in the profile would =
-be useful.</div>
-<div><br class=3D"">
-</div>
-<div>I definitely recall some strangeness in the MDT reply code for very la=
-rge replies</div>
-<div>that may mean it is retrying the message if it is too large on the fir=
-st send.</div>
-<div>There are probably some improvements to commit v2_5_56_0-71-g006f25830=
-0</div>
-<div>&quot;LU-3338 llite: Limit reply buffer size&quot; to better chose the=
- reply buffer size if large</div>
-<div>layouts are commonly returned. I think it just bails and limits the la=
-yout buffer to</div>
-<div>a max of PAGE_SIZE or similar, instead of having a better algorithm.</=
-div>
-<div><br class=3D"">
-</div>
-<div><br class=3D"">
-</div>
-<div>In times gone by, we also had a patch to improve vmalloc() performance=
-, but</div>
-<div>unfortunately they were rejected upstream because &quot;we don't want =
-developers</div>
-<div>using vmalloc() and if the performance is bad they will avoid it&quot;=
-, or similar.</div>
-<div><br class=3D"">
-</div>
-<div>Now that kvmalloc() is a widey-used interface in the code, maybe impro=
-ving</div>
-<div>vmalloc() performance is of interest again (i.e. removing the single g=
-lobal lock)?</div>
-<div>One simple optimization was to linearly use the vmalloc address space =
-from</div>
-<div>start to end, instead of trying to have a &quot;smart&quot; usage of t=
-he address space. &nbsp;It</div>
-<div>is 32TiB in size, so takes a while to exhaust (probably several days u=
-nder normal</div>
-<div>usage), so the first pass through is &quot;free&quot;.</div>
-<div><br class=3D"">
-</div>
-<div><br class=3D"">
-</div>
-<div>It isn't clear to me what your goal with the radix tree is? &nbsp;Do y=
-ou intend to replace</div>
-<div>vmalloc() usage in Lustre with a custom memory allocator based on this=
-, or is the</div>
-<div>goal to optimize the kernel vmalloc() allocation using the radix tree =
-code?</div>
-<div><br class=3D"">
-</div>
-<div>I think the use of a custom memory allocator in Lustre would be far mo=
-re nasty than</div>
-<div>lots of the things that are raised as objections to upstream inclusion=
-, so I think it</div>
-<div>would be a step backward. &nbsp;Optimizing vmalloc() in upstream kerne=
-ls (if changes</div>
-<div>are accepted) would be a better use of time. &nbsp;For the few sites t=
-hat have many OSTs,</div>
-<div>they can afford a kernel patch on the client (likely they have a custo=
-m kernel from</div>
-<div>their system vendor anyway), and the other 99% of users will not need =
-it.</div>
-<div><br class=3D"">
-</div>
-<div><br class=3D"">
-</div>
-<div>I think a more practical approach might be to have a pool of prealloca=
-ted reply</div>
-<div>buffers (using vmalloc()) that is kept on the client. &nbsp;That would=
- avoid the overhead</div>
-<div>of vmalloc/vfree each time, and not need intrusive code changes. &nbsp=
-;In the likely</div>
-<div>case of a small layout for a file (even if _some_ layouts are very lar=
-ge), the saved</div>
-<div>RPC replay buffer can be kmalloc'd normally and copied over. &nbsp;I d=
-on't think there</div>
-<div>will be real-world workloads where a client is keeping thousands of di=
-fferent files</div>
-<div>open with huge layouts, so it is likely that the number of large buffe=
-rs in the reply</div>
-<div>pool will be relatively small.</div>
-<br class=3D"">
-<div class=3D"">
-<div dir=3D"auto" style=3D"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); =
-letter-spacing: normal; text-align: start; text-indent: 0px; text-transform=
-: none; white-space: normal; word-spacing: 0px; -webkit-text-stroke-width: =
-0px; text-decoration: none; word-wrap: break-word; -webkit-nbsp-mode: space=
-; line-break: after-white-space;" class=3D"">
-<div dir=3D"auto" style=3D"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); =
-letter-spacing: normal; text-align: start; text-indent: 0px; text-transform=
-: none; white-space: normal; word-spacing: 0px; -webkit-text-stroke-width: =
-0px; text-decoration: none; word-wrap: break-word; -webkit-nbsp-mode: space=
-; line-break: after-white-space;" class=3D"">
-<div dir=3D"auto" style=3D"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); =
-letter-spacing: normal; text-align: start; text-indent: 0px; text-transform=
-: none; white-space: normal; word-spacing: 0px; -webkit-text-stroke-width: =
-0px; text-decoration: none; word-wrap: break-word; -webkit-nbsp-mode: space=
-; line-break: after-white-space;" class=3D"">
-<div dir=3D"auto" style=3D"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); =
-letter-spacing: normal; text-align: start; text-indent: 0px; text-transform=
-: none; white-space: normal; word-spacing: 0px; -webkit-text-stroke-width: =
-0px; text-decoration: none; word-wrap: break-word; -webkit-nbsp-mode: space=
-; line-break: after-white-space;" class=3D"">
-<div dir=3D"auto" style=3D"caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0); =
-letter-spacing: normal; text-align: start; text-indent: 0px; text-transform=
-: none; white-space: normal; word-spacing: 0px; -webkit-text-stroke-width: =
-0px; text-decoration: none; word-wrap: break-word; -webkit-nbsp-mode: space=
-; line-break: after-white-space;" class=3D"">
-<div>Cheers, Andreas</div>
-<div>--</div>
-<div>Andreas Dilger</div>
-<div>Principal Lustre Architect</div>
-<div>Whamcloud</div>
-<div><br class=3D"">
-</div>
-<div><br class=3D"">
-</div>
-<div><br class=3D"">
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<br class=3D"Apple-interchange-newline">
-<br class=3D"Apple-interchange-newline">
-</div>
-<br class=3D"">
-</body>
-</html>
+<html><head><meta http-equiv=3D"content-type" content=3D"text/html; charset=3D=
+utf-8"></head><body dir=3D"auto">FYI, I noticed this new patch submitted ups=
+tream.<div><br></div><div>If it gets included upstream, there is a patch for=
+ward to allow the<div>standard quota tools to query Lustre quota data.&nbsp;=
+<br><br><div dir=3D"ltr">Cheers, Andreas</div><div dir=3D"ltr"><br>Begin for=
+warded message:<br><br></div><blockquote type=3D"cite"><div dir=3D"ltr"><b>From:=
+</b> Sascha Hauer &lt;s.hauer@pengutronix.de&gt;<br><b>Date:</b> January 22,=
+ 2021 at 07:17:45 PST<br><b>To:</b> linux-fsdevel@vger.kernel.org<br><b>Cc:<=
+/b> Richard Weinberger &lt;richard@nod.at&gt;, linux-mtd@lists.infradead.org=
+, kernel@pengutronix.de, Jan Kara &lt;jack@suse.com&gt;, Sascha Hauer &lt;s.=
+hauer@pengutronix.de&gt;<br><b>Subject:</b> <b>[PATCH 1/8] quota: Allow to p=
+ass mount path to quotactl</b><br><br></div></blockquote><blockquote type=3D=
+"cite"><div dir=3D"ltr">=EF=BB=BF<span>This patch introduces the Q_PATH flag=
+ to the quotactl cmd argument.</span><br><span>When given, the path given in=
+ the special argument to quotactl will</span><br><span>be the mount path whe=
+re the filesystem is mounted, instead of a path</span><br><span>to the block=
+ device.</span><br><span>This is necessary for filesystems which do not have=
+ a block device as</span><br><span>backing store. Particularly this is done f=
+or upcoming UBIFS support.</span><br><span></span><br><span>Signed-off-by: S=
+ascha Hauer &lt;s.hauer@pengutronix.de&gt;</span><br><span>---</span><br><sp=
+an> fs/quota/quota.c &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&=
+nbsp;| 66 ++++++++++++++++++++++++++++----------</span><br><span> include/ua=
+pi/linux/quota.h | &nbsp;1 +</span><br><span> 2 files changed, 50 insertions=
+(+), 17 deletions(-)</span><br><span></span><br><span>diff --git a/fs/quota/=
+quota.c b/fs/quota/quota.c</span><br><span>index 6d16b2be5ac4..f653b27a9a4e 1=
+00644</span><br><span>--- a/fs/quota/quota.c</span><br><span>+++ b/fs/quota/=
+quota.c</span><br><span>@@ -17,6 +17,7 @@</span><br><span> #include &lt;linu=
+x/capability.h&gt;</span><br><span> #include &lt;linux/quotaops.h&gt;</span>=
+<br><span> #include &lt;linux/types.h&gt;</span><br><span>+#include &lt;linu=
+x/mount.h&gt;</span><br><span> #include &lt;linux/writeback.h&gt;</span><br>=
+<span> #include &lt;linux/nospec.h&gt;</span><br><span> #include "compat.h"<=
+/span><br><span>@@ -859,25 +860,10 @@ static bool quotactl_cmd_onoff(int cmd=
+)</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp; (cmd =3D=3D Q_XQUOTAON) || (=
+cmd =3D=3D Q_XQUOTAOFF);</span><br><span> }</span><br><span></span><br><span=
+>-/*</span><br><span>- * look up a superblock on which quota ops will be per=
+formed</span><br><span>- * - use the name of a block device to find the supe=
+rblock thereon</span><br><span>- */</span><br><span>-static struct super_blo=
+ck *quotactl_block(const char __user *special, int cmd)</span><br><span>+sta=
+tic struct super_block *quotactl_sb(dev_t dev, int cmd)</span><br><span> {</=
+span><br><span>-#ifdef CONFIG_BLOCK</span><br><span>  &nbsp; &nbsp;struct su=
+per_block *sb;</span><br><span>- &nbsp; &nbsp;struct filename *tmp =3D getna=
+me(special);</span><br><span>  &nbsp; &nbsp;bool excl =3D false, thawed =3D f=
+alse;</span><br><span>- &nbsp; &nbsp;int error;</span><br><span>- &nbsp; &nb=
+sp;dev_t dev;</span><br><span>-</span><br><span>- &nbsp; &nbsp;if (IS_ERR(tm=
+p))</span><br><span>- &nbsp; &nbsp; &nbsp; &nbsp;return ERR_CAST(tmp);</span=
+><br><span>- &nbsp; &nbsp;error =3D lookup_bdev(tmp-&gt;name, &amp;dev);</sp=
+an><br><span>- &nbsp; &nbsp;putname(tmp);</span><br><span>- &nbsp; &nbsp;if (=
+error)</span><br><span>- &nbsp; &nbsp; &nbsp; &nbsp;return ERR_PTR(error);</=
+span><br><span></span><br><span>  &nbsp; &nbsp;if (quotactl_cmd_onoff(cmd)) {=
+</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp;excl =3D true;</span><br><span=
+>@@ -901,12 +887,50 @@ static struct super_block *quotactl_block(const char _=
+_user *special, int cmd)</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp;goto r=
+etry;</span><br><span>  &nbsp; &nbsp;}</span><br><span>  &nbsp; &nbsp;return=
+ sb;</span><br><span>+}</span><br><span>+</span><br><span>+/*</span><br><spa=
+n>+ * look up a superblock on which quota ops will be performed</span><br><s=
+pan>+ * - use the name of a block device to find the superblock thereon</spa=
+n><br><span>+ */</span><br><span>+static struct super_block *quotactl_block(=
+const char __user *special, int cmd)</span><br><span>+{</span><br><span>+#if=
+def CONFIG_BLOCK</span><br><span>+ &nbsp; &nbsp;struct filename *tmp =3D get=
+name(special);</span><br><span>+ &nbsp; &nbsp;int error;</span><br><span>+ &=
+nbsp; &nbsp;dev_t dev;</span><br><span></span><br><span>+ &nbsp; &nbsp;if (I=
+S_ERR(tmp))</span><br><span>+ &nbsp; &nbsp; &nbsp; &nbsp;return ERR_CAST(tmp=
+);</span><br><span>+ &nbsp; &nbsp;error =3D lookup_bdev(tmp-&gt;name, &amp;d=
+ev);</span><br><span>+ &nbsp; &nbsp;putname(tmp);</span><br><span>+ &nbsp; &=
+nbsp;if (error)</span><br><span>+ &nbsp; &nbsp; &nbsp; &nbsp;return ERR_PTR(=
+error);</span><br><span>+</span><br><span>+ &nbsp; &nbsp;return quotactl_sb(=
+dev, cmd);</span><br><span> #else</span><br><span>  &nbsp; &nbsp;return ERR_=
+PTR(-ENODEV);</span><br><span> #endif</span><br><span> }</span><br><span></s=
+pan><br><span>+static struct super_block *quotactl_path(const char __user *s=
+pecial, int cmd)</span><br><span>+{</span><br><span>+ &nbsp; &nbsp;struct su=
+per_block *sb;</span><br><span>+ &nbsp; &nbsp;struct path path;</span><br><s=
+pan>+ &nbsp; &nbsp;int error;</span><br><span>+</span><br><span>+ &nbsp; &nb=
+sp;error =3D user_path_at(AT_FDCWD, special, LOOKUP_FOLLOW | LOOKUP_AUTOMOUN=
+T,</span><br><span>+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&=
+amp;path);</span><br><span>+ &nbsp; &nbsp;if (error)</span><br><span>+ &nbsp=
+; &nbsp; &nbsp; &nbsp;return ERR_PTR(error);</span><br><span>+</span><br><sp=
+an>+ &nbsp; &nbsp;sb =3D quotactl_sb(path.mnt-&gt;mnt_sb-&gt;s_dev, cmd);</s=
+pan><br><span>+</span><br><span>+ &nbsp; &nbsp;path_put(&amp;path);</span><b=
+r><span>+</span><br><span>+ &nbsp; &nbsp;return sb;</span><br><span>+}</span=
+><br><span>+</span><br><span> /*</span><br><span> &nbsp;* This is the system=
+ call interface. This communicates with</span><br><span> &nbsp;* the user-le=
+vel programs. Currently this only supports diskquota</span><br><span>@@ -920=
+,6 +944,7 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const char __user *=
+, special,</span><br><span>  &nbsp; &nbsp;struct super_block *sb =3D NULL;</=
+span><br><span>  &nbsp; &nbsp;struct path path, *pathp =3D NULL;</span><br><=
+span>  &nbsp; &nbsp;int ret;</span><br><span>+ &nbsp; &nbsp;bool q_path;</sp=
+an><br><span></span><br><span>  &nbsp; &nbsp;cmds =3D cmd &gt;&gt; SUBCMDSHI=
+FT;</span><br><span>  &nbsp; &nbsp;type =3D cmd &amp; SUBCMDMASK;</span><br>=
+<span>@@ -927,6 +952,9 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const=
+ char __user *, special,</span><br><span>  &nbsp; &nbsp;if (type &gt;=3D MAX=
+QUOTAS)</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp;return -EINVAL;</span><=
+br><span></span><br><span>+ &nbsp; &nbsp;q_path =3D cmds &amp; Q_PATH;</span=
+><br><span>+ &nbsp; &nbsp;cmds &amp;=3D ~Q_PATH;</span><br><span>+</span><br=
+><span>  &nbsp; &nbsp;/*</span><br><span>  &nbsp; &nbsp; * As a special case=
+ Q_SYNC can be called without a specific device.</span><br><span>  &nbsp; &n=
+bsp; * It will iterate all superblocks that have quota enabled and call</spa=
+n><br><span>@@ -951,7 +979,11 @@ SYSCALL_DEFINE4(quotactl, unsigned int, cmd=
+, const char __user *, special,</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp=
+; &nbsp; &nbsp;pathp =3D &amp;path;</span><br><span>  &nbsp; &nbsp;}</span><=
+br><span></span><br><span>- &nbsp; &nbsp;sb =3D quotactl_block(special, cmds=
+);</span><br><span>+ &nbsp; &nbsp;if (q_path)</span><br><span>+ &nbsp; &nbsp=
+; &nbsp; &nbsp;sb =3D quotactl_path(special, cmds);</span><br><span>+ &nbsp;=
+ &nbsp;else</span><br><span>+ &nbsp; &nbsp; &nbsp; &nbsp;sb =3D quotactl_blo=
+ck(special, cmds);</span><br><span>+</span><br><span>  &nbsp; &nbsp;if (IS_E=
+RR(sb)) {</span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp;ret =3D PTR_ERR(sb);<=
+/span><br><span>  &nbsp; &nbsp; &nbsp; &nbsp;goto out;</span><br><span>diff -=
+-git a/include/uapi/linux/quota.h b/include/uapi/linux/quota.h</span><br><sp=
+an>index f17c9636a859..e1787c0df601 100644</span><br><span>--- a/include/uap=
+i/linux/quota.h</span><br><span>+++ b/include/uapi/linux/quota.h</span><br><=
+span>@@ -71,6 +71,7 @@</span><br><span> #define Q_GETQUOTA 0x800007 &nbsp; &=
+nbsp;/* get user quota structure */</span><br><span> #define Q_SETQUOTA 0x80=
+0008 &nbsp; &nbsp;/* set user quota structure */</span><br><span> #define Q_=
+GETNEXTQUOTA 0x800009 &nbsp; &nbsp;/* get disk limits and usage &gt;=3D ID *=
+/</span><br><span>+#define Q_PATH &nbsp;&nbsp;&nbsp;&nbsp;0x400000 &nbsp; &n=
+bsp;/* quotactl special arg contains mount path */</span><br><span></span><b=
+r><span> /* Quota format type IDs */</span><br><span> #define &nbsp; &nbsp;Q=
+FMT_VFS_OLD 1</span><br><span>-- </span><br><span>2.20.1</span><br><span></s=
+pan><br></div></blockquote></div></div></body></html>=
 
---_000_C8588A5161AD41C4A41E9263CF66B1DFwhamcloudcom_--
+--Apple-Mail-0FCFF05D-544C-416C-BEB2-6069ED9717EB--
 
---===============7847252238094375253==
+--===============7057999662320647493==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -434,4 +410,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============7847252238094375253==--
+--===============7057999662320647493==--
