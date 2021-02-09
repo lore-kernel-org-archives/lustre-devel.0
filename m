@@ -7,37 +7,36 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A259FC433E0
-	for <lustre-devel@archiver.kernel.org>; Tue,  9 Feb 2021 00:54:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16B83C433DB
+	for <lustre-devel@archiver.kernel.org>; Tue,  9 Feb 2021 00:54:57 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5681061606
-	for <lustre-devel@archiver.kernel.org>; Tue,  9 Feb 2021 00:54:53 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5681061606
+	by mail.kernel.org (Postfix) with ESMTPS id C8E6364E77
+	for <lustre-devel@archiver.kernel.org>; Tue,  9 Feb 2021 00:54:56 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C8E6364E77
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 709AA30F758;
-	Mon,  8 Feb 2021 16:54:45 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id BB2D130FAB6;
+	Mon,  8 Feb 2021 16:54:48 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8EA7F30F962
- for <lustre-devel@lists.lustre.org>; Mon,  8 Feb 2021 16:54:31 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9F78530F95B
+ for <lustre-devel@lists.lustre.org>; Mon,  8 Feb 2021 16:54:32 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id F00261006EBB;
- Mon,  8 Feb 2021 19:54:28 -0500 (EST)
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 06CAF1006EBF;
+ Mon,  8 Feb 2021 19:54:29 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id EB06B4CC37; Mon,  8 Feb 2021 19:54:28 -0500 (EST)
+ id 044A44CC22; Mon,  8 Feb 2021 19:54:29 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  8 Feb 2021 19:54:22 -0500
-Message-Id: <1612832067-1449-5-git-send-email-jsimmons@infradead.org>
+Date: Mon,  8 Feb 2021 19:54:26 -0500
+Message-Id: <1612832067-1449-9-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1612832067-1449-1-git-send-email-jsimmons@infradead.org>
 References: <1612832067-1449-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 4/9] lustre: osc: correctly update size/kms
- for fallocate
+Subject: [lustre-devel] [PATCH 8/9] lustre: osc: avoid crash if ocd reset
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -57,162 +56,87 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Bobi Jam <bobijam@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-* fallocate chose oa->o_size for falloc_offset and o->o_blocks for
-  falloc_end, but forgot to change attr->cat_size and attr->cat_kms
-  to use sa_attr.lvb_size to update osc's lvb and kms if it expands
-  the file's size.
+Avoid divide-by-zero if OSC obd_connect_data is not fully initialized.
+cl_ocd_grant_param is only set after cl_max_extent_pages is OK to use.
 
-  Other setattr IO uses @size (sa_falloc_offset in fallocate case) to
-  update the lvb and kms.
-
-* lock request extent for fallocate should be
-  [sa_falloc_offset, sa_falloc_end)
-
-* calculate sa_attr.lvb_size correctly for osc objects
-  (lov_io_sub_inherit())
-
-Fixes: d748d2ffa1bc ("lustre: fallocate: Implement fallocate preallocate operation")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14326
-Lustre-commit: 43979e4e257e78d ("LU-14326 osc: correctly update size/kms for fallocate")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/41272
-Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14283
+Lustre-commit: 1ec58a2e6ef98ba ("LU-14283 osc: avoid crash if ocd reset")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/41225
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Wang Shilong <wshilong@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/vvp_io.c   |  2 +-
- fs/lustre/lov/lov_io.c     | 11 +++++------
- fs/lustre/osc/osc_cache.c  |  3 ++-
- fs/lustre/osc/osc_io.c     | 33 +++++++++++++++++----------------
- fs/lustre/osc/osc_object.c |  4 +++-
- 5 files changed, 28 insertions(+), 25 deletions(-)
+ fs/lustre/include/obd.h     |  8 +++++---
+ fs/lustre/osc/osc_request.c | 11 +++++------
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index b0b31c37..ac6aef0 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -647,7 +647,7 @@ static int vvp_io_setattr_lock(const struct lu_env *env,
- 			enqflags = CEF_DISCARD_DATA;
- 	} else if (cl_io_is_fallocate(io)) {
- 		lock_start = io->u.ci_setattr.sa_falloc_offset;
--		lock_end = lock_start + io->u.ci_setattr.sa_attr.lvb_size;
-+		lock_end = io->u.ci_setattr.sa_falloc_end;
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index de62005..9957105 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -206,6 +206,11 @@ struct client_obd {
+ 	 */
+ 	u32			 cl_dom_min_inline_repsize;
+ 
++	/* checksumming for data sent over the network */
++	unsigned int		 cl_checksum:1,	/* 0 = disabled, 1 = enabled */
++				 cl_checksum_dump:1, /* same */
++				 cl_ocd_grant_param:1;
++	/* supported checksum types that are worked out at connect time */
+ 	enum lustre_sec_part     cl_sp_me;
+ 	enum lustre_sec_part     cl_sp_to;
+ 	struct sptlrpc_flavor    cl_flvr_mgc;   /* fixed flavor of mgc->mgs */
+@@ -334,9 +339,6 @@ struct client_obd {
+ 	struct list_head	 cl_flight_waiters;
+ 	u32			 cl_rpcs_in_flight;
+ 
+-	/* checksumming for data sent over the network */
+-	unsigned int		cl_checksum:1,	/* 0 = disabled, 1 = enabled */
+-				cl_checksum_dump:1; /* same */
+ 	/* supported checksum types that are worked out at connect time */
+ 	u32			cl_supp_cksum_types;
+ 	/* checksum algorithm to be used */
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 8d3688f..be722c9 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -702,7 +702,7 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+ 
+ 	oa->o_valid |= bits;
+ 	spin_lock(&cli->cl_loi_list_lock);
+-	if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data, GRANT_PARAM))
++	if (cli->cl_ocd_grant_param)
+ 		oa->o_dirty = cli->cl_dirty_grant;
+ 	else
+ 		oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
+@@ -735,8 +735,7 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+ 		nrpages *= cli->cl_max_rpcs_in_flight + 1;
+ 		nrpages = max(nrpages, cli->cl_dirty_max_pages);
+ 		undirty = nrpages << PAGE_SHIFT;
+-		if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data,
+-				 GRANT_PARAM)) {
++		if (cli->cl_ocd_grant_param) {
+ 			int nrextents;
+ 
+ 			/*
+@@ -1070,10 +1069,10 @@ void osc_init_grant(struct client_obd *cli, struct obd_connect_data *ocd)
+ 					     ~chunk_mask) & chunk_mask;
+ 		/* determine maximum extent size, in #pages */
+ 		size = (u64)ocd->ocd_grant_max_blks << ocd->ocd_grant_blkbits;
+-		cli->cl_max_extent_pages = size >> PAGE_SHIFT;
+-		if (!cli->cl_max_extent_pages)
+-			cli->cl_max_extent_pages = 1;
++		cli->cl_max_extent_pages = (size >> PAGE_SHIFT) ? : 1;
++		cli->cl_ocd_grant_param = 1;
  	} else {
- 		unsigned int valid = io->u.ci_setattr.sa_avalid;
- 
-diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
-index c9600bc..2297e53 100644
---- a/fs/lustre/lov/lov_io.c
-+++ b/fs/lustre/lov/lov_io.c
-@@ -677,17 +677,16 @@ static void lov_io_sub_inherit(struct lov_io_sub *sub, struct lov_io *lio,
- 			parent->u.ci_setattr.sa_parent_fid;
- 		/* For SETATTR(fallocate) pass the subtype to lower IO */
- 		io->u.ci_setattr.sa_subtype = parent->u.ci_setattr.sa_subtype;
--		if (cl_io_is_trunc(io)) {
-+		if (cl_io_is_fallocate(io)) {
-+			io->u.ci_setattr.sa_falloc_offset = start;
-+			io->u.ci_setattr.sa_falloc_end = end;
-+		}
-+		if (cl_io_is_trunc(io) || cl_io_is_fallocate(io)) {
- 			loff_t new_size = parent->u.ci_setattr.sa_attr.lvb_size;
- 
- 			new_size = lov_size_to_stripe(lsm, index, new_size,
- 						      stripe);
- 			io->u.ci_setattr.sa_attr.lvb_size = new_size;
--		} else if (cl_io_is_fallocate(io)) {
--			io->u.ci_setattr.sa_falloc_offset = start;
--			io->u.ci_setattr.sa_falloc_end = end;
--			io->u.ci_setattr.sa_attr.lvb_size =
--				parent->u.ci_setattr.sa_attr.lvb_size;
- 		}
- 		lov_lsm2layout(lsm, lsm->lsm_entries[index],
- 			       &io->u.ci_setattr.sa_layout);
-diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
-index d511ece..4abe8ba 100644
---- a/fs/lustre/osc/osc_cache.c
-+++ b/fs/lustre/osc/osc_cache.c
-@@ -1159,7 +1159,8 @@ static int osc_extent_make_ready(const struct lu_env *env,
- 		int last_oap_count = osc_refresh_count(env, last,
- 						       OBD_BRW_WRITE);
- 
--		LASSERT(last_oap_count > 0);
-+		LASSERTF(last_oap_count > 0,
-+			 "last_oap_count %d\n", last_oap_count);
- 		LASSERT(last->oap_page_off + last_oap_count <= PAGE_SIZE);
- 		last->oap_count = last_oap_count;
- 		spin_lock(&last->oap_lock);
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index a0537b8..ce0f7ec 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -569,8 +569,14 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 			unsigned int cl_valid = 0;
- 
- 			if (ia_avalid & ATTR_SIZE) {
--				attr->cat_size = size;
--				attr->cat_kms = size;
-+				if (io_is_falloc) {
-+					attr->cat_size =
-+						io->u.ci_setattr.sa_attr.lvb_size;
-+					attr->cat_kms = attr->cat_size;
-+				} else {
-+					attr->cat_size = size;
-+					attr->cat_kms = size;
-+				}
- 				cl_valid = CAT_SIZE | CAT_KMS;
- 			}
- 			if (ia_avalid & ATTR_MTIME_SET) {
-@@ -707,22 +713,17 @@ void osc_io_setattr_end(const struct lu_env *env,
- 	}
- 
- 	if (cl_io_is_fallocate(io)) {
--		cl_object_attr_lock(obj);
--
--		/* update blocks */
--		if (oa->o_valid & OBD_MD_FLBLOCKS) {
--			attr->cat_blocks = oa->o_blocks;
--			cl_valid |= CAT_BLOCKS;
--		}
-+		if (result == 0) {
-+			cl_object_attr_lock(obj);
-+			/* update blocks */
-+			if (oa->o_valid & OBD_MD_FLBLOCKS) {
-+				attr->cat_blocks = oa->o_blocks;
-+				cl_valid |= CAT_BLOCKS;
-+			}
- 
--		/* update size */
--		if (oa->o_valid & OBD_MD_FLSIZE) {
--			attr->cat_size = oa->o_size;
--			cl_valid |= CAT_SIZE;
-+			cl_object_attr_update(env, obj, attr, cl_valid);
-+			cl_object_attr_unlock(obj);
- 		}
--
--		cl_object_attr_update(env, obj, attr, cl_valid);
--		cl_object_attr_unlock(obj);
- 	}
- }
- EXPORT_SYMBOL(osc_io_setattr_end);
-diff --git a/fs/lustre/osc/osc_object.c b/fs/lustre/osc/osc_object.c
-index 273098a..00f2800 100644
---- a/fs/lustre/osc/osc_object.c
-+++ b/fs/lustre/osc/osc_object.c
-@@ -218,7 +218,9 @@ static int osc_object_ast_clear(struct ldlm_lock *lock, void *data)
- 			   lvb->lvb_atime, oinfo->loi_lvb.lvb_size,
- 			   oinfo->loi_lvb.lvb_blocks, oinfo->loi_lvb.lvb_ctime,
- 			   oinfo->loi_lvb.lvb_mtime, oinfo->loi_lvb.lvb_atime);
--		LASSERT(oinfo->loi_lvb.lvb_size >= oinfo->loi_kms);
-+		LASSERTF(oinfo->loi_lvb.lvb_size >= oinfo->loi_kms,
-+			 "lvb_size %#llx, loi_kms %#llx\n",
-+			 oinfo->loi_lvb.lvb_size, oinfo->loi_kms);
- 
- 		cl_object_attr_lock(&osc->oo_cl);
- 		memcpy(lvb, &oinfo->loi_lvb, sizeof(oinfo->loi_lvb));
++		cli->cl_ocd_grant_param = 0;
+ 		cli->cl_grant_extent_tax = 0;
+ 		cli->cl_chunkbits = PAGE_SHIFT;
+ 		cli->cl_max_extent_pages = DT_MAX_BRW_PAGES;
 -- 
 1.8.3.1
 
