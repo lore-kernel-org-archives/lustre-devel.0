@@ -1,68 +1,140 @@
-Return-Path: <SRS0=M+uU=HW=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=no9r=HY=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
-	SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=BAYES_00,DKIM_INVALID,
+	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82792C433E0
-	for <lustre-devel@archiver.kernel.org>; Sat, 20 Feb 2021 03:01:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CDFFC433E0
+	for <lustre-devel@archiver.kernel.org>; Mon, 22 Feb 2021 19:58:57 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16B8F61606
-	for <lustre-devel@archiver.kernel.org>; Sat, 20 Feb 2021 03:01:08 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16B8F61606
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=opendrives.com
+	by mail.kernel.org (Postfix) with ESMTPS id 06B4464E02
+	for <lustre-devel@archiver.kernel.org>; Mon, 22 Feb 2021 19:58:46 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06B4464E02
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lists.lustre.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2492F21FBE1;
-	Fri, 19 Feb 2021 19:01:08 -0800 (PST)
-Received: from mail-ej1-f53.google.com (mail-ej1-f53.google.com
- [209.85.218.53])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AD7D321FB65
- for <lustre-devel@lists.lustre.org>; Fri, 19 Feb 2021 19:01:05 -0800 (PST)
-Received: by mail-ej1-f53.google.com with SMTP id g5so17714591ejt.2
- for <lustre-devel@lists.lustre.org>; Fri, 19 Feb 2021 19:01:05 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 55EC121EBD9;
+	Mon, 22 Feb 2021 11:58:44 -0800 (PST)
+Received: from prdesa-1.llnl.gov (prdesa-1.llnl.gov [128.15.143.181])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 31BD521CB77
+ for <lustre-devel@lists.lustre.org>; Mon, 22 Feb 2021 11:58:42 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=opendrives-com.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=abvad557k4vjf2B8Jzp3unrIigIyF+v3H2ANeyBgbYc=;
- b=1LtJMaKb7I9HkMlPkxhS1PIywsNPK8a+rC2SYco5AjByWuM9nToBOvk4h0k0XPorjt
- xoY/NgXW6U5pDumjmpoySCL2Qz9bRcLun5oNECm3KJ0BUBj4bX4OHsdmKgm2Wy1C+bZK
- bb6fPFckzWMsT22HsuycBskOsjMwl5ZDBfVEmkvFmd36Nu9FcPghoWAalQOIRkYaCzCP
- BAh5Flxd5aGz2IIY1wnteOdeh5fQQIDLott/NB9+5IuH/BWC4lJa+0w+/UmwK3omWwpV
- Xqzw4U8OKlzXYYmDZxPUI3Wh4V3u2nqFxXPoysf9qYwLPLo0XQMutTAiEvGUnIn5Qn5k
- w82A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=abvad557k4vjf2B8Jzp3unrIigIyF+v3H2ANeyBgbYc=;
- b=rVdYDAlt27RJH3ljBqsOp4O8wx4HdiCEs4eAdp/f8eV/JW4BwQ6dsvGzp+Nr7MeFcA
- t8N9GkBHIuRQAZV3OC4PcuyZ0xDSXhn+bXzdBFNVXy9CFL9RDMwcyv5YL72xjYfIH4Co
- xnFXYuYxumEXexfC8tY9iq9uUEedOM5/niPEpdDF/HTexQbFniJvD5pCRu++azssreg/
- g+TXOaZycisX7qKyHBF5F0vfHjrwvpD5nCzp7Zxy2NakWcabFXjhJ5B6ptNcbKJuI4t0
- ZfDkJNDHj/P+TfZgt5Y25YrGR8BVyAJMLep0q5B/h0tmnhHIqXJK+7qOEOONwMM5wcxj
- 5y5w==
-X-Gm-Message-State: AOAM531d5HSmcvzf14d8r5y4D7Dzuf1Rcec5ASz78QyMoOTGvi96gdEg
- 1pBmmEX17xU3twjV2g+vrqZILZWG3ffIoOoIMwB1+Q==
-X-Google-Smtp-Source: ABdhPJzUOpUbv6DrQ6yZTFs/+u67YojIYVV7mNK8nxdVK2MNHkzuvM91zAGdUHKWdkP9WI+oNE6XnmVe6omNBcFH/ZE=
-X-Received: by 2002:a17:907:1b02:: with SMTP id
- mp2mr11734040ejc.419.1613790064219; 
- Fri, 19 Feb 2021 19:01:04 -0800 (PST)
-MIME-Version: 1.0
+ d=llnl.gov; i=@llnl.gov; q=dns/txt; s=08082017;
+ t=1614023922; x=1645559922;
+ h=from:to:cc:subject:date:message-id:references:
+ in-reply-to:content-transfer-encoding:mime-version;
+ bh=goH1/9nuYvDqnMB7VTM/DazGPPFery/6UbisP2Y7DwA=;
+ b=KRAO2yv5/xHSbLfQTM5Fu0RKeGMxy+PZgtVcJqLmGGFr3KM4xwPRQ/SI
+ 6xQkVQbjFkchLVEtEs3O2r41RSVEE/SD/P3dL2Bfl/hyAVk3+z0hbpE1n
+ etJ1J6NC1/OqU0rGvJyCgfDo7WPwcAxpe5JdYBPBB+Je82/nPYanABLQ0 A=;
+IronPort-SDR: hby6HvmsSQS6gyFLzBx/y6JlF2si1EXvE8GbKOg8Vu3IJlO2Z+jBGB3B7SHM2IAev00U4OVvBf
+ t/yaO6AxozdA==
+X-Attachments: 
+Received: from mail-dm3gcc02lp2109.outbound.protection.outlook.com (HELO
+ GCC02-DM3-obe.outbound.protection.outlook.com) ([104.47.65.109])
+ by prdesa-1.llnl.gov with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384;
+ 22 Feb 2021 11:58:35 -0800
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=dVkQhhdoPQX5rPbkQyjs0zq0nr2wB/hgN6dBRHwXyQAI8YiOAWwq1z+08baS8H2OW+8ShptFOakNImhkosH3juyRqMKQ7nedwUtPnGi9IbEHwR4kurt5E8tvDPRf7zWlY4U2MEvxsk+z1Lepjs6GT/w0PsbczvbIwqiEaECeWOChziQoLQsTQA+s0vPImUQdp4XXUBXwP9OSD31Kz2w6we//BS8zBEHcfQ8GStuzVWDLvm+6zcXWPb4T7DZ0gOdeLgY4In57JOc+JTXbR2x764mrBHueBQ5Oa/UDyWPgRCE+205MVT3HCLAC3CrYNkd1lwKQ29L8aR2x76HZBVvOgA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=goH1/9nuYvDqnMB7VTM/DazGPPFery/6UbisP2Y7DwA=;
+ b=RF3wyzU+qaJnphkYq6x0MbmggYGwtyT4P77+kStgjBzaFK5RbwRV15RvcKZrPNVUivzaeoTS2kCWKy0E/C609TSR4e8Ba+W3U+o6V13DvoX4IjJyxDO0sUpEF6fwa/5/mzQqOGeZaqGueZPDvbPsIEtK365rU60p3HAucMmHDW5QqBPqJzEssJ27cuiaE37bcxLBEXjh5F1m9LdJC1QgNfrc+jVk0jR0fDAg26rtLfe+DpiCm1/T0GIfWhkIf45ueHG/96nEQPd/4iaRwTI6NEgLsPQiLN/eZTDRm0X7yF9vIy+ja7ZSXzjkJv9ZdldkxdcDyEPiM5KNDciGFjmNeg==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=llnl.gov; dmarc=pass action=none header.from=llnl.gov;
+ dkim=pass header.d=llnl.gov; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=doellnl.onmicrosoft.com; s=selector1-doellnl-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=goH1/9nuYvDqnMB7VTM/DazGPPFery/6UbisP2Y7DwA=;
+ b=vMZYEk/wGEmuJ1PXlTHxX9Rz76T1AYHcdDupF0ThTKXVqUE0h5WqGe+n/WtPyomEHSjwa5xx+NL4Ms2pR4aV2mUZX2nb+NuP8O20233niKjW8II5ct+gVfa09+NufSfT1YeY9dmuRls4/N8p45LkkouFB1FcjDERYClT6SCKE3M=
+Received: from BY5PR09MB5427.namprd09.prod.outlook.com (2603:10b6:a03:241::20)
+ by BY3PR09MB8258.namprd09.prod.outlook.com (2603:10b6:a03:350::7)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.3868.29; Mon, 22 Feb
+ 2021 19:58:33 +0000
+Received: from BY5PR09MB5427.namprd09.prod.outlook.com
+ ([fe80::1d03:add3:dbda:3ae4]) by BY5PR09MB5427.namprd09.prod.outlook.com
+ ([fe80::1d03:add3:dbda:3ae4%7]) with mapi id 15.20.3868.033; Mon, 22 Feb 2021
+ 19:58:32 +0000
+To: Christian Kuntz <c.kuntz@opendrives.com>, Andreas Dilger
+ <adilger@whamcloud.com>
+Thread-Topic: [lustre-devel] Testing 2.14 on Debian + ZFS
+Thread-Index: AQHXAZPx8Qd/Trlf5ECtW8wE/6Ekhapdye6AgAFxOACAALjtAIAAcfiAgAQ/gIU=
+Date: Mon, 22 Feb 2021 19:58:32 +0000
+Message-ID: <BY5PR09MB5427C96986B487A6E8BCDF86F8819@BY5PR09MB5427.namprd09.prod.outlook.com>
 References: <CANdLGj7=6X1ixcyNOguUAzxTTnegD3h2zfgaEso+Fv5E7YejVA@mail.gmail.com>
  <477F0D07-A7E1-488A-8E06-FE6C2E748FE1@whamcloud.com>
  <CANdLGj7o4yJf3byyM4LaAm+ZfNkAswTjU+HSUeK2yK+Yw4cvVg@mail.gmail.com>
- <E4233477-F17B-4DD4-BC89-4DEAAD4590E5@whamcloud.com>
-In-Reply-To: <E4233477-F17B-4DD4-BC89-4DEAAD4590E5@whamcloud.com>
-From: Christian Kuntz <c.kuntz@opendrives.com>
-Date: Fri, 19 Feb 2021 19:00:53 -0800
-Message-ID: <CANdLGj4nJPfc6WA1ZrOeGhfjX+60QX_v_2xC7XDbHuSMXN3KCA@mail.gmail.com>
-To: Andreas Dilger <adilger@whamcloud.com>
+ <E4233477-F17B-4DD4-BC89-4DEAAD4590E5@whamcloud.com>,
+ <CANdLGj4nJPfc6WA1ZrOeGhfjX+60QX_v_2xC7XDbHuSMXN3KCA@mail.gmail.com>
+In-Reply-To: <CANdLGj4nJPfc6WA1ZrOeGhfjX+60QX_v_2xC7XDbHuSMXN3KCA@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: opendrives.com; dkim=none (message not signed)
+ header.d=none;opendrives.com; dmarc=none action=none header.from=llnl.gov;
+x-originating-ip: [128.15.168.227]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 8fa38a33-d851-4e04-219b-08d8d76c3b9d
+x-ms-traffictypediagnostic: BY3PR09MB8258:
+x-ms-exchange-transport-forked: True
+x-microsoft-antispam-prvs: <BY3PR09MB8258BFA5D693BDBE025BA3E2F8819@BY3PR09MB8258.namprd09.prod.outlook.com>
+x-ms-oob-tlc-oobclassifiers: OLM:8882;
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: DECrV9F0jo0TSpVZ1uRr2gVoLXjAO5CrdyC3zxUuu+Vsay0COTH9b+x5+KttGdkO4ridpqnT4E2zxTSGO5em4+RXxtSuLojEEi/6tNHPz1KCQ+W6CwxFECl/5MthOGGx6Or4GkrRH2bsCs56PwtA7/5iYD+HJtHKJ2ryo4gbwTihDfRnEB3MVRCqaPo5sN+qcIIiQQ+IAzZLVVrJ4HA9P2rVTaLdjY8SXy5Kd1P+PelnxTGWHUaUw1GkfSMa01cNJB5IovlByrKmTUXmIssoDuwvTuNujjXHjWmOeXZ5QnFoAX4reCjvESFsFZn/Zw/4SVzTORQ7f3iDw9IijcWAFQSZJK9WPyP28/ZdyTAQtnRydYaGGqsiIrLBl51/K829BnOskzUdIZbZWfrWj5kgUGnA62nGRgerBcByjI4o7sNI8ktDqa1M9mFG2MhwMMpw0wTZYAoD/f3x390VrjNecP6Pi0jmOWGjGWHSI/A2qbb0ZDnRcGsXqHCfZUZiQefwem3QdZ1v9s301oSPMOEHk2+ZXf6mbvZcjD4yQF0rFgwB/i9Pa3vTweXyWx0q768jtH4Xt7x1F12NZZHB4gsoEx6L9WLXNTgqATeRuamYoD5FNWhGcFKeONWeCmzmqHiGsv/q7IwcYdeToap5V5HxcQ==
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:BY5PR09MB5427.namprd09.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(4636009)(136003)(396003)(39850400004)(366004)(376002)(346002)(86362001)(8936002)(186003)(83380400001)(54906003)(316002)(4326008)(966005)(2906002)(8676002)(71200400001)(6506007)(110136005)(7696005)(9686003)(107886003)(5660300002)(55016002)(52536014)(53546011)(66946007)(66446008)(64756008)(66556008)(478600001)(66476007)(76116006)(33656002)(26005)(13693001);
+ DIR:OUT; SFP:1102; 
+x-ms-exchange-antispam-messagedata: =?utf-8?B?TnR1L2c2SnFjeUFvK1VoajlFcG5uUDVpY21mUXlCN0JzeTZwZElQb2YxNFJY?=
+ =?utf-8?B?WnJwdlVBbi8vUWhGYzF0eVBUQzJlWGRJU3lEcGNkaytJVUhBSU1FaHZYSUFo?=
+ =?utf-8?B?YjFJMWRuQ1lMcUVLOVhXWHFJME9lWHpneUhmVSthalpLNXd2clJZVnZIS09t?=
+ =?utf-8?B?bmQ3alJtRFpaekhqVldGSXBHSEorc05TM3BEaDBENms0S1U2SDUzWHhlOUg2?=
+ =?utf-8?B?NXJTd2xvSFFYaTV5bDRnc0xGaVQ2OVhHc3VDdFAxdkJXdXIyaTZ6RDFRT1pJ?=
+ =?utf-8?B?Nk5MNk1xcVNBam1aVzNiY2ZpY0Zpc3pyYjc1YXliZDdXYlZDeDhnZWFYcU5E?=
+ =?utf-8?B?TWtTWUN6RXpvd3oyMExYQnJSaE51eGFucXlKOEZoWHhuZUVBK2FJNmtYYm9u?=
+ =?utf-8?B?Kytmb01PWDMzTE52cEdPb3FMK1FOYkxUeTgyRkxYUW5KejY2MUxwNUxTMmdS?=
+ =?utf-8?B?OHRBN2JUWGJnemQwekU0b0M4N09aN1JPTHkrbmNiQy82eTFBK1pXajQvU2NH?=
+ =?utf-8?B?R0I1eEw4bGpHMEVNU0o0S1FJdllLdWp4MmVPZExHWUszUGZBWWlmWStFZXd5?=
+ =?utf-8?B?R1N1cWZTd3ZYR3pYMUlPWGhldEUyWlBSb3FIdC9HdHY1cUY1T2JLdlRVSEdy?=
+ =?utf-8?B?SXRLZndBQjBIeDZEd2hHcXROTm5IbFpIbENrOStqZG1mN1BFM0NiZWdweHlk?=
+ =?utf-8?B?MW1iSHlGeE1JQzdMUXVNbEZtSnJqc1I2dE1yZjV5ZFBFUTJHemJhZXdaOWRp?=
+ =?utf-8?B?T2l3TGM5dDFFOStTOWZ3Vi9Nakh5YUEyaVdCcDNPQW1HSG9ETkZveUpudzFm?=
+ =?utf-8?B?MFlUMzZWNS80bWJIVEw0eXRmZTFDeGlVOXl0U3A3NWFmOXFrVU44NkRZWmw4?=
+ =?utf-8?B?VFoydFcycVdvcWpPT01FL1pmYzlwSXJCRzVGaGwxOTU2bVF5bHM3M3ZIMU82?=
+ =?utf-8?B?R1grUkYzUEJJWUkvdzJFSjZFRHhGM2Urb0dZZE5weE5wQWx6ZmxyOEZvKzI3?=
+ =?utf-8?B?VWhraTU5clZZN0xFZFN3SkpoK0JZYzdra2FXODBPVmtxeGxQSWVEYkNqNHQ1?=
+ =?utf-8?B?ZFArTlZLYi9DQXAvQ0w4TGVjV2ZUUjk0cHBvNW4zTWFEMit2czFqOHVYRzFl?=
+ =?utf-8?B?emk0Ui94L3hTeEkvbHA5ZGJtc0NWSnZuMnVMTkVaRk5vQWdITGxINjZZc0tp?=
+ =?utf-8?B?Q3NOb2hHTzlQQ0VXWkp4c3ZJUk55cmczdkthc3lCYUtCYThIUHpxQzByeWJi?=
+ =?utf-8?B?MHk3U1R5R2lIVDM2T0RMZUEwUjNBYUVleG1NeHc4RjZ2Z2pEQXJzYlhMZjQr?=
+ =?utf-8?B?b3RhbEVZVTVIdzJRQ1ladHdmRk1OM2ttOW5iOE1hZ09zVnpzN2c5aHd1R0lp?=
+ =?utf-8?B?bmlLSllLS2N6UC9OaVlubjR1WEVLQmRTUk5xTzU1TCtER3ZGa0FRc0RGVUR1?=
+ =?utf-8?B?aUNFeVh4VHBHVXJldXVSTUMrRytOYSt3bnhnYlVtN1lHN2UxV0pENitTKzhK?=
+ =?utf-8?B?NE8xNVJJM2tCTDYyZVk2SnVZOGJuSmRlcGxHanl4ZVAwZ3p4aVk0RVIxZVVZ?=
+ =?utf-8?B?T3VzbVVrZFpsOFN0dzJYMzRWUkhnQUFYdVRRWVpVMXdCNGYxMUVyaWlicFI2?=
+ =?utf-8?B?Z3FTSUkzcWpuZXJIMFZCSG8ybHJRL3FWMXk0RGFEMHFPN2pzb014MWFzdmI4?=
+ =?utf-8?B?Y0dlRk9GWk8xTkYvQlZCY3dEUkJrd3R3TFQza0s4c0VZNXhMWXVsUDMvYkFO?=
+ =?utf-8?Q?SapcSgc80NELF3rxHPA5JYMBCs6l1FtQmJ7JCkx?=
+MIME-Version: 1.0
+X-OriginatorOrg: llnl.gov
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: BY5PR09MB5427.namprd09.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8fa38a33-d851-4e04-219b-08d8d76c3b9d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Feb 2021 19:58:32.8005 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: a722dec9-ae4e-4ae3-9d75-fd66e2680a63
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: sz3i2qXViNi4wz1lOng3y8ixt8wom/2xUb6fnZXrstvwL8yw8mu/t6yV6zR7JyCo6a+QmQ3lQIWrsG2gA5jLkw==
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY3PR09MB8258
 Subject: Re: [lustre-devel] Testing 2.14 on Debian + ZFS
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
@@ -76,382 +148,124 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
+From: "Faaland, Olaf P. via lustre-devel" <lustre-devel@lists.lustre.org>
+Reply-To: "Faaland, Olaf P." <faaland1@llnl.gov>
 Cc: Lustre-devel <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============7012750093139603677=="
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7012750093139603677==
-Content-Type: multipart/alternative; boundary="000000000000852b4605bbbbc70d"
-
---000000000000852b4605bbbbc70d
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-Thanks for the confirmation!
-
-After going in a few circles, I think I've got it figured out and would
-appreciate some pointers on how to proceed:
-
-To preface, the way I'm building is from source-dirs after a package build
-(which is admittedly kind of janky as I write it out now). It would appear
-that the configure scripting will look in "zfs/include", and thus miss the
-new "zfs/include/os/..." directories that hold some important header files,
-causing configuration variables to miss-set in config.h thus creating the
-compile-time problems of type mismatches and redefinitions I was seeing.
-
- I was able to confirm manually setting some of the configuration defs and
-adding the new header dirs to the makefile fixed the problem, but I'm a
-little confused as to how to proceed in patching. Since the configuration
-scripting and the makefiles seem to expect only a single include-dir of
-header files for both zfs and spl respectively, I'm wondering what the best
-approach to patching this behavior would be.
-
-Thanks for your time and consideration,
-Christian
-
-On Fri, Feb 19, 2021 at 12:13 PM Andreas Dilger <adilger@whamcloud.com>
-wrote:
-
-> This is exactly the right place for such discussions.
->
-> Once you have patches, please submit to Gerrit for review, testing, and
-> landing:
->
-> https://wiki.lustre.org/Using_Gerrit
->
-> Cheers, Andreas
->
-> On Feb 19, 2021, at 02:11, Christian Kuntz <c.kuntz@opendrives.com> wrote=
-:
->
-> =EF=BB=BF
-> Thanks for your time and the thoughtful response.
->
-> Looking at this a bit more, it seems to be caused by the recent ZFS 2.0
-> changes for linux and freebsd support, namely the `include/os/linux` path=
-s
-> that provide `<sys/types.h>` that ZFS is trying to use. Adding them into
-> the includes for the osd-zfs directory has fixed the references being
-> broken, and now I'm contending some redefinitions and argument type
-> mismatches. I'll try and sort this out, in the meantime is there a better
-> place for me to place messages about this? I know this mailing list isn't
-> used very frequently and I'd hate to flood it with such off-the-beaten-pa=
-th
-> stuff.
->
-> Best,
-> Christian
->
-> On Thu, Feb 18, 2021 at 3:09 AM Andreas Dilger <adilger@whamcloud.com>
-> wrote:
->
->> On Feb 12, 2021, at 16:07, Christian Kuntz <c.kuntz@opendrives.com>
->> wrote:
->>
->>
->> Hello,
->>
->> I hope I'm communicating in the right place here, I'm currently working
->> to compile Lustre 2.14.0-RC2 on Debian 10.7 with ZFS 2.0.2 for OSDs. If
->> there's anything I can do to help with the testing effort or help Lustre=
-'s
->> Debian support be more robust, please let me know! I hope I'm not too la=
-te
->> in the release cycle to contribute.
->>
->>
->> Thanks for the offer of testing.  Unfortunately we are very late in the
->> 2.14.0 release cycle (we are hoping to make the final release in the nex=
-t
->> week or so, barring any critical defects).  However, even if any changes
->> miss the final 2.14.0 release, having patches available to fix any issue=
-s
->> you run into will make it easier for the next person to build on Debian.
->>
->> Ideally, any required fixes for Debian building should go into the Lustr=
-e
->> tree directly rather than into a separate "downstream" package, so that
->> "make debs" works out-of-the-box.  We do build Ubuntu 18.04 and 20.04
->> clients regularly, and ZFS 2.0 servers on RHEL7/8, but I don't know if
->> anyone is building the server code on Debian/Ubuntu on a regular basis.
->>
->> On the topic of compiling, I'm currently working to get debian packages
->> made and running into a compilation issue that didn't seem to present on=
- my
->> previous endeavors with 2.13 and 0.7. I've got the kernel and zfs locall=
-y
->> built and their packages made, and lustre's configure step successfully
->> completes, but when it comes to compiling it appears that the osd-zfs
->> portion has some broken include links:
->>
->> In file included from /zfs-linux-2.0.2/include/sys/arc.h:32,
->>                  from /lustre-debian/lustre/osd-zfs/osd_internal.h:51,
->>                  from /lustre-debian/lustre/osd-zfs/osd_handler.c:52:
->> /zfs-linux-2.0.2/include/sys/zfs_context.h:45:10: fatal error:
->> sys/types.h: No such file or directory
->>  #include <sys/types.h>
->>
->> For reference, my configure and make looks like:
->> ./configure --with-linux=3D/linux-4.19.171-2/  \
->>
->>  --with-linux-obj=3Dlinux-4.19.171-2/debian/build/build_amd64_none_amd64=
- \
->>              --with-zfs=3D/zfs-linux-2.0.2 \
->>               --enable-server --enable-modules --disable-ldiskfs
->> make -j"$(nproc)" debs
->>
->>
->> From the error and some probing, it looks like zfs_context.h expects som=
-e
->> header files to be in their libc standard `/usr/include/sys` (or somewhe=
-re
->> abouts), but lustre's make process is pulling them from the linux source=
-s
->> in `SRC/include/linux/`. Predictably, I found this out the hard way by
->> adding `-I/usr/include` to the Makefile for the zfs osds and getting
->> battered with errors and warnings about duplicate definitions.
->>
->>
->> It may be that you are looking at this from the wrong angle.  Rather tha=
-n
->> trying to include more userspace headers, it might be worthwhile to see =
-why
->> <sys/arc.h> is being included by osd_internal.h and maybe there is a mor=
-e
->> appropriate header that could be used in the kernel?  Failing that, it
->> isn't clear wh zfs_context.h is including the <sys/type.h> header from
->> userspace when building with __KERNEL__ set?  Kernel code should be usin=
-g
->> <linux/types.h>.
->>
->> Cheers, Andreas
->> --
->> Andreas Dilger
->> Principal Lustre Architect
->> Whamcloud
->>
->>
->>
->>
->>
->>
->>
-
---000000000000852b4605bbbbc70d
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">Thanks for the confirmation!=C2=A0<br><br>After going in a=
- few circles, I think I&#39;ve got it figured out and would appreciate some=
- pointers on how to proceed:<br><br>To preface, the way I&#39;m building is=
- from source-dirs after a package=C2=A0build (which is admittedly kind of j=
-anky as I write it out now). It would appear that the configure scripting w=
-ill look in &quot;zfs/include&quot;, and thus miss the new &quot;zfs/includ=
-e/os/...&quot; directories that hold some important header files, causing c=
-onfiguration variables to miss-set in config.h thus creating the compile-ti=
-me problems of type mismatches and redefinitions I was seeing.<br><br>=C2=
-=A0I was able to confirm manually setting some of the configuration defs an=
-d adding the new header dirs to the makefile fixed the problem, but I&#39;m=
- a little confused as to how to proceed in patching. Since the configuratio=
-n scripting and the makefiles seem to expect only a single include-dir of h=
-eader files for both zfs and spl respectively, I&#39;m wondering what the b=
-est approach to patching this behavior would be.<br><br>Thanks for your tim=
-e and consideration,<br>Christian</div><br><div class=3D"gmail_quote"><div =
-dir=3D"ltr" class=3D"gmail_attr">On Fri, Feb 19, 2021 at 12:13 PM Andreas D=
-ilger &lt;<a href=3D"mailto:adilger@whamcloud.com">adilger@whamcloud.com</a=
->&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px=
- 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
-
-
-
-<div dir=3D"auto">
-This is exactly the right place for such discussions.=C2=A0
-<div><br>
-</div>
-<div>Once you have patches, please submit to Gerrit for review, testing, an=
-d landing:</div>
-<div><br>
-</div>
-<div><a href=3D"https://wiki.lustre.org/Using_Gerrit" target=3D"_blank">htt=
-ps://wiki.lustre.org/Using_Gerrit</a><br>
-<div dir=3D"ltr"><br>
-</div>
-<div dir=3D"ltr">Cheers, Andreas</div>
-<div dir=3D"ltr"><br>
-<blockquote type=3D"cite">On Feb 19, 2021, at 02:11, Christian Kuntz &lt;<a=
- href=3D"mailto:c.kuntz@opendrives.com" target=3D"_blank">c.kuntz@opendrive=
-s.com</a>&gt; wrote:<br>
-<br>
-</blockquote>
-</div>
-<blockquote type=3D"cite">
-<div dir=3D"ltr">=EF=BB=BF
-<div dir=3D"ltr">Thanks for your time and the thoughtful response.<br>
-<br>
-Looking at this a bit more, it seems=C2=A0to be caused by the recent ZFS 2.=
-0 changes for linux and freebsd support, namely=C2=A0the `include/os/linux`=
- paths that=C2=A0provide `&lt;sys/types.h&gt;` that ZFS is trying to use. A=
-dding them into the includes for the osd-zfs directory
- has fixed the references being broken, and now I&#39;m contending some red=
-efinitions and argument type mismatches. I&#39;ll try and sort this out, in=
- the meantime is there a better place for me to place messages about this? =
-I know this mailing list isn&#39;t used very
- frequently and I&#39;d hate to flood it with such off-the-beaten-path stuf=
-f.<br>
-<br>
-Best,<br>
-Christian</div>
-<br>
-<div class=3D"gmail_quote">
-<div dir=3D"ltr" class=3D"gmail_attr">On Thu, Feb 18, 2021 at 3:09 AM Andre=
-as Dilger &lt;<a href=3D"mailto:adilger@whamcloud.com" target=3D"_blank">ad=
-ilger@whamcloud.com</a>&gt; wrote:<br>
-</div>
-<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
-left:1px solid rgb(204,204,204);padding-left:1ex">
-<div>On Feb 12, 2021, at 16:07, Christian Kuntz &lt;<a href=3D"mailto:c.kun=
-tz@opendrives.com" target=3D"_blank">c.kuntz@opendrives.com</a>&gt; wrote:<=
-br>
-<div>
-<blockquote type=3D"cite"><br>
-<div>
-<div dir=3D"ltr">Hello,<br>
-<br>
-I hope I&#39;m communicating in the right place here, I&#39;m currently wor=
-king to compile Lustre 2.14.0-RC2 on Debian 10.7 with ZFS 2.0.2 for OSDs. I=
-f there&#39;s anything I can do to help with the testing effort or help Lus=
-tre&#39;s Debian support be more robust, please
- let me know! I hope I&#39;m not too late in the release cycle to contribut=
-e.=C2=A0<br>
-</div>
-</div>
-</blockquote>
-<div><br>
-</div>
-Thanks for the offer of testing.=C2=A0 Unfortunately we are very late in th=
-e 2.14.0 release cycle (we are hoping to make the final release in the next=
- week or so, barring any critical defects).=C2=A0 However, even if any chan=
-ges miss the final 2.14.0 release, having
- patches available to fix any issues you run into will make it easier for t=
-he next person to build on Debian.</div>
-<div><br>
-</div>
-<div>Ideally, any required fixes for Debian building should go into the Lus=
-tre tree directly rather than into a separate &quot;downstream&quot; packag=
-e, so that &quot;make debs&quot; works out-of-the-box.=C2=A0 We do build Ub=
-untu 18.04 and 20.04 clients regularly, and ZFS 2.0 servers
- on RHEL7/8, but I don&#39;t know if anyone is building the server code on =
-Debian/Ubuntu on a regular basis. =C2=A0</div>
-<div><br>
-<blockquote type=3D"cite">
-<div>
-<div dir=3D"ltr">On the topic of compiling, I&#39;m currently working to ge=
-t debian packages made and running into a compilation issue that didn&#39;t=
- seem to present on my previous endeavors with 2.13 and 0.7. I&#39;ve got t=
-he kernel and zfs locally built and their packages
- made, and lustre&#39;s configure step successfully completes, but when it =
-comes to compiling it appears that the osd-zfs portion has some broken incl=
-ude links:<br>
-<br>
-In file included from /zfs-linux-2.0.2/include/sys/arc.h:32,<br>
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0from /lustre-=
-debian/lustre/osd-zfs/osd_internal.h:51,<br>
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0from /lustre-=
-debian/lustre/osd-zfs/osd_handler.c:52:<br>
-/zfs-linux-2.0.2/include/sys/zfs_context.h:45:10: fatal error: sys/types.h:=
- No such file or directory<br>
-=C2=A0#include &lt;sys/types.h&gt;<br>
-<br>
-For reference, my configure and make looks like:<br>
-./configure --with-linux=3D/linux-4.19.171-2/=C2=A0 \<br>
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0--with-linux-obj=3Dlinux-4.=
-19.171-2/debian/build/build_amd64_none_amd64 \<br>
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0--with-zfs=3D/zfs-linux-2.0=
-.2 \<br>
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 --enable-server --enable-m=
-odules --disable-ldiskfs<br>
-make -j&quot;$(nproc)&quot; debs<br>
-<br>
-<br>
-From the error and some probing, it looks like zfs_context.h expects some h=
-eader files to be in their libc standard `/usr/include/sys` (or somewhere a=
-bouts), but lustre&#39;s make process is pulling them from the linux source=
-s in `SRC/include/linux/`. Predictably,
- I found this out the hard way by adding `-I/usr/include` to the Makefile f=
-or the zfs osds and getting battered with errors and warnings about duplica=
-te definitions.=C2=A0<br>
-</div>
-</div>
-</blockquote>
-<br>
-</div>
-<div>It may be that you are looking at this from the wrong angle.=C2=A0 Rat=
-her than trying to include more userspace headers, it might be worthwhile t=
-o see why &lt;sys/arc.h&gt; is being included by osd_internal.h and maybe t=
-here is a more appropriate header that could
- be used in the kernel?=C2=A0 Failing that, it isn&#39;t clear wh zfs_conte=
-xt.h is including the &lt;sys/type.h&gt; header from userspace when buildin=
-g with __KERNEL__ set?=C2=A0 Kernel code should be using &lt;linux/types.h&=
-gt;.</div>
-<br>
-<div>
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div>Cheers, Andreas</div>
-<div>--</div>
-<div>Andreas Dilger</div>
-<div>Principal Lustre Architect</div>
-<div>Whamcloud</div>
-<div><br>
-</div>
-<div><br>
-</div>
-<div><br>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<br>
-<br>
-</div>
-<br>
-</div>
-</blockquote>
-</div>
-</div>
-</blockquote>
-</div>
-</div>
-
-</blockquote></div>
-
---000000000000852b4605bbbbc70d--
-
---===============7012750093139603677==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============7012750093139603677==--
+SGkgQ2hyaXN0aWFuLA0KDQpDYW4geW91IGV4cGxhaW4gaW4gbW9yZSBkZXRhaWwgd2hhdCB5b3Ug
+bWVhbiBieSAiYnVpbGRpbmcgLi4uIGZyb20gc291cmNlLWRpcnMgYWZ0ZXIgYSBwYWNrYWdlIGJ1
+aWxkIj8gIEFuZCBjYW4geW91IGlkZW50aWZ5IHRoZSBsaW5lcyBpbiBjb25maWcvbHVzdHJlLWJ1
+aWxkLXpmcy5tNCB0aGF0IHlvdSdyZSByZWZlcnJpbmcgdG8/DQoNCnRoYW5rIHlvdSwNCi1PbGFm
+DQoNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18NCkZyb206IENocmlz
+dGlhbiBLdW50eiA8Yy5rdW50ekBvcGVuZHJpdmVzLmNvbT4NClNlbnQ6IEZyaWRheSwgRmVicnVh
+cnkgMTksIDIwMjEgNzowMCBQTQ0KVG86IEFuZHJlYXMgRGlsZ2VyDQpDYzogTHVzdHJlLWRldmVs
+OyBCZWhsZW5kb3JmLCBCcmlhbiBELjsgRmFhbGFuZCwgT2xhZiBQLg0KU3ViamVjdDogUmU6IFts
+dXN0cmUtZGV2ZWxdIFRlc3RpbmcgMi4xNCBvbiBEZWJpYW4gKyBaRlMNCg0KVGhhbmtzIGZvciB0
+aGUgY29uZmlybWF0aW9uIQ0KDQpBZnRlciBnb2luZyBpbiBhIGZldyBjaXJjbGVzLCBJIHRoaW5r
+IEkndmUgZ290IGl0IGZpZ3VyZWQgb3V0IGFuZCB3b3VsZCBhcHByZWNpYXRlIHNvbWUgcG9pbnRl
+cnMgb24gaG93IHRvIHByb2NlZWQ6DQoNClRvIHByZWZhY2UsIHRoZSB3YXkgSSdtIGJ1aWxkaW5n
+IGlzIGZyb20gc291cmNlLWRpcnMgYWZ0ZXIgYSBwYWNrYWdlIGJ1aWxkICh3aGljaCBpcyBhZG1p
+dHRlZGx5IGtpbmQgb2YgamFua3kgYXMgSSB3cml0ZSBpdCBvdXQgbm93KS4gSXQgd291bGQgYXBw
+ZWFyIHRoYXQgdGhlIGNvbmZpZ3VyZSBzY3JpcHRpbmcgd2lsbCBsb29rIGluICJ6ZnMvaW5jbHVk
+ZSIsIGFuZCB0aHVzIG1pc3MgdGhlIG5ldyAiemZzL2luY2x1ZGUvb3MvLi4uIiBkaXJlY3Rvcmll
+cyB0aGF0IGhvbGQgc29tZSBpbXBvcnRhbnQgaGVhZGVyIGZpbGVzLCBjYXVzaW5nIGNvbmZpZ3Vy
+YXRpb24gdmFyaWFibGVzIHRvIG1pc3Mtc2V0IGluIGNvbmZpZy5oIHRodXMgY3JlYXRpbmcgdGhl
+IGNvbXBpbGUtdGltZSBwcm9ibGVtcyBvZiB0eXBlIG1pc21hdGNoZXMgYW5kIHJlZGVmaW5pdGlv
+bnMgSSB3YXMgc2VlaW5nLg0KDQogSSB3YXMgYWJsZSB0byBjb25maXJtIG1hbnVhbGx5IHNldHRp
+bmcgc29tZSBvZiB0aGUgY29uZmlndXJhdGlvbiBkZWZzIGFuZCBhZGRpbmcgdGhlIG5ldyBoZWFk
+ZXIgZGlycyB0byB0aGUgbWFrZWZpbGUgZml4ZWQgdGhlIHByb2JsZW0sIGJ1dCBJJ20gYSBsaXR0
+bGUgY29uZnVzZWQgYXMgdG8gaG93IHRvIHByb2NlZWQgaW4gcGF0Y2hpbmcuIFNpbmNlIHRoZSBj
+b25maWd1cmF0aW9uIHNjcmlwdGluZyBhbmQgdGhlIG1ha2VmaWxlcyBzZWVtIHRvIGV4cGVjdCBv
+bmx5IGEgc2luZ2xlIGluY2x1ZGUtZGlyIG9mIGhlYWRlciBmaWxlcyBmb3IgYm90aCB6ZnMgYW5k
+IHNwbCByZXNwZWN0aXZlbHksIEknbSB3b25kZXJpbmcgd2hhdCB0aGUgYmVzdCBhcHByb2FjaCB0
+byBwYXRjaGluZyB0aGlzIGJlaGF2aW9yIHdvdWxkIGJlLg0KDQpUaGFua3MgZm9yIHlvdXIgdGlt
+ZSBhbmQgY29uc2lkZXJhdGlvbiwNCkNocmlzdGlhbg0KDQpPbiBGcmksIEZlYiAxOSwgMjAyMSBh
+dCAxMjoxMyBQTSBBbmRyZWFzIERpbGdlciA8YWRpbGdlckB3aGFtY2xvdWQuY29tPG1haWx0bzph
+ZGlsZ2VyQHdoYW1jbG91ZC5jb20+PiB3cm90ZToNClRoaXMgaXMgZXhhY3RseSB0aGUgcmlnaHQg
+cGxhY2UgZm9yIHN1Y2ggZGlzY3Vzc2lvbnMuDQoNCk9uY2UgeW91IGhhdmUgcGF0Y2hlcywgcGxl
+YXNlIHN1Ym1pdCB0byBHZXJyaXQgZm9yIHJldmlldywgdGVzdGluZywgYW5kIGxhbmRpbmc6DQoN
+Cmh0dHBzOi8vd2lraS5sdXN0cmUub3JnL1VzaW5nX0dlcnJpdDxodHRwczovL3VybGRlZmVuc2Uu
+dXMvdjIvdXJsP3U9aHR0cHMtM0FfX3dpa2kubHVzdHJlLm9yZ19Vc2luZy01RkdlcnJpdCZkPUR3
+TUZhUSZjPXBLb0FWUXJvNnFEYkxvSzBUODU4OEI0bVpKaEpoQzRlNlFYSnkwWG5KZWMmcj0yZHhU
+MExMRVV4MEliaEZGOEhSSlZDVE9faWhiRXdLTG45Z0Y3S2M4YUcwJm09U1U1c2FjMDRjZWt2YVJ2
+YlVjaGVvVTAyVzdFVXUtRjRzVmtrcldIVW5vRSZzPWdUY3VHTVVpNVB5Y1JFYk1CNExhMXMwZFZO
+TThhNVNUYjlwRFZYWnQtTHcmZT0+DQoNCkNoZWVycywgQW5kcmVhcw0KDQpPbiBGZWIgMTksIDIw
+MjEsIGF0IDAyOjExLCBDaHJpc3RpYW4gS3VudHogPGMua3VudHpAb3BlbmRyaXZlcy5jb208bWFp
+bHRvOmMua3VudHpAb3BlbmRyaXZlcy5jb20+PiB3cm90ZToNCg0K77u/DQpUaGFua3MgZm9yIHlv
+dXIgdGltZSBhbmQgdGhlIHRob3VnaHRmdWwgcmVzcG9uc2UuDQoNCkxvb2tpbmcgYXQgdGhpcyBh
+IGJpdCBtb3JlLCBpdCBzZWVtcyB0byBiZSBjYXVzZWQgYnkgdGhlIHJlY2VudCBaRlMgMi4wIGNo
+YW5nZXMgZm9yIGxpbnV4IGFuZCBmcmVlYnNkIHN1cHBvcnQsIG5hbWVseSB0aGUgYGluY2x1ZGUv
+b3MvbGludXhgIHBhdGhzIHRoYXQgcHJvdmlkZSBgPHN5cy90eXBlcy5oPmAgdGhhdCBaRlMgaXMg
+dHJ5aW5nIHRvIHVzZS4gQWRkaW5nIHRoZW0gaW50byB0aGUgaW5jbHVkZXMgZm9yIHRoZSBvc2Qt
+emZzIGRpcmVjdG9yeSBoYXMgZml4ZWQgdGhlIHJlZmVyZW5jZXMgYmVpbmcgYnJva2VuLCBhbmQg
+bm93IEknbSBjb250ZW5kaW5nIHNvbWUgcmVkZWZpbml0aW9ucyBhbmQgYXJndW1lbnQgdHlwZSBt
+aXNtYXRjaGVzLiBJJ2xsIHRyeSBhbmQgc29ydCB0aGlzIG91dCwgaW4gdGhlIG1lYW50aW1lIGlz
+IHRoZXJlIGEgYmV0dGVyIHBsYWNlIGZvciBtZSB0byBwbGFjZSBtZXNzYWdlcyBhYm91dCB0aGlz
+PyBJIGtub3cgdGhpcyBtYWlsaW5nIGxpc3QgaXNuJ3QgdXNlZCB2ZXJ5IGZyZXF1ZW50bHkgYW5k
+IEknZCBoYXRlIHRvIGZsb29kIGl0IHdpdGggc3VjaCBvZmYtdGhlLWJlYXRlbi1wYXRoIHN0dWZm
+Lg0KDQpCZXN0LA0KQ2hyaXN0aWFuDQoNCk9uIFRodSwgRmViIDE4LCAyMDIxIGF0IDM6MDkgQU0g
+QW5kcmVhcyBEaWxnZXIgPGFkaWxnZXJAd2hhbWNsb3VkLmNvbTxtYWlsdG86YWRpbGdlckB3aGFt
+Y2xvdWQuY29tPj4gd3JvdGU6DQpPbiBGZWIgMTIsIDIwMjEsIGF0IDE2OjA3LCBDaHJpc3RpYW4g
+S3VudHogPGMua3VudHpAb3BlbmRyaXZlcy5jb208bWFpbHRvOmMua3VudHpAb3BlbmRyaXZlcy5j
+b20+PiB3cm90ZToNCg0KSGVsbG8sDQoNCkkgaG9wZSBJJ20gY29tbXVuaWNhdGluZyBpbiB0aGUg
+cmlnaHQgcGxhY2UgaGVyZSwgSSdtIGN1cnJlbnRseSB3b3JraW5nIHRvIGNvbXBpbGUgTHVzdHJl
+IDIuMTQuMC1SQzIgb24gRGViaWFuIDEwLjcgd2l0aCBaRlMgMi4wLjIgZm9yIE9TRHMuIElmIHRo
+ZXJlJ3MgYW55dGhpbmcgSSBjYW4gZG8gdG8gaGVscCB3aXRoIHRoZSB0ZXN0aW5nIGVmZm9ydCBv
+ciBoZWxwIEx1c3RyZSdzIERlYmlhbiBzdXBwb3J0IGJlIG1vcmUgcm9idXN0LCBwbGVhc2UgbGV0
+IG1lIGtub3chIEkgaG9wZSBJJ20gbm90IHRvbyBsYXRlIGluIHRoZSByZWxlYXNlIGN5Y2xlIHRv
+IGNvbnRyaWJ1dGUuDQoNClRoYW5rcyBmb3IgdGhlIG9mZmVyIG9mIHRlc3RpbmcuICBVbmZvcnR1
+bmF0ZWx5IHdlIGFyZSB2ZXJ5IGxhdGUgaW4gdGhlIDIuMTQuMCByZWxlYXNlIGN5Y2xlICh3ZSBh
+cmUgaG9waW5nIHRvIG1ha2UgdGhlIGZpbmFsIHJlbGVhc2UgaW4gdGhlIG5leHQgd2VlayBvciBz
+bywgYmFycmluZyBhbnkgY3JpdGljYWwgZGVmZWN0cykuICBIb3dldmVyLCBldmVuIGlmIGFueSBj
+aGFuZ2VzIG1pc3MgdGhlIGZpbmFsIDIuMTQuMCByZWxlYXNlLCBoYXZpbmcgcGF0Y2hlcyBhdmFp
+bGFibGUgdG8gZml4IGFueSBpc3N1ZXMgeW91IHJ1biBpbnRvIHdpbGwgbWFrZSBpdCBlYXNpZXIg
+Zm9yIHRoZSBuZXh0IHBlcnNvbiB0byBidWlsZCBvbiBEZWJpYW4uDQoNCklkZWFsbHksIGFueSBy
+ZXF1aXJlZCBmaXhlcyBmb3IgRGViaWFuIGJ1aWxkaW5nIHNob3VsZCBnbyBpbnRvIHRoZSBMdXN0
+cmUgdHJlZSBkaXJlY3RseSByYXRoZXIgdGhhbiBpbnRvIGEgc2VwYXJhdGUgImRvd25zdHJlYW0i
+IHBhY2thZ2UsIHNvIHRoYXQgIm1ha2UgZGVicyIgd29ya3Mgb3V0LW9mLXRoZS1ib3guICBXZSBk
+byBidWlsZCBVYnVudHUgMTguMDQgYW5kIDIwLjA0IGNsaWVudHMgcmVndWxhcmx5LCBhbmQgWkZT
+IDIuMCBzZXJ2ZXJzIG9uIFJIRUw3LzgsIGJ1dCBJIGRvbid0IGtub3cgaWYgYW55b25lIGlzIGJ1
+aWxkaW5nIHRoZSBzZXJ2ZXIgY29kZSBvbiBEZWJpYW4vVWJ1bnR1IG9uIGEgcmVndWxhciBiYXNp
+cy4NCg0KT24gdGhlIHRvcGljIG9mIGNvbXBpbGluZywgSSdtIGN1cnJlbnRseSB3b3JraW5nIHRv
+IGdldCBkZWJpYW4gcGFja2FnZXMgbWFkZSBhbmQgcnVubmluZyBpbnRvIGEgY29tcGlsYXRpb24g
+aXNzdWUgdGhhdCBkaWRuJ3Qgc2VlbSB0byBwcmVzZW50IG9uIG15IHByZXZpb3VzIGVuZGVhdm9y
+cyB3aXRoIDIuMTMgYW5kIDAuNy4gSSd2ZSBnb3QgdGhlIGtlcm5lbCBhbmQgemZzIGxvY2FsbHkg
+YnVpbHQgYW5kIHRoZWlyIHBhY2thZ2VzIG1hZGUsIGFuZCBsdXN0cmUncyBjb25maWd1cmUgc3Rl
+cCBzdWNjZXNzZnVsbHkgY29tcGxldGVzLCBidXQgd2hlbiBpdCBjb21lcyB0byBjb21waWxpbmcg
+aXQgYXBwZWFycyB0aGF0IHRoZSBvc2QtemZzIHBvcnRpb24gaGFzIHNvbWUgYnJva2VuIGluY2x1
+ZGUgbGlua3M6DQoNCkluIGZpbGUgaW5jbHVkZWQgZnJvbSAvemZzLWxpbnV4LTIuMC4yL2luY2x1
+ZGUvc3lzL2FyYy5oOjMyLA0KICAgICAgICAgICAgICAgICBmcm9tIC9sdXN0cmUtZGViaWFuL2x1
+c3RyZS9vc2QtemZzL29zZF9pbnRlcm5hbC5oOjUxLA0KICAgICAgICAgICAgICAgICBmcm9tIC9s
+dXN0cmUtZGViaWFuL2x1c3RyZS9vc2QtemZzL29zZF9oYW5kbGVyLmM6NTI6DQovemZzLWxpbnV4
+LTIuMC4yL2luY2x1ZGUvc3lzL3pmc19jb250ZXh0Lmg6NDU6MTA6IGZhdGFsIGVycm9yOiBzeXMv
+dHlwZXMuaDogTm8gc3VjaCBmaWxlIG9yIGRpcmVjdG9yeQ0KICNpbmNsdWRlIDxzeXMvdHlwZXMu
+aD4NCg0KRm9yIHJlZmVyZW5jZSwgbXkgY29uZmlndXJlIGFuZCBtYWtlIGxvb2tzIGxpa2U6DQou
+L2NvbmZpZ3VyZSAtLXdpdGgtbGludXg9L2xpbnV4LTQuMTkuMTcxLTIvICBcDQogICAgICAgICAg
+ICAgLS13aXRoLWxpbnV4LW9iaj1saW51eC00LjE5LjE3MS0yL2RlYmlhbi9idWlsZC9idWlsZF9h
+bWQ2NF9ub25lX2FtZDY0IFwNCiAgICAgICAgICAgICAtLXdpdGgtemZzPS96ZnMtbGludXgtMi4w
+LjIgXA0KICAgICAgICAgICAgICAtLWVuYWJsZS1zZXJ2ZXIgLS1lbmFibGUtbW9kdWxlcyAtLWRp
+c2FibGUtbGRpc2tmcw0KbWFrZSAtaiIkKG5wcm9jKSIgZGVicw0KDQoNCkZyb20gdGhlIGVycm9y
+IGFuZCBzb21lIHByb2JpbmcsIGl0IGxvb2tzIGxpa2UgemZzX2NvbnRleHQuaCBleHBlY3RzIHNv
+bWUgaGVhZGVyIGZpbGVzIHRvIGJlIGluIHRoZWlyIGxpYmMgc3RhbmRhcmQgYC91c3IvaW5jbHVk
+ZS9zeXNgIChvciBzb21ld2hlcmUgYWJvdXRzKSwgYnV0IGx1c3RyZSdzIG1ha2UgcHJvY2VzcyBp
+cyBwdWxsaW5nIHRoZW0gZnJvbSB0aGUgbGludXggc291cmNlcyBpbiBgU1JDL2luY2x1ZGUvbGlu
+dXgvYC4gUHJlZGljdGFibHksIEkgZm91bmQgdGhpcyBvdXQgdGhlIGhhcmQgd2F5IGJ5IGFkZGlu
+ZyBgLUkvdXNyL2luY2x1ZGVgIHRvIHRoZSBNYWtlZmlsZSBmb3IgdGhlIHpmcyBvc2RzIGFuZCBn
+ZXR0aW5nIGJhdHRlcmVkIHdpdGggZXJyb3JzIGFuZCB3YXJuaW5ncyBhYm91dCBkdXBsaWNhdGUg
+ZGVmaW5pdGlvbnMuDQoNCkl0IG1heSBiZSB0aGF0IHlvdSBhcmUgbG9va2luZyBhdCB0aGlzIGZy
+b20gdGhlIHdyb25nIGFuZ2xlLiAgUmF0aGVyIHRoYW4gdHJ5aW5nIHRvIGluY2x1ZGUgbW9yZSB1
+c2Vyc3BhY2UgaGVhZGVycywgaXQgbWlnaHQgYmUgd29ydGh3aGlsZSB0byBzZWUgd2h5IDxzeXMv
+YXJjLmg+IGlzIGJlaW5nIGluY2x1ZGVkIGJ5IG9zZF9pbnRlcm5hbC5oIGFuZCBtYXliZSB0aGVy
+ZSBpcyBhIG1vcmUgYXBwcm9wcmlhdGUgaGVhZGVyIHRoYXQgY291bGQgYmUgdXNlZCBpbiB0aGUg
+a2VybmVsPyAgRmFpbGluZyB0aGF0LCBpdCBpc24ndCBjbGVhciB3aCB6ZnNfY29udGV4dC5oIGlz
+IGluY2x1ZGluZyB0aGUgPHN5cy90eXBlLmg+IGhlYWRlciBmcm9tIHVzZXJzcGFjZSB3aGVuIGJ1
+aWxkaW5nIHdpdGggX19LRVJORUxfXyBzZXQ/ICBLZXJuZWwgY29kZSBzaG91bGQgYmUgdXNpbmcg
+PGxpbnV4L3R5cGVzLmg+Lg0KDQpDaGVlcnMsIEFuZHJlYXMNCi0tDQpBbmRyZWFzIERpbGdlcg0K
+UHJpbmNpcGFsIEx1c3RyZSBBcmNoaXRlY3QNCldoYW1jbG91ZA0KDQoNCg0KDQoNCg0KX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbHVzdHJlLWRldmVsIG1h
+aWxpbmcgbGlzdApsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwpodHRwOi8vbGlzdHMubHVz
+dHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmcK
