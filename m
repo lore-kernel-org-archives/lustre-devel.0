@@ -1,68 +1,70 @@
-Return-Path: <SRS0=DK0x=IG=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=LkXh=IK=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_HELO_NONE,
-	SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,DKIM_INVALID,
+	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
+	SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BDC4C433E0
-	for <lustre-devel@archiver.kernel.org>; Mon,  8 Mar 2021 14:09:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 08078C433DB
+	for <lustre-devel@archiver.kernel.org>; Fri, 12 Mar 2021 12:28:43 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A8587650F2
-	for <lustre-devel@archiver.kernel.org>; Mon,  8 Mar 2021 14:09:38 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8587650F2
+	by mail.kernel.org (Postfix) with ESMTPS id 0D8E964F6C
+	for <lustre-devel@archiver.kernel.org>; Fri, 12 Mar 2021 12:28:41 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D8E964F6C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=lists.lustre.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4BA1621FE7F;
-	Mon,  8 Mar 2021 06:09:38 -0800 (PST)
-Received: from smtp-fw-6002.amazon.com (smtp-fw-6002.amazon.com [52.95.49.90])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A9A2A21FD65
- for <lustre-devel@lists.lustre.org>;
- Mon,  8 Mar 2021 06:09:36 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 82AC721F562;
+	Fri, 12 Mar 2021 04:28:41 -0800 (PST)
+Received: from mail-lf1-f46.google.com (mail-lf1-f46.google.com
+ [209.85.167.46])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8C0AB312009
+ for <lustre-devel@lists.lustre.org>; Thu, 11 Mar 2021 20:36:09 -0800 (PST)
+Received: by mail-lf1-f46.google.com with SMTP id x4so36896588lfu.7
+ for <lustre-devel@lists.lustre.org>; Thu, 11 Mar 2021 20:36:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
- t=1615212578; x=1646748578;
- h=from:to:subject:date:message-id:content-id:
- content-transfer-encoding:mime-version;
- bh=+Q2gW4Ucujm4k7e+JIqMhV0Bavnk6oLf90Sc3LwhY20=;
- b=lvxQlGf2Bmc0KqwKh5Iv6r3SCvtlXPXbk/qUH+Yut/Stxw8xIUQnTC0P
- Dnc4pCwl8985afJoPkISusZgBC7JvVN4H0FevPS6vqbyHPuouSbn8eRy8
- zqCglWU51FTj0v1kZ91ktaOlPV0erv9N/0QZTaiP5e+SnF1Qf8BJxWcPy A=;
-X-IronPort-AV: E=Sophos;i="5.81,232,1610409600"; d="scan'208";a="95285895"
-Received: from iad12-co-svc-p1-lb1-vlan2.amazon.com (HELO
- email-inbound-relay-2a-e7be2041.us-west-2.amazon.com) ([10.43.8.2])
- by smtp-border-fw-out-6002.iad6.amazon.com with ESMTP;
- 08 Mar 2021 14:09:29 +0000
-Received: from EX13D21EUA001.ant.amazon.com
- (pdx1-ws-svc-p6-lb9-vlan2.pdx.amazon.com [10.236.137.194])
- by email-inbound-relay-2a-e7be2041.us-west-2.amazon.com (Postfix) with ESMTPS
- id 229E8A1D12
- for <lustre-devel@lists.lustre.org>; Mon,  8 Mar 2021 14:09:28 +0000 (UTC)
-Received: from EX13D21EUA004.ant.amazon.com (10.43.165.59) by
- EX13D21EUA001.ant.amazon.com (10.43.165.41) with Microsoft SMTP Server (TLS)
- id 15.0.1497.2; Mon, 8 Mar 2021 14:09:26 +0000
-Received: from EX13D21EUA004.ant.amazon.com ([10.43.165.59]) by
- EX13D21EUA004.ant.amazon.com ([10.43.165.59]) with mapi id 15.00.1497.012;
- Mon, 8 Mar 2021 14:09:26 +0000
-To: Lustre Development List <lustre-devel@lists.lustre.org>
-Thread-Topic: LDLM behaviour question
-Thread-Index: AQHXFCSm6DtX2f593EWFOGh1ZqlBuQ==
-Date: Mon, 8 Mar 2021 14:09:26 +0000
-Message-ID: <B489BBDF-36DA-4B79-BCB3-19FBBEEF75E2@amazon.com>
-Accept-Language: fr-FR, en-US
-Content-Language: fr-FR
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-exchange-transport-fromentityheader: Hosted
-x-originating-ip: [10.43.164.179]
-Content-ID: <6AC39D8C0315FE4B857AC7A5FBE5DE17@amazon.com>
-MIME-Version: 1.0
-Subject: [lustre-devel] LDLM behaviour question
+ d=cloudlinux.com; s=google;
+ h=from:message-id:mime-version:subject:date:in-reply-to:cc:to
+ :references; bh=IqL9uq8U8U12Wdj3LF3h6kRNNrIrwkV/Zr7FzAtLQ5U=;
+ b=FVbivas2LnVYcAOdiPrmWaUSVYN+r8oSvTzT3YD4nN032VRlzo0wQG2Ok1wXZWspWt
+ jC9KtwFM8Ou/1hWTh2/200a6Oh4sYPv/QYZ4TP9OU4H1fcz3mDiG/OdRjOk5lnPp2wGh
+ W6w92Oe/adLnYZY0I3rgZiK8f2RtHPqjLSYFZc6P2Rsfb7c5fRj25XmmzbDolINCHP8L
+ XUz9+9dzmaTdWQPo556sMHKjT9Vi1KnWZFtrlODUUYffCtQ8++anI43Jz2MU9EGWnITS
+ STvdDff/F3rwMdwueROzUWDX/8L1ZARRipwyk/7qSu6PjJsfbAhkxFVpN4a16ozUPPV2
+ l14A==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:message-id:mime-version:subject:date
+ :in-reply-to:cc:to:references;
+ bh=IqL9uq8U8U12Wdj3LF3h6kRNNrIrwkV/Zr7FzAtLQ5U=;
+ b=TI8d1nZ902ZHQuwimBjRd3ibDmB2OePsRPQvFJV9QGIk+42snM2LMdWRbhc63YTKpP
+ AXEOmPH11pPtIXS6fo4ojFlv/xgVfjYMA49kkjZx3/fndVPrsiKiLbrdc9/UJ2EvmRFX
+ BG1aG1MMy96xI6or9tyR6u21PMSpiSb0cywdNHWZ1yWr7uI7YyzGRFYIdBqxNk2ze8Wb
+ Ovq6tNAMjYp8hF4fhvJ0VnBbUUuQL8acpttpKSlqrzmYRQIc6XUBoKsz5HNIZKoN4ppC
+ idJFS27xUh/xPabyjGE2+ssbT7kJdjfdKeuSc1OKUg49shhSwu3tjK1odH21WUIzJajB
+ rmEw==
+X-Gm-Message-State: AOAM530OXOErOaz/4UvoC0UIZaFCNshwlcQj2dxjXOiRkVNvr43cSu5c
+ 5bj/HrNFJSPVzMh4izvCq7rG1A==
+X-Google-Smtp-Source: ABdhPJzLSul+9dRl3BfcJrjKZrqyABKgBgi+W7hqWa1Qh+ZdCbAIpxXTLT5+eugAxjQSuhYupMSEDA==
+X-Received: by 2002:ac2:5221:: with SMTP id i1mr4279863lfl.160.1615523768196; 
+ Thu, 11 Mar 2021 20:36:08 -0800 (PST)
+Received: from [192.168.1.5] ([5.8.48.45])
+ by smtp.gmail.com with ESMTPSA id f25sm1451455lfh.226.2021.03.11.20.36.07
+ (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 11 Mar 2021 20:36:07 -0800 (PST)
+Message-Id: <5BFA79A7-96F0-4C71-8266-5460DFD7A0F6@cloudlinux.com>
+Mime-Version: 1.0 (Mac OS X Mail 11.5 \(3445.9.7\))
+Date: Fri, 12 Mar 2021 07:36:05 +0300
+In-Reply-To: <B489BBDF-36DA-4B79-BCB3-19FBBEEF75E2@amazon.com>
+To: "Degremont, Aurelien" <degremoa@amazon.com>
+References: <B489BBDF-36DA-4B79-BCB3-19FBBEEF75E2@amazon.com>
+X-Mailer: Apple Mail (2.3445.9.7)
+X-Mailman-Approved-At: Fri, 12 Mar 2021 04:28:39 -0800
+Subject: Re: [lustre-devel] LDLM behaviour question
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -75,22 +77,123 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: "Degremont, Aurelien via lustre-devel" <lustre-devel@lists.lustre.org>
-Reply-To: "Degremont, Aurelien" <degremoa@amazon.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+From: Alexey Lyashkov via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Alexey Lyashkov <umka@cloudlinux.com>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============6025183517572758847=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-SGkgYWxsLA0KDQpJIHdhcyBub3QgYWJsZSB0byBmaW5kIGEgZG9jdW1lbnQgZ2l2aW5nIHRoaXMg
-bGV2ZWwgb2YgZGV0YWlsIG9mIExETE0gYmVoYXZpb3IuDQpJIGhhdmUgYSBiYXNpYyBxdWVzdGlv
-biByZWdhcmRpbmcgY29tcGF0aWJpbGl0eSBiZXR3ZWVuIElCSVRTIGxvY2sgZm9yIHRoZSBzYW1l
-IGZpZC4NCg0KSXMgaXQgcG9zc2libGUgZm9yIHRoZSBzYW1lIE1EVCB0byBsb2NrIHRoZSBzYW1l
-IEZJRCwgd2l0aCAyIElCSVRTIGxvY2ssIHdpdGggZGlmZmVyZW50IGJpdHM/IChpZTogVVBEQVRF
-IHZzIExBWU9VVCkNCldoYXQncyB0aGUgYmVoYXZpb3IgaXMgbm90IHdvcmtpbmc/DQoNClNlY29u
-ZCBxdWVzdGlvbjogd2hhdCBoYXBwZW4gd2hlbiB5b3UgY2FsbCBtdWx0aXBsZSB0aW1lcyBtZHRf
-b2JqZWN0X2xvY2soKSBmb3IgdGhlIHNhbWUgZmlkL3NhbWUgYml0cyBvbiB0aGUgc2FtZSBNRFQ/
-DQoNClRoYW5rcw0KDQpBdXLDqWxpZW4gDQoNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fCmx1c3RyZS1kZXZlbCBtYWlsaW5nIGxpc3QKbHVzdHJlLWRldmVs
-QGxpc3RzLmx1c3RyZS5vcmcKaHR0cDovL2xpc3RzLmx1c3RyZS5vcmcvbGlzdGluZm8uY2dpL2x1
-c3RyZS1kZXZlbC1sdXN0cmUub3JnCg==
+
+--===============6025183517572758847==
+Content-Type: multipart/alternative;
+	boundary="Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00"
+
+
+--Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain;
+	charset=utf-8
+
+Aur=C3=A9lien,
+
+
+
+> 8 =D0=BC=D0=B0=D1=80=D1=82=D0=B0 2021 =D0=B3., =D0=B2 17:09, =
+Degremont, Aurelien via lustre-devel <lustre-devel@lists.lustre.org> =
+=D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BB(=D0=B0):
+>=20
+> Hi all,
+>=20
+> I was not able to find a document giving this level of detail of LDLM =
+behavior.
+I think this aged book will good start. =
+https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesystem_Intern=
+als.pdf =
+<https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesystem_Inter=
+nals.pdf>
+
+
+> I have a basic question regarding compatibility between IBITS lock for =
+the same fid.
+>=20
+> Is it possible for the same MDT to lock the same FID, with 2 IBITS =
+lock, with different bits? (ie: UPDATE vs LAYOUT)
+> What's the behavior is not working?
+>=20
+Yes, this is possible. Same story as LOOKUP, OPEN, DOM =E2=80=A6
+
+
+> Second question: what happen when you call multiple times =
+mdt_object_lock() for the same fid/same bits on the same MDT?
+>=20
+> Thanks
+>=20
+> Aur=C3=A9lien=20
+>=20
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel@lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+
+--Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html;
+	charset=utf-8
+
+<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html; =
+charset=3Dutf-8"></head><body style=3D"word-wrap: break-word; =
+-webkit-nbsp-mode: space; line-break: after-white-space;" class=3D""><div =
+class=3D"">Aur=C3=A9lien,</div><div class=3D""><br class=3D""></div><div =
+class=3D""><br class=3D""></div><div class=3D""><div><br =
+class=3D""><blockquote type=3D"cite" class=3D""><div class=3D"">8 =
+=D0=BC=D0=B0=D1=80=D1=82=D0=B0 2021 =D0=B3., =D0=B2 17:09, Degremont, =
+Aurelien via lustre-devel &lt;<a =
+href=3D"mailto:lustre-devel@lists.lustre.org" =
+class=3D"">lustre-devel@lists.lustre.org</a>&gt; =
+=D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BB(=D0=B0):</div><br =
+class=3D"Apple-interchange-newline"><div class=3D""><div class=3D"">Hi =
+all,<br class=3D""><br class=3D"">I was not able to find a document =
+giving this level of detail of LDLM behavior.<br =
+class=3D""></div></div></blockquote><div><div class=3D"">I think this =
+aged book will good start.&nbsp;<a =
+href=3D"https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesyste=
+m_Internals.pdf" =
+class=3D"">https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesy=
+stem_Internals.pdf</a></div><div class=3D""><br class=3D""></div></div><br=
+ class=3D""><blockquote type=3D"cite" class=3D""><div class=3D""><div =
+class=3D"">I have a basic question regarding compatibility between IBITS =
+lock for the same fid.<br class=3D""><br class=3D"">Is it possible for =
+the same MDT to lock the same FID, with 2 IBITS lock, with different =
+bits? (ie: UPDATE vs LAYOUT)<br class=3D"">What's the behavior is not =
+working?<br class=3D""><br class=3D""></div></div></blockquote><div>Yes, =
+this is possible. Same story as LOOKUP, OPEN, DOM =E2=80=A6</div><div><br =
+class=3D""></div><br class=3D""><blockquote type=3D"cite" class=3D""><div =
+class=3D""><div class=3D"">Second question: what happen when you call =
+multiple times mdt_object_lock() for the same fid/same bits on the same =
+MDT?<br class=3D""><br class=3D""></div></div></blockquote><blockquote =
+type=3D"cite" class=3D""><div class=3D""><div class=3D"">Thanks<br =
+class=3D""><br class=3D"">Aur=C3=A9lien <br class=3D""><br =
+class=3D"">_______________________________________________<br =
+class=3D"">lustre-devel mailing list<br class=3D""><a =
+href=3D"mailto:lustre-devel@lists.lustre.org" =
+class=3D"">lustre-devel@lists.lustre.org</a><br =
+class=3D"">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org<br=
+ class=3D""></div></div></blockquote></div><br =
+class=3D""></div></body></html>=
+
+--Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00--
+
+--===============6025183517572758847==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel@lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============6025183517572758847==--
