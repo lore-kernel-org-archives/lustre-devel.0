@@ -1,70 +1,41 @@
-Return-Path: <SRS0=LkXh=IK=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=o51I=JC=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
-	SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no
+X-Spam-Status: No, score=-11.7 required=3.0 tests=BAYES_00,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08078C433DB
-	for <lustre-devel@archiver.kernel.org>; Fri, 12 Mar 2021 12:28:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6237BC433B4
+	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:51:21 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D8E964F6C
-	for <lustre-devel@archiver.kernel.org>; Fri, 12 Mar 2021 12:28:41 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D8E964F6C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=lists.lustre.org
-Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
+	by mail.kernel.org (Postfix) with ESMTPS id B29146138E
+	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:51:20 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B29146138E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 82AC721F562;
-	Fri, 12 Mar 2021 04:28:41 -0800 (PST)
-Received: from mail-lf1-f46.google.com (mail-lf1-f46.google.com
- [209.85.167.46])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8C0AB312009
- for <lustre-devel@lists.lustre.org>; Thu, 11 Mar 2021 20:36:09 -0800 (PST)
-Received: by mail-lf1-f46.google.com with SMTP id x4so36896588lfu.7
- for <lustre-devel@lists.lustre.org>; Thu, 11 Mar 2021 20:36:09 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=cloudlinux.com; s=google;
- h=from:message-id:mime-version:subject:date:in-reply-to:cc:to
- :references; bh=IqL9uq8U8U12Wdj3LF3h6kRNNrIrwkV/Zr7FzAtLQ5U=;
- b=FVbivas2LnVYcAOdiPrmWaUSVYN+r8oSvTzT3YD4nN032VRlzo0wQG2Ok1wXZWspWt
- jC9KtwFM8Ou/1hWTh2/200a6Oh4sYPv/QYZ4TP9OU4H1fcz3mDiG/OdRjOk5lnPp2wGh
- W6w92Oe/adLnYZY0I3rgZiK8f2RtHPqjLSYFZc6P2Rsfb7c5fRj25XmmzbDolINCHP8L
- XUz9+9dzmaTdWQPo556sMHKjT9Vi1KnWZFtrlODUUYffCtQ8++anI43Jz2MU9EGWnITS
- STvdDff/F3rwMdwueROzUWDX/8L1ZARRipwyk/7qSu6PjJsfbAhkxFVpN4a16ozUPPV2
- l14A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:message-id:mime-version:subject:date
- :in-reply-to:cc:to:references;
- bh=IqL9uq8U8U12Wdj3LF3h6kRNNrIrwkV/Zr7FzAtLQ5U=;
- b=TI8d1nZ902ZHQuwimBjRd3ibDmB2OePsRPQvFJV9QGIk+42snM2LMdWRbhc63YTKpP
- AXEOmPH11pPtIXS6fo4ojFlv/xgVfjYMA49kkjZx3/fndVPrsiKiLbrdc9/UJ2EvmRFX
- BG1aG1MMy96xI6or9tyR6u21PMSpiSb0cywdNHWZ1yWr7uI7YyzGRFYIdBqxNk2ze8Wb
- Ovq6tNAMjYp8hF4fhvJ0VnBbUUuQL8acpttpKSlqrzmYRQIc6XUBoKsz5HNIZKoN4ppC
- idJFS27xUh/xPabyjGE2+ssbT7kJdjfdKeuSc1OKUg49shhSwu3tjK1odH21WUIzJajB
- rmEw==
-X-Gm-Message-State: AOAM530OXOErOaz/4UvoC0UIZaFCNshwlcQj2dxjXOiRkVNvr43cSu5c
- 5bj/HrNFJSPVzMh4izvCq7rG1A==
-X-Google-Smtp-Source: ABdhPJzLSul+9dRl3BfcJrjKZrqyABKgBgi+W7hqWa1Qh+ZdCbAIpxXTLT5+eugAxjQSuhYupMSEDA==
-X-Received: by 2002:ac2:5221:: with SMTP id i1mr4279863lfl.160.1615523768196; 
- Thu, 11 Mar 2021 20:36:08 -0800 (PST)
-Received: from [192.168.1.5] ([5.8.48.45])
- by smtp.gmail.com with ESMTPSA id f25sm1451455lfh.226.2021.03.11.20.36.07
- (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 11 Mar 2021 20:36:07 -0800 (PST)
-Message-Id: <5BFA79A7-96F0-4C71-8266-5460DFD7A0F6@cloudlinux.com>
-Mime-Version: 1.0 (Mac OS X Mail 11.5 \(3445.9.7\))
-Date: Fri, 12 Mar 2021 07:36:05 +0300
-In-Reply-To: <B489BBDF-36DA-4B79-BCB3-19FBBEEF75E2@amazon.com>
-To: "Degremont, Aurelien" <degremoa@amazon.com>
-References: <B489BBDF-36DA-4B79-BCB3-19FBBEEF75E2@amazon.com>
-X-Mailer: Apple Mail (2.3445.9.7)
-X-Mailman-Approved-At: Fri, 12 Mar 2021 04:28:39 -0800
-Subject: Re: [lustre-devel] LDLM behaviour question
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6352921F62F;
+	Mon,  5 Apr 2021 00:51:20 +0000 (UTC)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A1AC321F521
+ for <lustre-devel@lists.lustre.org>; Mon,  5 Apr 2021 00:51:17 +0000 (UTC)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 8BC286B0;
+ Sun,  4 Apr 2021 20:51:16 -0400 (EDT)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id 7E62490AA8; Sun,  4 Apr 2021 20:51:16 -0400 (EDT)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Sun,  4 Apr 2021 20:50:29 -0400
+Message-Id: <1617583870-32029-1-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+Subject: [lustre-devel] [PATCH 00/41] lustre: sync to OpenSFS branch as of
+ March 1
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -77,123 +48,175 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Alexey Lyashkov via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Alexey Lyashkov <umka@cloudlinux.com>
 Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============6025183517572758847=="
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
+Backport various patches for the start of 2.15 development cycle.
+This covers the USDP feature landing. I did hold back the fake
+symlink work as well as IPv6 LNet support. Newer kernels have
+isses with the ports which I need to investigate.
 
---===============6025183517572758847==
-Content-Type: multipart/alternative;
-	boundary="Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00"
+Alex Zhuravlev (1):
+  lustre: obdclass: try to skip corrupted llog records
 
+Amir Shehata (9):
+  lnet: UDSP storage and marshalled structs
+  lnet: foundation patch for selection mod
+  lnet: Preferred gateway selection
+  lnet: Select NI/peer NI with highest prio
+  lnet: select best peer and local net
+  lnet: UDSP handling
+  lnet: Apply UDSP on local and remote NIs
+  lnet: Add the kernel level Marshalling API
+  lnet: ioctl handler for get policy info
 
---Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/plain;
-	charset=utf-8
+Andreas Dilger (4):
+  lustre: lov: avoid NULL dereference in cleanup
+  lustre: llite: quiet spurious ioctl warning
+  lsutre: ldlm: return error from ldlm_namespace_new()
+  lustre: llite: remove unused ll_teardown_mmaps()
 
-Aur=C3=A9lien,
+Andrew Perepechko (1):
+  lustre: llite: data corruption due to RPC reordering
 
+Andriy Skulysh (1):
+  lustre: lov: grant deadlock if same OSC in two components
 
+Bobi Jam (1):
+  lustre: lov: fix layout generation inc for mirror split
 
-> 8 =D0=BC=D0=B0=D1=80=D1=82=D0=B0 2021 =D0=B3., =D0=B2 17:09, =
-Degremont, Aurelien via lustre-devel <lustre-devel@lists.lustre.org> =
-=D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BB(=D0=B0):
->=20
-> Hi all,
->=20
-> I was not able to find a document giving this level of detail of LDLM =
-behavior.
-I think this aged book will good start. =
-https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesystem_Intern=
-als.pdf =
-<https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesystem_Inter=
-nals.pdf>
+James Simmons (1):
+  lnet: place wire protocol data int own headers
 
+John L. Hammond (1):
+  lustre: change EWOULDBLOCK to EAGAIN
 
-> I have a basic question regarding compatibility between IBITS lock for =
-the same fid.
->=20
-> Is it possible for the same MDT to lock the same FID, with 2 IBITS =
-lock, with different bits? (ie: UPDATE vs LAYOUT)
-> What's the behavior is not working?
->=20
-Yes, this is possible. Same story as LOOKUP, OPEN, DOM =E2=80=A6
+Mr NeilBrown (11):
+  lustre: lov: style cleanups in lov_set_osc_active()
+  lustre: change various operations structs to const
+  lustre: mark strings in char arrays as const
+  lustre: convert snprintf to scnprintf as appropriate
+  lustre: remove non-static 'inline' markings.
+  lustre: llite: use is_root_inode()
+  lnet: libcfs: discard cfs_firststr
+  lnet: libcfs: use wait_event_timeout() in tracefiled().
+  lnet: use init_wait() rather than init_waitqueue_entry()
+  lnet: discard LNET_MD_PHYS
+  lnet: o2iblnd: convert peers hash table to hashtable.h
 
+Oleg Drokin (2):
+  lustre: update version to 2.14.0
+  lustre: update version to 2.14.50
 
-> Second question: what happen when you call multiple times =
-mdt_object_lock() for the same fid/same bits on the same MDT?
->=20
-> Thanks
->=20
-> Aur=C3=A9lien=20
->=20
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel@lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Rahul Deshmkuh (1):
+  lustre: lov: fixes bitfield in lod qos code
 
+Sebastien Buisson (3):
+  lustre: ptlrpc: do not output error when imp_sec is freed
+  lustre: gss: handle empty reqmsg in sptlrpc_req_ctx_switch
+  lustre: sec: file ioctls to handle encryption policies
 
---Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/html;
-	charset=utf-8
+Serguei Smirnov (1):
+  lnet: modify assertion in lnet_post_send_locked
 
-<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html; =
-charset=3Dutf-8"></head><body style=3D"word-wrap: break-word; =
--webkit-nbsp-mode: space; line-break: after-white-space;" class=3D""><div =
-class=3D"">Aur=C3=A9lien,</div><div class=3D""><br class=3D""></div><div =
-class=3D""><br class=3D""></div><div class=3D""><div><br =
-class=3D""><blockquote type=3D"cite" class=3D""><div class=3D"">8 =
-=D0=BC=D0=B0=D1=80=D1=82=D0=B0 2021 =D0=B3., =D0=B2 17:09, Degremont, =
-Aurelien via lustre-devel &lt;<a =
-href=3D"mailto:lustre-devel@lists.lustre.org" =
-class=3D"">lustre-devel@lists.lustre.org</a>&gt; =
-=D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BB(=D0=B0):</div><br =
-class=3D"Apple-interchange-newline"><div class=3D""><div class=3D"">Hi =
-all,<br class=3D""><br class=3D"">I was not able to find a document =
-giving this level of detail of LDLM behavior.<br =
-class=3D""></div></div></blockquote><div><div class=3D"">I think this =
-aged book will good start.&nbsp;<a =
-href=3D"https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesyste=
-m_Internals.pdf" =
-class=3D"">https://wiki.lustre.org/images/d/da/Understanding_Lustre_Filesy=
-stem_Internals.pdf</a></div><div class=3D""><br class=3D""></div></div><br=
- class=3D""><blockquote type=3D"cite" class=3D""><div class=3D""><div =
-class=3D"">I have a basic question regarding compatibility between IBITS =
-lock for the same fid.<br class=3D""><br class=3D"">Is it possible for =
-the same MDT to lock the same FID, with 2 IBITS lock, with different =
-bits? (ie: UPDATE vs LAYOUT)<br class=3D"">What's the behavior is not =
-working?<br class=3D""><br class=3D""></div></div></blockquote><div>Yes, =
-this is possible. Same story as LOOKUP, OPEN, DOM =E2=80=A6</div><div><br =
-class=3D""></div><br class=3D""><blockquote type=3D"cite" class=3D""><div =
-class=3D""><div class=3D"">Second question: what happen when you call =
-multiple times mdt_object_lock() for the same fid/same bits on the same =
-MDT?<br class=3D""><br class=3D""></div></div></blockquote><blockquote =
-type=3D"cite" class=3D""><div class=3D""><div class=3D"">Thanks<br =
-class=3D""><br class=3D"">Aur=C3=A9lien <br class=3D""><br =
-class=3D"">_______________________________________________<br =
-class=3D"">lustre-devel mailing list<br class=3D""><a =
-href=3D"mailto:lustre-devel@lists.lustre.org" =
-class=3D"">lustre-devel@lists.lustre.org</a><br =
-class=3D"">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org<br=
- class=3D""></div></div></blockquote></div><br =
-class=3D""></div></body></html>=
+Sonia Sharma (3):
+  lnet: Add the kernel level De-Marshalling API
+  lnet: Add the ioctl handler for "add policy"
+  lnet: ioctl handler for "delete policy"
 
---Apple-Mail=_EAA4D1BF-8E0C-4B9E-8A0F-8C5F73A01F00--
+Wang Shilong (1):
+  lustre: llite: make readahead aware of hints
 
---===============6025183517572758847==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+ fs/lustre/fld/fld_request.c                |    2 +-
+ fs/lustre/include/cl_object.h              |   18 +-
+ fs/lustre/include/lu_object.h              |   17 +-
+ fs/lustre/include/lustre_log.h             |   10 +-
+ fs/lustre/include/lustre_net.h             |    2 +-
+ fs/lustre/include/lustre_osc.h             |    2 +
+ fs/lustre/include/obd_cksum.h              |    2 +-
+ fs/lustre/{llite => include}/range_lock.h  |    0
+ fs/lustre/ldlm/ldlm_lib.c                  |   10 +-
+ fs/lustre/ldlm/ldlm_resource.c             |   32 +-
+ fs/lustre/llite/Makefile                   |    2 +-
+ fs/lustre/llite/crypto.c                   |    8 +-
+ fs/lustre/llite/file.c                     |   33 +-
+ fs/lustre/llite/glimpse.c                  |    2 +-
+ fs/lustre/llite/llite_internal.h           |    5 +-
+ fs/lustre/llite/llite_mmap.c               |   59 +-
+ fs/lustre/llite/lproc_llite.c              |   32 +-
+ fs/lustre/llite/pcc.c                      |   38 +-
+ fs/lustre/llite/rw.c                       |   20 +-
+ fs/lustre/llite/super25.c                  |    2 +-
+ fs/lustre/llite/vvp_page.c                 |    2 +-
+ fs/lustre/lmv/lmv_obd.c                    |    2 +-
+ fs/lustre/lmv/lproc_lmv.c                  |    6 +-
+ fs/lustre/lov/lov_ea.c                     |    4 +-
+ fs/lustre/lov/lov_io.c                     |    4 +
+ fs/lustre/lov/lov_obd.c                    |   17 +-
+ fs/lustre/lov/lov_object.c                 |    3 +-
+ fs/lustre/lov/lov_pack.c                   |    8 -
+ fs/lustre/mdc/mdc_dev.c                    |    3 +-
+ fs/lustre/obdclass/Makefile                |    3 +-
+ fs/lustre/obdclass/cl_io.c                 |   14 +-
+ fs/lustre/obdclass/llog.c                  |   80 +-
+ fs/lustre/obdclass/llog_cat.c              |   14 +-
+ fs/lustre/obdclass/llog_internal.h         |    5 +
+ fs/lustre/obdclass/llog_obd.c              |    2 +-
+ fs/lustre/obdclass/lu_tgt_descs.c          |   38 +-
+ fs/lustre/obdclass/obd_sysfs.c             |    6 +-
+ fs/lustre/{llite => obdclass}/range_lock.c |    6 +-
+ fs/lustre/osc/osc_io.c                     |   17 +-
+ fs/lustre/osc/osc_lock.c                   |    2 +-
+ fs/lustre/osc/osc_request.c                |    2 +-
+ fs/lustre/ptlrpc/client.c                  |    2 +-
+ fs/lustre/ptlrpc/errno.c                   |    4 +-
+ fs/lustre/ptlrpc/llog_client.c             |    2 +-
+ fs/lustre/ptlrpc/pers.c                    |    1 -
+ fs/lustre/ptlrpc/sec.c                     |   14 +-
+ include/linux/lnet/lib-lnet.h              |   45 +
+ include/linux/lnet/lib-types.h             |   72 +-
+ include/linux/lnet/udsp.h                  |  144 +++
+ include/uapi/linux/lnet/libcfs_debug.h     |    1 +
+ include/uapi/linux/lnet/libcfs_ioctl.h     |    8 +-
+ include/uapi/linux/lnet/lnet-dlc.h         |   91 +-
+ include/uapi/linux/lnet/lnet-idl.h         |  241 +++++
+ include/uapi/linux/lnet/lnet-types.h       |  220 +---
+ include/uapi/linux/lnet/lnetctl.h          |    1 +
+ include/uapi/linux/lnet/lnetst.h           |    2 +
+ include/uapi/linux/lnet/nidstr.h           |    5 +
+ include/uapi/linux/lnet/socklnd.h          |    1 +
+ include/uapi/linux/lustre/lustre_user.h    |    2 +-
+ include/uapi/linux/lustre/lustre_ver.h     |    6 +-
+ net/lnet/klnds/o2iblnd/o2iblnd-idl.h       |  157 +++
+ net/lnet/klnds/o2iblnd/o2iblnd.c           |  267 +++--
+ net/lnet/klnds/o2iblnd/o2iblnd.h           |  133 +--
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c        |   18 +-
+ net/lnet/klnds/socklnd/socklnd_cb.c        |    4 +-
+ net/lnet/libcfs/libcfs_string.c            |   28 -
+ net/lnet/libcfs/tracefile.c                |   37 +-
+ net/lnet/lnet/Makefile                     |    2 +-
+ net/lnet/lnet/api-ni.c                     |  278 ++++-
+ net/lnet/lnet/config.c                     |    4 +
+ net/lnet/lnet/lib-move.c                   |  399 ++++---
+ net/lnet/lnet/nidstrings.c                 |   66 ++
+ net/lnet/lnet/peer.c                       |  267 +++--
+ net/lnet/lnet/udsp.c                       | 1553 ++++++++++++++++++++++++++++
+ 74 files changed, 3744 insertions(+), 865 deletions(-)
+ rename fs/lustre/{llite => include}/range_lock.h (100%)
+ rename fs/lustre/{llite => obdclass}/range_lock.c (96%)
+ create mode 100644 include/linux/lnet/udsp.h
+ create mode 100644 include/uapi/linux/lnet/lnet-idl.h
+ create mode 100644 net/lnet/klnds/o2iblnd/o2iblnd-idl.h
+ create mode 100644 net/lnet/lnet/udsp.c
+
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============6025183517572758847==--
