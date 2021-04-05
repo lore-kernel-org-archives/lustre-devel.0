@@ -2,41 +2,42 @@ Return-Path: <SRS0=o51I=JC=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.9 required=3.0 tests=BAYES_00,
+X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_CR_TRAILER,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CD8B4C43460
-	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:52:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BBB55C433ED
+	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:52:08 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8476861396
-	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:52:07 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8476861396
+	by mail.kernel.org (Postfix) with ESMTPS id 7E69161396
+	for <lustre-devel@archiver.kernel.org>; Mon,  5 Apr 2021 00:52:08 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E69161396
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6298521FBE8;
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E027A3283A0;
 	Mon,  5 Apr 2021 00:51:47 +0000 (UTC)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 291BB21F8E8
- for <lustre-devel@lists.lustre.org>; Mon,  5 Apr 2021 00:51:23 +0000 (UTC)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 13F1221F858
+ for <lustre-devel@lists.lustre.org>; Mon,  5 Apr 2021 00:51:22 +0000 (UTC)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id CA1999EA;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id BBDF66D1;
  Sun,  4 Apr 2021 20:51:16 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id C711590AA9; Sun,  4 Apr 2021 20:51:16 -0400 (EDT)
+ id B8B7A90AAC; Sun,  4 Apr 2021 20:51:16 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  4 Apr 2021 20:50:47 -0400
-Message-Id: <1617583870-32029-19-git-send-email-jsimmons@infradead.org>
+Date: Sun,  4 Apr 2021 20:50:43 -0400
+Message-Id: <1617583870-32029-15-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1617583870-32029-1-git-send-email-jsimmons@infradead.org>
 References: <1617583870-32029-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 18/41] lnet: ioctl handler for get policy info
+Subject: [lustre-devel] [PATCH 14/41] lnet: Add the kernel level Marshalling
+ API
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -59,227 +60,266 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Amir Shehata <ashehata@whamcloud.com>
 
-Add ioctl handler for GET_UDSP_SIZE and GET_UDSP
+Given a UDSP, Marshal the UDSP pointed to by udsp
+into the memory block that is allocated from userspace.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-9121
-Lustre-commit: 6248e1cd7fb70f4 ("LU-9121 lnet: ioctl handler for get policy info")
+Lustre-commit: cd0ef3165e1d1b5f ("LU-9121 lnet: Add the kernel level Marshalling API")
+Signed-off-by: Sonia Sharma <sharmaso@whamcloud.com>
 Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/34579
+Reviewed-on: https://review.whamcloud.com/34403
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/udsp.h              |  7 +++
- include/uapi/linux/lnet/libcfs_ioctl.h |  5 +-
- net/lnet/lnet/api-ni.c                 | 64 +++++++++++++++++++++++++
- net/lnet/lnet/udsp.c                   | 88 ++++++++++++++++++++++++++++++++++
- 4 files changed, 163 insertions(+), 1 deletion(-)
+ include/linux/lnet/udsp.h |  13 +++
+ net/lnet/lnet/udsp.c      | 214 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 227 insertions(+)
 
 diff --git a/include/linux/lnet/udsp.h b/include/linux/lnet/udsp.h
-index 3683d43..188dce4 100644
+index 265cb42..0cf630f 100644
 --- a/include/linux/lnet/udsp.h
 +++ b/include/linux/lnet/udsp.h
-@@ -134,4 +134,11 @@ int lnet_udsp_marshal(struct lnet_udsp *udsp,
+@@ -114,4 +114,17 @@
   */
- int lnet_udsp_demarshal_add(void *bulk, u32 bulk_size);
+ void lnet_udsp_destroy(bool shutdown);
  
 +/**
-+ * lnet_udsp_get_construct_info
-+ *	get information of how the UDSP policies impacted the given
-+ *	construct.
++ * lnet_get_udsp_size
++ *	Return the size needed to store the marshalled UDSP
 + */
-+void lnet_udsp_get_construct_info(struct lnet_ioctl_construct_udsp_info *info);
++size_t lnet_get_udsp_size(struct lnet_udsp *udsp);
 +
++/**
++ * lnet_udsp_marshal
++ *	Marshal the udsp into the bulk memory provided.
++ *	Return success/failure.
++ */
++int lnet_udsp_marshal(struct lnet_udsp *udsp,
++		      struct lnet_ioctl_udsp *ioc_udsp);
  #endif /* UDSP_H */
-diff --git a/include/uapi/linux/lnet/libcfs_ioctl.h b/include/uapi/linux/lnet/libcfs_ioctl.h
-index 9e3c427..d0b29c52 100644
---- a/include/uapi/linux/lnet/libcfs_ioctl.h
-+++ b/include/uapi/linux/lnet/libcfs_ioctl.h
-@@ -152,6 +152,9 @@ struct libcfs_ioctl_data {
- #define IOC_LIBCFS_GET_RECOVERY_QUEUE	_IOWR(IOC_LIBCFS_TYPE, 104, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_ADD_UDSP		_IOWR(IOC_LIBCFS_TYPE, 105, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_DEL_UDSP		_IOWR(IOC_LIBCFS_TYPE, 106, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_MAX_NR				       106
-+#define IOC_LIBCFS_GET_UDSP_SIZE	_IOWR(IOC_LIBCFS_TYPE, 107, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_GET_UDSP		_IOWR(IOC_LIBCFS_TYPE, 108, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_GET_CONST_UDSP_INFO	_IOWR(IOC_LIBCFS_TYPE, 109, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_MAX_NR				       109
- 
- #endif /* __LIBCFS_IOCTL_H__ */
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index 50f7b9e..f121d69 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -4162,6 +4162,70 @@ u32 lnet_get_dlc_seq_locked(void)
- 		return rc;
+diff --git a/net/lnet/lnet/udsp.c b/net/lnet/lnet/udsp.c
+index 85e31fe..499035d 100644
+--- a/net/lnet/lnet/udsp.c
++++ b/net/lnet/lnet/udsp.c
+@@ -1049,3 +1049,217 @@ struct lnet_udsp *
+ 		lnet_udsp_free(udsp);
  	}
- 
-+	case IOC_LIBCFS_GET_UDSP_SIZE: {
-+		struct lnet_ioctl_udsp *ioc_udsp = arg;
-+		struct lnet_udsp *udsp;
+ }
 +
-+		if (ioc_udsp->iou_hdr.ioc_len < sizeof(*ioc_udsp))
-+			return -EINVAL;
++static size_t
++lnet_size_marshaled_nid_descr(struct lnet_ud_nid_descr *descr)
++{
++	struct cfs_expr_list *expr;
++	int expr_count = 0;
++	int range_count = 0;
++	size_t size = sizeof(struct lnet_ioctl_udsp_descr);
 +
-+		rc = 0;
++	if (!lnet_udsp_criteria_present(descr))
++		return size;
 +
-+		mutex_lock(&the_lnet.ln_api_mutex);
-+		udsp = lnet_udsp_get_policy(ioc_udsp->iou_idx);
-+		if (!udsp) {
-+			rc = -ENOENT;
-+		} else {
-+			/* coming in iou_idx will hold the idx of the udsp
-+			 * to get the size of. going out the iou_idx will
-+			 * hold the size of the UDSP found at the passed
-+			 * in index.
-+			 */
-+			ioc_udsp->iou_idx = lnet_get_udsp_size(udsp);
-+			if (ioc_udsp->iou_idx < 0)
-+				rc = -EINVAL;
++	/* we always have one net expression */
++	if (!list_empty(&descr->ud_net_id.udn_net_num_range)) {
++		expr = list_first_entry(&descr->ud_net_id.udn_net_num_range,
++					struct cfs_expr_list, el_link);
++
++		/* count the number of cfs_range_expr in the net expression */
++		range_count = lnet_get_list_len(&expr->el_exprs);
++	}
++
++	/* count the number of cfs_range_expr in the address expressions */
++	list_for_each_entry(expr, &descr->ud_addr_range, el_link) {
++		expr_count++;
++		range_count += lnet_get_list_len(&expr->el_exprs);
++	}
++
++	size += (sizeof(struct lnet_expressions) * expr_count);
++	size += (sizeof(struct lnet_range_expr) * range_count);
++
++	return size;
++}
++
++size_t
++lnet_get_udsp_size(struct lnet_udsp *udsp)
++{
++	size_t size = sizeof(struct lnet_ioctl_udsp);
++
++	size += lnet_size_marshaled_nid_descr(&udsp->udsp_src);
++	size += lnet_size_marshaled_nid_descr(&udsp->udsp_dst);
++	size += lnet_size_marshaled_nid_descr(&udsp->udsp_rte);
++
++	CDEBUG(D_NET, "get udsp (%p) size: %d\n", udsp, (int)size);
++
++	return size;
++}
++
++static int
++copy_exprs(struct cfs_expr_list *expr, void __user **bulk,
++	   u32 *bulk_size)
++{
++	struct cfs_range_expr *range;
++	struct lnet_range_expr range_expr;
++
++	/* copy over the net range expressions to the bulk */
++	list_for_each_entry(range, &expr->el_exprs, re_link) {
++		range_expr.re_lo = range->re_lo;
++		range_expr.re_hi = range->re_hi;
++		range_expr.re_stride = range->re_stride;
++		CDEBUG(D_NET, "Copy Range %u:%u:%u\n",
++		       range_expr.re_lo, range_expr.re_hi,
++		       range_expr.re_stride);
++		if (copy_to_user(*bulk, &range_expr, sizeof(range_expr))) {
++			CDEBUG(D_NET, "Failed to copy range_expr\n");
++			return -EFAULT;
 +		}
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+
-+		return rc;
++		*bulk += sizeof(range_expr);
++		*bulk_size -= sizeof(range_expr);
 +	}
 +
-+	case IOC_LIBCFS_GET_UDSP: {
-+		struct lnet_ioctl_udsp *ioc_udsp = arg;
-+		struct lnet_udsp *udsp;
++	return 0;
++}
 +
-+		if (ioc_udsp->iou_hdr.ioc_len < sizeof(*ioc_udsp))
-+			return -EINVAL;
++static int
++copy_nid_range(struct lnet_ud_nid_descr *nid_descr, char *type,
++	       void **bulk, u32 *bulk_size)
++{
++	struct lnet_ioctl_udsp_descr ioc_udsp_descr;
++	struct cfs_expr_list *expr;
++	struct lnet_expressions ioc_expr;
++	int expr_count;
++	int net_expr_count;
++	int rc;
 +
-+		rc = 0;
++	memset(&ioc_udsp_descr, 0, sizeof(ioc_udsp_descr));
++	ioc_udsp_descr.iud_src_hdr.ud_descr_type = *(u32 *)type;
 +
-+		mutex_lock(&the_lnet.ln_api_mutex);
-+		udsp = lnet_udsp_get_policy(ioc_udsp->iou_idx);
-+		if (!udsp)
-+			rc = -ENOENT;
-+		else
-+			rc = lnet_udsp_marshal(udsp, ioc_udsp);
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+
-+		return rc;
-+	}
-+
-+	case IOC_LIBCFS_GET_CONST_UDSP_INFO: {
-+		struct lnet_ioctl_construct_udsp_info *info = arg;
-+
-+		if (info->cud_hdr.ioc_len < sizeof(*info))
-+			return -EINVAL;
-+
-+		CDEBUG(D_NET, "GET_UDSP_INFO for %s\n",
-+		       libcfs_nid2str(info->cud_nid));
-+
-+		mutex_lock(&the_lnet.ln_api_mutex);
-+		lnet_udsp_get_construct_info(info);
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+
++	/* if criteria not present, copy over the static part of the NID
++	 * descriptor
++	 */
++	if (!lnet_udsp_criteria_present(nid_descr)) {
++		CDEBUG(D_NET, "Descriptor %u:%u:%u:%u\n",
++		       ioc_udsp_descr.iud_src_hdr.ud_descr_type,
++		       ioc_udsp_descr.iud_src_hdr.ud_descr_count,
++		       ioc_udsp_descr.iud_net.ud_net_type,
++		       ioc_udsp_descr.iud_net.ud_net_num_expr.le_count);
++		if (copy_to_user(*bulk, &ioc_udsp_descr,
++				 sizeof(ioc_udsp_descr))) {
++			CDEBUG(D_NET, "failed to copy ioc_udsp_descr\n");
++			return -EFAULT;
++		}
++		*bulk += sizeof(ioc_udsp_descr);
++		*bulk_size -= sizeof(ioc_udsp_descr);
 +		return 0;
 +	}
 +
- 	default:
- 		ni = lnet_net2ni_addref(data->ioc_net);
- 		if (!ni)
-diff --git a/net/lnet/lnet/udsp.c b/net/lnet/lnet/udsp.c
-index f686ff2..516db98 100644
---- a/net/lnet/lnet/udsp.c
-+++ b/net/lnet/lnet/udsp.c
-@@ -980,6 +980,94 @@ struct lnet_udsp *
- 	return 0;
- }
- 
-+static void
-+lnet_udsp_get_ni_info(struct lnet_ioctl_construct_udsp_info *info,
-+		      struct lnet_ni *ni)
-+{
-+	struct lnet_nid_list *ne;
-+	struct lnet_net *net = ni->ni_net;
-+	int i = 0;
++	expr_count = lnet_get_list_len(&nid_descr->ud_addr_range);
 +
-+	LASSERT(ni);
-+
-+	info->cud_nid_priority = ni->ni_sel_priority;
-+	if (net) {
-+		info->cud_net_priority = ni->ni_net->net_sel_priority;
-+		list_for_each_entry(ne, &net->net_rtr_pref_nids, nl_list) {
-+			if (i < LNET_MAX_SHOW_NUM_NID)
-+				info->cud_pref_rtr_nid[i] = ne->nl_nid;
-+			else
-+				break;
-+			i++;
-+		}
-+	}
-+}
-+
-+static void
-+lnet_udsp_get_peer_info(struct lnet_ioctl_construct_udsp_info *info,
-+			struct lnet_peer_ni *lpni)
-+{
-+	struct lnet_nid_list *ne;
-+	int i = 0;
-+
-+	/* peer tree structure needs to be in existence */
-+	LASSERT(lpni && lpni->lpni_peer_net &&
-+		lpni->lpni_peer_net->lpn_peer);
-+
-+	info->cud_nid_priority = lpni->lpni_sel_priority;
-+	CDEBUG(D_NET, "lpni %s has %d pref nids\n",
-+	       libcfs_nid2str(lpni->lpni_nid),
-+	       lpni->lpni_pref_nnids);
-+	if (lpni->lpni_pref_nnids == 1) {
-+		info->cud_pref_nid[0] = lpni->lpni_pref.nid;
-+	} else if (lpni->lpni_pref_nnids > 1) {
-+		struct list_head *list = &lpni->lpni_pref.nids;
-+
-+		list_for_each_entry(ne, list, nl_list) {
-+			if (i < LNET_MAX_SHOW_NUM_NID)
-+				info->cud_pref_nid[i] = ne->nl_nid;
-+			else
-+				break;
-+			i++;
-+		}
-+	}
-+
-+	i = 0;
-+	list_for_each_entry(ne, &lpni->lpni_rtr_pref_nids, nl_list) {
-+		if (i < LNET_MAX_SHOW_NUM_NID)
-+			info->cud_pref_rtr_nid[i] = ne->nl_nid;
-+		else
-+			break;
-+		i++;
-+	}
-+
-+	info->cud_net_priority = lpni->lpni_peer_net->lpn_sel_priority;
-+}
-+
-+void
-+lnet_udsp_get_construct_info(struct lnet_ioctl_construct_udsp_info *info)
-+{
-+	struct lnet_ni *ni;
-+	struct lnet_peer_ni *lpni;
-+
-+	lnet_net_lock(0);
-+	if (!info->cud_peer) {
-+		ni = lnet_nid2ni_locked(info->cud_nid, 0);
-+		if (ni)
-+			lnet_udsp_get_ni_info(info, ni);
++	/* copy the net information */
++	if (!list_empty(&nid_descr->ud_net_id.udn_net_num_range)) {
++		expr = list_first_entry(&nid_descr->ud_net_id.udn_net_num_range,
++					struct cfs_expr_list, el_link);
++		net_expr_count = lnet_get_list_len(&expr->el_exprs);
 +	} else {
-+		lpni = lnet_find_peer_ni_locked(info->cud_nid);
-+		if (!lpni) {
-+			CDEBUG(D_NET, "nid %s is not found\n",
-+			       libcfs_nid2str(info->cud_nid));
-+		} else {
-+			lnet_udsp_get_peer_info(info, lpni);
-+			lnet_peer_ni_decref_locked(lpni);
-+		}
++		net_expr_count = 0;
 +	}
-+	lnet_net_unlock(0);
++
++	/* set the total expression count */
++	ioc_udsp_descr.iud_src_hdr.ud_descr_count = expr_count;
++	ioc_udsp_descr.iud_net.ud_net_type =
++		nid_descr->ud_net_id.udn_net_type;
++	ioc_udsp_descr.iud_net.ud_net_num_expr.le_count = net_expr_count;
++
++	CDEBUG(D_NET, "Descriptor %u:%u:%u:%u\n",
++	       ioc_udsp_descr.iud_src_hdr.ud_descr_type,
++	       ioc_udsp_descr.iud_src_hdr.ud_descr_count,
++	       ioc_udsp_descr.iud_net.ud_net_type,
++	       ioc_udsp_descr.iud_net.ud_net_num_expr.le_count);
++
++	/* copy over the header info to the bulk */
++	if (copy_to_user(*bulk, &ioc_udsp_descr, sizeof(ioc_udsp_descr))) {
++		CDEBUG(D_NET, "Failed to copy data\n");
++		return -EFAULT;
++	}
++	*bulk += sizeof(ioc_udsp_descr);
++	*bulk_size -= sizeof(ioc_udsp_descr);
++
++	/* copy over the net num expression if it exists */
++	if (net_expr_count) {
++		rc = copy_exprs(expr, bulk, bulk_size);
++		if (rc)
++			return rc;
++	}
++
++	/* copy the address range */
++	list_for_each_entry(expr, &nid_descr->ud_addr_range, el_link) {
++		ioc_expr.le_count = lnet_get_list_len(&expr->el_exprs);
++		if (copy_to_user(*bulk, &ioc_expr, sizeof(ioc_expr))) {
++			CDEBUG(D_NET, "failex to copy ioc_expr\n");
++			return -EFAULT;
++		}
++		*bulk += sizeof(ioc_expr);
++		*bulk_size -= sizeof(ioc_expr);
++
++		rc = copy_exprs(expr, bulk, bulk_size);
++		if (rc)
++			return rc;
++	}
++
++	return 0;
 +}
 +
- struct lnet_udsp *
- lnet_udsp_alloc(void)
- {
++int
++lnet_udsp_marshal(struct lnet_udsp *udsp, struct lnet_ioctl_udsp *ioc_udsp)
++{
++	int rc = -ENOMEM;
++	void __user *bulk;
++	u32 bulk_size;
++
++	if (!ioc_udsp)
++		return -EINVAL;
++
++	bulk = ioc_udsp->iou_bulk;
++	bulk_size = ioc_udsp->iou_hdr.ioc_len +
++	  ioc_udsp->iou_bulk_size;
++
++	CDEBUG(D_NET, "marshal udsp (%p)\n", udsp);
++	CDEBUG(D_NET, "MEM -----> bulk: %p:0x%x\n", bulk, bulk_size);
++	/* make sure user space allocated enough buffer to marshal the
++	 * udsp
++	 */
++	if (bulk_size != lnet_get_udsp_size(udsp)) {
++		rc = -ENOSPC;
++		goto fail;
++	}
++
++	ioc_udsp->iou_idx = udsp->udsp_idx;
++	ioc_udsp->iou_action_type = udsp->udsp_action_type;
++	ioc_udsp->iou_action.priority = udsp->udsp_action.udsp_priority;
++
++	bulk_size -= sizeof(*ioc_udsp);
++
++	rc = copy_nid_range(&udsp->udsp_src, "SRC", &bulk, &bulk_size);
++	if (rc)
++		goto fail;
++
++	rc = copy_nid_range(&udsp->udsp_dst, "DST", &bulk, &bulk_size);
++	if (rc)
++		goto fail;
++
++	rc = copy_nid_range(&udsp->udsp_rte, "RTE", &bulk, &bulk_size);
++	if (rc)
++		goto fail;
++
++	CDEBUG(D_NET, "MEM <----- bulk: %p\n", bulk);
++
++	/* we should've consumed the entire buffer */
++	LASSERT(bulk_size == 0);
++	return 0;
++
++fail:
++	CERROR("Failed to marshal udsp: %d\n", rc);
++	return rc;
++}
 -- 
 1.8.3.1
 
