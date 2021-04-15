@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49A11C43461
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:04:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27328C433B4
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:04:30 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 01D5B610CB
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:04:20 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01D5B610CB
+	by mail.kernel.org (Postfix) with ESMTPS id BC76361222
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:04:29 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC76361222
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9A96A32ACEA;
-	Wed, 14 Apr 2021 21:03:39 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 34BCE32CBE4;
+	Wed, 14 Apr 2021 21:03:43 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 60A8532F3FA
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:47 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id F36E332F5F5
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:53 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 51290100F332;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 8E434100F35A;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 44F449188E; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id 8C8DE9188E; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:01:54 -0400
-Message-Id: <1618459361-17909-3-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:02:17 -0400
+Message-Id: <1618459361-17909-26-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 02/49] lustre: lmv: iput() can safely be
- passed NULL.
+Subject: [lustre-devel] [PATCH 25/49] lnet: uapi: move userland only
+ nidstr.h handling
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -57,41 +57,89 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+The function cfs_expand_nidlist() no longer exist for kernel
+internals. We can move the function prototype from the UAPI
+header to string.h which is a libcfs user land header.
+The structure netstrfns that is defined in a UAPI header
+has been adding user land only handling. Additional its
+use struct list_head which will confuse reviewers since
+kernel developers see this as a kernel only thing.
 
-iput() is a no-op when passed a NULL pointer, so there is no
-need to test for NULL before calling it - doing so clutters
-the code.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 650a6dec18306e56 ("LU-6142 lustre: iput() can safely be passed NULL.")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/40291
-Reviewed-by: Aurelien Degremont <degremoa@amazon.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13903
+Lustre-commit: 062809b1313ac700 ("LU-13903 utils: move userland only nidstr.h handling")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/39115
+Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 ---
- fs/lustre/lmv/lmv_obd.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ include/linux/lnet/lib-types.h   | 15 +++++++++++++++
+ include/uapi/linux/lnet/nidstr.h | 15 ---------------
+ net/lnet/lnet/nidstrings.c       |  1 +
+ 3 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 747786e..9c0a0cf 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -3141,10 +3141,8 @@ static int lmv_unpackmd(struct obd_export *exp, struct lmv_stripe_md **lsmp,
- 		}
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 2424993..cc451cf 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -238,6 +238,21 @@ struct lnet_test_peer {
+ #define LNET_COOKIE_TYPE_BITS	2
+ #define LNET_COOKIE_MASK	((1ULL << LNET_COOKIE_TYPE_BITS) - 1ULL)
  
- 		if (lmv_dir_striped(lsm)) {
--			for (i = 0; i < lsm->lsm_md_stripe_count; i++) {
--				if (lsm->lsm_md_oinfo[i].lmo_root)
--					iput(lsm->lsm_md_oinfo[i].lmo_root);
--			}
-+			for (i = 0; i < lsm->lsm_md_stripe_count; i++)
-+				iput(lsm->lsm_md_oinfo[i].lmo_root);
- 			lsm_size = lmv_stripe_md_size(lsm->lsm_md_stripe_count);
- 		} else {
- 			lsm_size = lmv_stripe_md_size(0);
++struct netstrfns {
++	u32	nf_type;
++	char	*nf_name;
++	char	*nf_modname;
++	void	(*nf_addr2str)(u32 addr, char *str, size_t size);
++	int	(*nf_str2addr)(const char *str, int nob, u32 *addr);
++	int	(*nf_parse_addrlist)(char *str, int len,
++				     struct list_head *list);
++	int	(*nf_print_addrlist)(char *buffer, int count,
++				     struct list_head *list);
++	int	(*nf_match_addr)(u32 addr, struct list_head *list);
++	int	(*nf_min_max)(struct list_head *nidlist, u32 *min_nid,
++			      u32 *max_nid);
++};
++
+ struct lnet_ni;			/* forward ref */
+ 
+ struct lnet_lnd {
+diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
+index d402a6a..caf28e2 100644
+--- a/include/uapi/linux/lnet/nidstr.h
++++ b/include/uapi/linux/lnet/nidstr.h
+@@ -108,19 +108,4 @@ int cfs_match_net(__u32 net_id, __u32 net_type,
+ int cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
+ 			      char *max_nid, __kernel_size_t nidstr_length);
+ 
+-struct netstrfns {
+-	__u32	nf_type;
+-	char	*nf_name;
+-	char	*nf_modname;
+-	void	(*nf_addr2str)(__u32 addr, char *str, __kernel_size_t size);
+-	int	(*nf_str2addr)(const char *str, int nob, __u32 *addr);
+-	int	(*nf_parse_addrlist)(char *str, int len,
+-				     struct list_head *list);
+-	int	(*nf_print_addrlist)(char *buffer, int count,
+-				     struct list_head *list);
+-	int	(*nf_match_addr)(__u32 addr, struct list_head *list);
+-	int	(*nf_min_max)(struct list_head *nidlist, __u32 *min_nid,
+-			      __u32 *max_nid);
+-};
+-
+ #endif /* _LNET_NIDSTRINGS_H */
+diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
+index b1cd86b..cce2ae4 100644
+--- a/net/lnet/lnet/nidstrings.c
++++ b/net/lnet/lnet/nidstrings.c
+@@ -42,6 +42,7 @@
+ #include <linux/libcfs/libcfs.h>
+ #include <linux/libcfs/libcfs_string.h>
+ #include <uapi/linux/lnet/nidstr.h>
++#include <linux/lnet/lib-types.h>
+ 
+ /* max value for numeric network address */
+ #define MAX_NUMERIC_VALUE 0xffffffff
 -- 
 1.8.3.1
 
