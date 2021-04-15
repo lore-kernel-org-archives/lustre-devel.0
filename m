@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 938D3C433ED
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DA24C433B4
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:33 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D624610CB
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:30 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D624610CB
+	by mail.kernel.org (Postfix) with ESMTPS id E6FC560230
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:32 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6FC560230
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5B42732F875;
-	Wed, 14 Apr 2021 21:03:14 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D01FF32F63B;
+	Wed, 14 Apr 2021 21:03:15 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E117D32F545
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:52 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3027432F494
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:51 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 8198A100F356;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 6EDB2100F350;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 802229188F; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id 6DE3191883; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:02:13 -0400
-Message-Id: <1618459361-17909-22-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:02:07 -0400
+Message-Id: <1618459361-17909-16-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 21/49] lustre: sec: fix migrate for encrypted
- dir
+Subject: [lustre-devel] [PATCH 15/49] lnet: o2iblnd: change some ints to
+ bool.
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -57,114 +57,177 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-When setting an encryption policy on a directory that we want to
-be encrypted, we need to make sure it is empty.
-But, in some cases, setting the LL_XATTR_NAME_ENCRYPTION_CONTEXT xattr
-should be allowed on non-empty directories, for instance when a
-directory is migrated across MDTs into new shard directories.
-Also, it is required for the encrpytion key to be available on the
-client when migrating a directory so that the filenames can be
-properly rehashed for the new MDT directory shard.
-And, in any case, we need to prevent explicit setting of
-LL_XATTR_NAME_ENCRYPTION_CONTEXT xattr outside of encryption policy
-definition.
+Each of these ints can suitably be bool.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14401
-Lustre-commit: 67c4cffac6dbd30c ("LU-14401 sec: fix migrate for encrypted dir")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/41413
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 86e192059905ac49 ("LU-12678 o2iblnd: change some ints to bool.")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39304
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/crypto.c         |  1 +
- fs/lustre/llite/file.c           | 12 ++++++++++++
- fs/lustre/llite/llite_internal.h |  8 +++++---
- fs/lustre/llite/xattr.c          | 11 +++++++++++
- 4 files changed, 29 insertions(+), 3 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c    |  8 ++++----
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 26 +++++++++++++-------------
+ 2 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/fs/lustre/llite/crypto.c b/fs/lustre/llite/crypto.c
-index 0598b3c..8bbb766 100644
---- a/fs/lustre/llite/crypto.c
-+++ b/fs/lustre/llite/crypto.c
-@@ -104,6 +104,7 @@ static int ll_set_context(struct inode *inode, const void *ctx, size_t len,
- 		return -EPERM;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index c8cebf6..01cc1ed 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -127,7 +127,7 @@ static int kiblnd_msgtype2size(int type)
+ 	}
+ }
  
- 	dentry = (struct dentry *)fs_data;
-+	set_bit(LLIF_SET_ENC_CTX, &ll_i2info(inode)->lli_flags);
- 	rc = __vfs_setxattr(dentry, inode, LL_XATTR_NAME_ENCRYPTION_CONTEXT,
- 			    ctx, len, XATTR_CREATE);
- 	if (rc)
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 767eafa..225008e 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -4455,6 +4455,18 @@ int ll_migrate(struct inode *parent, struct file *file, struct lmv_user_md *lum,
- 		goto out_iput;
+-static int kiblnd_unpack_rd(struct kib_msg *msg, int flip)
++static int kiblnd_unpack_rd(struct kib_msg *msg, bool flip)
+ {
+ 	struct kib_rdma_desc *rd;
+ 	int nob;
+@@ -206,7 +206,7 @@ int kiblnd_unpack_msg(struct kib_msg *msg, int nob)
+ 	u32 msg_cksum;
+ 	u16 version;
+ 	int msg_nob;
+-	int flip;
++	bool flip;
+ 
+ 	/* 6 bytes are enough to have received magic + version */
+ 	if (nob < 6) {
+@@ -215,9 +215,9 @@ int kiblnd_unpack_msg(struct kib_msg *msg, int nob)
  	}
  
-+	if (IS_ENCRYPTED(child_inode)) {
-+		rc = llcrypt_get_encryption_info(child_inode);
-+		if (rc)
-+			goto out_iput;
-+		if (!llcrypt_has_encryption_key(child_inode)) {
-+			CDEBUG(D_SEC, "no enc key for "DFID"\n",
-+			       PFID(ll_inode2fid(child_inode)));
-+			rc = -ENOKEY;
-+			goto out_iput;
-+		}
-+	}
-+
- 	op_data = ll_prep_md_op_data(NULL, parent, NULL, name, namelen,
- 				     child_inode->i_mode, LUSTRE_OPC_ANY, NULL);
- 	if (IS_ERR(op_data)) {
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 0d97253..dc9ea03 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -97,12 +97,14 @@ enum ll_file_flags {
- 	LLIF_FILE_RESTORING	= 1,
- 	/* Xattr cache is attached to the file */
- 	LLIF_XATTR_CACHE	= 2,
-+	/* Project inherit */
-+	LLIF_PROJECT_INHERIT	= 3,
- 	/* update atime from MDS no matter if it's older than
- 	 * local inode atime.
- 	 */
--	LLIF_UPDATE_ATIME,
--	/* Project inherit */
--	LLIF_PROJECT_INHERIT	= 3,
-+	LLIF_UPDATE_ATIME	= 4,
-+	/* setting encryption context in progress */
-+	LLIF_SET_ENC_CTX	= 6,
- };
+ 	if (msg->ibm_magic == IBLND_MSG_MAGIC) {
+-		flip = 0;
++		flip = false;
+ 	} else if (msg->ibm_magic == __swab32(IBLND_MSG_MAGIC)) {
+-		flip = 1;
++		flip = true;
+ 	} else {
+ 		CERROR("Bad magic: %08x\n", msg->ibm_magic);
+ 		return -EPROTO;
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 2ebda4e..5066c93 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -2758,7 +2758,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 		if (priv_nob >= offsetof(struct kib_rej, ibr_padding)) {
+ 			struct kib_rej *rej = priv;
+ 			struct kib_connparams *cp = NULL;
+-			int flip = 0;
++			bool flip = false;
+ 			u64 incarnation = -1;
  
- /* See comment on trunc_sem_down_read_nowait */
-diff --git a/fs/lustre/llite/xattr.c b/fs/lustre/llite/xattr.c
-index 119fb26..7004893 100644
---- a/fs/lustre/llite/xattr.c
-+++ b/fs/lustre/llite/xattr.c
-@@ -133,6 +133,17 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
- 			return -EPERM;
- 	}
+ 			/* NB. default incarnation is -1 because:
+@@ -2777,7 +2777,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			    rej->ibr_magic == __swab32(LNET_PROTO_MAGIC)) {
+ 				__swab32s(&rej->ibr_magic);
+ 				__swab16s(&rej->ibr_version);
+-				flip = 1;
++				flip = true;
+ 			}
  
-+	/* Setting LL_XATTR_NAME_ENCRYPTION_CONTEXT xattr is only allowed
-+	 * when defining an encryption policy on a directory, ie when it
-+	 * comes from ll_set_context().
-+	 * When new files/dirs are created in an encrypted dir, the xattr
-+	 * is set directly in the create request.
-+	 */
-+	if (handler->flags == XATTR_SECURITY_T &&
-+	    !strcmp(name, "c") &&
-+	    !test_and_clear_bit(LLIF_SET_ENC_CTX, &ll_i2info(inode)->lli_flags))
-+		return -EPERM;
-+
- 	fullname = kasprintf(GFP_KERNEL, "%s%s", xattr_prefix(handler), name);
- 	if (!fullname)
- 		return -ENOMEM;
+ 			if (priv_nob >= sizeof(struct kib_rej) &&
+@@ -3385,7 +3385,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	struct kib_conn *conn;
+ 	int timeout;
+ 	int i;
+-	int dropped_lock;
++	bool dropped_lock;
+ 	int peer_index = 0;
+ 	unsigned long deadline = jiffies;
+ 
+@@ -3397,7 +3397,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	while (!kiblnd_data.kib_shutdown) {
+ 		int reconn = 0;
+ 
+-		dropped_lock = 0;
++		dropped_lock = false;
+ 
+ 		conn = list_first_entry_or_null(
+ 			&kiblnd_data.kib_connd_zombies,
+@@ -3412,7 +3412,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			}
+ 
+ 			spin_unlock_irqrestore(lock, flags);
+-			dropped_lock = 1;
++			dropped_lock = true;
+ 
+ 			kiblnd_destroy_conn(conn);
+ 
+@@ -3439,7 +3439,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			list_del(&conn->ibc_list);
+ 
+ 			spin_unlock_irqrestore(lock, flags);
+-			dropped_lock = 1;
++			dropped_lock = true;
+ 
+ 			kiblnd_disconnect_conn(conn);
+ 			wait = conn->ibc_waits;
+@@ -3469,7 +3469,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			list_del(&conn->ibc_list);
+ 
+ 			spin_unlock_irqrestore(lock, flags);
+-			dropped_lock = 1;
++			dropped_lock = true;
+ 
+ 			reconn += kiblnd_reconnect_peer(conn->ibc_peer);
+ 			kiblnd_peer_decref(conn->ibc_peer);
+@@ -3503,7 +3503,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			unsigned int lnd_timeout;
+ 
+ 			spin_unlock_irqrestore(lock, flags);
+-			dropped_lock = 1;
++			dropped_lock = true;
+ 
+ 			/*
+ 			 * Time to check for RDMA timeouts on a few more
+@@ -3677,7 +3677,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	wait_queue_entry_t wait;
+ 	unsigned long flags;
+ 	struct ib_wc wc;
+-	int did_something;
++	bool did_something;
+ 	int rc;
+ 
+ 	init_wait(&wait);
+@@ -3701,7 +3701,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			spin_lock_irqsave(&sched->ibs_lock, flags);
+ 		}
+ 
+-		did_something = 0;
++		did_something = false;
+ 
+ 		conn = list_first_entry_or_null(&sched->ibs_conns,
+ 						struct kib_conn,
+@@ -3778,7 +3778,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			}
+ 
+ 			kiblnd_conn_decref(conn); /* ...drop my ref from above */
+-			did_something = 1;
++			did_something = true;
+ 		}
+ 
+ 		if (did_something)
+@@ -3816,14 +3816,14 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	write_lock_irqsave(glock, flags);
+ 
+ 	while (!kiblnd_data.kib_shutdown) {
+-		int do_failover = 0;
++		bool do_failover = false;
+ 		int long_sleep;
+ 
+ 		list_for_each_entry(dev, &kiblnd_data.kib_failed_devs,
+ 				    ibd_fail_list) {
+ 			if (ktime_get_seconds() < dev->ibd_next_failover)
+ 				continue;
+-			do_failover = 1;
++			do_failover = true;
+ 			break;
+ 		}
+ 
 -- 
 1.8.3.1
 
