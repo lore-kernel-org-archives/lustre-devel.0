@@ -7,36 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8ABF2C433B4
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:05:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 11C38C433ED
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:05:22 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B2B861222
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:05:18 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B2B861222
+	by mail.kernel.org (Postfix) with ESMTPS id C897861222
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:05:21 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C897861222
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id C3ED12F74CD;
-	Wed, 14 Apr 2021 21:04:06 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 713E02F74EA;
+	Wed, 14 Apr 2021 21:04:08 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 40E2632F6D6
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:03:00 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8846432F68F
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:57 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id D46B9100F377;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id B3AF5100F366;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id D1D006DF7E; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id B27639188E; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:02:39 -0400
-Message-Id: <1618459361-17909-48-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:02:29 -0400
+Message-Id: <1618459361-17909-38-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 47/49] lnet: convert lpni_refcount to a kref
+Subject: [lustre-devel] [PATCH 37/49] lnet: libcfs: discard
+ cfs_trace_copyin_string()
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -56,146 +57,254 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: "Mr. NeilBrown" <neilb@suse.de>
+From: Mr NeilBrown <neilb@suse.de>
 
-This refcount is used exactly like a kref.  So change it to one.
-kref uses refcount_t which will warn on increment-from-zero and
-similar problems (which enabled with CONFIG option), so we don't
-need the LASSERT calls.
+Instead of cfs_trace_copyin_string(), use memdup_user_nul().
+This combines the allocation with the copyin, and nul-terminates.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
-Lustre-commit: e520ee276800362c ("LU-12678 lnet: convert lpni_refcount to a kref")
-Signed-off-by: Mr. NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/41941
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
+The resulting code is a lot simpler.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14428
+Lustre-commit: 67af976c806994ce ("LU-14428 libcfs: discard cfs_trace_copyin_string()")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/41490
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h  |  9 +++------
- include/linux/lnet/lib-types.h |  3 ++-
- net/lnet/lnet/peer.c           | 14 ++++++++------
- net/lnet/lnet/router_proc.c    |  2 +-
- 4 files changed, 14 insertions(+), 14 deletions(-)
+ include/linux/libcfs/libcfs_debug.h |  2 --
+ net/lnet/libcfs/module.c            | 19 +++++-------
+ net/lnet/libcfs/tracefile.c         | 59 +++++++------------------------------
+ net/lnet/libcfs/tracefile.h         |  2 --
+ net/lnet/lnet/router_proc.c         | 22 +++++++-------
+ 5 files changed, 30 insertions(+), 74 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 8b369dd..e4dbe0e 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -351,18 +351,15 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
- static inline void
- lnet_peer_ni_addref_locked(struct lnet_peer_ni *lp)
+diff --git a/include/linux/libcfs/libcfs_debug.h b/include/linux/libcfs/libcfs_debug.h
+index 99905f7..93eb752 100644
+--- a/include/linux/libcfs/libcfs_debug.h
++++ b/include/linux/libcfs/libcfs_debug.h
+@@ -209,8 +209,6 @@ int libcfs_debug_msg(struct libcfs_debug_msg_data *msgdata,
+ 	__printf(2, 3);
+ 
+ /* other external symbols that tracefile provides: */
+-int cfs_trace_copyin_string(char *knl_buffer, int knl_buffer_nob,
+-			    const char __user *usr_buffer, int usr_buffer_nob);
+ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ 			     const char *knl_buffer, char *append);
+ 
+diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
+index f9cc6df..93e9b9e 100644
+--- a/net/lnet/libcfs/module.c
++++ b/net/lnet/libcfs/module.c
+@@ -295,7 +295,7 @@ static int proc_dobitmasks(struct ctl_table *table, int write,
+ 			   void __user *buffer, size_t *lenp, loff_t *ppos)
  {
--	LASSERT(atomic_read(&lp->lpni_refcount) > 0);
--	atomic_inc(&lp->lpni_refcount);
-+	kref_get(&lp->lpni_kref);
+ 	const int tmpstrlen = 512;
+-	char *tmpstr;
++	char *tmpstr = NULL;
+ 	int rc;
+ 	size_t nob = *lenp;
+ 	loff_t pos = *ppos;
+@@ -303,11 +303,10 @@ static int proc_dobitmasks(struct ctl_table *table, int write,
+ 	int is_subsys = (mask == &libcfs_subsystem_debug) ? 1 : 0;
+ 	int is_printk = (mask == &libcfs_printk) ? 1 : 0;
+ 
+-	tmpstr = kzalloc(tmpstrlen, GFP_KERNEL);
+-	if (!tmpstr)
+-		return -ENOMEM;
+-
+ 	if (!write) {
++		tmpstr = kzalloc(tmpstrlen, GFP_KERNEL);
++		if (!tmpstr)
++			return -ENOMEM;
+ 		libcfs_debug_mask2str(tmpstr, tmpstrlen, *mask, is_subsys);
+ 		rc = strlen(tmpstr);
+ 
+@@ -318,13 +317,11 @@ static int proc_dobitmasks(struct ctl_table *table, int write,
+ 						      tmpstr + pos, "\n");
+ 		}
+ 	} else {
+-		rc = cfs_trace_copyin_string(tmpstr, tmpstrlen, buffer, nob);
+-		if (rc < 0) {
+-			kfree(tmpstr);
+-			return rc;
+-		}
++		tmpstr = memdup_user_nul(buffer, nob);
++		if (!tmpstr)
++			return -ENOMEM;
+ 
+-		rc = libcfs_debug_str2mask(mask, tmpstr, is_subsys);
++		rc = libcfs_debug_str2mask(mask, strim(tmpstr), is_subsys);
+ 		/* Always print LBUG/LASSERT to console, so keep this mask */
+ 		if (is_printk)
+ 			*mask |= D_EMERG;
+diff --git a/net/lnet/libcfs/tracefile.c b/net/lnet/libcfs/tracefile.c
+index e3a063f..731623b 100644
+--- a/net/lnet/libcfs/tracefile.c
++++ b/net/lnet/libcfs/tracefile.c
+@@ -920,34 +920,6 @@ void cfs_trace_flush_pages(void)
+ 	}
  }
  
--void lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lp);
-+void lnet_destroy_peer_ni_locked(struct kref *ref);
- 
- static inline void
- lnet_peer_ni_decref_locked(struct lnet_peer_ni *lp)
+-int cfs_trace_copyin_string(char *knl_buffer, int knl_buffer_nob,
+-			    const char __user *usr_buffer, int usr_buffer_nob)
+-{
+-	int nob;
+-
+-	if (usr_buffer_nob > knl_buffer_nob)
+-		return -EOVERFLOW;
+-
+-	if (copy_from_user((void *)knl_buffer,
+-			   usr_buffer, usr_buffer_nob))
+-		return -EFAULT;
+-
+-	nob = strnlen(knl_buffer, usr_buffer_nob);
+-	while (--nob >= 0)		/* strip trailing whitespace */
+-		if (!isspace(knl_buffer[nob]))
+-			break;
+-
+-	if (nob < 0)			/* empty string */
+-		return -EINVAL;
+-
+-	if (nob == knl_buffer_nob)	/* no space to terminate */
+-		return -EOVERFLOW;
+-
+-	knl_buffer[nob + 1] = 0;	/* terminate */
+-	return 0;
+-}
+-EXPORT_SYMBOL(cfs_trace_copyin_string);
+-
+ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ 			     const char *knl_buffer, char *append)
  {
--	LASSERT(atomic_read(&lp->lpni_refcount) > 0);
--	if (atomic_dec_and_test(&lp->lpni_refcount))
--		lnet_destroy_peer_ni_locked(lp);
-+	kref_put(&lp->lpni_kref, lnet_destroy_peer_ni_locked);
+@@ -977,26 +949,20 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ int cfs_trace_dump_debug_buffer_usrstr(void __user *usr_str, int usr_str_nob)
+ {
+ 	char *str;
++	char *path;
+ 	int rc;
+ 
+-	if (usr_str_nob >= 2 * PAGE_SIZE)
+-		return -EINVAL;
+-	str = kzalloc(usr_str_nob + 1, GFP_KERNEL);
++	str = memdup_user_nul(usr_str, usr_str_nob);
+ 	if (!str)
+ 		return -ENOMEM;
+ 
+-	rc = cfs_trace_copyin_string(str, usr_str_nob + 1,
+-				     usr_str, usr_str_nob);
+-	if (rc)
+-		goto out;
+-
+-	if (str[0] != '/') {
++	path = strim(str);
++	if (path[0] != '/')
+ 		rc = -EINVAL;
+-		goto out;
+-	}
+-	rc = cfs_tracefile_dump_all_pages(str);
+-out:
++	else
++		rc = cfs_tracefile_dump_all_pages(str);
+ 	kfree(str);
++
+ 	return rc;
  }
  
- static inline int
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index af8f61e..ce067b3 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -42,6 +42,7 @@
- #include <linux/uio.h>
- #include <linux/types.h>
- #include <linux/completion.h>
-+#include <linux/kref.h>
+@@ -1045,18 +1011,13 @@ int cfs_trace_daemon_command_usrstr(void __user *usr_str, int usr_str_nob)
+ 	char *str;
+ 	int rc;
  
- #include <uapi/linux/lnet/lnet-types.h>
- #include <uapi/linux/lnet/lnetctl.h>
-@@ -568,7 +569,7 @@ struct lnet_peer_ni {
- 	/* peer's NID */
- 	lnet_nid_t		 lpni_nid;
- 	/* # refs */
--	atomic_t		 lpni_refcount;
-+	struct kref		 lpni_kref;
- 	/* health value for the peer */
- 	atomic_t		 lpni_healthv;
- 	/* recovery ping mdh */
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 15fcb5e..c833e34 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -127,7 +127,7 @@
- 	INIT_LIST_HEAD(&lpni->lpni_on_remote_peer_ni_list);
- 	INIT_LIST_HEAD(&lpni->lpni_rtr_pref_nids);
- 	LNetInvalidateMDHandle(&lpni->lpni_recovery_ping_mdh);
--	atomic_set(&lpni->lpni_refcount, 1);
-+	kref_init(&lpni->lpni_kref);
- 	lpni->lpni_sel_priority = LNET_MAX_SELECTION_PRIORITY;
+-	if (usr_str_nob >= 2 * PAGE_SIZE)
+-		return -EINVAL;
+-	str = kzalloc(usr_str_nob + 1, GFP_KERNEL);
++	str = memdup_user_nul(usr_str, usr_str_nob);
+ 	if (!str)
+ 		return -ENOMEM;
  
- 	spin_lock_init(&lpni->lpni_lock);
-@@ -1864,14 +1864,16 @@ struct lnet_peer_net *
+-	rc = cfs_trace_copyin_string(str, usr_str_nob + 1,
+-				     usr_str, usr_str_nob);
+-	if (!rc)
+-		rc = cfs_trace_daemon_command(str);
+-
++	rc = cfs_trace_daemon_command(str);
+ 	kfree(str);
++
+ 	return rc;
  }
  
- void
--lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lpni)
-+lnet_destroy_peer_ni_locked(struct kref *ref)
- {
-+	struct lnet_peer_ni *lpni = container_of(ref, struct lnet_peer_ni,
-+						 lpni_kref);
- 	struct lnet_peer_table *ptable;
- 	struct lnet_peer_net *lpn;
+diff --git a/net/lnet/libcfs/tracefile.h b/net/lnet/libcfs/tracefile.h
+index 5b90c1b..311ec8c 100644
+--- a/net/lnet/libcfs/tracefile.h
++++ b/net/lnet/libcfs/tracefile.h
+@@ -59,8 +59,6 @@
+ int cfs_tracefile_init(int max_pages);
+ void cfs_tracefile_exit(void);
  
- 	CDEBUG(D_NET, "%p nid %s\n", lpni, libcfs_nid2str(lpni->lpni_nid));
- 
--	LASSERT(atomic_read(&lpni->lpni_refcount) == 0);
-+	LASSERT(kref_read(&lpni->lpni_kref) == 0);
- 	LASSERT(list_empty(&lpni->lpni_txq));
- 	LASSERT(lpni->lpni_txqnob == 0);
- 	LASSERT(list_empty(&lpni->lpni_peer_nis));
-@@ -3779,7 +3781,7 @@ void lnet_peer_discovery_stop(void)
- 		aliveness = (lnet_is_peer_ni_alive(lp)) ? "up" : "down";
- 
- 	CDEBUG(D_WARNING, "%-24s %4d %5s %5d %5d %5d %5d %5d %ld\n",
--	       libcfs_nid2str(lp->lpni_nid), atomic_read(&lp->lpni_refcount),
-+	       libcfs_nid2str(lp->lpni_nid), kref_read(&lp->lpni_kref),
- 	       aliveness, lp->lpni_net->net_tunables.lct_peer_tx_credits,
- 	       lp->lpni_rtrcredits, lp->lpni_minrtrcredits,
- 	       lp->lpni_txcredits, lp->lpni_mintxcredits, lp->lpni_txqnob);
-@@ -3837,7 +3839,7 @@ void lnet_peer_discovery_stop(void)
- 					 ? "up" : "down");
- 
- 			*nid = lp->lpni_nid;
--			*refcount = atomic_read(&lp->lpni_refcount);
-+			*refcount = kref_read(&lp->lpni_kref);
- 			*ni_peer_tx_credits =
- 				lp->lpni_net->net_tunables.lct_peer_tx_credits;
- 			*peer_tx_credits = lp->lpni_txcredits;
-@@ -3922,7 +3924,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
- 			snprintf(lpni_info->cr_aliveness, LNET_MAX_STR_LEN,
- 				 lnet_is_peer_ni_alive(lpni) ? "up" : "down");
- 
--		lpni_info->cr_refcount = atomic_read(&lpni->lpni_refcount);
-+		lpni_info->cr_refcount = kref_read(&lpni->lpni_kref);
- 		lpni_info->cr_ni_peer_tx_credits = lpni->lpni_net ?
- 			lpni->lpni_net->net_tunables.lct_peer_tx_credits : 0;
- 		lpni_info->cr_peer_tx_credits = lpni->lpni_txcredits;
+-int cfs_trace_copyin_string(char *knl_buffer, int knl_buffer_nob,
+-			    const char __user *usr_buffer, int usr_buffer_nob);
+ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ 			     const char *knl_str, char *append);
+ int cfs_trace_dump_debug_buffer_usrstr(void __user *usr_str, int usr_str_nob);
 diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
-index 25d172d..dd52a08 100644
+index 623899e..25d172d 100644
 --- a/net/lnet/lnet/router_proc.c
 +++ b/net/lnet/lnet/router_proc.c
-@@ -475,7 +475,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+@@ -743,7 +743,7 @@ struct lnet_portal_rotors {
+ 	const char	*pr_desc;
+ };
  
- 		if (peer) {
- 			lnet_nid_t nid = peer->lpni_nid;
--			int nrefs = atomic_read(&peer->lpni_refcount);
-+			int nrefs = kref_read(&peer->lpni_kref);
- 			time64_t lastalive = -1;
- 			char *aliveness = "NA";
- 			int maxcr = peer->lpni_net ?
+-static struct lnet_portal_rotors	portal_rotors[] = {
++static struct lnet_portal_rotors portal_rotors[] = {
+ 	{
+ 		.pr_value = LNET_PTL_ROTOR_OFF,
+ 		.pr_name  = "OFF",
+@@ -783,11 +783,11 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+ 	int rc;
+ 	int i;
+ 
+-	buf = kmalloc(buf_len, GFP_KERNEL);
+-	if (!buf)
+-		return -ENOMEM;
+-
+ 	if (!write) {
++		buf = kmalloc(buf_len, GFP_KERNEL);
++		if (!buf)
++			return -ENOMEM;
++
+ 		lnet_res_lock(0);
+ 
+ 		for (i = 0; portal_rotors[i].pr_value >= 0; i++) {
+@@ -810,12 +810,14 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+ 			rc = cfs_trace_copyout_string(buffer, nob,
+ 						      buf + pos, "\n");
+ 		}
+-		goto out;
++		kfree(buf);
++
++		return rc;
+ 	}
+ 
+-	rc = cfs_trace_copyin_string(buf, buf_len, buffer, nob);
+-	if (rc < 0)
+-		goto out;
++	buf = memdup_user_nul(buffer, nob);
++	if (!buf)
++		return -ENOMEM;
+ 
+ 	tmp = strim(buf);
+ 
+@@ -830,8 +832,8 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+ 		}
+ 	}
+ 	lnet_res_unlock(0);
+-out:
+ 	kfree(buf);
++
+ 	return rc;
+ }
+ 
 -- 
 1.8.3.1
 
