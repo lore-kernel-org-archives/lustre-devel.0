@@ -7,36 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47E64C433ED
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 97777C433B4
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:03 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E57B1610CB
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:02:59 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E57B1610CB
+	by mail.kernel.org (Postfix) with ESMTPS id 23BB7610CB
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:03 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23BB7610CB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6D75B32F64F;
-	Wed, 14 Apr 2021 21:02:56 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6CAC232F564;
+	Wed, 14 Apr 2021 21:02:58 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 903E532F3FA
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:48 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1DF6132F3FA
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:49 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5A5CF100F338;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5F9A5100F33A;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 4FE5691893; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id 5AA6191884; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:01:58 -0400
-Message-Id: <1618459361-17909-7-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:02:01 -0400
+Message-Id: <1618459361-17909-10-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 06/49] lnet: Prevent discovery on deleted peer
+Subject: [lustre-devel] [PATCH 09/49] lustre: llite: update and fix module
+ loading bug in mounting code
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -49,177 +50,218 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Chris Horn <chris.horn@hpe.com>
+If a MSG was not up and you attempted to mount a client it would
+fail as expected. The issue was when you attempted to unload
+the lustre module that it would oops. Remove the module_put()
+that was causing this problem. Update the llite module code to
+sync us with the OpenSFS tree.
 
-We needn't perform any discovery activities on a peer that has had
-lnet_peer_del() called on it.
-
-HPE-bug-id: LUS-9192
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13895
-Lustre-commit: fd32cd817cba336c ("LU-13895 lnet: Prevent discovery on deleted peer"):1
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/39605
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Fixes: a989830c88 ("lustre: llite: move client mounting from obdclass to llite")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12514
+Lustre-commit: 53fa81765750e38f ("LU-12514 llite: move client mounting from obdclass to llite")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/37693
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 ---
- include/linux/lnet/lib-lnet.h  |  2 ++
- include/linux/lnet/lib-types.h |  4 ++-
- net/lnet/lnet/peer.c           | 73 ++++++++++++++++++++++++------------------
- 3 files changed, 46 insertions(+), 33 deletions(-)
+ fs/lustre/include/lustre_disk.h |  5 ++--
+ fs/lustre/llite/llite_lib.c     |  5 ----
+ fs/lustre/llite/super25.c       | 60 ++++++++++++++++++++++-------------------
+ fs/lustre/obdclass/class_obd.c  | 15 +++++------
+ 4 files changed, 42 insertions(+), 43 deletions(-)
 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 1efac9b..2741c6f 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -893,6 +893,8 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
- {
- 	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL))
- 		return false;
-+	if (lp->lp_state & LNET_PEER_MARK_DELETED)
-+		return false;
- 	if (lp->lp_state & LNET_PEER_FORCE_PUSH)
- 		return true;
- 	if (lp->lp_state & LNET_PEER_NO_DISCOVERY)
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index f1f4eac5..2424993 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -750,7 +750,9 @@ struct lnet_peer {
- #define LNET_PEER_RTR_DISCOVERED BIT(17)
+diff --git a/fs/lustre/include/lustre_disk.h b/fs/lustre/include/lustre_disk.h
+index b6b693f..a54b5fd 100644
+--- a/fs/lustre/include/lustre_disk.h
++++ b/fs/lustre/include/lustre_disk.h
+@@ -150,12 +150,13 @@ struct lustre_sb_info {
+ int lustre_start_mgc(struct super_block *sb);
+ int lustre_common_put_super(struct super_block *sb);
  
- /* peer is marked for deletion */
--#define LNET_PEER_MARK_DELETION BIT(18)
-+#define LNET_PEER_MARK_DELETION		BIT(18)
-+/* lnet_peer_del()/lnet_peer_del_locked() has been called on the peer */
-+#define LNET_PEER_MARK_DELETED		BIT(19)
+-int mgc_fsname2resid(char *fsname, struct ldlm_res_id *res_id, int type);
+-
+ struct lustre_sb_info *lustre_init_lsi(struct super_block *sb);
+ int lustre_put_lsi(struct super_block *sb);
+ int lmd_parse(char *options, struct lustre_mount_data *lmd);
  
- struct lnet_peer_net {
- 	/* chain on lp_peer_nets */
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 48f78ef..34153a8 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -450,6 +450,10 @@ void lnet_peer_uninit(void)
- 
- 	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(peer->lp_primary_nid));
- 
-+	spin_lock(&peer->lp_lock);
-+	peer->lp_state |= LNET_PEER_MARK_DELETED;
-+	spin_unlock(&peer->lp_lock);
++/* mgc_request.c */
++int mgc_fsname2resid(char *fsname, struct ldlm_res_id *res_id, int type);
 +
- 	lpni = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
- 	while (lpni) {
- 		lpni2 = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
-@@ -462,9 +466,40 @@ void lnet_peer_uninit(void)
- 	return rc2;
+ /** @} disk */
+ 
+ #endif /* _LUSTRE_DISK_H */
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index ca6e736..e7c1b73 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -1052,8 +1052,6 @@ int ll_fill_super(struct super_block *sb)
+ 
+ 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p\n", sb);
+ 
+-	try_module_get(THIS_MODULE);
+-
+ 	cfg = kzalloc(sizeof(*cfg), GFP_NOFS);
+ 	if (!cfg) {
+ 		err = -ENOMEM;
+@@ -1252,9 +1250,6 @@ void ll_put_super(struct super_block *sb)
+ 	ll_common_put_super(sb);
+ 
+ 	cl_env_cache_purge(~0);
+-
+-	module_put(THIS_MODULE);
+-
+ } /* client_put_super */
+ 
+ struct inode *ll_inode_from_resource_lock(struct ldlm_lock *lock)
+diff --git a/fs/lustre/llite/super25.c b/fs/lustre/llite/super25.c
+index e3194a5..1b074a6 100644
+--- a/fs/lustre/llite/super25.c
++++ b/fs/lustre/llite/super25.c
+@@ -32,6 +32,7 @@
+  */
+ 
+ #define DEBUG_SUBSYSTEM S_LLITE
++
+ #define D_MOUNT (D_SUPER | D_CONFIG/*|D_WARNING */)
+ 
+ #include <linux/module.h>
+@@ -95,11 +96,12 @@ static int ll_drop_inode(struct inode *inode)
+ 	.show_options		= ll_show_options,
+ };
+ 
+-/** This is the entry point for the mount call into Lustre.
++/**
++ * This is the entry point for the mount call into Lustre.
+  * This is called when a server or client is mounted,
+  * and this is where we start setting things up.
+  *
+- * @data:	Mount options (e.g. -o flock,abort_recov)
++ * @lmd2data	Mount options (e.g. -o flock,abort_recov)
+  */
+ static int lustre_fill_super(struct super_block *sb, void *lmd2_data,
+ 			     int silent)
+@@ -132,30 +134,30 @@ static int lustre_fill_super(struct super_block *sb, void *lmd2_data,
+ 		goto out_put_lsi;
+ 	}
+ 
+-	if (lmd_is_client(lmd)) {
+-		CDEBUG(D_MOUNT, "Mounting client %s\n", lmd->lmd_profile);
+-
+-		rc = ptlrpc_inc_ref();
+-		if (rc)
+-			goto out_put_lsi;
+-		rc = lustre_start_mgc(sb);
+-		if (rc) {
+-			/* This will put_lsi and ptlrpc_dec_ref */
+-			ll_common_put_super(sb);
+-			goto out;
+-		}
+-		/* Connect and start */
+-		rc = ll_fill_super(sb);
+-		/*
+-		 * c_f_s will call ll_common_put_super on failure, otherwise
+-		 * c_f_s will have taken another reference to the module
+-		 */
+-	} else {
+-		CERROR("This is client-side-only module, cannot handle server mount.\n");
+-		rc = -EINVAL;
++	if (!lmd_is_client(lmd)) {
++		rc = -ENODEV;
++		CERROR("%s: This is client-side-only module, cannot handle server mount: rc = %d\n",
++		       lmd->lmd_profile, rc);
++		goto out_put_lsi;
+ 	}
+ 
+-	/* If error happens in fill_super() call, @lsi will be killed there.
++	CDEBUG(D_MOUNT, "Mounting client %s\n", lmd->lmd_profile);
++	rc = ptlrpc_inc_ref();
++	if (rc)
++		goto out_put_lsi;
++
++	rc = lustre_start_mgc(sb);
++	if (rc) {
++		/* This will put_lsi and ptlrpc_dec_ref */
++		ll_common_put_super(sb);
++		goto out;
++	}
++	/* Connect and start */
++	rc = ll_fill_super(sb);
++	/* ll_file_super will call lustre_common_put_super on failure,
++	 * which takes care of the module reference.
++	 *
++	 * If error happens in fill_super() call, @lsi will be killed there.
+ 	 * This is why we do not put it here.
+ 	 */
+ 	goto out;
+@@ -163,10 +165,10 @@ static int lustre_fill_super(struct super_block *sb, void *lmd2_data,
+ 	lustre_put_lsi(sb);
+ out:
+ 	if (rc) {
+-		CERROR("Unable to mount %s (%d)\n",
+-		       s2lsi(sb) ? lmd->lmd_dev : "", rc);
++		CERROR("llite: Unable to mount %s: rc = %d\n",
++		       s2lsi(sb) ? lmd->lmd_dev : "<unknown>", rc);
+ 	} else {
+-		CDEBUG(D_SUPER, "Mount %s complete\n",
++		CDEBUG(D_SUPER, "%s: Mount complete\n",
+ 		       lmd->lmd_dev);
+ 	}
+ 	lockdep_on();
+@@ -268,10 +270,12 @@ static int __init lustre_init(void)
+ 
+ 	rc = register_filesystem(&lustre_fs_type);
+ 	if (rc)
+-		goto out_inode_fini_env;
++		goto out_xattr;
+ 
+ 	return 0;
+ 
++out_xattr:
++	ll_xattr_fini();
+ out_inode_fini_env:
+ 	cl_env_put(cl_inode_fini_env, &cl_inode_fini_refcheck);
+ out_vvp:
+diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
+index 76664bf..38b8967 100644
+--- a/fs/lustre/obdclass/class_obd.c
++++ b/fs/lustre/obdclass/class_obd.c
+@@ -719,12 +719,14 @@ static int __init obdclass_init(void)
+ 	/* simulate a late OOM situation now to require all
+ 	 * alloc'ed/initialized resources to be freed
+ 	 */
+-	if (!OBD_FAIL_CHECK(OBD_FAIL_OBDCLASS_MODULE_LOAD))
+-		return 0;
+-
+-	/* force error to ensure module will be unloaded/cleaned */
+-	err = -ENOMEM;
++	if (OBD_FAIL_CHECK(OBD_FAIL_OBDCLASS_MODULE_LOAD)) {
++		/* force error to ensure module will be unloaded/cleaned */
++		err = -ENOMEM;
++		goto cleanup_all;
++	}
++	return 0;
+ 
++cleanup_all:
+ 	llog_info_fini();
+ 
+ cleanup_cl_global:
+@@ -748,9 +750,6 @@ static int __init obdclass_init(void)
+ cleanup_zombie_impexp:
+ 	obd_zombie_impexp_stop();
+ 
+-	if (err)
+-		return err;
+-
+ 	return err;
  }
  
-+/* Discovering this peer is taking too long. Cancel any Ping or Push
-+ * that discovery is waiting on by unlinking the relevant MDs. The
-+ * lnet_discovery_event_handler() will proceed from here and complete
-+ * the cleanup.
-+ */
-+static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
-+{
-+	struct lnet_handle_md ping_mdh;
-+	struct lnet_handle_md push_mdh;
-+
-+	LNetInvalidateMDHandle(&ping_mdh);
-+	LNetInvalidateMDHandle(&push_mdh);
-+
-+	spin_lock(&lp->lp_lock);
-+	if (lp->lp_state & LNET_PEER_PING_SENT) {
-+		ping_mdh = lp->lp_ping_mdh;
-+		LNetInvalidateMDHandle(&lp->lp_ping_mdh);
-+	}
-+	if (lp->lp_state & LNET_PEER_PUSH_SENT) {
-+		push_mdh = lp->lp_push_mdh;
-+		LNetInvalidateMDHandle(&lp->lp_push_mdh);
-+	}
-+	spin_unlock(&lp->lp_lock);
-+
-+	if (!LNetMDHandleIsInvalid(ping_mdh))
-+		LNetMDUnlink(ping_mdh);
-+	if (!LNetMDHandleIsInvalid(push_mdh))
-+		LNetMDUnlink(push_mdh);
-+}
-+
- static int
- lnet_peer_del(struct lnet_peer *peer)
- {
-+	lnet_peer_cancel_discovery(peer);
- 	lnet_net_lock(LNET_LOCK_EX);
- 	lnet_peer_del_locked(peer);
- 	lnet_net_unlock(LNET_LOCK_EX);
-@@ -2955,6 +2990,10 @@ static int lnet_peer_deletion(struct lnet_peer *lp)
- 	CDEBUG(D_NET, "peer %s(%p) state %#x\n",
- 	       libcfs_nid2str(lp->lp_primary_nid), lp, lp->lp_state);
- 
-+	/* no-op if lnet_peer_del() has already been called on this peer */
-+	if (lp->lp_state & LNET_PEER_MARK_DELETED)
-+		return 0;
-+
- 	if (the_lnet.ln_dc_state != LNET_DC_STATE_RUNNING)
- 		return -ESHUTDOWN;
- 
-@@ -3382,37 +3421,6 @@ static void lnet_peer_discovery_error(struct lnet_peer *lp, int error)
- }
- 
- /*
-- * Discovering this peer is taking too long. Cancel any Ping or Push
-- * that discovery is waiting on by unlinking the relevant MDs. The
-- * lnet_discovery_event_handler() will proceed from here and complete
-- * the cleanup.
-- */
--static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
--{
--	struct lnet_handle_md ping_mdh;
--	struct lnet_handle_md push_mdh;
--
--	LNetInvalidateMDHandle(&ping_mdh);
--	LNetInvalidateMDHandle(&push_mdh);
--
--	spin_lock(&lp->lp_lock);
--	if (lp->lp_state & LNET_PEER_PING_SENT) {
--		ping_mdh = lp->lp_ping_mdh;
--		LNetInvalidateMDHandle(&lp->lp_ping_mdh);
--	}
--	if (lp->lp_state & LNET_PEER_PUSH_SENT) {
--		push_mdh = lp->lp_push_mdh;
--		LNetInvalidateMDHandle(&lp->lp_push_mdh);
--	}
--	spin_unlock(&lp->lp_lock);
--
--	if (!LNetMDHandleIsInvalid(ping_mdh))
--		LNetMDUnlink(ping_mdh);
--	if (!LNetMDHandleIsInvalid(push_mdh))
--		LNetMDUnlink(push_mdh);
--}
--
--/*
-  * Wait for work to be queued or some other change that must be
-  * attended to. Returns non-zero if the discovery thread should shut
-  * down.
-@@ -3566,7 +3574,8 @@ static int lnet_peer_discovery(void *arg)
- 			CDEBUG(D_NET, "peer %s(%p) state %#x\n",
- 			       libcfs_nid2str(lp->lp_primary_nid), lp,
- 			       lp->lp_state);
--			if (lp->lp_state & LNET_PEER_MARK_DELETION)
-+			if (lp->lp_state & (LNET_PEER_MARK_DELETION |
-+					    LNET_PEER_MARK_DELETED))
- 				rc = lnet_peer_deletion(lp);
- 			else if (lp->lp_state & LNET_PEER_DATA_PRESENT)
- 				rc = lnet_peer_data_present(lp);
 -- 
 1.8.3.1
 
