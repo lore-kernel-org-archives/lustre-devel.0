@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 542F0C433ED
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FDE0C433ED
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:19 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5724B60230
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:16 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5724B60230
+	by mail.kernel.org (Postfix) with ESMTPS id ED05C60230
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:18 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED05C60230
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4FE4732F4D6;
-	Wed, 14 Apr 2021 21:03:06 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CEF4532F766;
+	Wed, 14 Apr 2021 21:03:07 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 56B1C32F493
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:50 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 436D732F3FA
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:48 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 66EA1100F34D;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5898A100F335;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 643BE91890; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id 4D22291891; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:02:04 -0400
-Message-Id: <1618459361-17909-13-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:01:57 -0400
+Message-Id: <1618459361-17909-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/49] lustre: fixup ldlm_pool and lu_object
- shrinker failure cases
+Subject: [lustre-devel] [PATCH 05/49] lnet: Prevent discovery on peer marked
+ deletion
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,174 +50,168 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Chris Horn <chris.horn@hpe.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Chris Horn <chris.horn@hpe.com>
 
-For ldlm_pools, ldlm_pools_fini() can be called when ldlm_pools_init()
-fails, or even in case where it hasn't been called.  So add a static
-flag to ensure we ldlm_pools_fini() does undo things that haven't been
-done.
+If a peer has been marked for deletion then we needn't perform any
+other discovery operation on it. Integrate this peer state into the
+top level of the discovery state machine so that it is checked before
+any other state.
 
-For lu_global_init() we need to add proper cleanup if anything fails.
-
-Fixes: ab33cb5ad1e57 ("drivers: lustre: obdclass: check result of register_shrinker()")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12477
-Lustre-commit: 812b2ccf0284df42 ("LU-12477 lustre: check return status of register_shrinker()")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/40883
-Reviewed-by: Yang Sheng <ys@whamcloud.com>
+HPE-bug-id: LUS-9192
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13895
+Lustre-commit: aa7de0af6969df77 ("LU-13895 lnet: Prevent discovery on peer marked deletion")
+Signed-off-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-on: https://review.whamcloud.com/39604
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ldlm/ldlm_pool.c     | 43 +++++++++++++++++++-----------------------
- fs/lustre/obdclass/lu_object.c | 39 +++++++++++++++++++-------------------
- 2 files changed, 38 insertions(+), 44 deletions(-)
+ net/lnet/lnet/peer.c | 109 ++++++++++++++++++++++++++++++---------------------
+ 1 file changed, 65 insertions(+), 44 deletions(-)
 
-diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
-index 2e4d16b..b93ad4d 100644
---- a/fs/lustre/ldlm/ldlm_pool.c
-+++ b/fs/lustre/ldlm/ldlm_pool.c
-@@ -889,6 +889,12 @@ static unsigned long ldlm_pools_cli_scan(struct shrinker *s,
- 			       sc->gfp_mask);
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 8ee5ec3..48f78ef 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -2934,6 +2934,68 @@ static bool lnet_is_nid_in_ping_info(lnet_nid_t nid,
+ 	return false;
  }
  
-+static struct shrinker ldlm_pools_cli_shrinker = {
-+	.count_objects	= ldlm_pools_cli_count,
-+	.scan_objects	= ldlm_pools_cli_scan,
-+	.seeks		= DEFAULT_SEEKS,
-+};
++/* Delete a peer that has been marked for deletion. NB: when this peer was added
++ * to the discovery queue a reference was taken that will prevent the peer from
++ * actually being freed by this function. After this function exits the
++ * discovery thread should call lnet_peer_discovery_complete() which will
++ * drop that reference as well as wake any waiters that may also be holding a
++ * ref on the peer
++ */
++static int lnet_peer_deletion(struct lnet_peer *lp)
++__must_hold(&lp->lp_lock)
++{
++	struct list_head rlist;
++	struct lnet_route *route, *tmp;
++	int sensitivity = lp->lp_health_sensitivity;
 +
- static void ldlm_pools_recalc(struct work_struct *ws);
- static DECLARE_DELAYED_WORK(ldlm_recalc_pools, ldlm_pools_recalc);
- 
-@@ -976,40 +982,29 @@ static void ldlm_pools_recalc(struct work_struct *ws)
- 	schedule_delayed_work(&ldlm_recalc_pools, delay * HZ);
- }
- 
--static int ldlm_pools_thread_start(void)
--{
--	time64_t delay = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
--
--	schedule_delayed_work(&ldlm_recalc_pools, delay);
--
--	return 0;
--}
--
--static void ldlm_pools_thread_stop(void)
--{
--	cancel_delayed_work_sync(&ldlm_recalc_pools);
--}
--
--static struct shrinker ldlm_pools_cli_shrinker = {
--	.count_objects	= ldlm_pools_cli_count,
--	.scan_objects	= ldlm_pools_cli_scan,
--	.seeks		= DEFAULT_SEEKS,
--};
-+static bool ldlm_pools_init_done;
- 
- int ldlm_pools_init(void)
- {
-+	time64_t delay = LDLM_POOL_CLI_DEF_RECALC_PERIOD;
- 	int rc;
- 
--	rc = ldlm_pools_thread_start();
--	if (!rc)
--		rc = register_shrinker(&ldlm_pools_cli_shrinker);
-+	rc = register_shrinker(&ldlm_pools_cli_shrinker);
-+	if (rc)
-+		goto out;
- 
-+	schedule_delayed_work(&ldlm_recalc_pools, delay);
-+	ldlm_pools_init_done = true;
-+out:
- 	return rc;
- }
- 
- void ldlm_pools_fini(void)
- {
--	unregister_shrinker(&ldlm_pools_cli_shrinker);
-+	if (ldlm_pools_init_done) {
-+		unregister_shrinker(&ldlm_pools_cli_shrinker);
- 
--	ldlm_pools_thread_stop();
-+		cancel_delayed_work_sync(&ldlm_recalc_pools);
++	INIT_LIST_HEAD(&rlist);
++
++	lp->lp_state &= ~(LNET_PEER_DISCOVERING | LNET_PEER_FORCE_PING |
++			  LNET_PEER_FORCE_PUSH);
++	CDEBUG(D_NET, "peer %s(%p) state %#x\n",
++	       libcfs_nid2str(lp->lp_primary_nid), lp, lp->lp_state);
++
++	if (the_lnet.ln_dc_state != LNET_DC_STATE_RUNNING)
++		return -ESHUTDOWN;
++
++	spin_unlock(&lp->lp_lock);
++
++	mutex_lock(&the_lnet.ln_api_mutex);
++
++	lnet_net_lock(LNET_LOCK_EX);
++	/* remove the peer from the discovery work
++	 * queue if it's on there in preparation
++	 * of deleting it.
++	 */
++	if (!list_empty(&lp->lp_dc_list))
++		list_del(&lp->lp_dc_list);
++	list_for_each_entry_safe(route, tmp,
++				 &lp->lp_routes,
++				 lr_gwlist)
++		lnet_move_route(route, NULL, &rlist);
++	lnet_net_unlock(LNET_LOCK_EX);
++
++	/* lnet_peer_del() deletes all the peer NIs owned by this peer */
++	lnet_peer_del(lp);
++
++	list_for_each_entry_safe(route, tmp,
++				 &rlist, lr_list) {
++		/* re-add these routes */
++		lnet_add_route(route->lr_net,
++			       route->lr_hops,
++			       route->lr_nid,
++			       route->lr_priority,
++			       sensitivity);
++		kfree(route);
 +	}
- }
 +
-diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
-index e8fc328..fcf0739 100644
---- a/fs/lustre/obdclass/lu_object.c
-+++ b/fs/lustre/obdclass/lu_object.c
-@@ -2138,10 +2138,8 @@ int lu_global_init(void)
++	mutex_unlock(&the_lnet.ln_api_mutex);
++
++	spin_lock(&lp->lp_lock);
++
++	return 0;
++}
++
+ /*
+  * Update a peer using the data received.
+  */
+@@ -3504,7 +3566,9 @@ static int lnet_peer_discovery(void *arg)
+ 			CDEBUG(D_NET, "peer %s(%p) state %#x\n",
+ 			       libcfs_nid2str(lp->lp_primary_nid), lp,
+ 			       lp->lp_state);
+-			if (lp->lp_state & LNET_PEER_DATA_PRESENT)
++			if (lp->lp_state & LNET_PEER_MARK_DELETION)
++				rc = lnet_peer_deletion(lp);
++			else if (lp->lp_state & LNET_PEER_DATA_PRESENT)
+ 				rc = lnet_peer_data_present(lp);
+ 			else if (lp->lp_state & LNET_PEER_PING_FAILED)
+ 				rc = lnet_peer_ping_failed(lp);
+@@ -3536,49 +3600,6 @@ static int lnet_peer_discovery(void *arg)
+ 				lnet_peer_discovery_complete(lp);
+ 			if (the_lnet.ln_dc_state == LNET_DC_STATE_STOPPING)
+ 				break;
+-
+-			if (lp->lp_state & LNET_PEER_MARK_DELETION) {
+-				struct list_head rlist;
+-				struct lnet_route *route, *tmp;
+-				int sensitivity = lp->lp_health_sensitivity;
+-
+-				INIT_LIST_HEAD(&rlist);
+-
+-				/* remove the peer from the discovery work
+-				 * queue if it's on there in preparation
+-				 * of deleting it.
+-				 */
+-				if (!list_empty(&lp->lp_dc_list))
+-					list_del(&lp->lp_dc_list);
+-
+-				lnet_net_unlock(LNET_LOCK_EX);
+-
+-				mutex_lock(&the_lnet.ln_api_mutex);
+-
+-				lnet_net_lock(LNET_LOCK_EX);
+-				list_for_each_entry_safe(route, tmp,
+-							 &lp->lp_routes,
+-							 lr_gwlist)
+-					lnet_move_route(route, NULL, &rlist);
+-				lnet_net_unlock(LNET_LOCK_EX);
+-
+-				/* delete the peer */
+-				lnet_peer_del(lp);
+-
+-				list_for_each_entry_safe(route, tmp,
+-							 &rlist, lr_list) {
+-					/* re-add these routes */
+-					lnet_add_route(route->lr_net,
+-						       route->lr_hops,
+-						       route->lr_nid,
+-						       route->lr_priority,
+-						       sensitivity);
+-					kfree(route);
+-				}
+-				mutex_unlock(&the_lnet.ln_api_mutex);
+-
+-				lnet_net_lock(LNET_LOCK_EX);
+-			}
+ 		}
  
- 	LU_CONTEXT_KEY_INIT(&lu_global_key);
- 	result = lu_context_key_register(&lu_global_key);
--	if (result != 0) {
--		lu_ref_global_fini();
--		return result;
--	}
-+	if (result != 0)
-+		goto out_lu_ref;
- 
- 	/*
- 	 * At this level, we don't know what tags are needed, so allocate them
-@@ -2153,8 +2151,7 @@ int lu_global_init(void)
- 	up_write(&lu_sites_guard);
- 	if (result != 0) {
- 		lu_context_key_degister(&lu_global_key);
--		lu_ref_global_fini();
--		return result;
-+		goto out_lu_ref;
- 	}
- 
- 	/*
-@@ -2163,23 +2160,25 @@ int lu_global_init(void)
- 	 * lu_object/inode cache consuming all the memory.
- 	 */
- 	result = register_shrinker(&lu_site_shrinker);
--	if (result == 0) {
--		result = rhashtable_init(&lu_env_rhash, &lu_env_rhash_params);
--		if (result != 0)
--			unregister_shrinker(&lu_site_shrinker);
--	}
--	if (result != 0) {
--		/* Order explained in lu_global_fini(). */
--		lu_context_key_degister(&lu_global_key);
-+	if (result)
-+		goto out_env;
- 
--		down_write(&lu_sites_guard);
--		lu_env_fini(&lu_shrink_env);
--		up_write(&lu_sites_guard);
-+	result = rhashtable_init(&lu_env_rhash, &lu_env_rhash_params);
-+	if (result)
-+		goto out_shrinker;
- 
--		lu_ref_global_fini();
--		return result;
--	}
-+	return result;
- 
-+out_shrinker:
-+	unregister_shrinker(&lu_site_shrinker);
-+out_env:
-+	/* Order explained in lu_global_fini(). */
-+	lu_context_key_degister(&lu_global_key);
-+	down_write(&lu_sites_guard);
-+	lu_env_fini(&lu_shrink_env);
-+	up_write(&lu_sites_guard);
-+out_lu_ref:
-+	lu_ref_global_fini();
- 	return result;
- }
- 
+ 		lnet_net_unlock(LNET_LOCK_EX);
 -- 
 1.8.3.1
 
