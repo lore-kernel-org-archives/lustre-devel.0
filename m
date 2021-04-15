@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D84C7C433B4
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A986BC433ED
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:51 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 934F7610CB
-	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:47 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 934F7610CB
+	by mail.kernel.org (Postfix) with ESMTPS id 550F1610CB
+	for <lustre-devel@archiver.kernel.org>; Thu, 15 Apr 2021 04:03:51 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 550F1610CB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A68F332F902;
-	Wed, 14 Apr 2021 21:03:23 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A9085247A5E;
+	Wed, 14 Apr 2021 21:03:25 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4B1C332F509
- for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:52 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 60DEE32F65E
+ for <lustre-devel@lists.lustre.org>; Wed, 14 Apr 2021 21:02:56 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 7B0B4100F354;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A6ED0100F362;
  Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 79DA391883; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
+ id A5C3F9188E; Thu, 15 Apr 2021 00:02:45 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 15 Apr 2021 00:02:11 -0400
-Message-Id: <1618459361-17909-20-git-send-email-jsimmons@infradead.org>
+Date: Thu, 15 Apr 2021 00:02:25 -0400
+Message-Id: <1618459361-17909-34-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
 References: <1618459361-17909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 19/49] lustre: mds: add enums for MDS_ATTR
- flags
+Subject: [lustre-devel] [PATCH 33/49] lustre: quota: call rhashtable_lookup
+ near params decl
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -57,116 +57,103 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-Add mds_attr_flags to the code to make it easier to follow the logic.
+rhashtable_lookup() is an inline function which depends - for
+performancs - on the 'rhashtable_params' being visible and
+consnt.  So it should only be called in the same file that
+declared the params.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12885
-Lustre-commit: 6c6b8cb972ac92c0 ("LU-12885 mds: add enums for MDS_ATTR flags")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33512
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+recent patch make pools_hash_params an external variable and calls
+rhashtable_lookup from a separate file, which will break the
+optimisation.
+
+So add lov_pool_find() and use it to maintainer optimization.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13359
+Fixes: 226a0a32c6b3 ("lustre: quota: make used for pool correct")
+Lustre-commit: 1d116c8ff68fc784 ("LU-13359 quota: call rhashtable_lookup near params decl")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/39676
 Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Sergey Cheremencev <sergey.cheremencev@hpe.com>
+Reviewed-by: Petros Koutoupis <petros.koutoupis@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_lib.c                | 10 +++++---
- include/uapi/linux/lustre/lustre_idl.h | 46 ++++++++++++++++++----------------
- 2 files changed, 30 insertions(+), 26 deletions(-)
+ fs/lustre/lov/lov_internal.h |  4 ++--
+ fs/lustre/lov/lov_obd.c      |  8 +-------
+ fs/lustre/lov/lov_pool.c     | 18 +++++++++++++++++-
+ 3 files changed, 20 insertions(+), 10 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
-index 6cb14c1..9251aec 100644
---- a/fs/lustre/mdc/mdc_lib.c
-+++ b/fs/lustre/mdc/mdc_lib.c
-@@ -325,9 +325,10 @@ void mdc_open_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
- 	set_mrc_cr_flags(rec, cr_flags);
+diff --git a/fs/lustre/lov/lov_internal.h b/fs/lustre/lov/lov_internal.h
+index d26e68b..e58235a 100644
+--- a/fs/lustre/lov/lov_internal.h
++++ b/fs/lustre/lov/lov_internal.h
+@@ -380,6 +380,6 @@ static inline void lov_lsm2layout(struct lov_stripe_md *lsm,
+ 	}
  }
  
--static inline u64 attr_pack(unsigned int ia_valid, enum op_xvalid ia_xvalid)
-+static inline enum mds_attr_flags mdc_attr_pack(unsigned int ia_valid,
-+						enum op_xvalid ia_xvalid)
- {
--	u64 sa_valid = 0;
-+	enum mds_attr_flags sa_valid = 0;
+-extern const struct rhashtable_params pools_hash_params;
+-extern void lov_pool_putref(struct pool_desc *pool);
++struct pool_desc *lov_pool_find(struct obd_device *obd, char *poolname);
++void lov_pool_putref(struct pool_desc *pool);
+ #endif
+diff --git a/fs/lustre/lov/lov_obd.c b/fs/lustre/lov/lov_obd.c
+index 95fcd57..29b0645 100644
+--- a/fs/lustre/lov/lov_obd.c
++++ b/fs/lustre/lov/lov_obd.c
+@@ -1235,13 +1235,7 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
+ 	}
  
- 	if (ia_valid & ATTR_MODE)
- 		sa_valid |= MDS_ATTR_MODE;
-@@ -370,6 +371,7 @@ static inline u64 attr_pack(unsigned int ia_valid, enum op_xvalid ia_xvalid)
- 		sa_valid |= MDS_ATTR_LSIZE;
- 	if (ia_xvalid & OP_XVALID_LAZYBLOCKS)
- 		sa_valid |= MDS_ATTR_LBLOCKS;
+ 	if (oqctl->qc_cmd == LUSTRE_Q_GETQUOTAPOOL) {
+-		rcu_read_lock();
+-		pool = rhashtable_lookup(&lov->lov_pools_hash_body,
+-					 oqctl->qc_poolname,
+-					 pools_hash_params);
+-		if (pool && !atomic_inc_not_zero(&pool->pool_refcount))
+-			pool = NULL;
+-		rcu_read_unlock();
++		pool = lov_pool_find(obd, oqctl->qc_poolname);
+ 		if (!pool)
+ 			return -ENOENT;
+ 		/* Set Q_GETOQUOTA back as targets report it's own
+diff --git a/fs/lustre/lov/lov_pool.c b/fs/lustre/lov/lov_pool.c
+index de8aed9..8fbc6ee 100644
+--- a/fs/lustre/lov/lov_pool.c
++++ b/fs/lustre/lov/lov_pool.c
+@@ -63,7 +63,7 @@ static int pool_cmpfn(struct rhashtable_compare_arg *arg, const void *obj)
+ 	return strcmp(pool_name, pool->pool_name);
+ }
+ 
+-const struct rhashtable_params pools_hash_params = {
++static const struct rhashtable_params pools_hash_params = {
+ 	.key_len	= 1, /* actually variable */
+ 	.key_offset	= offsetof(struct pool_desc, pool_name),
+ 	.head_offset	= offsetof(struct pool_desc, pool_hash),
+@@ -317,6 +317,22 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
+ 	return rc;
+ }
+ 
++struct pool_desc *lov_pool_find(struct obd_device *obd, char *poolname)
++{
++	struct pool_desc *pool;
++	struct lov_obd *lov = &obd->u.lov;
 +
- 	return sa_valid;
- }
- 
-@@ -383,8 +385,8 @@ static void mdc_setattr_pack_rec(struct mdt_rec_setattr *rec,
- 	rec->sa_suppgid = -1;
- 
- 	rec->sa_fid = op_data->op_fid1;
--	rec->sa_valid  = attr_pack(op_data->op_attr.ia_valid,
--				   op_data->op_xvalid);
-+	rec->sa_valid  = mdc_attr_pack(op_data->op_attr.ia_valid,
-+				       op_data->op_xvalid);
- 	rec->sa_mode = op_data->op_attr.ia_mode;
- 	rec->sa_uid = from_kuid(&init_user_ns, op_data->op_attr.ia_uid);
- 	rec->sa_gid = from_kgid(&init_user_ns, op_data->op_attr.ia_gid);
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 3a33657..b0c6191 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1683,28 +1683,30 @@ struct mdt_rec_setattr {
-  * since the client and MDS may run different kernels (see bug 13828)
-  * Therefore, we should only use MDS_ATTR_* attributes for sa_valid.
-  */
--#define MDS_ATTR_MODE		   0x1ULL /* = 1 */
--#define MDS_ATTR_UID		   0x2ULL /* = 2 */
--#define MDS_ATTR_GID		   0x4ULL /* = 4 */
--#define MDS_ATTR_SIZE		   0x8ULL /* = 8 */
--#define MDS_ATTR_ATIME		  0x10ULL /* = 16 */
--#define MDS_ATTR_MTIME		  0x20ULL /* = 32 */
--#define MDS_ATTR_CTIME		  0x40ULL /* = 64 */
--#define MDS_ATTR_ATIME_SET	  0x80ULL /* = 128 */
--#define MDS_ATTR_MTIME_SET	 0x100ULL /* = 256 */
--#define MDS_ATTR_FORCE		 0x200ULL /* = 512, Not a change, but a change it */
--#define MDS_ATTR_ATTR_FLAG	 0x400ULL /* = 1024 */
--#define MDS_ATTR_KILL_SUID	 0x800ULL /* = 2048 */
--#define MDS_ATTR_KILL_SGID	0x1000ULL /* = 4096 */
--#define MDS_ATTR_CTIME_SET	0x2000ULL /* = 8192 */
--#define MDS_ATTR_FROM_OPEN	0x4000ULL /* = 16384, called from open path,
--					   * ie O_TRUNC
--					   */
--#define MDS_ATTR_BLOCKS		0x8000ULL  /* = 32768 */
--#define MDS_ATTR_PROJID		0x10000ULL /* = 65536 */
--#define MDS_ATTR_LSIZE		0x20000ULL /* = 131072 */
--#define MDS_ATTR_LBLOCKS	0x40000ULL /* = 262144 */
--#define MDS_ATTR_OVERRIDE	0x2000000ULL /* = 33554432 */
-+enum mds_attr_flags {
-+	MDS_ATTR_MODE =		      0x1ULL, /* = 1 */
-+	MDS_ATTR_UID =		      0x2ULL, /* = 2 */
-+	MDS_ATTR_GID =		      0x4ULL, /* = 4 */
-+	MDS_ATTR_SIZE =		      0x8ULL, /* = 8 */
-+	MDS_ATTR_ATIME =	     0x10ULL, /* = 16 */
-+	MDS_ATTR_MTIME =	     0x20ULL, /* = 32 */
-+	MDS_ATTR_CTIME =	     0x40ULL, /* = 64 */
-+	MDS_ATTR_ATIME_SET =	     0x80ULL, /* = 128 */
-+	MDS_ATTR_MTIME_SET =	    0x100ULL, /* = 256 */
-+	MDS_ATTR_FORCE =	    0x200ULL, /* = 512, Not a change, but a change it */
-+	MDS_ATTR_ATTR_FLAG =	    0x400ULL, /* = 1024 */
-+	MDS_ATTR_KILL_SUID =	    0x800ULL, /* = 2048 */
-+	MDS_ATTR_KILL_SGID =	   0x1000ULL, /* = 4096 */
-+	MDS_ATTR_CTIME_SET =	   0x2000ULL, /* = 8192 */
-+	MDS_ATTR_FROM_OPEN =	   0x4000ULL, /* = 16384, called from open path,
-+					       * ie O_TRUNC
-+					       */
-+	MDS_ATTR_BLOCKS =	   0x8000ULL, /* = 32768 */
-+	MDS_ATTR_PROJID	=	  0x10000ULL, /* = 65536 */
-+	MDS_ATTR_LSIZE =	  0x20000ULL, /* = 131072 */
-+	MDS_ATTR_LBLOCKS =	  0x40000ULL, /* = 262144 */
-+	MDS_ATTR_OVERRIDE =	0x2000000ULL, /* = 33554432 */
-+};
- 
- enum mds_op_bias {
- /*	MDS_CHECK_SPLIT		= 1 << 0, obsolete before 2.3.58 */
++	rcu_read_lock();
++	pool = rhashtable_lookup(&lov->lov_pools_hash_body,
++				 poolname,
++				 pools_hash_params);
++	if (pool && !atomic_inc_not_zero(&pool->pool_refcount))
++		pool = NULL;
++	rcu_read_unlock();
++
++	return pool;
++}
++
+ int lov_pool_del(struct obd_device *obd, char *poolname)
+ {
+ 	struct lov_obd *lov;
 -- 
 1.8.3.1
 
