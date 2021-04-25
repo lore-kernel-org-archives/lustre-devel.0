@@ -2,42 +2,42 @@ Return-Path: <SRS0=Gt0B=JW=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
+X-Spam-Status: No, score=-13.9 required=3.0 tests=BAYES_00,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_CR_TRAILER,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,UNWANTED_LANGUAGE_BODY,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4253FC433B4
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBF7CC433ED
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:09 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3522611CC
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:05 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3522611CC
+	by mail.kernel.org (Postfix) with ESMTPS id ADF7E611ED
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:09 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADF7E611ED
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id F407F21F7B5;
-	Sun, 25 Apr 2021 13:09:33 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 43CE921F8A5;
+	Sun, 25 Apr 2021 13:09:37 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0470E21F7DB
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E94E721F7E9
  for <lustre-devel@lists.lustre.org>; Sun, 25 Apr 2021 13:08:48 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 3FFF210087D2;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 4EA2010087D5;
  Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 3DC4269A63; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
+ id 4D4E569A63; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 25 Apr 2021 16:08:30 -0400
-Message-Id: <1619381316-7719-24-git-send-email-jsimmons@infradead.org>
+Date: Sun, 25 Apr 2021 16:08:33 -0400
+Message-Id: <1619381316-7719-27-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
 References: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 23/29] lustre: ldlm: discard l_lock from
- struct ldlm_lock.
+Subject: [lustre-devel] [PATCH 26/29] lustre: fallocate: Add punch mode to
+ fallocate
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,288 +50,297 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Arshad Hussain <arshad.hussain@aeoncomputing.com>,
+ Mikhail Pershin <mpershin@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 
-This spinlock (l_lock) is only used to stablise the l_resource
-pointer while taking a spinlock on the resource.
+This patch adds fallocate(2) punch operation
+(FALLOCATE_FL_PUNCH_HOLE) mode support for ldiskfs backend
+OSD and for OSC/OST
 
-This is not necessary - it is sufficient to take the resource
-spinlock, and then check if l_resource has changed or not.  If it
-hasn't then it cannot change until the resource spinlock is dropped.
-
-We must ensure this is safe even if the resource is freed before
-lock_res_and_lock() managed to get the lock.  To do this we mark the
-slab as SLAB_TYPESAFE_BY_RCU and initialise the lock in an
-init_once() function, but not on every allocate (and specifically
-don't zero the whole struct on each allocation). This means that if
-we find a resource after taking the RCU read lock, then it is always
-safe to take and then drop the spinlock. After taking the spinlock,
-we can check if it is more generally safe to use.
-
-Discarding l_lock shrinks 'struct ldlm_lock' which helps save memory.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-4801
-Lustre-commit: bb6edb7b8eeec65f4 ("LU-4801 ldlm: discard l_lock from struct ldlm_lock.")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/39811
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14160
+Lustre-commit: cb037f305c64cd512 ("LU-14160 fallocate: Add punch mode to fallocate")
+Signed-off-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/40877
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_dlm.h | 17 +++++++++--------
- fs/lustre/ldlm/l_lock.c        | 27 +++++++++++++++------------
- fs/lustre/ldlm/ldlm_lock.c     | 28 ++++++++++++++--------------
- fs/lustre/ldlm/ldlm_lockd.c    | 22 +++++++++++++++++++++-
- fs/lustre/ldlm/ldlm_resource.c | 12 +++++-------
- 5 files changed, 64 insertions(+), 42 deletions(-)
+ fs/lustre/include/cl_object.h |  1 -
+ fs/lustre/llite/file.c        | 43 ++++++++++++++-------------
+ fs/lustre/mdc/mdc_dev.c       |  3 ++
+ fs/lustre/osc/osc_io.c        | 68 +++++++++++++++++++++++++------------------
+ fs/lustre/osc/osc_request.c   |  7 -----
+ 5 files changed, 65 insertions(+), 57 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index f1828df..1fc199b 100644
---- a/fs/lustre/include/lustre_dlm.h
-+++ b/fs/lustre/include/lustre_dlm.h
-@@ -649,13 +649,10 @@ struct ldlm_lock {
- 	 */
- 	struct portals_handle		l_handle;
- 	/**
--	 * Internal spinlock protects l_resource.  We should hold this lock
--	 * first before taking res_lock.
--	 */
--	spinlock_t			l_lock;
--	/**
- 	 * Pointer to actual resource this lock is in.
--	 * ldlm_lock_change_resource() can change this.
-+	 * ldlm_lock_change_resource() can change this on the client.
-+	 * When this is possible, rcu must be used to stablise
-+	 * the resource while we lock and check it hasn't been changed.
- 	 */
- 	struct ldlm_resource		*l_resource;
- 	/**
-@@ -889,9 +886,13 @@ struct ldlm_resource {
+diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
+index 3926aac..b69c04a 100644
+--- a/fs/lustre/include/cl_object.h
++++ b/fs/lustre/include/cl_object.h
+@@ -1876,7 +1876,6 @@ struct cl_io {
+ 			/* The following are used for fallocate(2) */
+ 			int			sa_falloc_mode;
+ 			loff_t			sa_falloc_offset;
+-			loff_t			sa_falloc_len;
+ 			loff_t			sa_falloc_end;
+ 		} ci_setattr;
+ 		struct cl_data_version_io {
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 15072bb1..c8f250c 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -4998,7 +4998,7 @@ int cl_falloc(struct inode *inode, int mode, loff_t offset, loff_t len)
+ 	struct lu_env *env;
+ 	struct cl_io *io;
+ 	u16 refcheck;
+-	int rc; loff_t sa_falloc_end;
++	int rc;
+ 	loff_t size = i_size_read(inode);
  
- 	/**
- 	 * List item for list in namespace hash.
--	 * protected by ns_lock
-+	 * protected by ns_lock.
-+	 * Shared with linkage for RCU-delayed free.
- 	 */
--	struct hlist_node		lr_hash;
-+	union {
-+		struct hlist_node		lr_hash;
-+		struct rcu_head			lr_rcu;
-+	};
- 
- 	/** Reference count for this resource */
- 	atomic_t			lr_refcount;
-diff --git a/fs/lustre/ldlm/l_lock.c b/fs/lustre/ldlm/l_lock.c
-index 296259a..3531420 100644
---- a/fs/lustre/ldlm/l_lock.c
-+++ b/fs/lustre/ldlm/l_lock.c
-@@ -41,19 +41,25 @@
-  *
-  * LDLM locking uses resource to serialize access to locks
-  * but there is a case when we change resource of lock upon
-- * enqueue reply. We rely on lock->l_resource = new_res
-+ * enqueue reply. We rely on rcu_assign_pointer(lock->l_resource, new_res)
-  * being an atomic operation.
-  */
- struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
--				__acquires(&lock->l_lock)
--				__acquires(&lock->l_resource->lr_lock)
-+__acquires(&lock->l_resource->lr_lock)
- {
--	spin_lock(&lock->l_lock);
-+	struct ldlm_resource *res;
- 
--	lock_res(lock->l_resource);
--
--	ldlm_set_res_locked(lock);
--	return lock->l_resource;
-+	rcu_read_lock();
-+	while (1) {
-+		res = rcu_dereference(lock->l_resource);
-+		lock_res(res);
-+		if (res == lock->l_resource) {
-+			ldlm_set_res_locked(lock);
-+			rcu_read_unlock();
-+			return res;
-+		}
-+		unlock_res(res);
-+	}
- }
- EXPORT_SYMBOL(lock_res_and_lock);
- 
-@@ -61,13 +67,10 @@ struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
-  * Unlock a lock and its resource previously locked with lock_res_and_lock
-  */
- void unlock_res_and_lock(struct ldlm_lock *lock)
--		__releases(&lock->l_resource->lr_lock)
--		__releases(&lock->l_lock)
-+__releases(&lock->l_resource->lr_lock)
- {
--	/* on server-side resource of lock doesn't change */
- 	ldlm_clear_res_locked(lock);
- 
- 	unlock_res(lock->l_resource);
--	spin_unlock(&lock->l_lock);
- }
- EXPORT_SYMBOL(unlock_res_and_lock);
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index b7ce0bb..c872455 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -385,8 +385,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- 	if (!lock)
- 		return NULL;
- 
--	spin_lock_init(&lock->l_lock);
--	lock->l_resource = resource;
-+	RCU_INIT_POINTER(lock->l_resource, resource);
- 	lu_ref_add(&resource->lr_reference, "lock", lock);
- 
- 	refcount_set(&lock->l_handle.h_ref, 2);
-@@ -455,12 +454,13 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 
- 	lu_ref_add(&newres->lr_reference, "lock", lock);
- 	/*
--	 * To flip the lock from the old to the new resource, lock, oldres and
--	 * newres have to be locked. Resource spin-locks are nested within
--	 * lock->l_lock, and are taken in the memory address order to avoid
--	 * dead-locks.
-+	 * To flip the lock from the old to the new resource, oldres
-+	 * and newres have to be locked. Resource spin-locks are taken
-+	 * in the memory address order to avoid dead-locks.
-+	 * As this is the only circumstance where ->l_resource
-+	 * can change, and this cannot race with itself, it is safe
-+	 * to access lock->l_resource without being careful about locking.
- 	 */
--	spin_lock(&lock->l_lock);
- 	oldres = lock->l_resource;
- 	if (oldres < newres) {
- 		lock_res(oldres);
-@@ -471,9 +471,9 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 	}
- 	LASSERT(memcmp(new_resid, &oldres->lr_name,
- 		       sizeof(oldres->lr_name)) != 0);
--	lock->l_resource = newres;
-+	rcu_assign_pointer(lock->l_resource, newres);
- 	unlock_res(oldres);
--	unlock_res_and_lock(lock);
-+	unlock_res(newres);
- 
- 	/* ...and the flowers are still standing! */
- 	lu_ref_del(&oldres->lr_reference, "lock", lock);
-@@ -1875,11 +1875,11 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 	va_list args;
- 	struct va_format vaf;
- 
--	if (spin_trylock(&lock->l_lock)) {
--		if (lock->l_resource)
--			resource = ldlm_resource_getref(lock->l_resource);
--		spin_unlock(&lock->l_lock);
--	}
-+	rcu_read_lock();
-+	resource = rcu_dereference(lock->l_resource);
-+	if (resource && !atomic_inc_not_zero(&resource->lr_refcount))
-+		resource = NULL;
-+	rcu_read_unlock();
- 
- 	va_start(args, fmt);
- 	vaf.fmt = fmt;
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index 6f498cc..7d8bae2 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -1208,6 +1208,23 @@ static int ldlm_cleanup(void)
- 	return 0;
- }
- 
-+void ldlm_resource_init_once(void *p)
-+{
-+	/*
-+	 * It is import to initialise the spinlock only once,
-+	 * as ldlm_lock_change_resource() could try to lock
-+	 * the resource *after* it has been freed and possibly
-+	 * reused. SLAB_TYPESAFE_BY_RCU ensures the memory won't
-+	 * be freed while the lock is being taken, but we need to
-+	 * ensure that it doesn't get reinitialized either.
-+	 */
-+	struct ldlm_resource *res = p;
+ 	env = cl_env_get(&refcheck);
+@@ -5011,34 +5011,32 @@ int cl_falloc(struct inode *inode, int mode, loff_t offset, loff_t len)
+ 	io->u.ci_setattr.sa_parent_fid = lu_object_fid(&io->ci_obj->co_lu);
+ 	io->u.ci_setattr.sa_falloc_mode = mode;
+ 	io->u.ci_setattr.sa_falloc_offset = offset;
+-	io->u.ci_setattr.sa_falloc_len = len;
+-	io->u.ci_setattr.sa_falloc_end = io->u.ci_setattr.sa_falloc_offset +
+-					 io->u.ci_setattr.sa_falloc_len;
++	io->u.ci_setattr.sa_falloc_end = offset + len;
+ 	io->u.ci_setattr.sa_subtype = CL_SETATTR_FALLOCATE;
+-	sa_falloc_end = io->u.ci_setattr.sa_falloc_end;
+-	if (sa_falloc_end > size) {
++	if (io->u.ci_setattr.sa_falloc_end > size) {
++		loff_t newsize = io->u.ci_setattr.sa_falloc_end;
 +
-+	memset(res, 0, sizeof(*res));
-+	mutex_init(&res->lr_lvb_mutex);
-+	spin_lock_init(&res->lr_lock);
+ 		/* Check new size against VFS/VM file size limit and rlimit */
+-		rc = inode_newsize_ok(inode, sa_falloc_end);
++		rc = inode_newsize_ok(inode, newsize);
+ 		if (rc)
+ 			goto out;
+-		if (sa_falloc_end > ll_file_maxbytes(inode)) {
++		if (newsize > ll_file_maxbytes(inode)) {
+ 			CDEBUG(D_INODE, "file size too large %llu > %llu\n",
+-			       (unsigned long long)(sa_falloc_end),
++			       (unsigned long long)newsize,
+ 			       ll_file_maxbytes(inode));
+ 			rc = -EFBIG;
+ 			goto out;
+ 		}
+ 	}
+ 
+-again:
+-	if (cl_io_init(env, io, CIT_SETATTR, io->ci_obj) == 0)
+-		rc = cl_io_loop(env, io);
+-	else
+-		rc = io->ci_result;
+-
+-	cl_io_fini(env, io);
+-	if (unlikely(io->ci_need_restart))
+-		goto again;
++	do {
++		rc = cl_io_init(env, io, CIT_SETATTR, io->ci_obj);
++		if (rc)
++			rc = io->ci_result;
++		else
++			rc = cl_io_loop(env, io);
++		cl_io_fini(env, io);
++	} while (unlikely(io->ci_need_restart));
+ 
+ out:
+ 	cl_env_put(env, &refcheck);
+@@ -5050,6 +5048,9 @@ long ll_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
+ 	struct inode *inode = filp->f_path.dentry->d_inode;
+ 	int rc;
+ 
++	if (offset < 0 || len <= 0)
++		return -EINVAL;
++
+ 	/*
+ 	 * Encrypted inodes can't handle collapse range or zero range or insert
+ 	 * range since we would need to re-encrypt blocks with a different IV or
+@@ -5062,10 +5063,10 @@ long ll_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
+ 		return -EOPNOTSUPP;
+ 
+ 	/*
+-	 * Only mode == 0 (which is standard prealloc) is supported now.
+-	 * Punch is not supported yet.
++	 * mode == 0 (which is standard prealloc) and PUNCH is supported.
++	 * Rest of mode options are not supported yet.
+ 	 */
+-	if (mode & ~FALLOC_FL_KEEP_SIZE)
++	if (mode & ~(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE))
+ 		return -EOPNOTSUPP;
+ 
+ 	ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_FALLOCATE, 1);
+diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
+index 7807f9e..70f8987 100644
+--- a/fs/lustre/mdc/mdc_dev.c
++++ b/fs/lustre/mdc/mdc_dev.c
+@@ -1046,6 +1046,9 @@ static int mdc_io_setattr_start(const struct lu_env *env,
+ 			return rc;
+ 	}
+ 
++	if (cl_io_is_fallocate(io))
++		return -EOPNOTSUPP;
++
+ 	if (oio->oi_lockless == 0) {
+ 		cl_object_attr_lock(obj);
+ 		rc = cl_object_attr_get(env, obj, attr);
+diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
+index 9d783e0..3be3cfe 100644
+--- a/fs/lustre/osc/osc_io.c
++++ b/fs/lustre/osc/osc_io.c
+@@ -530,6 +530,29 @@ static void osc_trunc_check(const struct lu_env *env, struct cl_io *io,
+ 			     trunc_check_cb, (void *)&size);
+ }
+ 
++/**
++ * Flush affected pages prior punch.
++ * We shouldn't discard them locally first because that could be data loss
++ * if server doesn't support fallocate punch, we also need these data to be
++ * flushed first to prevent re-ordering with the punch
++ */
++static int osc_punch_start(const struct lu_env *env, struct cl_io *io,
++			   struct cl_object *obj)
++{
++	struct osc_object *osc = cl2osc(obj);
++	pgoff_t pg_start = cl_index(obj, io->u.ci_setattr.sa_falloc_offset);
++	pgoff_t pg_end = cl_index(obj, io->u.ci_setattr.sa_falloc_end - 1);
++	int rc;
++
++	rc = osc_cache_writeback_range(env, osc, pg_start, pg_end, 1, 0);
++	if (rc < 0)
++		return rc;
++
++	osc_page_gang_lookup(env, io, osc, pg_start, pg_end, osc_discard_cb,
++			     osc);
++	return 0;
 +}
 +
- int ldlm_init(void)
+ static int osc_io_setattr_start(const struct lu_env *env,
+ 				const struct cl_io_slice *slice)
  {
- 	mutex_init(&ldlm_ref_mutex);
-@@ -1215,7 +1232,9 @@ int ldlm_init(void)
- 	mutex_init(ldlm_namespace_lock(LDLM_NAMESPACE_CLIENT));
- 	ldlm_resource_slab = kmem_cache_create("ldlm_resources",
- 					       sizeof(struct ldlm_resource), 0,
--					       SLAB_HWCACHE_ALIGN, NULL);
-+					       SLAB_TYPESAFE_BY_RCU |
-+					       SLAB_HWCACHE_ALIGN,
-+					       ldlm_resource_init_once);
- 	if (!ldlm_resource_slab)
- 		return -ENOMEM;
+@@ -543,19 +566,17 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 	unsigned int ia_avalid = io->u.ci_setattr.sa_avalid;
+ 	enum op_xvalid ia_xvalid = io->u.ci_setattr.sa_xvalid;
+ 	u64 size = io->u.ci_setattr.sa_attr.lvb_size;
+-	u64 end = OBD_OBJECT_EOF;
+-	bool io_is_falloc = false;
++	bool io_is_falloc = cl_io_is_fallocate(io);
+ 	int result = 0;
  
-@@ -1248,6 +1267,7 @@ void ldlm_exit(void)
- {
- 	if (ldlm_refcount)
- 		CERROR("ldlm_refcount is %d in %s!\n", ldlm_refcount, __func__);
-+	synchronize_rcu();
- 	kmem_cache_destroy(ldlm_resource_slab);
- 	/*
- 	 * ldlm_lock_put() use RCU to call ldlm_lock_free, so need call
-diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
-index 481f14e..6e3feb2 100644
---- a/fs/lustre/ldlm/ldlm_resource.c
-+++ b/fs/lustre/ldlm/ldlm_resource.c
-@@ -1064,12 +1064,14 @@ static struct ldlm_resource *ldlm_resource_new(enum ldlm_type ldlm_type)
- {
- 	struct ldlm_resource *res;
+ 	/* truncate cache dirty pages first */
+-	if (cl_io_is_trunc(io)) {
++	if (cl_io_is_trunc(io))
+ 		result = osc_cache_truncate_start(env, cl2osc(obj), size,
+ 						  &oio->oi_trunc);
+-	} else if (cl_io_is_fallocate(io)) {
+-		io_is_falloc = true;
+-		size = io->u.ci_setattr.sa_falloc_offset;
+-		end = io->u.ci_setattr.sa_falloc_end;
+-	}
++	/* flush local pages prior punching them on server */
++	if (io_is_falloc &&
++	    io->u.ci_setattr.sa_falloc_mode & FALLOC_FL_PUNCH_HOLE)
++		result = osc_punch_start(env, io, obj);
  
--	res = kmem_cache_zalloc(ldlm_resource_slab, GFP_NOFS);
-+	res = kmem_cache_alloc(ldlm_resource_slab, GFP_NOFS);
- 	if (!res)
- 		return NULL;
+ 	if (result == 0 && oio->oi_lockless == 0) {
+ 		cl_object_attr_lock(obj);
+@@ -565,14 +586,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 			unsigned int cl_valid = 0;
  
- 	INIT_LIST_HEAD(&res->lr_granted);
- 	INIT_LIST_HEAD(&res->lr_waiting);
-+	res->lr_lvb_inode = NULL;
-+	res->lr_lvb_len = 0;
- 
- 	if (ldlm_type == LDLM_EXTENT) {
- 		int idx;
-@@ -1087,17 +1089,13 @@ static struct ldlm_resource *ldlm_resource_new(enum ldlm_type ldlm_type)
- 			res->lr_itree[idx].lit_mode = BIT(idx);
- 			res->lr_itree[idx].lit_root = RB_ROOT_CACHED;
+ 			if (ia_avalid & ATTR_SIZE) {
+-				if (io_is_falloc) {
+-					attr->cat_size =
+-						io->u.ci_setattr.sa_attr.lvb_size;
+-					attr->cat_kms = attr->cat_size;
+-				} else {
+-					attr->cat_size = size;
+-					attr->cat_kms = size;
+-				}
++				attr->cat_size = size;
++				attr->cat_kms = size;
+ 				cl_valid = CAT_SIZE | CAT_KMS;
+ 			}
+ 			if (ia_avalid & ATTR_MTIME_SET) {
+@@ -612,17 +627,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 			oa->o_valid |= OBD_MD_FLMTIME;
+ 			oa->o_mtime = attr->cat_mtime;
  		}
-+	} else {
-+		res->lr_itree = NULL;
+-		if (ia_avalid & ATTR_SIZE) {
+-			if (io_is_falloc) {
+-				oa->o_size = size;
+-				oa->o_blocks = end;
+-				oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
+-			} else {
+-				oa->o_size = size;
+-				oa->o_blocks = OBD_OBJECT_EOF;
+-				oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
+-			}
+ 
++		if (ia_avalid & ATTR_SIZE || io_is_falloc) {
+ 			if (oio->oi_lockless) {
+ 				oa->o_flags = OBD_FL_SRVLOCK;
+ 				oa->o_valid |= OBD_MD_FLFLAGS;
+@@ -646,10 +652,16 @@ static int osc_io_setattr_start(const struct lu_env *env,
+ 		if (io_is_falloc) {
+ 			int falloc_mode = io->u.ci_setattr.sa_falloc_mode;
+ 
++			oa->o_size = io->u.ci_setattr.sa_falloc_offset;
++			oa->o_blocks = io->u.ci_setattr.sa_falloc_end;
++			oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
+ 			result = osc_fallocate_base(osc_export(cl2osc(obj)),
+ 						    oa, osc_async_upcall,
+ 						    cbargs, falloc_mode);
+ 		} else if (ia_avalid & ATTR_SIZE) {
++			oa->o_size = size;
++			oa->o_blocks = OBD_OBJECT_EOF;
++			oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
+ 			result = osc_punch_send(osc_export(cl2osc(obj)),
+ 						oa, osc_async_upcall, cbargs);
+ 		} else {
+@@ -682,11 +694,11 @@ void osc_io_setattr_end(const struct lu_env *env,
+ 	if (result == 0) {
+ 		if (oio->oi_lockless) {
+ 			/* lockless truncate */
+-			struct osc_device *osd = lu2osc_dev(obj->co_lu.lo_dev);
++			struct osc_device *osc = lu2osc_dev(obj->co_lu.lo_dev);
+ 
+ 			LASSERT(cl_io_is_trunc(io) || cl_io_is_fallocate(io));
+ 			/* XXX: Need a lock. */
+-			osd->od_stats.os_lockless_truncates++;
++			osc->od_stats.os_lockless_truncates++;
+ 		}
  	}
  
- 	atomic_set(&res->lr_refcount, 1);
--	spin_lock_init(&res->lr_lock);
- 	lu_ref_init(&res->lr_reference);
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 973c504..376afb9 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -454,14 +454,7 @@ int osc_fallocate_base(struct obd_export *exp, struct obdo *oa,
+ 	struct obd_import *imp = class_exp2cliimp(exp);
+ 	int rc;
  
--	/* Since LVB init can be delayed now, there is no longer need to
--	 * immediately acquire mutex here.
+-	/*
+-	 * Only mode == 0 (which is standard prealloc) is supported now.
+-	 * Punch is not supported yet.
 -	 */
--	mutex_init(&res->lr_lvb_mutex);
+-	if (mode & ~FALLOC_FL_KEEP_SIZE)
+-		return -EOPNOTSUPP;
+ 	oa->o_falloc_mode = mode;
 -
- 	return res;
- }
- 
+ 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
+ 				   &RQF_OST_FALLOCATE);
+ 	if (!req)
 -- 
 1.8.3.1
 
