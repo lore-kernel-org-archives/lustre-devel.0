@@ -2,42 +2,42 @@ Return-Path: <SRS0=Gt0B=JW=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.9 required=3.0 tests=BAYES_00,
+X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_CR_TRAILER,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EBF7CC433ED
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FD3CC433B4
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:13 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADF7E611ED
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:09 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADF7E611ED
+	by mail.kernel.org (Postfix) with ESMTPS id 4777561260
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:13 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4777561260
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 43CE921F8A5;
-	Sun, 25 Apr 2021 13:09:37 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AE14921F9AE;
+	Sun, 25 Apr 2021 13:09:40 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E94E721F7E9
- for <lustre-devel@lists.lustre.org>; Sun, 25 Apr 2021 13:08:48 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4585121F7F8
+ for <lustre-devel@lists.lustre.org>; Sun, 25 Apr 2021 13:08:49 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 4EA2010087D5;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 4FA4C10087D6;
  Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 4D4E569A63; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
+ id 4E88669A7E; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 25 Apr 2021 16:08:33 -0400
-Message-Id: <1619381316-7719-27-git-send-email-jsimmons@infradead.org>
+Date: Sun, 25 Apr 2021 16:08:34 -0400
+Message-Id: <1619381316-7719-28-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
 References: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 26/29] lustre: fallocate: Add punch mode to
- fallocate
+Subject: [lustre-devel] [PATCH 27/29] lustre: various: only use
+ wake_up_all() on exclusive waitqs
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,297 +50,306 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Arshad Hussain <arshad.hussain@aeoncomputing.com>,
- Mikhail Pershin <mpershin@whamcloud.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-This patch adds fallocate(2) punch operation
-(FALLOCATE_FL_PUNCH_HOLE) mode support for ldiskfs backend
-OSD and for OSC/OST
+wake_up_all() is not necessary of wait_queues which are not the
+subject of an exclusive waiter.  When all waiters are non-exclusive,
+wake_up() will wake them all up.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14160
-Lustre-commit: cb037f305c64cd512 ("LU-14160 fallocate: Add punch mode to fallocate")
-Signed-off-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
-Signed-off-by: Mikhail Pershin <mpershin@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/40877
+Use of wake_up_all() suggests to the reader that the queue is subject
+to exclusive waits.  When that is not the case, the usage can cause
+confusion.
+
+So change all wake_up_all() on non-exclusive waitqueues to wake_up().
+
+The only wait_queues on which exclusive waits are requested are:
+ws_waitq         ibs_waitq        kss_waitq         ksnd_connd_waitq
+blp_waitq        imp_replay_waitq cl_mod_rpcs_waitq cl_cache_waiters
+cl_destroy_waitq scp_waitq
+
+All others now only use wake_up().
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14352
+Lustre-commit: 1f4e9f0f4f483dc9 ("LU-14352 various: only use wake_up_all() on exclusive waitqs")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/41289
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Yang Sheng <ys@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h |  1 -
- fs/lustre/llite/file.c        | 43 ++++++++++++++-------------
- fs/lustre/mdc/mdc_dev.c       |  3 ++
- fs/lustre/osc/osc_io.c        | 68 +++++++++++++++++++++++++------------------
- fs/lustre/osc/osc_request.c   |  7 -----
- 5 files changed, 65 insertions(+), 57 deletions(-)
+ fs/lustre/ldlm/ldlm_lock.c       | 6 +++---
+ fs/lustre/llite/pcc.c            | 2 +-
+ fs/lustre/lov/lov_io.c           | 4 ++--
+ fs/lustre/mdc/mdc_changelog.c    | 8 ++++----
+ fs/lustre/obdclass/cl_io.c       | 2 +-
+ fs/lustre/obdclass/lu_object.c   | 2 +-
+ fs/lustre/osc/osc_io.c           | 2 +-
+ fs/lustre/osc/osc_page.c         | 6 +++---
+ fs/lustre/ptlrpc/sec_bulk.c      | 2 +-
+ fs/lustre/ptlrpc/service.c       | 2 +-
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 4 ++--
+ net/lnet/klnds/socklnd/socklnd.c | 4 ++--
+ net/lnet/lnet/peer.c             | 2 +-
+ 13 files changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index 3926aac..b69c04a 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -1876,7 +1876,6 @@ struct cl_io {
- 			/* The following are used for fallocate(2) */
- 			int			sa_falloc_mode;
- 			loff_t			sa_falloc_offset;
--			loff_t			sa_falloc_len;
- 			loff_t			sa_falloc_end;
- 		} ci_setattr;
- 		struct cl_data_version_io {
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 15072bb1..c8f250c 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -4998,7 +4998,7 @@ int cl_falloc(struct inode *inode, int mode, loff_t offset, loff_t len)
- 	struct lu_env *env;
- 	struct cl_io *io;
- 	u16 refcheck;
--	int rc; loff_t sa_falloc_end;
-+	int rc;
- 	loff_t size = i_size_read(inode);
- 
- 	env = cl_env_get(&refcheck);
-@@ -5011,34 +5011,32 @@ int cl_falloc(struct inode *inode, int mode, loff_t offset, loff_t len)
- 	io->u.ci_setattr.sa_parent_fid = lu_object_fid(&io->ci_obj->co_lu);
- 	io->u.ci_setattr.sa_falloc_mode = mode;
- 	io->u.ci_setattr.sa_falloc_offset = offset;
--	io->u.ci_setattr.sa_falloc_len = len;
--	io->u.ci_setattr.sa_falloc_end = io->u.ci_setattr.sa_falloc_offset +
--					 io->u.ci_setattr.sa_falloc_len;
-+	io->u.ci_setattr.sa_falloc_end = offset + len;
- 	io->u.ci_setattr.sa_subtype = CL_SETATTR_FALLOCATE;
--	sa_falloc_end = io->u.ci_setattr.sa_falloc_end;
--	if (sa_falloc_end > size) {
-+	if (io->u.ci_setattr.sa_falloc_end > size) {
-+		loff_t newsize = io->u.ci_setattr.sa_falloc_end;
-+
- 		/* Check new size against VFS/VM file size limit and rlimit */
--		rc = inode_newsize_ok(inode, sa_falloc_end);
-+		rc = inode_newsize_ok(inode, newsize);
- 		if (rc)
- 			goto out;
--		if (sa_falloc_end > ll_file_maxbytes(inode)) {
-+		if (newsize > ll_file_maxbytes(inode)) {
- 			CDEBUG(D_INODE, "file size too large %llu > %llu\n",
--			       (unsigned long long)(sa_falloc_end),
-+			       (unsigned long long)newsize,
- 			       ll_file_maxbytes(inode));
- 			rc = -EFBIG;
- 			goto out;
- 		}
+diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
+index c872455..8201e28 100644
+--- a/fs/lustre/ldlm/ldlm_lock.c
++++ b/fs/lustre/ldlm/ldlm_lock.c
+@@ -1217,7 +1217,7 @@ void ldlm_lock_fail_match_locked(struct ldlm_lock *lock)
+ {
+ 	if ((lock->l_flags & LDLM_FL_FAIL_NOTIFIED) == 0) {
+ 		lock->l_flags |= LDLM_FL_FAIL_NOTIFIED;
+-		wake_up_all(&lock->l_waitq);
++		wake_up(&lock->l_waitq);
  	}
- 
--again:
--	if (cl_io_init(env, io, CIT_SETATTR, io->ci_obj) == 0)
--		rc = cl_io_loop(env, io);
--	else
--		rc = io->ci_result;
--
--	cl_io_fini(env, io);
--	if (unlikely(io->ci_need_restart))
--		goto again;
-+	do {
-+		rc = cl_io_init(env, io, CIT_SETATTR, io->ci_obj);
-+		if (rc)
-+			rc = io->ci_result;
-+		else
-+			rc = cl_io_loop(env, io);
-+		cl_io_fini(env, io);
-+	} while (unlikely(io->ci_need_restart));
- 
- out:
- 	cl_env_put(env, &refcheck);
-@@ -5050,6 +5048,9 @@ long ll_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
- 	struct inode *inode = filp->f_path.dentry->d_inode;
- 	int rc;
- 
-+	if (offset < 0 || len <= 0)
-+		return -EINVAL;
-+
- 	/*
- 	 * Encrypted inodes can't handle collapse range or zero range or insert
- 	 * range since we would need to re-encrypt blocks with a different IV or
-@@ -5062,10 +5063,10 @@ long ll_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
- 		return -EOPNOTSUPP;
- 
- 	/*
--	 * Only mode == 0 (which is standard prealloc) is supported now.
--	 * Punch is not supported yet.
-+	 * mode == 0 (which is standard prealloc) and PUNCH is supported.
-+	 * Rest of mode options are not supported yet.
- 	 */
--	if (mode & ~FALLOC_FL_KEEP_SIZE)
-+	if (mode & ~(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE))
- 		return -EOPNOTSUPP;
- 
- 	ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_FALLOCATE, 1);
-diff --git a/fs/lustre/mdc/mdc_dev.c b/fs/lustre/mdc/mdc_dev.c
-index 7807f9e..70f8987 100644
---- a/fs/lustre/mdc/mdc_dev.c
-+++ b/fs/lustre/mdc/mdc_dev.c
-@@ -1046,6 +1046,9 @@ static int mdc_io_setattr_start(const struct lu_env *env,
- 			return rc;
- 	}
- 
-+	if (cl_io_is_fallocate(io))
-+		return -EOPNOTSUPP;
-+
- 	if (oio->oi_lockless == 0) {
- 		cl_object_attr_lock(obj);
- 		rc = cl_object_attr_get(env, obj, attr);
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index 9d783e0..3be3cfe 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -530,6 +530,29 @@ static void osc_trunc_check(const struct lu_env *env, struct cl_io *io,
- 			     trunc_check_cb, (void *)&size);
  }
  
-+/**
-+ * Flush affected pages prior punch.
-+ * We shouldn't discard them locally first because that could be data loss
-+ * if server doesn't support fallocate punch, we also need these data to be
-+ * flushed first to prevent re-ordering with the punch
-+ */
-+static int osc_punch_start(const struct lu_env *env, struct cl_io *io,
-+			   struct cl_object *obj)
-+{
-+	struct osc_object *osc = cl2osc(obj);
-+	pgoff_t pg_start = cl_index(obj, io->u.ci_setattr.sa_falloc_offset);
-+	pgoff_t pg_end = cl_index(obj, io->u.ci_setattr.sa_falloc_end - 1);
-+	int rc;
-+
-+	rc = osc_cache_writeback_range(env, osc, pg_start, pg_end, 1, 0);
-+	if (rc < 0)
-+		return rc;
-+
-+	osc_page_gang_lookup(env, io, osc, pg_start, pg_end, osc_discard_cb,
-+			     osc);
-+	return 0;
-+}
-+
- static int osc_io_setattr_start(const struct lu_env *env,
- 				const struct cl_io_slice *slice)
+@@ -1231,7 +1231,7 @@ void ldlm_lock_fail_match_locked(struct ldlm_lock *lock)
+ void ldlm_lock_allow_match_locked(struct ldlm_lock *lock)
  {
-@@ -543,19 +566,17 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 	unsigned int ia_avalid = io->u.ci_setattr.sa_avalid;
- 	enum op_xvalid ia_xvalid = io->u.ci_setattr.sa_xvalid;
- 	u64 size = io->u.ci_setattr.sa_attr.lvb_size;
--	u64 end = OBD_OBJECT_EOF;
--	bool io_is_falloc = false;
-+	bool io_is_falloc = cl_io_is_fallocate(io);
- 	int result = 0;
+ 	ldlm_set_lvb_ready(lock);
+-	wake_up_all(&lock->l_waitq);
++	wake_up(&lock->l_waitq);
+ }
+ EXPORT_SYMBOL(ldlm_lock_allow_match_locked);
  
- 	/* truncate cache dirty pages first */
--	if (cl_io_is_trunc(io)) {
-+	if (cl_io_is_trunc(io))
- 		result = osc_cache_truncate_start(env, cl2osc(obj), size,
- 						  &oio->oi_trunc);
--	} else if (cl_io_is_fallocate(io)) {
--		io_is_falloc = true;
--		size = io->u.ci_setattr.sa_falloc_offset;
--		end = io->u.ci_setattr.sa_falloc_end;
--	}
-+	/* flush local pages prior punching them on server */
-+	if (io_is_falloc &&
-+	    io->u.ci_setattr.sa_falloc_mode & FALLOC_FL_PUNCH_HOLE)
-+		result = osc_punch_start(env, io, obj);
- 
- 	if (result == 0 && oio->oi_lockless == 0) {
- 		cl_object_attr_lock(obj);
-@@ -565,14 +586,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 			unsigned int cl_valid = 0;
- 
- 			if (ia_avalid & ATTR_SIZE) {
--				if (io_is_falloc) {
--					attr->cat_size =
--						io->u.ci_setattr.sa_attr.lvb_size;
--					attr->cat_kms = attr->cat_size;
--				} else {
--					attr->cat_size = size;
--					attr->cat_kms = size;
--				}
-+				attr->cat_size = size;
-+				attr->cat_kms = size;
- 				cl_valid = CAT_SIZE | CAT_KMS;
- 			}
- 			if (ia_avalid & ATTR_MTIME_SET) {
-@@ -612,17 +627,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 			oa->o_valid |= OBD_MD_FLMTIME;
- 			oa->o_mtime = attr->cat_mtime;
+@@ -1752,7 +1752,7 @@ void ldlm_cancel_callback(struct ldlm_lock *lock)
  		}
--		if (ia_avalid & ATTR_SIZE) {
--			if (io_is_falloc) {
--				oa->o_size = size;
--				oa->o_blocks = end;
--				oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
--			} else {
--				oa->o_size = size;
--				oa->o_blocks = OBD_OBJECT_EOF;
--				oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
--			}
+ 		/* only canceller can set bl_done bit */
+ 		ldlm_set_bl_done(lock);
+-		wake_up_all(&lock->l_waitq);
++		wake_up(&lock->l_waitq);
+ 	} else if (!ldlm_is_bl_done(lock)) {
+ 		/*
+ 		 * The lock is guaranteed to have been canceled once
+diff --git a/fs/lustre/llite/pcc.c b/fs/lustre/llite/pcc.c
+index 297189c9..b259fa5 100644
+--- a/fs/lustre/llite/pcc.c
++++ b/fs/lustre/llite/pcc.c
+@@ -1566,7 +1566,7 @@ static void pcc_io_fini(struct inode *inode)
  
-+		if (ia_avalid & ATTR_SIZE || io_is_falloc) {
- 			if (oio->oi_lockless) {
- 				oa->o_flags = OBD_FL_SRVLOCK;
- 				oa->o_valid |= OBD_MD_FLFLAGS;
-@@ -646,10 +652,16 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 		if (io_is_falloc) {
- 			int falloc_mode = io->u.ci_setattr.sa_falloc_mode;
+ 	LASSERT(pcci && atomic_read(&pcci->pcci_active_ios) > 0);
+ 	if (atomic_dec_and_test(&pcci->pcci_active_ios))
+-		wake_up_all(&pcci->pcci_waitq);
++		wake_up(&pcci->pcci_waitq);
+ }
  
-+			oa->o_size = io->u.ci_setattr.sa_falloc_offset;
-+			oa->o_blocks = io->u.ci_setattr.sa_falloc_end;
-+			oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
- 			result = osc_fallocate_base(osc_export(cl2osc(obj)),
- 						    oa, osc_async_upcall,
- 						    cbargs, falloc_mode);
- 		} else if (ia_avalid & ATTR_SIZE) {
-+			oa->o_size = size;
-+			oa->o_blocks = OBD_OBJECT_EOF;
-+			oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
- 			result = osc_punch_send(osc_export(cl2osc(obj)),
- 						oa, osc_async_upcall, cbargs);
- 		} else {
-@@ -682,11 +694,11 @@ void osc_io_setattr_end(const struct lu_env *env,
- 	if (result == 0) {
- 		if (oio->oi_lockless) {
- 			/* lockless truncate */
--			struct osc_device *osd = lu2osc_dev(obj->co_lu.lo_dev);
-+			struct osc_device *osc = lu2osc_dev(obj->co_lu.lo_dev);
+ ssize_t pcc_file_read_iter(struct kiocb *iocb,
+diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
+index 7da0047..1d5ea41 100644
+--- a/fs/lustre/lov/lov_io.c
++++ b/fs/lustre/lov/lov_io.c
+@@ -651,7 +651,7 @@ static void lov_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
  
- 			LASSERT(cl_io_is_trunc(io) || cl_io_is_fallocate(io));
- 			/* XXX: Need a lock. */
--			osd->od_stats.os_lockless_truncates++;
-+			osc->od_stats.os_lockless_truncates++;
- 		}
+ 	LASSERT(atomic_read(&lov->lo_active_ios) > 0);
+ 	if (atomic_dec_and_test(&lov->lo_active_ios))
+-		wake_up_all(&lov->lo_waitq);
++		wake_up(&lov->lo_waitq);
+ }
+ 
+ static void lov_io_sub_inherit(struct lov_io_sub *sub, struct lov_io *lio,
+@@ -1674,7 +1674,7 @@ static void lov_empty_io_fini(const struct lu_env *env,
+ 	struct lov_object *lov = cl2lov(ios->cis_obj);
+ 
+ 	if (atomic_dec_and_test(&lov->lo_active_ios))
+-		wake_up_all(&lov->lo_waitq);
++		wake_up(&lov->lo_waitq);
+ }
+ 
+ static int lov_empty_io_submit(const struct lu_env *env,
+diff --git a/fs/lustre/mdc/mdc_changelog.c b/fs/lustre/mdc/mdc_changelog.c
+index f671f465..ef6d4f9 100644
+--- a/fs/lustre/mdc/mdc_changelog.c
++++ b/fs/lustre/mdc/mdc_changelog.c
+@@ -256,7 +256,7 @@ static int chlg_read_cat_process_cb(const struct lu_env *env,
+ 	crs->crs_rec_count++;
+ 	mutex_unlock(&crs->crs_lock);
+ 
+-	wake_up_all(&crs->crs_waitq_cons);
++	wake_up(&crs->crs_waitq_cons);
+ 
+ 	return 0;
+ }
+@@ -347,7 +347,7 @@ static int chlg_load(void *args)
+ 	if (rc < 0)
+ 		crs->crs_err = rc;
+ 
+-	wake_up_all(&crs->crs_waitq_cons);
++	wake_up(&crs->crs_waitq_cons);
+ 
+ 	if (llh)
+ 		llog_cat_close(NULL, llh);
+@@ -420,7 +420,7 @@ static ssize_t chlg_read(struct file *file, char __user *buff, size_t count,
+ 
+ 	if (written_total > 0) {
+ 		rc = written_total;
+-		wake_up_all(&crs->crs_waitq_prod);
++		wake_up(&crs->crs_waitq_prod);
+ 	} else if (rc == 0) {
+ 		rc = crs->crs_err;
+ 	}
+@@ -464,7 +464,7 @@ static int chlg_set_start_offset(struct chlg_reader_state *crs, u64 offset)
  	}
  
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 973c504..376afb9 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -454,14 +454,7 @@ int osc_fallocate_base(struct obd_export *exp, struct obdo *oa,
- 	struct obd_import *imp = class_exp2cliimp(exp);
- 	int rc;
+ 	mutex_unlock(&crs->crs_lock);
+-	wake_up_all(&crs->crs_waitq_prod);
++	wake_up(&crs->crs_waitq_prod);
+ 	return 0;
+ }
  
--	/*
--	 * Only mode == 0 (which is standard prealloc) is supported now.
--	 * Punch is not supported yet.
--	 */
--	if (mode & ~FALLOC_FL_KEEP_SIZE)
--		return -EOPNOTSUPP;
- 	oa->o_falloc_mode = mode;
--
- 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
- 				   &RQF_OST_FALLOCATE);
- 	if (!req)
+diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
+index 27804d3..ca4d387 100644
+--- a/fs/lustre/obdclass/cl_io.c
++++ b/fs/lustre/obdclass/cl_io.c
+@@ -1187,7 +1187,7 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		 * the wakeup ensures cl_sync_io_wait() doesn't complete
+ 		 * before the wakeup completes.
+ 		 */
+-		wake_up_all_locked(&anchor->csi_waitq);
++		wake_up_locked(&anchor->csi_waitq);
+ 		if (end_io)
+ 			end_io(env, anchor);
+ 		if (anchor->csi_aio)
+diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
+index fcf0739..419cb74 100644
+--- a/fs/lustre/obdclass/lu_object.c
++++ b/fs/lustre/obdclass/lu_object.c
+@@ -398,7 +398,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
+ 	}
+ 
+ 	if (waitqueue_active(wq))
+-		wake_up_all(wq);
++		wake_up(wq);
+ }
+ 
+ /**
+diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
+index 3be3cfe..ce64cf8 100644
+--- a/fs/lustre/osc/osc_io.c
++++ b/fs/lustre/osc/osc_io.c
+@@ -437,7 +437,7 @@ void osc_io_iter_fini(const struct lu_env *env,
+ 		oio->oi_is_active = 0;
+ 		LASSERT(atomic_read(&osc->oo_nr_ios) > 0);
+ 		if (atomic_dec_and_test(&osc->oo_nr_ios))
+-			wake_up_all(&osc->oo_io_waitq);
++			wake_up(&osc->oo_io_waitq);
+ 	}
+ }
+ EXPORT_SYMBOL(osc_io_iter_fini);
+diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
+index c59a5ac..8b25329a 100644
+--- a/fs/lustre/osc/osc_page.c
++++ b/fs/lustre/osc/osc_page.c
+@@ -679,7 +679,7 @@ long osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
+ 	atomic_dec(&cli->cl_lru_shrinkers);
+ 	if (count > 0) {
+ 		atomic_long_add(count, cli->cl_lru_left);
+-		wake_up_all(&osc_lru_waitq);
++		wake_up(&osc_lru_waitq);
+ 	}
+ 	return count > 0 ? count : rc;
+ }
+@@ -890,7 +890,7 @@ unsigned long osc_lru_reserve(struct client_obd *cli, unsigned long npages)
+ void osc_lru_unreserve(struct client_obd *cli, unsigned long npages)
+ {
+ 	atomic_long_add(npages, cli->cl_lru_left);
+-	wake_up_all(&osc_lru_waitq);
++	wake_up(&osc_lru_waitq);
+ }
+ 
+ /**
+@@ -987,7 +987,7 @@ void osc_dec_unstable_pages(struct ptlrpc_request *req)
+ 						&cli->cl_cache->ccc_unstable_nr);
+ 	LASSERT(unstable_count >= 0);
+ 	if (!unstable_count)
+-		wake_up_all(&cli->cl_cache->ccc_unstable_waitq);
++		wake_up(&cli->cl_cache->ccc_unstable_waitq);
+ 
+ 	if (waitqueue_active(&osc_lru_waitq))
+ 		(void)ptlrpcd_queue_work(cli->cl_lru_work);
+diff --git a/fs/lustre/ptlrpc/sec_bulk.c b/fs/lustre/ptlrpc/sec_bulk.c
+index 9548721..ef127b8 100644
+--- a/fs/lustre/ptlrpc/sec_bulk.c
++++ b/fs/lustre/ptlrpc/sec_bulk.c
+@@ -304,7 +304,7 @@ static inline void enc_pools_wakeup(void)
+ 
+ 	if (unlikely(page_pools.epp_waitqlen)) {
+ 		LASSERT(waitqueue_active(&page_pools.epp_waitq));
+-		wake_up_all(&page_pools.epp_waitq);
++		wake_up(&page_pools.epp_waitq);
+ 	}
+ }
+ 
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index 070eecc..1057892 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -2465,7 +2465,7 @@ static void ptlrpc_stop_hr_threads(void)
+ 		if (!hrp->hrp_thrs)
+ 			continue; /* uninitialized */
+ 		for (j = 0; j < hrp->hrp_nthrs; j++)
+-			wake_up_all(&hrp->hrp_thrs[j].hrt_waitq);
++			wake_up(&hrp->hrp_thrs[j].hrt_waitq);
+ 	}
+ 
+ 	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index 782e29b..0c43969 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2520,8 +2520,8 @@ static void kiblnd_base_shutdown(void)
+ 		cfs_percpt_for_each(sched, i, kiblnd_data.kib_scheds)
+ 			wake_up_all(&sched->ibs_waitq);
+ 
+-		wake_up_all(&kiblnd_data.kib_connd_waitq);
+-		wake_up_all(&kiblnd_data.kib_failover_waitq);
++		wake_up(&kiblnd_data.kib_connd_waitq);
++		wake_up(&kiblnd_data.kib_failover_waitq);
+ 
+ 		wait_var_event_warning(&kiblnd_data.kib_nthreads,
+ 				       !atomic_read(&kiblnd_data.kib_nthreads),
+diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
+index 141da88..54c5e2c 100644
+--- a/net/lnet/klnds/socklnd/socklnd.c
++++ b/net/lnet/klnds/socklnd/socklnd.c
+@@ -1799,12 +1799,12 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+ 		/* flag threads to terminate; wake and wait for them to die */
+ 		ksocknal_data.ksnd_shuttingdown = 1;
+ 		wake_up_all(&ksocknal_data.ksnd_connd_waitq);
+-		wake_up_all(&ksocknal_data.ksnd_reaper_waitq);
++		wake_up(&ksocknal_data.ksnd_reaper_waitq);
+ 
+ 		if (ksocknal_data.ksnd_schedulers) {
+ 			cfs_percpt_for_each(sched, i,
+ 					    ksocknal_data.ksnd_schedulers)
+-					wake_up_all(&sched->kss_waitq);
++					    wake_up_all(&sched->kss_waitq);
+ 		}
+ 
+ 		wait_var_event_warning(&ksocknal_data.ksnd_nthreads,
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index c833e34..36e52df 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -2131,7 +2131,7 @@ static void lnet_peer_discovery_complete(struct lnet_peer *lp)
+ 	spin_lock(&lp->lp_lock);
+ 	list_splice_init(&lp->lp_dc_pendq, &pending_msgs);
+ 	spin_unlock(&lp->lp_lock);
+-	wake_up_all(&lp->lp_dc_waitq);
++	wake_up(&lp->lp_dc_waitq);
+ 
+ 	if (lp->lp_rtr_refcount > 0)
+ 		lnet_router_discovery_complete(lp);
 -- 
 1.8.3.1
 
