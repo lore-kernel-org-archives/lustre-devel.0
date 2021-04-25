@@ -7,36 +7,37 @@ X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A765C433ED
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8C5DC433ED
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:28 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9B1B611CC
-	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:24 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9B1B611CC
+	by mail.kernel.org (Postfix) with ESMTPS id 7B68C61260
+	for <lustre-devel@archiver.kernel.org>; Sun, 25 Apr 2021 20:10:28 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B68C61260
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0EE7521F9F4;
-	Sun, 25 Apr 2021 13:09:52 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1A5A221FA70;
+	Sun, 25 Apr 2021 13:09:55 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6EFB721F513
- for <lustre-devel@lists.lustre.org>; Sun, 25 Apr 2021 13:08:45 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id DDEA621F7A3
+ for <lustre-devel@lists.lustre.org>; Sun, 25 Apr 2021 13:08:46 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 24CD210087C8;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 32C1C10087CD;
  Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 2226969A8C; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
+ id 319D369A63; Sun, 25 Apr 2021 16:08:40 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 25 Apr 2021 16:08:21 -0400
-Message-Id: <1619381316-7719-15-git-send-email-jsimmons@infradead.org>
+Date: Sun, 25 Apr 2021 16:08:26 -0400
+Message-Id: <1619381316-7719-20-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
 References: <1619381316-7719-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 14/29] lustre: uapi: remove obsolete ioctls
+Subject: [lustre-devel] [PATCH 19/29] lustre: mdt: mkdir should return
+ -EEXIST if exists
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -49,149 +50,109 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-Remove some very obsolete ioctl number definitions.
+lfs setdirstripe' will try restripe if target exists, however
+it's confusing to get -ENOTSUPP or -EALREADY for 'lfs mkdir', while
+the latter invokes the same function as 'lfs setdirstripe'.
 
-Highlight that some of the ioctl codes conflict with upstream
-FSVerity ioctls that we may need to implement in the future.
-This does not necessarily mean the actual ioctl numbers will
-conflict (the "size" field can disambiguate them), but we should
-avoid this range when adding new ioctls.
+Pack MDS_OPEN_CREAT flag in request for 'lfs mkdir', and MDT won't
+try restripe if it's set.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13107
-Lustre-commit: 0f38a0b9db4f7c6c1 ("LU-13107 uapi: remove obsolete ioctls")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/37107
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Jian Yu <yujian@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14366
+Lustre-commit: 65e3e4050ec5bb371 ("LU-14366 mdt: lfs mkdir should return -EEXIST if exists")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/41329
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Yingjin Qian <qian@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/dir.c                    |  3 +++
- fs/lustre/llite/file.c                   |  3 +++
- fs/lustre/llite/llite_lib.c              |  2 +-
- include/uapi/linux/lustre/lustre_ioctl.h | 28 +++++++++-------------------
- include/uapi/linux/lustre/lustre_user.h  |  1 +
- 5 files changed, 17 insertions(+), 20 deletions(-)
+ fs/lustre/llite/dir.c                  | 11 +++++++++--
+ fs/lustre/mdc/mdc_lib.c                |  5 +++++
+ include/uapi/linux/lustre/lustre_idl.h |  2 ++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
 
 diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index 5dc93f4..76294ff5 100644
+index 76294ff5..21b40d1 100644
 --- a/fs/lustre/llite/dir.c
 +++ b/fs/lustre/llite/dir.c
-@@ -1865,7 +1865,10 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		kfree(qctl);
- 		return rc;
- 	}
-+	case OBD_IOC_GETNAME_OLD:
-+		/* fall through */
- 	case OBD_IOC_GETDTNAME:
-+		/* fall through */
- 	case OBD_IOC_GETMDNAME:
- 		return ll_get_obd_name(inode, cmd, arg);
- 	case LL_IOC_FLUSHCTX:
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index e9f0fc9..1ca4589 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -3745,7 +3745,10 @@ static int ll_heat_set(struct inode *inode, enum lu_heat_flag flags)
- 
- 		return 0;
- 	}
-+	case OBD_IOC_GETNAME_OLD:
-+		/* fall through */
- 	case OBD_IOC_GETDTNAME:
-+		/* fall through */
- 	case OBD_IOC_GETMDNAME:
- 		return ll_get_obd_name(inode, cmd, arg);
- 	case LL_IOC_HSM_STATE_GET: {
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 2f2d9f0..6af95fd 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -2986,7 +2986,7 @@ int ll_get_obd_name(struct inode *inode, unsigned int cmd, unsigned long arg)
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct obd_device *obd;
- 
--	if (cmd == OBD_IOC_GETDTNAME)
-+	if (cmd == OBD_IOC_GETNAME_OLD || cmd == OBD_IOC_GETDTNAME)
- 		obd = class_exp2obd(sbi->ll_dt_exp);
- 	else if (cmd == OBD_IOC_GETMDNAME)
- 		obd = class_exp2obd(sbi->ll_md_exp);
-diff --git a/include/uapi/linux/lustre/lustre_ioctl.h b/include/uapi/linux/lustre/lustre_ioctl.h
-index be388fc..fb1e6f1 100644
---- a/include/uapi/linux/lustre/lustre_ioctl.h
-+++ b/include/uapi/linux/lustre/lustre_ioctl.h
-@@ -132,11 +132,6 @@ static inline __u32 obd_ioctl_packlen(struct obd_ioctl_data *data)
+@@ -373,7 +373,8 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
+  *		<0 if the creation is failed.
   */
- #define OBD_IOC_DATA_TYPE	long
+ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
+-			       size_t len, const char *dirname, umode_t mode)
++			       size_t len, const char *dirname, umode_t mode,
++			       bool createonly)
+ {
+ 	struct inode *parent = dparent->d_inode;
+ 	struct ptlrpc_request *request = NULL;
+@@ -482,6 +483,9 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
+ 	}
  
--/*	IOC_LDLM_TEST		_IOWR('f', 40, long) */
--/*	IOC_LDLM_DUMP		_IOWR('f', 41, long) */
--/*	IOC_LDLM_REGRESS_START	_IOWR('f', 42, long) */
--/*	IOC_LDLM_REGRESS_STOP	_IOWR('f', 43, long) */
--
- #define OBD_IOC_CREATE		_IOWR('f', 101, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_DESTROY		_IOW('f', 104, OBD_IOC_DATA_TYPE)
- /*	OBD_IOC_PREALLOCATE	_IOWR('f', 105, OBD_IOC_DATA_TYPE) */
-@@ -148,29 +143,24 @@ static inline __u32 obd_ioctl_packlen(struct obd_ioctl_data *data)
- 
- #define OBD_IOC_STATFS		_IOWR('f', 113, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_SYNC		_IOW('f', 114, OBD_IOC_DATA_TYPE)
--/*	OBD_IOC_READ2		_IOWR('f', 115, OBD_IOC_DATA_TYPE) */
--/*	OBD_IOC_FORMAT		_IOWR('f', 116, OBD_IOC_DATA_TYPE) */
--/*	OBD_IOC_PARTITION	_IOWR('f', 117, OBD_IOC_DATA_TYPE) */
--/*	OBD_IOC_COPY		_IOWR('f', 120, OBD_IOC_DATA_TYPE) */
--/*	OBD_IOC_MIGR		_IOWR('f', 121, OBD_IOC_DATA_TYPE) */
--/*	OBD_IOC_PUNCH		_IOWR('f', 122, OBD_IOC_DATA_TYPE) */
--
--/*	OBD_IOC_MODULE_DEBUG	_IOWR('f', 124, OBD_IOC_DATA_TYPE) */
+ 	op_data->op_cli_flags |= CLI_SET_MEA;
++	if (createonly)
++		op_data->op_bias |= MDS_SETSTRIPE_CREATE;
 +
- #define OBD_IOC_BRW_READ	_IOWR('f', 125, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_BRW_WRITE	_IOWR('f', 126, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_NAME2DEV	_IOWR('f', 127, OBD_IOC_DATA_TYPE)
-+#define OBD_IOC_GETDTNAME	_IOR('f', 127, char[MAX_OBD_NAME])
-+/* ioctl codes 128-143 are reserved for fsverity */
- #define OBD_IOC_UUID2DEV	_IOWR('f', 130, OBD_IOC_DATA_TYPE)
--#define OBD_IOC_GETNAME		_IOWR('f', 131, OBD_IOC_DATA_TYPE)
-+#define OBD_IOC_GETNAME_OLD	_IOWR('f', 131, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_GETMDNAME	_IOR('f', 131, char[MAX_OBD_NAME])
--#define OBD_IOC_GETDTNAME	OBD_IOC_GETNAME
- /*	OBD_IOC_LOV_GET_CONFIG	_IOWR('f', 132, OBD_IOC_DATA_TYPE) until 2.14 */
- #define OBD_IOC_CLIENT_RECOVER	_IOW('f', 133, OBD_IOC_DATA_TYPE)
--/* was	OBD_IOC_PING_TARGET	_IOW('f', 136, OBD_IOC_DATA_TYPE) until 2.11 */
--/*	OBD_IOC_DEC_FS_USE_COUNT _IO('f', 139) */
--/* was OBD_IOC_NO_TRANSNO      _IOW('f', 140, OBD_IOC_DATA_TYPE) until 2.14 */
-+/* ioctl codes 128-143 are reserved for fsverity */
-+/* FS_IOC_ENABLE_VERITY		_IOW('f', 133, struct fsverity_enable_arg) */
-+/* FS_IOC_MEASURE_VERITY	_IOW('f', 134, struct fsverity_digest) */
-+/* was OBD_IOC_NO_TRANSNO	_IOW('f', 140, OBD_IOC_DATA_TYPE) until 2.14 */
- #define OBD_IOC_SET_READONLY	_IOW('f', 141, OBD_IOC_DATA_TYPE)
- #define OBD_IOC_ABORT_RECOVERY	_IOR('f', 142, OBD_IOC_DATA_TYPE)
--/*	OBD_IOC_ROOT_SQUASH	_IOWR('f', 143, OBD_IOC_DATA_TYPE) */
-+/* ioctl codes 128-143 are reserved for fsverity */
- #define OBD_GET_VERSION		_IOWR('f', 144, OBD_IOC_DATA_TYPE)
- /*	OBD_IOC_GSS_SUPPORT	_IOWR('f', 145, OBD_IOC_DATA_TYPE) */
- /*	OBD_IOC_CLOSE_UUID	_IOWR('f', 147, OBD_IOC_DATA_TYPE) */
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 3e2144a..4a21cd6 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -312,6 +312,7 @@ struct ll_ioc_lease_id {
-  * *INFO    - set/get lov_user_mds_data
-  */
- /*	lustre_ioctl.h			101-150 */
-+/* ioctl codes 128-143 are reserved for fsverity */
- #define LL_IOC_GETFLAGS			_IOR('f', 151, long)
- #define LL_IOC_SETFLAGS			_IOW('f', 152, long)
- #define LL_IOC_CLRFLAGS			_IOW('f', 153, long)
+ 	err = md_create(sbi->ll_md_exp, op_data, lump, len, mode,
+ 			from_kuid(&init_user_ns, current_fsuid()),
+ 			from_kgid(&init_user_ns, current_fsgid()),
+@@ -1378,6 +1382,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		int namelen = 0;
+ 		int lumlen = 0;
+ 		umode_t mode;
++		bool createonly = false;
+ 		int len;
+ 		int rc;
+ 
+@@ -1427,7 +1432,9 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		}
+ 
+ 		mode = data->ioc_type;
+-		rc = ll_dir_setdirstripe(dentry, lum, lumlen, filename, mode);
++		createonly = data->ioc_obdo1.o_flags & OBD_FL_OBDMDEXISTS;
++		rc = ll_dir_setdirstripe(dentry, lum, lumlen, filename, mode,
++					 createonly);
+ lmv_out_free:
+ 		kvfree(data);
+ 		return rc;
+diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
+index 9251aec..69261b2 100644
+--- a/fs/lustre/mdc/mdc_lib.c
++++ b/fs/lustre/mdc/mdc_lib.c
+@@ -212,6 +212,11 @@ void mdc_create_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
+ 	flags = 0;
+ 	if (op_data->op_bias & MDS_CREATE_VOLATILE)
+ 		flags |= MDS_OPEN_VOLATILE;
++	if (op_data->op_bias & MDS_SETSTRIPE_CREATE)
++		/* borrow MDS_OPEN_CREATE flag to indicate current setstripe
++		 * create only, and don't restripe if object exists.
++		 */
++		flags |= MDS_OPEN_CREAT;
+ 	set_mrc_cr_flags(rec, flags);
+ 	rec->cr_bias = op_data->op_bias;
+ 	rec->cr_umask = current_umask();
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index d71fe47..c79010b 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1736,6 +1736,8 @@ enum mds_op_bias {
+ 	MDS_TRUNC_KEEP_LEASE	= 1 << 18,
+ 	MDS_PCC_ATTACH		= 1 << 19,
+ 	MDS_CLOSE_UPDATE_TIMES	= 1 << 20,
++	/* setstripe create only, don't restripe if target exists */
++	 MDS_SETSTRIPE_CREATE	= 1 << 21,
+ };
+ 
+ #define MDS_CLOSE_INTENT (MDS_HSM_RELEASE | MDS_CLOSE_LAYOUT_SWAP |         \
 -- 
 1.8.3.1
 
