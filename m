@@ -2,42 +2,59 @@ Return-Path: <SRS0=WSMT=J7=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_CR_TRAILER,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=1.0 required=3.0 tests=BAYES_05,DKIM_INVALID,
+	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
+	SPF_HELO_NONE,SPF_PASS,T_KAM_HTML_FONT_INVALID autolearn=no
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D4BCC433ED
-	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 00:11:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91CE3C433ED
+	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 15:07:48 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2537D610E6
-	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 00:11:11 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2537D610E6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	by mail.kernel.org (Postfix) with ESMTPS id F2093610E9
+	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 15:07:47 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2093610E9
+Authentication-Results: mail.kernel.org; dmarc=pass (p=none dis=none) header.from=lists.lustre.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 68F2B21F83B;
-	Mon,  3 May 2021 17:10:52 -0700 (PDT)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id F00D221F597
- for <lustre-devel@lists.lustre.org>; Mon,  3 May 2021 17:10:24 -0700 (PDT)
-Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 3E5E7EE5;
- Mon,  3 May 2021 20:10:20 -0400 (EDT)
-Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 3A7778AD38; Mon,  3 May 2021 20:10:20 -0400 (EDT)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>
-Date: Mon,  3 May 2021 20:10:13 -0400
-Message-Id: <1620087016-17857-12-git-send-email-jsimmons@infradead.org>
-X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <1620087016-17857-1-git-send-email-jsimmons@infradead.org>
-References: <1620087016-17857-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 11/14] lustre: ptlrpc: idle import vs lock
- enqueue race
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 80CF921F6B2;
+	Tue,  4 May 2021 08:07:47 -0700 (PDT)
+Received: from mail-io1-f45.google.com (mail-io1-f45.google.com
+ [209.85.166.45])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6CDA721F1FA
+ for <lustre-devel@lists.lustre.org>; Sat,  1 May 2021 15:25:31 -0700 (PDT)
+Received: by mail-io1-f45.google.com with SMTP id z14so1188064ioc.12
+ for <lustre-devel@lists.lustre.org>; Sat, 01 May 2021 15:25:31 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=uncc.edu; s=google;
+ h=mime-version:from:date:message-id:subject:to;
+ bh=fJPnVOLOmDw+jGBGh7S0fyY+XMHX0aKtowju/vnSHMk=;
+ b=eDOqGI66h9iYKxtcSpK0dvlcUSiMCAYVyk5zjVkv2xs6EVjDWJssopgSODAz5S/DcA
+ SyJyXzNdTjSYYn6StCf9zoj2GSfemv2cOwguVMidJNynYwLFRVNUZ21YKyRcJP7yws9r
+ qK3U3pZEF0XEi0prijsl0TXtS/7NvxqVX1eVI=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
+ bh=fJPnVOLOmDw+jGBGh7S0fyY+XMHX0aKtowju/vnSHMk=;
+ b=mr4yLCcUQjCOt7APB6dGxI7Um/xj+vYr8HajAtliDlp5b3o+UrWHL9Y95vE8KrRZBQ
+ 1vyKm7SaKNUDTSpmqaGi8Q16a3q5YwxLs6fh6RV01Du3vwtrGEKfXl4Raon3E8hKqTIv
+ lUwartcthS/ib7kteaa8a4/rdYV+9pzvmrSs3Wi1I3l8uUFwGRqELw6wi6JmtipPguPc
+ 5POSLqZZzq4pyICy5Nl/u+NvBASiigeFPYpruc7SEBDyTsF8kY0H3WTPRYdlGra55HAa
+ VSm74spwMS8fGFPe0BFHp04wI7fX5l1cMtEffBfEWQp9OnsdDDuMVhmfSLDAn9kJHZck
+ YxYg==
+X-Gm-Message-State: AOAM532lMVG35NBr2waEd7qZu0mhCIDtPQAWt4r03Xy359NXa5ar77Fm
+ RcNysIEIE3q+QU91EwHqaqBw3bFLHPknIigcio9vCIklUYMz/A==
+X-Google-Smtp-Source: ABdhPJxHlgyCorqmp19/5j9wNT54CRzE8LfIAibXJnSroVX0zTg6ssWbhErDX2hf7peRJklTZ1+UQSgqfZckGRfQU7Y=
+X-Received: by 2002:a05:6638:4a:: with SMTP id
+ a10mr11340883jap.142.1619907930357; 
+ Sat, 01 May 2021 15:25:30 -0700 (PDT)
+MIME-Version: 1.0
+Date: Sat, 1 May 2021 18:25:19 -0400
+Message-ID: <CACyzrcQCUg7RDj9nwa8c8njt9M-wUBB-RgNkTtNkx_zoXsEz5g@mail.gmail.com>
+To: lustre-devel@lists.lustre.org
+X-Mailman-Approved-At: Tue, 04 May 2021 08:07:45 -0700
+Subject: [lustre-devel] Reading extended attributes from a Lustre filesystem
+ image.
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,276 +67,111 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Alexander Boyko <c17825@cray.com>, Andriy Skulysh <c17819@cray.com>,
- Alexander Boyko <alexander.boyko@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+From: Saisha Kamat via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Saisha Kamat <skamat1@uncc.edu>
+Content-Type: multipart/mixed; boundary="===============7627152796473210394=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Alexander Boyko <c17825@cray.com>
+--===============7627152796473210394==
+Content-Type: multipart/alternative; boundary="000000000000c2274305c14c34b1"
 
-There is a window after ptlrpc_check_import_is_idle()
-and setting LUSTRE_IMP_CONNECTING for lock enqueue.
-The lock get granted on OST and is returned to the client.
-Server's lock is destroyed on OST_DISCONNECT.
+--000000000000c2274305c14c34b1
+Content-Type: text/plain; charset="UTF-8"
 
-Perform import counters check with setting LUSTRE_IMP_CONNECTING.
-A regression test_812c was added to sanity.
+Hello,
 
-HPE-bug-id: LUS-8705
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14397
-Lustre-commit: e6af3c529021976e ("LU-14397 ptlrpc: idle import vs lock enqueue race")
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-Signed-off-by: Alexander Boyko <alexander.boyko@hpe.com>
-Reviewed-on: https://review.whamcloud.com/41403
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
-Reviewed-by: Andriy Skulysh <askulysh@gmail.com>
-Reviewed-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- fs/lustre/include/lustre_net.h  |  1 +
- fs/lustre/include/obd_class.h   |  2 ++
- fs/lustre/include/obd_support.h |  1 +
- fs/lustre/obdclass/obd_mount.c  |  4 +--
- fs/lustre/osc/osc_lock.c        |  5 ++++
- fs/lustre/ptlrpc/client.c       | 11 +++++++
- fs/lustre/ptlrpc/import.c       | 63 ++++++++++++++++++++++++++++-------------
- fs/lustre/ptlrpc/pinger.c       |  5 ++--
- 8 files changed, 69 insertions(+), 23 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index e1eb888..f84ee46 100644
---- a/fs/lustre/include/lustre_net.h
-+++ b/fs/lustre/include/lustre_net.h
-@@ -1904,6 +1904,7 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
- 			     u32 version, int opcode, char **bufs,
- 			     struct ptlrpc_cli_ctx *ctx);
- void ptlrpc_req_finished(struct ptlrpc_request *request);
-+void ptlrpc_req_finished_with_imp_lock(struct ptlrpc_request *request);
- struct ptlrpc_request *ptlrpc_request_addref(struct ptlrpc_request *req);
- struct ptlrpc_bulk_desc *ptlrpc_prep_bulk_imp(struct ptlrpc_request *req,
- 					      unsigned int nfrags,
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index 1d1777a..eb52733 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -1713,6 +1713,8 @@ struct root_squash_info {
- 	spinlock_t		rsi_lock;	/* protects rsi_nosquash_nids */
- };
- 
-+int server_name2index(const char *svname, u32 *idx, const char **endptr);
-+
- /* linux-module.c */
- struct obd_ioctl_data;
- int obd_ioctl_getdata(struct obd_ioctl_data **data, int *len, void __user *arg);
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 878a5cd..4628fab 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -365,6 +365,7 @@
- #define OBD_FAIL_PTLRPC_BULK_REPLY_ATTACH		0x522
- #define OBD_FAIL_PTLRPC_ROUND_XID			0x530
- #define OBD_FAIL_PTLRPC_CONNECT_RACE			0x531
-+#define OBD_FAIL_PTLRPC_IDLE_RACE			0x533
- 
- #define OBD_FAIL_OBD_PING_NET				0x600
- /*	OBD_FAIL_OBD_LOG_CANCEL_NET	0x601 obsolete since 1.5 */
-diff --git a/fs/lustre/obdclass/obd_mount.c b/fs/lustre/obdclass/obd_mount.c
-index fbad459..0a5e338 100644
---- a/fs/lustre/obdclass/obd_mount.c
-+++ b/fs/lustre/obdclass/obd_mount.c
-@@ -618,8 +618,7 @@ int server_name2fsname(const char *svname, char *fsname,
-  * rc < 0  on error
-  * if endptr isn't NULL it is set to end of name
-  */
--static int server_name2index(const char *svname, u32 *idx,
--			     const char **endptr)
-+int server_name2index(const char *svname, u32 *idx, const char **endptr)
- {
- 	unsigned long index;
- 	int rc;
-@@ -658,6 +657,7 @@ static int server_name2index(const char *svname, u32 *idx,
- 
- 	return rc;
- }
-+EXPORT_SYMBOL(server_name2index);
- 
- /*************** mount common between server and client ***************/
- 
-diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
-index de96fc0..e0de371 100644
---- a/fs/lustre/osc/osc_lock.c
-+++ b/fs/lustre/osc/osc_lock.c
-@@ -1037,6 +1037,11 @@ static int osc_lock_enqueue(const struct lu_env *env,
- 		if (osc_lock_is_lockless(oscl)) {
- 			oio->oi_lockless = 1;
- 		} else if (!async) {
-+			if (OBD_FAIL_PRECHECK(OBD_FAIL_PTLRPC_IDLE_RACE)) {
-+				OBD_RACE(OBD_FAIL_PTLRPC_IDLE_RACE);
-+				set_current_state(TASK_UNINTERRUPTIBLE);
-+				schedule_timeout(HZ / 2);
-+			}
- 			LASSERT(oscl->ols_state == OLS_GRANTED);
- 			LASSERT(oscl->ols_hold);
- 			LASSERT(oscl->ols_dlmlock);
-diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
-index 97f1251..a812b29 100644
---- a/fs/lustre/ptlrpc/client.c
-+++ b/fs/lustre/ptlrpc/client.c
-@@ -2543,6 +2543,17 @@ static void __ptlrpc_free_req(struct ptlrpc_request *request, int locked)
- 		ptlrpc_request_cache_free(request);
- }
- 
-+static int __ptlrpc_req_finished(struct ptlrpc_request *request, int locked);
-+/**
-+ * Drop one request reference. Must be called with import imp_lock held.
-+ * When reference count drops to zero, request is freed.
-+ */
-+void ptlrpc_req_finished_with_imp_lock(struct ptlrpc_request *request)
-+{
-+	assert_spin_locked(&request->rq_import->imp_lock);
-+	(void)__ptlrpc_req_finished(request, 1);
-+}
-+
- /**
-  * Helper function
-  * Drops one reference count for request @request.
-diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
-index 317f28c..1f31edb 100644
---- a/fs/lustre/ptlrpc/import.c
-+++ b/fs/lustre/ptlrpc/import.c
-@@ -1653,7 +1653,6 @@ static struct ptlrpc_request *ptlrpc_disconnect_prep_req(struct obd_import *imp)
- 	req->rq_timeout = min_t(timeout_t, req->rq_timeout,
- 				INITIAL_CONNECT_TIMEOUT);
- 
--	import_set_state(imp, LUSTRE_IMP_CONNECTING);
- 	req->rq_send_state =  LUSTRE_IMP_CONNECTING;
- 	ptlrpc_request_set_replen(req);
- 
-@@ -1701,16 +1700,20 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
- 				!ptlrpc_import_in_recovery(imp));
- 	}
- 
--	spin_lock(&imp->imp_lock);
--	if (imp->imp_state != LUSTRE_IMP_FULL)
--		goto out;
--	spin_unlock(&imp->imp_lock);
--
- 	req = ptlrpc_disconnect_prep_req(imp);
- 	if (IS_ERR(req)) {
- 		rc = PTR_ERR(req);
- 		goto set_state;
- 	}
-+
-+	spin_lock(&imp->imp_lock);
-+	if (imp->imp_state != LUSTRE_IMP_FULL) {
-+		ptlrpc_req_finished_with_imp_lock(req);
-+		goto out;
-+	}
-+	import_set_state_nolock(imp, LUSTRE_IMP_CONNECTING);
-+	spin_unlock(&imp->imp_lock);
-+
- 	rc = ptlrpc_queue_wait(req);
- 	ptlrpc_req_finished(req);
- 
-@@ -1794,6 +1797,21 @@ static int ptlrpc_disconnect_idle_interpret(const struct lu_env *env,
- 	return 0;
- }
- 
-+static bool ptlrpc_can_idle(struct obd_import *imp)
-+{
-+	struct ldlm_namespace *ns = imp->imp_obd->obd_namespace;
-+
-+	/* one request for disconnect rpc */
-+	if (atomic_read(&imp->imp_reqs) > 1)
-+		return false;
-+
-+	/* any lock increases ns_bref being a resource holder */
-+	if (ns && atomic_read(&ns->ns_bref) > 0)
-+		return false;
-+
-+	return true;
-+}
-+
- int ptlrpc_disconnect_and_idle_import(struct obd_import *imp)
- {
- 	struct ptlrpc_request *req;
-@@ -1804,31 +1822,38 @@ int ptlrpc_disconnect_and_idle_import(struct obd_import *imp)
- 	if (ptlrpc_import_in_recovery(imp))
- 		return 0;
- 
--	spin_lock(&imp->imp_lock);
-+	req = ptlrpc_disconnect_prep_req(imp);
-+	if (IS_ERR(req))
-+		return PTR_ERR(req);
- 
--	if (imp->imp_state != LUSTRE_IMP_FULL) {
-+	req->rq_interpret_reply = ptlrpc_disconnect_idle_interpret;
-+
-+	if (OBD_FAIL_PRECHECK(OBD_FAIL_PTLRPC_IDLE_RACE)) {
-+		u32 idx;
-+
-+		server_name2index(imp->imp_obd->obd_name, &idx, NULL);
-+		if (idx == 0)
-+			OBD_RACE(OBD_FAIL_PTLRPC_IDLE_RACE);
-+	}
-+
-+	spin_lock(&imp->imp_lock);
-+	if (imp->imp_state != LUSTRE_IMP_FULL || !ptlrpc_can_idle(imp)) {
-+		ptlrpc_req_finished_with_imp_lock(req);
- 		spin_unlock(&imp->imp_lock);
- 		return 0;
- 	}
-+	import_set_state_nolock(imp, LUSTRE_IMP_CONNECTING);
-+	/* don't make noise at reconnection */
-+	imp->imp_was_idle = 1;
- 	spin_unlock(&imp->imp_lock);
- 
--	req = ptlrpc_disconnect_prep_req(imp);
--	if (IS_ERR(req))
--		return PTR_ERR(req);
--
- 	CDEBUG_LIMIT(imp->imp_idle_debug, "%s: disconnect after %llus idle\n",
- 		     imp->imp_obd->obd_name,
- 		     ktime_get_real_seconds() - imp->imp_last_reply_time);
- 
--	/* don't make noise at reconnection */
--	spin_lock(&imp->imp_lock);
--	imp->imp_was_idle = 1;
--	spin_unlock(&imp->imp_lock);
--
--	req->rq_interpret_reply = ptlrpc_disconnect_idle_interpret;
- 	ptlrpcd_add_req(req);
- 
--	return 0;
-+	return 1;
- }
- EXPORT_SYMBOL(ptlrpc_disconnect_and_idle_import);
- 
-diff --git a/fs/lustre/ptlrpc/pinger.c b/fs/lustre/ptlrpc/pinger.c
-index f565982..76a0844 100644
---- a/fs/lustre/ptlrpc/pinger.c
-+++ b/fs/lustre/ptlrpc/pinger.c
-@@ -127,8 +127,9 @@ static int ptlrpc_ping(struct obd_import *imp)
- {
- 	struct ptlrpc_request *req;
- 
--	if (ptlrpc_check_import_is_idle(imp))
--		return ptlrpc_disconnect_and_idle_import(imp);
-+	if (ptlrpc_check_import_is_idle(imp) &&
-+	    ptlrpc_disconnect_and_idle_import(imp) == 1)
-+		return 0;
- 
- 	req = ptlrpc_prep_ping(imp);
- 	if (!req) {
--- 
-1.8.3.1
+I am a Ph.D student at UNCC and our team is working on the Lustre
+filesystem. I am reading extended attributes of the ldiskfs for every
+inode. I have used this source
+https://wiki.lustre.org/PFL2_High_Level_Design to interpret the layout in
+which the extended attributes are stored.
+
+
+For the Lustre image we are using, there are 605 inodes out of which 253
+have extended attributes. The count of lma is also 253, which is correct.
+However the only 22 inodes seem to have linkEA attributes and 2 inodes have
+lovEA attributes. The count for linkEA and lovEA is seems to be really
+small compared to the count for lma.
+
+I am wondering if there is an updated document on the layout of extended
+attributes for the ldiskfs inodes.
+
+
+Thanks and regards
+
+- Saisha Kamat
+
+--000000000000c2274305c14c34b1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><span id=3D"gmail-docs-internal-guid-f49b40a4-7fff-1bb1-77=
+c1-e72fb3e8dcc7"><p dir=3D"ltr" style=3D"line-height:1.656;margin-top:0pt;m=
+argin-bottom:0pt"><span style=3D"font-size:11pt;font-family:Arial;color:rgb=
+(0,0,0);background-color:transparent;font-variant-numeric:normal;font-varia=
+nt-east-asian:normal;vertical-align:baseline;white-space:pre-wrap">Hello,</=
+span></p><p dir=3D"ltr" style=3D"line-height:1.656;margin-top:0pt;margin-bo=
+ttom:0pt"><span style=3D"font-size:11pt;font-family:Arial;color:rgb(0,0,0);=
+background-color:transparent;font-variant-numeric:normal;font-variant-east-=
+asian:normal;vertical-align:baseline;white-space:pre-wrap"><br></span></p><=
+p dir=3D"ltr" style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt">=
+<span style=3D"font-size:11pt;font-family:Arial;color:rgb(0,0,0);background=
+-color:transparent;font-variant-numeric:normal;font-variant-east-asian:norm=
+al;vertical-align:baseline;white-space:pre-wrap">I am a Ph.D student at UNC=
+C and our team is working on the Lustre filesystem. I am reading extended a=
+ttributes of the ldiskfs for every inode. I have used this source </span><a=
+ href=3D"https://wiki.lustre.org/PFL2_High_Level_Design" style=3D"text-deco=
+ration-line:none"><span style=3D"font-size:11pt;font-family:Arial;backgroun=
+d-color:transparent;font-variant-numeric:normal;font-variant-east-asian:nor=
+mal;text-decoration-line:underline;vertical-align:baseline;white-space:pre-=
+wrap">https://wiki.lustre.org/PFL2_High_Level_Design</span></a><span style=
+=3D"font-size:11pt;font-family:Arial;color:rgb(0,0,0);background-color:tran=
+sparent;font-variant-numeric:normal;font-variant-east-asian:normal;vertical=
+-align:baseline;white-space:pre-wrap"> to interpret the layout in which the=
+ extended attributes are stored.=C2=A0</span></p><p dir=3D"ltr" style=3D"li=
+ne-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-size:=
+11pt;font-family:Arial;color:rgb(0,0,0);background-color:transparent;font-v=
+ariant-numeric:normal;font-variant-east-asian:normal;vertical-align:baselin=
+e;white-space:pre-wrap"><br></span></p><p dir=3D"ltr" style=3D"line-height:=
+1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-size:11pt;font-=
+family:Arial;color:rgb(0,0,0);background-color:transparent;font-variant-num=
+eric:normal;font-variant-east-asian:normal;vertical-align:baseline;white-sp=
+ace:pre-wrap">For the Lustre image we are using, there are 605 inodes out o=
+f which 253 have extended attributes. The count of lma is also 253, which i=
+s correct. However the only 22 inodes seem to have linkEA attributes and 2 =
+inodes have lovEA attributes. The count for linkEA and lovEA is seems to be=
+ really small compared to the count for lma.</span></p><p dir=3D"ltr" style=
+=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font=
+-size:11pt;font-family:Arial;color:rgb(0,0,0);background-color:transparent;=
+font-variant-numeric:normal;font-variant-east-asian:normal;vertical-align:b=
+aseline;white-space:pre-wrap">I am wondering if there is an updated documen=
+t on the layout of extended attributes for the ldiskfs inodes.</span></p><p=
+ dir=3D"ltr" style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><=
+span style=3D"font-size:11pt;font-family:Arial;color:rgb(0,0,0);background-=
+color:transparent;font-variant-numeric:normal;font-variant-east-asian:norma=
+l;vertical-align:baseline;white-space:pre-wrap"><br></span></p><p style=3D"=
+line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-siz=
+e:11pt;font-family:Arial;color:rgb(0,0,0);background-color:transparent;font=
+-variant-numeric:normal;font-variant-east-asian:normal;vertical-align:basel=
+ine;white-space:pre-wrap">Thanks and regards</span></p><p style=3D"line-hei=
+ght:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-size:11pt;f=
+ont-family:Arial;color:rgb(0,0,0);background-color:transparent;font-variant=
+-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;whit=
+e-space:pre-wrap">- Saisha Kamat</span></p><br></span></div>
+
+--000000000000c2274305c14c34b1--
+
+--===============7627152796473210394==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============7627152796473210394==--
