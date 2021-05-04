@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A2B81C433ED
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2BAFC433B4
 	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 00:10:39 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3232A611AD
+	by mail.kernel.org (Postfix) with ESMTPS id 3184B610E6
 	for <lustre-devel@archiver.kernel.org>; Tue,  4 May 2021 00:10:39 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3232A611AD
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3184B610E6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B9F9821F831;
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id C918B21F73A;
 	Mon,  3 May 2021 17:10:31 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3B56F21F3B4
- for <lustre-devel@lists.lustre.org>; Mon,  3 May 2021 17:10:22 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7E6AA21F3B4
+ for <lustre-devel@lists.lustre.org>; Mon,  3 May 2021 17:10:23 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 1D2CAEDC;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 288EEEE0;
  Mon,  3 May 2021 20:10:20 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 119208AD3D; Mon,  3 May 2021 20:10:20 -0400 (EDT)
+ id 1E84B8AD44; Mon,  3 May 2021 20:10:20 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  3 May 2021 20:10:04 -0400
-Message-Id: <1620087016-17857-3-git-send-email-jsimmons@infradead.org>
+Date: Mon,  3 May 2021 20:10:07 -0400
+Message-Id: <1620087016-17857-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1620087016-17857-1-git-send-email-jsimmons@infradead.org>
 References: <1620087016-17857-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 02/14] lustre: mdc: include linux/idr.h for
- referenced code
+Subject: [lustre-devel] [PATCH 05/14] lnet: Router ping timeout with
+ discovery disabled
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,43 +50,64 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Chris Horn <chris.horn@hpe.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Chris Horn <chris.horn@hpe.com>
 
-Include the <linux/idr.h> header in files that references IDR
-functionality.  Don't depend on its indirect inclusion elsewhere.
+Discovery pings are used to determine the health of gateways and
+associated routes. Ping replies from gateways with dynamic discovery
+(DD) disabled (or if DD is disabled locally) are handled in
+a special routine, lnet_router_discovery_ping_reply(), but this
+function and related code doesn't handle the case where a discovery
+ping hits the response tracker timeout and is unlinked by the
+monitor thread. In this case, an UNLINK event is generated and we
+do not call the lnet_router_discovery_ping_reply(). For gateways
+with DD enabled (and DD enabled locally), we handle this case
+in lnet_router_discovery_complete(). If discovery failed then
+lp_dc_error is set and we mark all routes down for the gateway. We
+can simply extend this logic to the case of gateways w/DD disabled
+(or DD disabled locally).
 
-Fixes: dcedf3009a71 ("lustre: changelog: support large number of MDT")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 3589a3141a4b9f94 ("LU-6142 mdc: include linux/idr.h for referenced code")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/43346
+Fixes: dc80207e3a ("lnet: fix asym routing with multi-hop")
+HPE-bug-id: LUS-9612
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14206
+Lustre-commit: 173d86c6e9a704a8 ("LU-14206 lnet: Router ping timeout with discovery disabled")
+Signed-off-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-on: https://review.whamcloud.com/40923
+Reviewed-by: Cyril Bordage <cbordage@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_changelog.c | 1 +
- 1 file changed, 1 insertion(+)
+ net/lnet/lnet/router.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_changelog.c b/fs/lustre/mdc/mdc_changelog.c
-index ef6d4f9..31c6c8a 100644
---- a/fs/lustre/mdc/mdc_changelog.c
-+++ b/fs/lustre/mdc/mdc_changelog.c
-@@ -36,6 +36,7 @@
- #include <linux/poll.h>
- #include <linux/device.h>
- #include <linux/cdev.h>
-+#include <linux/idr.h>
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index ae7582ca..e179997 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -495,11 +495,11 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 	lp->lp_alive = lp->lp_dc_error == 0;
+ 	spin_unlock(&lp->lp_lock);
  
- #include <lustre_log.h>
- #include <uapi/linux/lustre/lustre_ioctl.h>
+-	/* ping replies are being handled when discovery is disabled */
+-	if (lnet_is_discovery_disabled_locked(lp))
+-		return;
+-
+ 	if (!lp->lp_dc_error) {
++		/* ping replies are being handled when discovery is disabled */
++		if (lnet_is_discovery_disabled_locked(lp))
++			return;
++
+ 		/* mark single-hop routes. If the remote net is not configured
+ 		 * on the gateway we assume this is intentional and we mark the
+ 		 * gateway as multi-hop
 -- 
 1.8.3.1
 
