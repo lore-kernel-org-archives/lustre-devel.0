@@ -4,40 +4,40 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_CR_TRAILER,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SPF_HELO_NONE,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B33C3C433B4
-	for <lustre-devel@archiver.kernel.org>; Sat, 15 May 2021 13:06:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7941C433B4
+	for <lustre-devel@archiver.kernel.org>; Sat, 15 May 2021 13:06:57 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 74E2F61355
-	for <lustre-devel@archiver.kernel.org>; Sat, 15 May 2021 13:06:53 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74E2F61355
+	by mail.kernel.org (Postfix) with ESMTPS id 8421A611C9
+	for <lustre-devel@archiver.kernel.org>; Sat, 15 May 2021 13:06:57 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8421A611C9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2C0AB21FAC2;
-	Sat, 15 May 2021 06:06:35 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 355FE21FA9B;
+	Sat, 15 May 2021 06:06:38 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E9F4821CAD2
- for <lustre-devel@lists.lustre.org>; Sat, 15 May 2021 06:06:14 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4025C21CB06
+ for <lustre-devel@lists.lustre.org>; Sat, 15 May 2021 06:06:16 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 833581006773;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 8E9EC1006CBC;
  Sat, 15 May 2021 09:06:12 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 75EE19814B; Sat, 15 May 2021 09:06:12 -0400 (EDT)
+ id 8989993BCE; Sat, 15 May 2021 09:06:12 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sat, 15 May 2021 09:06:01 -0400
-Message-Id: <1621083970-32463-5-git-send-email-jsimmons@infradead.org>
+Date: Sat, 15 May 2021 09:06:07 -0400
+Message-Id: <1621083970-32463-11-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1621083970-32463-1-git-send-email-jsimmons@infradead.org>
 References: <1621083970-32463-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 04/13] lnet: socklnd: add conns_per_peer
- parameter
+Subject: [lustre-devel] [PATCH 10/13] lustre: lmv: add default LMV inherit
+ depth
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Serguei Smirnov <ssmirnov@whamcloud.com>,
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,268 +58,352 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Serguei Smirnov <ssmirnov@whamcloud.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-Introduce conns_per_peer ksocklnd module parameter.
-In typed mode, this parameter shall control
-the number of BULK_IN and BULK_OUT tcp connections,
-while the number of CONTROL connections shall stay
-at 1. In untyped mode, this parameter shall control
-the number of untyped connections.
-The default conns_per_peer is 1. Max is 127.
+A new field "u8 lum_max_inherit" is added into struct lmv_user_md,
+which represents the inherit depth of default LMV. It will be
+decreased by 1 for subdirectories.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12815
-Lustre-commit: 71b2476e4ddb95aa ("LU-12815 socklnd: add conns_per_peer parameter")
-Signed-off-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/41056
+The valid value of lum_max_inherit is [0, 255]:
+* 0 means unlimited inherit.
+* 1 means inherit end.
+* 250 is the max inherit depth.
+* [251, 254] are reserved.
+* 255 means it's not set.
+
+A new field "u8 lum_max_inherit_rr" is added, if default stripe
+offset is -1, lum_max_inherit_rr is non-zero, and system is balanced,
+new directories are created in roundrobin mannner, otherwise they
+are created on the MDT where their parents are located to avoid
+creating remote directories. And similarly this value will be
+decreased by 1 for each level of subdirectories.
+
+The valid value of lum_max_inherit_rr is different:
+* 0 means not set.
+* 1 means inherit end.
+* 250 is the max inherit depth.
+* [251, 254] are reserved.
+* 255 means unlimited inherit.
+
+However for the user interface of "lfs", the valid value is [-1, 250]:
+* -1 means unlimited inherit.
+* 0 means not set.
+* others are the same.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13440
+Lustre-commit: 01d34a6b3b2e34f7 ("LU-13440 lmv: add default LMV inherit depth")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/43131
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/socklnd/socklnd.c           | 92 ++++++++++++++++++++++++++++--
- net/lnet/klnds/socklnd/socklnd.h           | 23 ++++++--
- net/lnet/klnds/socklnd/socklnd_cb.c        |  3 +-
- net/lnet/klnds/socklnd/socklnd_modparams.c |  9 +++
- 4 files changed, 115 insertions(+), 12 deletions(-)
+ fs/lustre/include/lu_object.h           | 24 ++++++++++++-
+ fs/lustre/include/lustre_lmv.h          |  8 +++--
+ fs/lustre/llite/namei.c                 |  4 +++
+ fs/lustre/lmv/lmv_obd.c                 | 62 +++++++++++++++++++++++++++------
+ fs/lustre/obdclass/lu_tgt_descs.c       | 16 ---------
+ fs/lustre/ptlrpc/pack_generic.c         |  5 ++-
+ include/uapi/linux/lustre/lustre_user.h | 37 +++++++++++++++++++-
+ 7 files changed, 124 insertions(+), 32 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 4c79d1a..3a667e5 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -132,6 +132,9 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
- 	conn_cb->ksnr_connected = 0;
- 	conn_cb->ksnr_deleted = 0;
- 	conn_cb->ksnr_conn_count = 0;
-+	conn_cb->ksnr_ctrl_conn_count = 0;
-+	conn_cb->ksnr_blki_conn_count = 0;
-+	conn_cb->ksnr_blko_conn_count = 0;
+diff --git a/fs/lustre/include/lu_object.h b/fs/lustre/include/lu_object.h
+index a270631..3a71d6b 100644
+--- a/fs/lustre/include/lu_object.h
++++ b/fs/lustre/include/lu_object.h
+@@ -1537,11 +1537,33 @@ struct lu_tgt_descs {
+ void lu_tgt_descs_fini(struct lu_tgt_descs *ltd);
+ int ltd_add_tgt(struct lu_tgt_descs *ltd, struct lu_tgt_desc *tgt);
+ void ltd_del_tgt(struct lu_tgt_descs *ltd, struct lu_tgt_desc *tgt);
+-bool ltd_qos_is_usable(struct lu_tgt_descs *ltd);
+ int ltd_qos_penalties_calc(struct lu_tgt_descs *ltd);
+ int ltd_qos_update(struct lu_tgt_descs *ltd, struct lu_tgt_desc *tgt,
+ 		   u64 *total_wt);
  
- 	return conn_cb;
- }
-@@ -364,6 +367,73 @@ struct ksock_peer_ni *
++/**
++ * Whether MDT inode and space usages are balanced.
++ */
++static inline bool ltd_qos_is_balanced(struct lu_tgt_descs *ltd)
++{
++	return !test_bit(LQ_DIRTY, &ltd->ltd_qos.lq_flags) &&
++	       test_bit(LQ_SAME_SPACE, &ltd->ltd_qos.lq_flags);
++}
++
++/**
++ * Whether QoS data is up-to-date and QoS can be applied.
++ */
++static inline bool ltd_qos_is_usable(struct lu_tgt_descs *ltd)
++{
++	if (ltd_qos_is_balanced(ltd))
++		return false;
++
++	if (ltd->ltd_lov_desc.ld_active_tgt_count < 2)
++		return false;
++
++	return true;
++}
++
+ static inline struct lu_tgt_desc *ltd_first_tgt(struct lu_tgt_descs *ltd)
+ {
+ 	int index;
+diff --git a/fs/lustre/include/lustre_lmv.h b/fs/lustre/include/lustre_lmv.h
+index aee8342..a74f0a5 100644
+--- a/fs/lustre/include/lustre_lmv.h
++++ b/fs/lustre/include/lustre_lmv.h
+@@ -46,6 +46,8 @@ struct lmv_stripe_md {
+ 	u32	lsm_md_stripe_count;
+ 	u32	lsm_md_master_mdt_index;
+ 	u32	lsm_md_hash_type;
++	u8	lsm_md_max_inherit;
++	u8	lsm_md_max_inherit_rr;
+ 	u32	lsm_md_layout_version;
+ 	u32	lsm_md_migrate_offset;
+ 	u32	lsm_md_migrate_hash;
+@@ -119,11 +121,11 @@ static inline void lsm_md_dump(int mask, const struct lmv_stripe_md *lsm)
+ 	 * terminated string so only print LOV_MAXPOOLNAME bytes.
+ 	 */
+ 	CDEBUG(mask,
+-	       "magic %#x stripe count %d master mdt %d hash type %#x version %d migrate offset %d migrate hash %#x pool %.*s\n",
++	       "magic %#x stripe count %d master mdt %d hash type %#x max inherit %hhu version %d migrate offset %d migrate hash %#x pool %.*s\n",
+ 	       lsm->lsm_md_magic, lsm->lsm_md_stripe_count,
+ 	       lsm->lsm_md_master_mdt_index, lsm->lsm_md_hash_type,
+-	       lsm->lsm_md_layout_version, lsm->lsm_md_migrate_offset,
+-	       lsm->lsm_md_migrate_hash,
++	       lsm->lsm_md_max_inherit, lsm->lsm_md_layout_version,
++	       lsm->lsm_md_migrate_offset, lsm->lsm_md_migrate_hash,
+ 	       LOV_MAXPOOLNAME, lsm->lsm_md_pool_name);
+ 
+ 	if (!lmv_dir_striped(lsm))
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 658da49..6ed2943 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -1451,6 +1451,10 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 			md.default_lmv->lsm_md_master_mdt_index =
+ 				lum->lum_stripe_offset;
+ 			md.default_lmv->lsm_md_hash_type = lum->lum_hash_type;
++			md.default_lmv->lsm_md_max_inherit =
++				lum->lum_max_inherit;
++			md.default_lmv->lsm_md_max_inherit_rr =
++				lum->lum_max_inherit_rr;
+ 
+ 			err = ll_update_inode(dir, &md);
+ 			md_free_lustre_md(sbi->ll_md_exp, &md);
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 4fa441e..552ef07 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -1695,6 +1695,22 @@ int lmv_old_layout_lookup(struct lmv_obd *lmv, struct md_op_data *op_data)
  	return rc;
  }
  
-+static unsigned int
-+ksocknal_get_conn_count_by_type(struct ksock_conn_cb *conn_cb,
-+				int type)
++static inline bool lmv_op_user_qos_mkdir(const struct md_op_data *op_data)
 +{
-+	unsigned int count = 0;
++	const struct lmv_user_md *lum = op_data->op_data;
 +
-+	switch (type) {
-+	case SOCKLND_CONN_CONTROL:
-+		count = conn_cb->ksnr_ctrl_conn_count;
-+		break;
-+	case SOCKLND_CONN_BULK_IN:
-+		count = conn_cb->ksnr_blki_conn_count;
-+		break;
-+	case SOCKLND_CONN_BULK_OUT:
-+		count = conn_cb->ksnr_blko_conn_count;
-+		break;
-+	case SOCKLND_CONN_ANY:
-+		count = conn_cb->ksnr_conn_count;
-+		break;
-+	default:
-+		LBUG();
-+		break;
-+	}
-+
-+	return count;
++	return (op_data->op_cli_flags & CLI_SET_MEA) && lum &&
++	       le32_to_cpu(lum->lum_magic) == LMV_USER_MAGIC &&
++	       le32_to_cpu(lum->lum_stripe_offset) == LMV_OFFSET_DEFAULT;
 +}
 +
-+static void
-+ksocknal_incr_conn_count(struct ksock_conn_cb *conn_cb,
-+			 int type)
++static inline bool lmv_op_default_qos_mkdir(const struct md_op_data *op_data)
 +{
-+	conn_cb->ksnr_conn_count++;
++	const struct lmv_stripe_md *lsm = op_data->op_default_mea1;
 +
-+	/* check if all connections of the given type got created */
-+	switch (type) {
-+	case SOCKLND_CONN_CONTROL:
-+		conn_cb->ksnr_ctrl_conn_count++;
-+		/* there's a single control connection per peer */
-+		conn_cb->ksnr_connected |= BIT(type);
-+		break;
-+	case SOCKLND_CONN_BULK_IN:
-+		conn_cb->ksnr_blki_conn_count++;
-+		if (conn_cb->ksnr_blki_conn_count >=
-+		    *ksocknal_tunables.ksnd_conns_per_peer)
-+			conn_cb->ksnr_connected |= BIT(type);
-+		break;
-+	case SOCKLND_CONN_BULK_OUT:
-+		conn_cb->ksnr_blko_conn_count++;
-+		if (conn_cb->ksnr_blko_conn_count >=
-+		    *ksocknal_tunables.ksnd_conns_per_peer)
-+			conn_cb->ksnr_connected |= BIT(type);
-+		break;
-+	case SOCKLND_CONN_ANY:
-+		if (conn_cb->ksnr_conn_count >=
-+		    *ksocknal_tunables.ksnd_conns_per_peer)
-+			conn_cb->ksnr_connected |= BIT(type);
-+		break;
-+	default:
-+		LBUG();
-+		break;
-+	}
-+
-+	CDEBUG(D_NET, "Add conn type %d, ksnr_connected %x conns_per_peer %d\n",
-+	       type, conn_cb->ksnr_connected,
-+	       *ksocknal_tunables.ksnd_conns_per_peer);
++	return lsm && lsm->lsm_md_master_mdt_index == LMV_OFFSET_DEFAULT;
 +}
 +
- static void
- ksocknal_associate_cb_conn_locked(struct ksock_conn_cb *conn_cb,
- 				  struct ksock_conn *conn)
-@@ -407,8 +477,7 @@ struct ksock_peer_ni *
- 			iface->ksni_nroutes++;
- 	}
- 
--	conn_cb->ksnr_connected |= (1 << type);
--	conn_cb->ksnr_conn_count++;
-+	ksocknal_incr_conn_count(conn_cb, type);
- 
- 	/* Successful connection => further attempts can
- 	 * proceed immediately
-@@ -728,6 +797,7 @@ struct ksock_peer_ni *
- 	int rc2;
- 	int rc;
- 	int active;
-+	int num_dup = 0;
- 	char *warn = NULL;
- 
- 	active = !!conn_cb;
-@@ -928,11 +998,14 @@ struct ksock_peer_ni *
- 			    conn2->ksnc_type != conn->ksnc_type)
- 				continue;
- 
--			/*
--			 * Reply on a passive connection attempt so the peer
-+			num_dup++;
-+			if (num_dup < *ksocknal_tunables.ksnd_conns_per_peer)
-+				continue;
-+
-+			/* Reply on a passive connection attempt so the peer_ni
- 			 * realises we're connected.
- 			 */
--			LASSERT(!rc);
-+			LASSERT(rc == 0);
- 			if (!active)
- 				rc = EALREADY;
- 
-@@ -1148,7 +1221,14 @@ struct ksock_peer_ni *
- 	if (conn_cb) {
- 		/* dissociate conn from cb... */
- 		LASSERT(!conn_cb->ksnr_deleted);
--		LASSERT(conn_cb->ksnr_connected & BIT(conn->ksnc_type));
-+
-+		/* connected bit is set only if all connections
-+		 * of the given type got created
-+		 */
-+		if (ksocknal_get_conn_count_by_type(conn_cb, conn->ksnc_type) ==
-+		    *ksocknal_tunables.ksnd_conns_per_peer)
-+			LASSERT((conn_cb->ksnr_connected &
-+				BIT(conn->ksnc_type)) != 0);
- 
- 		list_for_each_entry(conn2, &peer_ni->ksnp_conns, ksnc_list) {
- 			if (conn2->ksnc_conn_cb == conn_cb &&
-diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
-index 9f8fe8a..dac8559 100644
---- a/net/lnet/klnds/socklnd/socklnd.h
-+++ b/net/lnet/klnds/socklnd/socklnd.h
-@@ -163,6 +163,11 @@ struct ksock_tunables {
- 	int		*ksnd_zc_recv_min_nfrags; /* minimum # of fragments to
- 						   * enable ZC receive
- 						   */
-+	int		*ksnd_conns_per_peer;	/* for typed mode, yields:
-+						 * 1 + 2*conns_per_peer total
-+						 * for untyped:
-+						 * conns_per_peer total
-+						 */
- };
- 
- struct ksock_net {
-@@ -371,6 +376,8 @@ struct ksock_conn {
- 							 */
- };
- 
-+#define SOCKNAL_CONN_COUNT_MAX_BITS	8	/* max conn count bits */
-+
- struct ksock_conn_cb {
- 	struct list_head	ksnr_connd_list;	/* chain on ksnr_connd_routes */
- 	struct ksock_peer_ni   *ksnr_peer;		/* owning peer_ni */
-@@ -389,8 +396,11 @@ struct ksock_conn_cb {
- 							 * type
- 							 */
- 	unsigned int		ksnr_deleted:1;		/* been removed from peer_ni? */
--	int			ksnr_conn_count;	/* # conns established by this
--							 * route
-+	unsigned int            ksnr_ctrl_conn_count:1; /* # conns by type */
-+	unsigned int		ksnr_blki_conn_count:8;
-+	unsigned int		ksnr_blko_conn_count:8;
-+	int			ksnr_conn_count;	/* total # conns for
-+							 * this cb
- 							 */
- };
- 
-@@ -595,9 +605,12 @@ struct ksock_proto {
- 
- static inline int ksocknal_timeout(void)
+ /* mkdir by QoS in two cases:
+  * 1. 'lfs mkdir -i -1'
+  * 2. parent default LMV master_mdt_index is -1
+@@ -1704,27 +1720,38 @@ int lmv_old_layout_lookup(struct lmv_obd *lmv, struct md_op_data *op_data)
+  */
+ static inline bool lmv_op_qos_mkdir(const struct md_op_data *op_data)
  {
--	return *ksocknal_tunables.ksnd_timeout ?
--		*ksocknal_tunables.ksnd_timeout :
--		lnet_get_lnd_timeout();
-+	return *ksocknal_tunables.ksnd_timeout ?: lnet_get_lnd_timeout();
-+}
-+
-+static inline int ksocknal_conns_per_peer(void)
-+{
-+	return *ksocknal_tunables.ksnd_conns_per_peer ?: 1;
+-	const struct lmv_stripe_md *lsm = op_data->op_default_mea1;
+-	const struct lmv_user_md *lum = op_data->op_data;
+-
+ 	if (op_data->op_code != LUSTRE_OPC_MKDIR)
+ 		return false;
+ 
+ 	if (lmv_dir_striped(op_data->op_mea1))
+ 		return false;
+ 
+-	if (op_data->op_cli_flags & CLI_SET_MEA && lum &&
+-	    (le32_to_cpu(lum->lum_magic) == LMV_USER_MAGIC ||
+-	     le32_to_cpu(lum->lum_magic) == LMV_USER_MAGIC_SPECIFIC) &&
+-	    le32_to_cpu(lum->lum_stripe_offset) == LMV_OFFSET_DEFAULT)
++	if (lmv_op_user_qos_mkdir(op_data))
+ 		return true;
+ 
+-	if (lsm && lsm->lsm_md_master_mdt_index == LMV_OFFSET_DEFAULT)
++	if (lmv_op_default_qos_mkdir(op_data))
+ 		return true;
+ 
+ 	return false;
  }
  
- int ksocknal_startup(struct lnet_ni *ni);
-diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
-index 43658b2..bfb98f5 100644
---- a/net/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/net/lnet/klnds/socklnd/socklnd_cb.c
-@@ -1818,7 +1818,8 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 			type = SOCKLND_CONN_ANY;
- 		} else if (wanted & BIT(SOCKLND_CONN_CONTROL)) {
- 			type = SOCKLND_CONN_CONTROL;
--		} else if (wanted & BIT(SOCKLND_CONN_BULK_IN)) {
-+		} else if (wanted & BIT(SOCKLND_CONN_BULK_IN) &&
-+			   conn_cb->ksnr_blki_conn_count <= conn_cb->ksnr_blko_conn_count) {
- 			type = SOCKLND_CONN_BULK_IN;
- 		} else {
- 			LASSERT(wanted & BIT(SOCKLND_CONN_BULK_OUT));
-diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
-index 017627f..bc772e4 100644
---- a/net/lnet/klnds/socklnd/socklnd_modparams.c
-+++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
-@@ -139,6 +139,10 @@
- module_param(zc_recv_min_nfrags, int, 0644);
- MODULE_PARM_DESC(zc_recv_min_nfrags, "minimum # of fragments to enable ZC recv");
- 
-+static unsigned int conns_per_peer = 1;
-+module_param(conns_per_peer, uint, 0444);
-+MODULE_PARM_DESC(conns_per_peer, "number of connections per peer");
++/* if default LMV is set, and its index is LMV_OFFSET_DEFAULT, and
++ * 1. max_inherit_rr is set and is not LMV_INHERIT_RR_NONE
++ * 2. or parent is ROOT
++ * mkdir roundrobin.
++ * NB, this also needs to check server is balanced, which is checked by caller.
++ */
++static inline bool lmv_op_default_rr_mkdir(const struct md_op_data *op_data)
++{
++	const struct lmv_stripe_md *lsm = op_data->op_default_mea1;
 +
- #if SOCKNAL_VERSION_DEBUG
- static int protocol = 3;
- module_param(protocol, int, 0644);
-@@ -177,6 +181,11 @@ int ksocknal_tunables_init(void)
- 	ksocknal_tunables.ksnd_zc_min_payload = &zc_min_payload;
- 	ksocknal_tunables.ksnd_zc_recv = &zc_recv;
- 	ksocknal_tunables.ksnd_zc_recv_min_nfrags = &zc_recv_min_nfrags;
-+	if (conns_per_peer > ((1 << SOCKNAL_CONN_COUNT_MAX_BITS) - 1)) {
-+		CWARN("socklnd conns_per_peer is capped at %u.\n",
-+		      (1 << SOCKNAL_CONN_COUNT_MAX_BITS) - 1);
-+	}
-+	ksocknal_tunables.ksnd_conns_per_peer     = &conns_per_peer;
++	if (!lmv_op_default_qos_mkdir(op_data))
++		return false;
++
++	return lsm->lsm_md_max_inherit_rr != LMV_INHERIT_RR_NONE ||
++	       fid_is_root(&op_data->op_fid1);
++}
++
+ /* 'lfs mkdir -i <specific_MDT>' */
+ static inline bool lmv_op_user_specific_mkdir(const struct md_op_data *op_data)
+ {
+@@ -1746,6 +1773,7 @@ static inline bool lmv_op_user_specific_mkdir(const struct md_op_data *op_data)
+ 	       op_data->op_default_mea1->lsm_md_master_mdt_index !=
+ 			LMV_OFFSET_DEFAULT;
+ }
++
+ int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
+ 		const void *data, size_t datalen, umode_t mode, uid_t uid,
+ 		gid_t gid, kernel_cap_t cap_effective, u64 rdev,
+@@ -1793,11 +1821,23 @@ int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
+ 		if (!tgt)
+ 			return -ENODEV;
+ 	} else if (lmv_op_qos_mkdir(op_data)) {
++		struct lmv_tgt_desc *tmp = tgt;
++
+ 		tgt = lmv_locate_tgt_qos(lmv, &op_data->op_mds);
+-		if (tgt == ERR_PTR(-EAGAIN))
+-			tgt = lmv_locate_tgt_rr(lmv, &op_data->op_mds);
++		if (tgt == ERR_PTR(-EAGAIN)) {
++			if (ltd_qos_is_balanced(&lmv->lmv_mdt_descs) &&
++			    !lmv_op_default_rr_mkdir(op_data) &&
++			    !lmv_op_user_qos_mkdir(op_data))
++				/* if it's not necessary, don't create remote
++				 * directory.
++				 */
++				tgt = tmp;
++			else
++				tgt = lmv_locate_tgt_rr(lmv, &op_data->op_mds);
++		}
+ 		if (IS_ERR(tgt))
+ 			return PTR_ERR(tgt);
++
+ 		/*
+ 		 * only update statfs after QoS mkdir, this means the cached
+ 		 * statfs may be stale, and current mkdir may not follow QoS
+@@ -3110,6 +3150,8 @@ static inline int lmv_unpack_user_md(struct obd_export *exp,
+ 	lsm->lsm_md_stripe_count = le32_to_cpu(lmu->lum_stripe_count);
+ 	lsm->lsm_md_master_mdt_index = le32_to_cpu(lmu->lum_stripe_offset);
+ 	lsm->lsm_md_hash_type = le32_to_cpu(lmu->lum_hash_type);
++	lsm->lsm_md_max_inherit = lmu->lum_max_inherit;
++	lsm->lsm_md_max_inherit_rr = lmu->lum_max_inherit_rr;
+ 	lsm->lsm_md_pool_name[LOV_MAXPOOLNAME] = 0;
  
- #if SOCKNAL_VERSION_DEBUG
- 	ksocknal_tunables.ksnd_protocol = &protocol;
+ 	return 0;
+diff --git a/fs/lustre/obdclass/lu_tgt_descs.c b/fs/lustre/obdclass/lu_tgt_descs.c
+index 9f33d22..83f4675 100644
+--- a/fs/lustre/obdclass/lu_tgt_descs.c
++++ b/fs/lustre/obdclass/lu_tgt_descs.c
+@@ -403,22 +403,6 @@ void ltd_del_tgt(struct lu_tgt_descs *ltd, struct lu_tgt_desc *tgt)
+ EXPORT_SYMBOL(ltd_del_tgt);
+ 
+ /**
+- * Whether QoS data is up-to-date and QoS can be applied.
+- */
+-bool ltd_qos_is_usable(struct lu_tgt_descs *ltd)
+-{
+-	if (!test_bit(LQ_DIRTY, &ltd->ltd_qos.lq_flags) &&
+-	    test_bit(LQ_SAME_SPACE, &ltd->ltd_qos.lq_flags))
+-		return false;
+-
+-	if (ltd->ltd_lov_desc.ld_active_tgt_count < 2)
+-		return false;
+-
+-	return true;
+-}
+-EXPORT_SYMBOL(ltd_qos_is_usable);
+-
+-/**
+  * Calculate penalties per-tgt and per-server
+  *
+  * Re-calculate penalties when the configuration changes, active targets
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 5dbab3d..047573a 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -2067,7 +2067,10 @@ void lustre_swab_lmv_user_md(struct lmv_user_md *lum)
+ 	__swab32s(&lum->lum_stripe_offset);
+ 	__swab32s(&lum->lum_hash_type);
+ 	__swab32s(&lum->lum_type);
+-	BUILD_BUG_ON(!offsetof(typeof(*lum), lum_padding1));
++	/* lum_max_inherit and lum_max_inherit_rr do not need to be swabbed */
++	BUILD_BUG_ON(offsetof(typeof(*lum), lum_padding1) == 0);
++	BUILD_BUG_ON(offsetof(typeof(*lum), lum_padding2) == 0);
++	BUILD_BUG_ON(offsetof(typeof(*lum), lum_padding3) == 0);
+ 	switch (lum->lum_magic) {
+ 	case LMV_USER_MAGIC_SPECIFIC:
+ 		count = lum->lum_stripe_count;
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 542d2d3..bcb9f86 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -789,7 +789,11 @@ struct lmv_user_md_v1 {
+ 	__u32	lum_stripe_offset;	/* MDT idx for default dirstripe */
+ 	__u32	lum_hash_type;		/* Dir stripe policy */
+ 	__u32	lum_type;		/* LMV type: default */
+-	__u32	lum_padding1;
++	__u8	lum_max_inherit;	/* inherit depth of default LMV */
++	__u8	lum_max_inherit_rr;	/* inherit depth of default LMV to
++					 * round-robin mkdir
++					 */
++	__u16	lum_padding1;
+ 	__u32	lum_padding2;
+ 	__u32	lum_padding3;
+ 	char	lum_pool_name[LOV_MAXPOOLNAME + 1];
+@@ -815,6 +819,37 @@ enum lmv_type {
+ 	LMV_TYPE_DEFAULT = 0x0000,
+ };
+ 
++/* lum_max_inherit will be decreased by 1 after each inheritance if it's not
++ * LMV_INHERIT_UNLIMITED or > LMV_INHERIT_MAX.
++ */
++enum {
++	/* for historical reason, 0 means unlimited inheritance */
++	LMV_INHERIT_UNLIMITED	= 0,
++	/* unlimited lum_max_inherit by default */
++	LMV_INHERIT_DEFAULT	= 0,
++	/* not inherit any more */
++	LMV_INHERIT_END		= 1,
++	/* max inherit depth */
++	LMV_INHERIT_MAX		= 250,
++	/* [251, 254] are reserved */
++	/* not set, or when inherit depth goes beyond end,  */
++	LMV_INHERIT_NONE	= 255,
++};
++
++enum {
++	/* not set, or when inherit_rr depth goes beyond end,  */
++	LMV_INHERIT_RR_NONE		= 0,
++	/* disable lum_max_inherit_rr by default */
++	LMV_INHERIT_RR_DEFAULT		= 0,
++	/* not inherit any more */
++	LMV_INHERIT_RR_END		= 1,
++	/* max inherit depth */
++	LMV_INHERIT_RR_MAX		= 250,
++	/* [251, 254] are reserved */
++	/* unlimited inheritance */
++	LMV_INHERIT_RR_UNLIMITED	= 255,
++};
++
+ static inline int lmv_user_md_size(int stripes, int lmm_magic)
+ {
+ 	int size = sizeof(struct lmv_user_md);
 -- 
 1.8.3.1
 
