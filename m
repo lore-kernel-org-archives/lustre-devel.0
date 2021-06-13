@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CB9BC48BDF
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F52FC49360
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:21 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D904161363
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:19 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D904161363
+	by mail.kernel.org (Postfix) with ESMTPS id DDD6D611CA
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:20 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDD6D611CA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E8A5B21F5DD;
-	Sun, 13 Jun 2021 16:12:03 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7CD2421F5EA;
+	Sun, 13 Jun 2021 16:12:04 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E510521F1C6
- for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:45 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 836AC21CB16
+ for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:42 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id D9551100B05B;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id B9152100B030;
  Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id D85559C30D; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
+ id AC4EA9C316; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 13 Jun 2021 19:11:29 -0400
-Message-Id: <1623625897-17706-20-git-send-email-jsimmons@infradead.org>
+Date: Sun, 13 Jun 2021 19:11:15 -0400
+Message-Id: <1623625897-17706-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
 References: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 19/27] lnet: libcfs: allow comma-separated
- masks
+Subject: [lustre-devel] [PATCH 05/27] lustre: llite: default lsm update may
+ memory leak
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,65 +50,83 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-For debug and changelog mask names, allow a comma-separated list
-of names to be given, so that the space-separated list does not
-need to be quoted for use.
+ll_update_default_lsm_md() should check whether lli_default_lsm_md
+is set before setting it to the data from lustre_md, and if it's set,
+release the old data to avoid memory leak
 
-Fix a couple of test cases where the debug parameter is set and
-printed overly verbosely during tests.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13055
-Lustre-commit: 6b6fde1026311a28 ("LU-13055 libcfs: allow comma-separated masks")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/43741
-Reviewed-by: Emoly Liu <emoly@whamcloud.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14004
+Lustre-commit: cd2ad336177f8f31 ("LU-14004 llite: default lsm update may memory leak")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/40103
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/libcfs/libcfs_string.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ fs/lustre/llite/llite_lib.c | 35 ++++++++++++++++-------------------
+ 1 file changed, 16 insertions(+), 19 deletions(-)
 
-diff --git a/net/lnet/libcfs/libcfs_string.c b/net/lnet/libcfs/libcfs_string.c
-index d2460f3..4259f8b8 100644
---- a/net/lnet/libcfs/libcfs_string.c
-+++ b/net/lnet/libcfs/libcfs_string.c
-@@ -52,14 +52,14 @@ int cfs_str2mask(const char *str, const char *(*bit2str)(int bit),
- 	char op = '\0';
- 	int newmask = minmask, i, len, found = 0;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 39bdee0..e98972d 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -1505,30 +1505,27 @@ static void ll_update_default_lsm_md(struct inode *inode, struct lustre_md *md)
+ 			}
+ 			up_write(&lli->lli_lsm_sem);
+ 		}
+-	} else if (lli->lli_default_lsm_md) {
+-		/* update default lsm if it changes */
++		return;
++	}
++
++	if (lli->lli_default_lsm_md) {
++		/* do nonthing if default lsm isn't changed */
+ 		down_read(&lli->lli_lsm_sem);
+ 		if (lli->lli_default_lsm_md &&
+-		    !lsm_md_eq(lli->lli_default_lsm_md, md->default_lmv)) {
+-			up_read(&lli->lli_lsm_sem);
+-			down_write(&lli->lli_lsm_sem);
+-			if (lli->lli_default_lsm_md)
+-				lmv_free_memmd(lli->lli_default_lsm_md);
+-			lli->lli_default_lsm_md = md->default_lmv;
+-			lsm_md_dump(D_INODE, md->default_lmv);
+-			md->default_lmv = NULL;
+-			up_write(&lli->lli_lsm_sem);
+-		} else {
++		    lsm_md_eq(lli->lli_default_lsm_md, md->default_lmv)) {
+ 			up_read(&lli->lli_lsm_sem);
++			return;
+ 		}
+-	} else {
+-		/* init default lsm */
+-		down_write(&lli->lli_lsm_sem);
+-		lli->lli_default_lsm_md = md->default_lmv;
+-		lsm_md_dump(D_INODE, md->default_lmv);
+-		md->default_lmv = NULL;
+-		up_write(&lli->lli_lsm_sem);
++		up_read(&lli->lli_lsm_sem);
+ 	}
++
++	down_write(&lli->lli_lsm_sem);
++	if (lli->lli_default_lsm_md)
++		lmv_free_memmd(lli->lli_default_lsm_md);
++	lli->lli_default_lsm_md = md->default_lmv;
++	lsm_md_dump(D_INODE, md->default_lmv);
++	md->default_lmv = NULL;
++	up_write(&lli->lli_lsm_sem);
+ }
  
--	/* <str> must be a list of tokens separated by whitespace
-+	/* <str> must be a list of tokens separated by whitespace or comma,
- 	 * and optionally an operator ('+' or '-').  If an operator
- 	 * appears first in <str>, '*oldmask' is used as the starting point
- 	 * (relative), otherwise minmask is used (absolute).  An operator
- 	 * applies to all following tokens up to the next operator.
- 	 */
- 	while (*str != '\0') {
--		while (isspace(*str))
-+		while (isspace(*str) || *str == ',')
- 			str++;
- 		if (*str == '\0')
- 			break;
-@@ -77,7 +77,7 @@ int cfs_str2mask(const char *str, const char *(*bit2str)(int bit),
- 		/* find token length */
- 		len = 0;
- 		while (str[len] != '\0' && !isspace(str[len]) &&
--		       str[len] != '+' && str[len] != '-')
-+		       str[len] != '+' && str[len] != '-' && str[len] != ',')
- 			len++;
- 
- 		/* match token */
+ static int ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
 -- 
 1.8.3.1
 
