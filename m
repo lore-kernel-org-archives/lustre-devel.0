@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3626DC48BE8
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:13:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 819A6C48BDF
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:13:07 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECC0F61363
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:13:02 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECC0F61363
+	by mail.kernel.org (Postfix) with ESMTPS id 40C4D611CA
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:13:07 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40C4D611CA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2877321F763;
-	Sun, 13 Jun 2021 16:12:29 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 34FA621F5FD;
+	Sun, 13 Jun 2021 16:12:32 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 288B021EBDE
- for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:45 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 289EA21F1EE
+ for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:46 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id D1801100B058;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id DCA2E100B05C;
  Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id CF2709C304; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
+ id DB64D9C303; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 13 Jun 2021 19:11:26 -0400
-Message-Id: <1623625897-17706-17-git-send-email-jsimmons@infradead.org>
+Date: Sun, 13 Jun 2021 19:11:30 -0400
+Message-Id: <1623625897-17706-21-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
 References: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 16/27] lustre: sec: forbid file rename from
- enc to unencrypted dir
+Subject: [lustre-devel] [PATCH 20/27] lustre: osc: cleanup comment in
+ osc_object_is_contended
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,49 +50,47 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Li Xi <lixi@ddn.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Li Xi <lixi@ddn.com>
 
-fscrypt allows renaming an encrypted file from an encrypted directory
-into an unencrypted directory. But it leaves the file encrypted,
-sitting in an unencrypted directory, which can lead to unexpected
-issues.
-So just prevent this kind of rename, and adapt sanity-sec test_47
-accordingly.
+ll_file_is_contended() does not exist any more, so the comment
+is invalid.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14629
-Lustre-commit: 1158386ac9c6a63 ("LU-14629 sec: forbid file rename from enc to unencrypted dir")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/43404
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14702
+Lustre-commit: 269a157c600a68fa ("LU-14702 osc: cleanup comment in osc_object_is_contended")
+Signed-off-by: Li Xi <lixi@ddn.com>
+Reviewed-on: https://review.whamcloud.com/43775
 Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/namei.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ fs/lustre/osc/osc_object.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index a2f5d8d..43cbfbd 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -1792,6 +1792,11 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
- 	err = fscrypt_prepare_rename(src, src_dchild, tgt, tgt_dchild, flags);
- 	if (err)
- 		return err;
-+	/* we prevent an encrypted file from being renamed
-+	 * into an unencrypted dir
-+	 */
-+	if (IS_ENCRYPTED(src) && !IS_ENCRYPTED(tgt))
-+		return -EXDEV;
+diff --git a/fs/lustre/osc/osc_object.c b/fs/lustre/osc/osc_object.c
+index 8f36789..0dd926a 100644
+--- a/fs/lustre/osc/osc_object.c
++++ b/fs/lustre/osc/osc_object.c
+@@ -344,10 +344,6 @@ int osc_object_is_contended(struct osc_object *obj)
+ 	if (!obj->oo_contended)
+ 		return 0;
  
- 	if (src_dchild->d_inode)
- 		mode = src_dchild->d_inode->i_mode;
+-	/*
+-	 * I like copy-paste. the code is copied from
+-	 * ll_file_is_contended.
+-	 */
+ 	retry_time = ktime_add_ns(obj->oo_contention_time,
+ 				  osc_contention_time * NSEC_PER_SEC);
+ 	if (ktime_after(ktime_get(), retry_time)) {
 -- 
 1.8.3.1
 
