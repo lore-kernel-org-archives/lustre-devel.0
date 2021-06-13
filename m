@@ -7,36 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4922C48BDF
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1D38C48BE8
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:38 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A403C611CA
-	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:37 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A403C611CA
+	by mail.kernel.org (Postfix) with ESMTPS id 89D3A61363
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jun 2021 23:12:38 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89D3A61363
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E2C1C21F693;
-	Sun, 13 Jun 2021 16:12:13 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 769BB21F6AA;
+	Sun, 13 Jun 2021 16:12:14 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 30F3321F2B4
- for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:47 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E372321EBDE
+ for <lustre-devel@lists.lustre.org>; Sun, 13 Jun 2021 16:11:44 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id E95BC100BAE1;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id CEC0D100B057;
  Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id E7E9C9C303; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
+ id CC37E9C303; Sun, 13 Jun 2021 19:11:38 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 13 Jun 2021 19:11:34 -0400
-Message-Id: <1623625897-17706-25-git-send-email-jsimmons@infradead.org>
+Date: Sun, 13 Jun 2021 19:11:25 -0400
+Message-Id: <1623625897-17706-16-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
 References: <1623625897-17706-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 24/27] lustre: llite: add selinux testing
+Subject: [lustre-devel] [PATCH 15/27] lnet: do not crash if
+ lnet_sock_getaddr returns error
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -49,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Saurabh Tandan <saurabh.tandan@intel.com>,
+Cc: Artem Blagodarenko <artem.blagodarenko@hpe.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -57,85 +58,66 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Artem Blagodarenko <artem.blagodarenko@hpe.com>
 
-New test sanity-selinux.sh aims at exercing SELinux support
-on the client side, as implemented according to LU-5560.
-This patch adds new fail_locs in CLIO.
+Some issues with network lead to panic in ksocknal_accept
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-5560
-Lustre-commit: bfca8338e5f2ae1b ("LU-5560 tests: add sanity-selinux.sh")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Signed-off-by: Saurabh Tandan <saurabh.tandan@intel.com>
-Reviewed-on: http://review.whamcloud.com/15818
-Reviewed-by: Andrew Perepechko <andrew.perepechko@hpe.com>
-Reviewed-by: Li Xi <lixi@ddn.com>
+rc = lnet_sock_getaddr(sock, true, &peer_ip, &peer_port);
+LASSERT(rc == 0); /* we succeeded before */
+
+Let's pass this error to the caller.
+
+HPE-bug-id: LUS-9256
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13950
+Lustre-commit: 48a9ea82eb30bbb ("LU-13950 lnet: do not crash if lnet_sock_getaddr returns error")
+Signed-off-by: Artem Blagodarenko <artem.blagodarenko@hpe.com>
+Reviewed-on: https://es-gerrit.dev.cray.com/157753
+Reviewed-by: Andriy Skulysh <c17819@cray.com>
+Reviewed-by: Alexander Zarochentsev <c17826@cray.com>
+Tested-by: Alexander Lezhoev <c17454@cray.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-on: https://review.whamcloud.com/39834
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_support.h | 3 +++
- fs/lustre/llite/dir.c           | 2 ++
- fs/lustre/llite/namei.c         | 6 ++++++
- 3 files changed, 11 insertions(+)
+ net/lnet/klnds/socklnd/socklnd.c | 5 ++++-
+ net/lnet/lnet/acceptor.c         | 5 ++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/include/obd_support.h b/fs/lustre/include/obd_support.h
-index 188e552..1e8cebf 100644
---- a/fs/lustre/include/obd_support.h
-+++ b/fs/lustre/include/obd_support.h
-@@ -468,6 +468,9 @@
- #define OBD_FAIL_LLITE_LOST_LAYOUT			0x1407
- #define OBD_FAIL_LLITE_NO_CHECK_DEAD			0x1408
- #define OBD_FAIL_GETATTR_DELAY				0x1409
-+#define OBD_FAIL_LLITE_CREATE_FILE_PAUSE		0x1409
-+#define OBD_FAIL_LLITE_NEWNODE_PAUSE			0x140a
-+#define OBD_FAIL_LLITE_SETDIRSTRIPE_PAUSE		0x140b
- #define OBD_FAIL_LLITE_CREATE_NODE_PAUSE		0x140c
- #define OBD_FAIL_LLITE_IMUTEX_SEC			0x140e
- #define OBD_FAIL_LLITE_IMUTEX_NOSEC			0x140f
-diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index 3432034..fa8e697 100644
---- a/fs/lustre/llite/dir.c
-+++ b/fs/lustre/llite/dir.c
-@@ -486,6 +486,8 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
- 	if (err)
- 		goto out_request;
+diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
+index 3a667e5..eb8c736 100644
+--- a/net/lnet/klnds/socklnd/socklnd.c
++++ b/net/lnet/klnds/socklnd/socklnd.c
+@@ -744,7 +744,10 @@ struct ksock_peer_ni *
+ 	struct sockaddr_storage peer;
  
-+	CFS_FAIL_TIMEOUT(OBD_FAIL_LLITE_SETDIRSTRIPE_PAUSE, cfs_fail_val);
-+
- 	err = ll_prep_inode(&inode, &request->rq_pill, parent->i_sb, NULL);
- 	if (err)
- 		goto out_inode;
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 9eab6fe..f42e872 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -1156,6 +1156,8 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
- 	else if (de)
- 		dentry = de;
+ 	rc = lnet_sock_getaddr(sock, true, &peer);
+-	LASSERT(!rc);			/* we succeeded before */
++	if (rc != 0) {
++		CERROR("Can't determine new connection's address\n");
++		return rc;
++	}
  
-+	CFS_FAIL_TIMEOUT(OBD_FAIL_LLITE_CREATE_FILE_PAUSE, cfs_fail_val);
-+
- 	if (!rc) {
- 		if (it_disposition(it, DISP_OPEN_CREATE)) {
- 			/* Dentry instantiated in ll_create_it. */
-@@ -1485,6 +1487,8 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 	cr = kzalloc(sizeof(*cr), GFP_NOFS);
+ 	if (!cr) {
+diff --git a/net/lnet/lnet/acceptor.c b/net/lnet/lnet/acceptor.c
+index b301ffa..3708b89 100644
+--- a/net/lnet/lnet/acceptor.c
++++ b/net/lnet/lnet/acceptor.c
+@@ -200,7 +200,10 @@ struct socket *
+ 	LASSERT(sizeof(cr) <= 16);		/* not too big for the stack */
  
- 	ll_update_times(request, dir);
+ 	rc = lnet_sock_getaddr(sock, true, &peer);
+-	LASSERT(!rc);				/* we succeeded before */
++	if (rc != 0) {
++		CERROR("Can't determine new connection's address\n");
++		return rc;
++	}
  
-+	CFS_FAIL_TIMEOUT(OBD_FAIL_LLITE_NEWNODE_PAUSE, cfs_fail_val);
-+
- 	err = ll_prep_inode(&inode, &request->rq_pill, dir->i_sb, NULL);
- 	if (err)
- 		goto err_exit;
-@@ -1575,6 +1579,8 @@ static int ll_create_nd(struct inode *dir, struct dentry *dentry,
- 	ktime_t kstart = ktime_get();
- 	int rc;
- 
-+	CFS_FAIL_TIMEOUT(OBD_FAIL_LLITE_CREATE_FILE_PAUSE, cfs_fail_val);
-+
- 	CDEBUG(D_VFSTRACE,
- 	       "VFS Op:name=%pd, dir=" DFID "(%p), flags=%u, excl=%d\n",
- 	       dentry, PFID(ll_inode2fid(dir)), dir, mode, want_excl);
+ 	if (!lnet_accept_magic(magic, LNET_PROTO_ACCEPTOR_MAGIC)) {
+ 		if (lnet_accept_magic(magic, LNET_PROTO_MAGIC)) {
 -- 
 1.8.3.1
 
