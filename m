@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9957EC07E95
-	for <lustre-devel@archiver.kernel.org>; Wed,  7 Jul 2021 19:11:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B64EC07E9B
+	for <lustre-devel@archiver.kernel.org>; Wed,  7 Jul 2021 19:12:01 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 45A7561C48
-	for <lustre-devel@archiver.kernel.org>; Wed,  7 Jul 2021 19:11:59 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45A7561C48
+	by mail.kernel.org (Postfix) with ESMTPS id E379B61C48
+	for <lustre-devel@archiver.kernel.org>; Wed,  7 Jul 2021 19:12:00 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E379B61C48
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id DB7D9338A6F;
-	Wed,  7 Jul 2021 12:11:42 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5D398338A80;
+	Wed,  7 Jul 2021 12:11:44 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 28B1C21F978
- for <lustre-devel@lists.lustre.org>; Wed,  7 Jul 2021 12:11:23 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 11FD321F888
+ for <lustre-devel@lists.lustre.org>; Wed,  7 Jul 2021 12:11:21 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 53617100F3DE;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 44B2310090EE;
  Wed,  7 Jul 2021 15:11:18 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 525769D8BF; Wed,  7 Jul 2021 15:11:18 -0400 (EDT)
+ id 3BF119D8BF; Wed,  7 Jul 2021 15:11:18 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Wed,  7 Jul 2021 15:11:13 -0400
-Message-Id: <1625685076-1964-13-git-send-email-jsimmons@infradead.org>
+Date: Wed,  7 Jul 2021 15:11:06 -0400
+Message-Id: <1625685076-1964-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1625685076-1964-1-git-send-email-jsimmons@infradead.org>
 References: <1625685076-1964-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/15] lustre: osc: Don't get time for each
- page
+Subject: [lustre-devel] [PATCH 05/15] lnet: Ensure ref taken when queueing
+ for discovery
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Patrick Farrell <farr0186@gmail.com>,
+Cc: Chris Horn <chris.horn@hpe.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,105 +58,45 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Patrick Farrell <farr0186@gmail.com>
+From: Chris Horn <chris.horn@hpe.com>
 
-Getting the time when each batch of pages starts is
-sufficiently accurate, and ktime_get() is several % of the
-CPU time when doing AIO + DIO.
+Call lnet_peer_queue_for_discovery() in
+lnet_discovery_event_handler() to ensure that we take a ref on
+the peer when forcing it onto the discovery queue. This also ensures
+that the peer state has LNET_PEER_DISCOVERING.
 
-This relies on previous patches in this series.
+Add a test to sanity-lnet.sh that can trigger the refcount loss bug
+in discovery.
 
-Measuring this in milliseconds/gigabyte lets us measure the
-improvement in absolute terms, rather than just relative
-terms.
-
-This patch reduces i/o time in ms/GiB by:
-Write: 17 ms/GiB
-Read: 6 ms/GiB
-
-Totals:
-Write: 237 ms/GiB
-Read: 223 ms/GiB
-
-IOR:
-mpirun -np 1  $IOR -w -r -t 64M -b 64G -o ./iorfile --posix.odirect
-Without the patch:
-write     4030 MiB/s
-read      4468  MiB/s
-
-With patch:
-write     4326 MiB/s
-read      4587 MiB/s
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-13799
-Lustre-commit: 485976ab451dd6708 ("LU-13799 osc: Don't get time for each page")
-Signed-off-by: Patrick Farrell <farr0186@gmail.com>
-Reviewed-on: https://review.whamcloud.com/39437
-Reviewed-by: Wang Shilong <wshilong@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+HPE-bug-id: LUS-7651
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14627
+Lustre-commit: 2ce6957b69370b0c ("LU-14627 lnet: Ensure ref taken when queueing for discovery")
+Signed-off-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-on: https://review.whamcloud.com/43418
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Stephane Thiell <sthiell@stanford.edu>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_osc.h | 2 +-
- fs/lustre/osc/osc_io.c         | 3 ++-
- fs/lustre/osc/osc_page.c       | 4 ++--
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ net/lnet/lnet/peer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index 884ea59..208bb59 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -584,7 +584,7 @@ void osc_index2policy(union ldlm_policy_data *policy,
- 		      pgoff_t start, pgoff_t end);
- void osc_lru_add_batch(struct client_obd *cli, struct list_head *list);
- void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
--		     enum cl_req_type crt, int brw_flags);
-+		     enum cl_req_type crt, int brw_flags, ktime_t submit_time);
- int lru_queue_work(const struct lu_env *env, void *data);
- long osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
- 		    long target, bool force);
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index 67fe85b..bd92b5d 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -132,6 +132,7 @@ int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
- 	unsigned int max_pages;
- 	unsigned int ppc_bits; /* pages per chunk bits */
- 	unsigned int ppc;
-+	ktime_t submit_time = ktime_get();
- 	bool sync_queue = false;
- 
- 	LASSERT(qin->pl_nr > 0);
-@@ -195,7 +196,7 @@ int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
- 		oap->oap_async_flags |= ASYNC_COUNT_STABLE;
- 		spin_unlock(&oap->oap_lock);
- 
--		osc_page_submit(env, opg, crt, brw_flags);
-+		osc_page_submit(env, opg, crt, brw_flags, submit_time);
- 		list_add_tail(&oap->oap_pending_item, &list);
- 
- 		if (page->cp_sync_io)
-diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
-index 94db9d2..0f088fe 100644
---- a/fs/lustre/osc/osc_page.c
-+++ b/fs/lustre/osc/osc_page.c
-@@ -295,7 +295,7 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
-  * transfer (i.e., transferred synchronously).
-  */
- void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
--		     enum cl_req_type crt, int brw_flags)
-+		     enum cl_req_type crt, int brw_flags, ktime_t submit_time)
- {
- 	struct osc_io *oio = osc_env_io(env);
- 	struct osc_async_page *oap = &opg->ops_oap;
-@@ -316,7 +316,7 @@ void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
- 		oap->oap_cmd |= OBD_BRW_NOQUOTA;
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 76b2d2f..29c3372 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -2783,7 +2783,8 @@ static void lnet_discovery_event_handler(struct lnet_event *event)
+ 	/* Put peer back at end of request queue, if discovery not already
+ 	 * done
+ 	 */
+-	if (rc == LNET_REDISCOVER_PEER && !lnet_peer_is_uptodate(lp)) {
++	if (rc == LNET_REDISCOVER_PEER && !lnet_peer_is_uptodate(lp) &&
++	    lnet_peer_queue_for_discovery(lp)) {
+ 		list_move_tail(&lp->lp_dc_list, &the_lnet.ln_dc_request);
+ 		wake_up(&the_lnet.ln_dc_waitq);
  	}
- 
--	opg->ops_submit_time = ktime_get();
-+	opg->ops_submit_time = submit_time;
- 	osc_page_transfer_get(opg, "transfer\0imm");
- 	osc_page_transfer_add(env, opg, crt);
- }
 -- 
 1.8.3.1
 
