@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51584C07E9D
-	for <lustre-devel@archiver.kernel.org>; Mon, 19 Jul 2021 12:33:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B16BC07E9B
+	for <lustre-devel@archiver.kernel.org>; Mon, 19 Jul 2021 12:33:07 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EEF4C6113B
-	for <lustre-devel@archiver.kernel.org>; Mon, 19 Jul 2021 12:33:03 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EEF4C6113B
+	by mail.kernel.org (Postfix) with ESMTPS id CF51E6113B
+	for <lustre-devel@archiver.kernel.org>; Mon, 19 Jul 2021 12:33:06 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF51E6113B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lustre-devel-bounces@lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B1B7034FADC;
-	Mon, 19 Jul 2021 05:32:40 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 52BCF34FA13;
+	Mon, 19 Jul 2021 05:32:42 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1D4D334F976
- for <lustre-devel@lists.lustre.org>; Mon, 19 Jul 2021 05:32:21 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D761B34F976
+ for <lustre-devel@lists.lustre.org>; Mon, 19 Jul 2021 05:32:20 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id B16976D6;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id B0D306D3;
  Mon, 19 Jul 2021 08:32:15 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id A898FBD1CD; Mon, 19 Jul 2021 08:32:15 -0400 (EDT)
+ id AF3B1BD; Mon, 19 Jul 2021 08:32:15 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon, 19 Jul 2021 08:32:08 -0400
-Message-Id: <1626697933-6971-14-git-send-email-jsimmons@infradead.org>
+Date: Mon, 19 Jul 2021 08:32:10 -0400
+Message-Id: <1626697933-6971-16-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1626697933-6971-1-git-send-email-jsimmons@infradead.org>
 References: <1626697933-6971-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 13/18] lnet: o2iblnd: Avoid double posting
- invalidate
+Subject: [lustre-devel] [PATCH 15/18] lustre: llite: reset pfid after dir
+ migration
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Mike Marciniszyn <mike.marciniszyn@cornelisnetworks.com>,
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,118 +58,88 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mike Marciniszyn <mike.marciniszyn@cornelisnetworks.com>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-When the kib_tx is provisioned during kiblnd_fmr_pool_map(), spare
-WRs in the kib_fast_reg_descriptor are setup and the mapping of
-pages is given to the mr.
+A plain directory will be turned into to a stripe upon
+migration/restripe, and reversely if target is plain directory, the
+target stripe will be turned into directory after.
 
-kiblnd_post_tx_locked() then posts the spare WRs from the
-kib_fast_reg_descriptor.
+In the first case, set pfid, and in the latter case, clear pfid,
+otherwise ll_lock_cancel_bits() will use the wrong master inode.
 
-if (rc == 0)
-        return 0;
-
-The code returns and the kib_fast_reg_descriptor is still contains
-the spare WRs.   The next time the kib_tx is used, the
-now obsolete WRs will be inadvertently posted.   For rdmavt, the
-obsolete invalidate will cause an -EINVAL to be returned from
-the post send.
-
-Fix by adding a state variable frd_posted to the kib_fast_reg_descriptor.
-The variable is set to false in kiblnd_fmr_pool_unmap().
-kiblnd_post_tx_locked() is adjusted to avoid prepending the
-kib_fast_reg_descriptor WRs when frd_posted is true.   After
-the post succeeds, the frd_posted is set to true.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14733
-Lustre-commit: 5930576791e864529 ("LU-14733 o2iblnd: Avoid double posting invalidate")
-Signed-off-by: Mike Marciniszyn <mike.marciniszyn@cornelisnetworks.com>
-Reviewed-on: https://review.whamcloud.com/44190
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14459
+Lustre-commit: abbe545a63b304e80 ("LU-14459 llite: reset pfid after dir migration")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/43289
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/o2iblnd/o2iblnd.c    |  2 ++
- net/lnet/klnds/o2iblnd/o2iblnd.h    |  1 +
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 12 +++++++-----
- 3 files changed, 10 insertions(+), 5 deletions(-)
+ fs/lustre/llite/llite_lib.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 81d9e4d..b519a31 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1539,6 +1539,7 @@ void kiblnd_fmr_pool_unmap(struct kib_fmr *fmr, int status)
- 	fps = fpo->fpo_owner;
- 	if (frd) {
- 		frd->frd_valid = false;
-+		frd->frd_posted = false;
- 		fmr->fmr_frd = NULL;
- 		spin_lock(&fps->fps_lock);
- 		list_add_tail(&frd->frd_list, &fpo->fast_reg.fpo_pool_list);
-@@ -1634,6 +1635,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
- 			fmr->fmr_key = is_rx ? mr->rkey : mr->lkey;
- 			fmr->fmr_frd = frd;
- 			fmr->fmr_pool = fpo;
-+			frd->frd_posted = false;
- 			return 0;
- 		}
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 10a9a95..88a1d17 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -1401,10 +1401,12 @@ static struct inode *ll_iget_anon_dir(struct super_block *sb,
+ 				      struct lustre_md *md)
+ {
+ 	struct ll_sb_info *sbi = ll_s2sbi(sb);
++	struct ll_inode_info *lli;
+ 	struct mdt_body *body = md->body;
+ 	struct inode *inode;
+ 	ino_t ino;
  
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 824b204..8d1d7eb 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -272,6 +272,7 @@ struct kib_fast_reg_descriptor { /* For fast registration */
- 	struct ib_reg_wr	frd_fastreg_wr;
- 	struct ib_mr	       *frd_mr;
- 	bool			frd_valid;
-+	bool			frd_posted;
- };
++	LASSERT(md->lmv);
+ 	ino = cl_fid_build_ino(fid, sbi->ll_flags & LL_SBI_32BIT_API);
+ 	inode = iget_locked(sb, ino);
+ 	if (!inode) {
+@@ -1413,10 +1415,8 @@ static struct inode *ll_iget_anon_dir(struct super_block *sb,
+ 		return ERR_PTR(-ENOENT);
+ 	}
  
- struct kib_fmr_pool {
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index c66acc51..32ccac2 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -721,6 +721,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	struct kib_msg *msg = tx->tx_msg;
- 	struct kib_peer_ni *peer_ni = conn->ibc_peer;
- 	struct lnet_ni *ni = peer_ni->ibp_ni;
-+	struct kib_fast_reg_descriptor *frd = tx->tx_fmr.fmr_frd;
- 	int ver = conn->ibc_version;
- 	int rc;
- 	int done;
-@@ -809,11 +810,10 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 		/* close_conn will launch failover */
- 		rc = -ENETDOWN;
- 	} else {
--		struct kib_fast_reg_descriptor *frd = tx->tx_fmr.fmr_frd;
- 		const struct ib_send_wr *bad = &tx->tx_wrq[tx->tx_nwrq - 1].wr;
- 		struct ib_send_wr *wrq = &tx->tx_wrq[0].wr;
++	lli = ll_i2info(inode);
+ 	if (inode->i_state & I_NEW) {
+-		struct ll_inode_info *lli = ll_i2info(inode);
+-		struct lmv_stripe_md *lsm = md->lmv;
+-
+ 		inode->i_mode = (inode->i_mode & ~S_IFMT) |
+ 				(body->mbo_mode & S_IFMT);
+ 		LASSERTF(S_ISDIR(inode->i_mode), "Not slave inode " DFID "\n",
+@@ -1432,12 +1432,17 @@ static struct inode *ll_iget_anon_dir(struct super_block *sb,
+ 		lli->lli_fid = *fid;
+ 		ll_lli_init(lli);
  
--		if (frd) {
-+		if (frd && !frd->frd_posted) {
- 			if (!frd->frd_valid) {
- 				wrq = &frd->frd_inv_wr;
- 				wrq->next = &frd->frd_fastreg_wr.wr;
-@@ -837,11 +837,13 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+-		LASSERT(lsm);
+ 		/* master object FID */
+ 		lli->lli_pfid = body->mbo_fid1;
+ 		CDEBUG(D_INODE, "lli %p slave " DFID " master " DFID "\n",
+ 		       lli, PFID(fid), PFID(&lli->lli_pfid));
+ 		unlock_new_inode(inode);
++	} else {
++		/* in directory restripe/auto-split, a directory will be
++		 * transformed to a stripe if it's plain, set its pfid here,
++		 * otherwise ll_lock_cancel_bits() can't find the master inode.
++		 */
++		lli->lli_pfid = body->mbo_fid1;
+ 	}
  
- 	conn->ibc_last_send = ktime_get();
+ 	return inode;
+@@ -1547,6 +1552,12 @@ static int ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 	if (md->default_lmv)
+ 		ll_update_default_lsm_md(inode, md);
  
--	if (!rc)
-+	if (rc == 0) {
-+		if (frd)
-+			frd->frd_posted = true;
- 		return 0;
-+	}
- 
--	/*
--	 * NB credits are transferred in the actual
-+	/* NB credits are transferred in the actual
- 	 * message, which can only be the last work item
- 	 */
- 	conn->ibc_credits += credit;
++	/* after dir migration/restripe, a stripe may be turned into a
++	 * directory, in this case, zero out its lli_pfid.
++	 */
++	if (unlikely(fid_is_norm(&lli->lli_pfid)))
++		fid_zero(&lli->lli_pfid);
++
+ 	/*
+ 	 * no striped information from request, lustre_md from req does not
+ 	 * include stripeEA, see ll_md_setattr()
 -- 
 1.8.3.1
 
