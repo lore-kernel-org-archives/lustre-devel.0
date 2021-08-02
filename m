@@ -2,67 +2,56 @@ Return-Path: <SRS0=Kfxm=MZ=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,
-	SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.7 required=3.0 tests=BAYES_00,
+	HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,URIBL_BLOCKED autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69393C4338F
-	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 03:13:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 33847C4338F
+	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 08:55:47 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DDCCD61050
-	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 03:13:09 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org DDCCD61050
-Authentication-Results: mail.kernel.org; dmarc=pass (p=none dis=none) header.from=lists.lustre.org
+	by mail.kernel.org (Postfix) with ESMTPS id A9B5361057
+	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 08:55:46 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org A9B5361057
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=CEA.FR
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3A6BD350B41;
-	Sun,  1 Aug 2021 20:13:09 -0700 (PDT)
-Received: from mail-yb1-f170.google.com (mail-yb1-f170.google.com
- [209.85.219.170])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A74D0350B5C
- for <lustre-devel@lists.lustre.org>; Sun,  1 Aug 2021 20:13:06 -0700 (PDT)
-Received: by mail-yb1-f170.google.com with SMTP id d73so1444230ybc.10
- for <lustre-devel@lists.lustre.org>; Sun, 01 Aug 2021 20:13:06 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=jAuehAzDbFYXWAT0sJkI8ETZb9xyKQ4HW7uW8e7K2dI=;
- b=TuDrWpDia6QoLzYOmi6Lj4Z5f1N6+SlAL6l6Ud28dLceFj6LPW8Nad/E2xRX7nRlip
- Z63hezyH9dd9VhZEFYroV/5Q45tJGWwH2zArf+RC3MsjgqWMA23DdSJK0ara2nDdgA2q
- pFgY89UUnW0oW4l6iu5Vky2a2x9GoZttoLn+zBjf4t2TbeyGPSySD+7aRUTPueRb/h2V
- k3vLgqBllPAA2ez3BsfqlvNykjwram43TcAItCJ5C7SdBjpEeTS3SOMozuBjmzPQyG8d
- 4a7DqVnG5ro5Phs740GD8aT6aSBQCVZd2z4WpmtC1fcbMe1A1LT5AK/HTXDANg60YKmq
- dJsA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=jAuehAzDbFYXWAT0sJkI8ETZb9xyKQ4HW7uW8e7K2dI=;
- b=csvFx0UsyyjzUd9hc+F65upEVI5Cse1px+52vWDwjV6TVJGZw41eT3P/0RFInuHqmw
- 5uoDedi2nPEeUuVsoQzuRzv1YG7ra/58vZzrDpZa0jrMuoV2yH1bVc9jmsibL/rbzlLJ
- hP1Ysqo0YY4FsDdZAre13IlrXPu5ySzE/ZBF6zkRLg02BhZdv4bH+L3Cm6yK4BhWHx/H
- m8F9HxaF4f5UmzZXKg+0f9+QdwXH1a5TN//buDJeOc2s39+6Vy9BDmJRmU2NaoKkN/oe
- IzAsPXyjt++Ro5LQQ/tjauBWN2Sanu6ckEcYa4qamNjcEG94Z1QtOx0fzzTZ/waPdsB2
- JwTg==
-X-Gm-Message-State: AOAM532TAJqEfg4JmXomR2MTLme6U8NgEVrzgGxnwnm5KNsyOT+NP4iT
- VyspiFD+2KOFz05kooj6YI58LLPD63hB7LqCfs3W2A==
-X-Google-Smtp-Source: ABdhPJxkcQtf+VeZi14MpwHMlpqmi3Z/94eAdXmw0tDUHGPo3scDyhhaBC3Ghp0EPOQt5n8jcKvOla/tQGb8G0ubdTI=
-X-Received: by 2002:a25:6e45:: with SMTP id j66mr18203769ybc.449.1627873985870; 
- Sun, 01 Aug 2021 20:13:05 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 679D8350C7D;
+	Mon,  2 Aug 2021 01:55:45 -0700 (PDT)
+Received: from oxalide-smtp-out.extra.cea.fr (oxalide-smtp-out.extra.cea.fr
+ [132.168.224.13])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8D4B6350C59
+ for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 01:55:42 -0700 (PDT)
+Received: from pisaure.intra.cea.fr (pisaure.intra.cea.fr [132.166.88.21])
+ by oxalide-sys.extra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with ESMTP
+ id 1728tekg024221
+ for <lustre-devel@lists.lustre.org>; Mon, 2 Aug 2021 10:55:40 +0200
+Received: from pisaure.intra.cea.fr (localhost [127.0.0.1])
+ by localhost (Postfix) with SMTP id 47999202D6A
+ for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 10:55:40 +0200 (CEST)
+Received: from muguet1-smtp-out.intra.cea.fr (muguet1-smtp-out.intra.cea.fr
+ [132.166.192.12])
+ by pisaure.intra.cea.fr (Postfix) with ESMTP id 3A0C0202D56
+ for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 10:55:40 +0200 (CEST)
+Received: from zia.cdc.esteban.ctsi (out.dam.intra.cea.fr [132.165.76.10])
+ by muguet1-sys.intra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with SMTP
+ id 1728teAa015353
+ for <lustre-devel@lists.lustre.org>; Mon, 2 Aug 2021 10:55:40 +0200
+Received: (qmail 28099 invoked from network); 2 Aug 2021 08:55:40 -0000
+From: "Thomas.LEIBOVICI@CEA.FR" <Thomas.LEIBOVICI@CEA.FR>
+To: "'lustre-discuss@lists.lustre.org'" <lustre-discuss@lists.lustre.org>,
+ "'lustre-devel@lists.lustre.org'" <lustre-devel@lists.lustre.org>,
+ "'lustre-announce@lists.lustre.org'" <lustre-announce@lists.lustre.org>
+Thread-Topic: [LAD21] Submit a presentation before your summer holidays!
+Thread-Index: AdeHe7NzRUbpP7mQT+2HBBbMkW26Xg==
+Date: Mon, 2 Aug 2021 08:55:38 +0000
+Message-ID: <8e74e0fdcacf49c9ae3beffbcc6e0a07@U-MYKONOS3.dif.dam.intra.cea.fr>
+Accept-Language: fr-FR, en-US
+Content-Language: fr-FR
 MIME-Version: 1.0
-References: <CACzn6-U5HD_7UO5KSPO7p5O9n3JKm87jVVk5FJRS1x4W=TW_DA@mail.gmail.com>
- <846A7FB8-D265-4CCD-B61C-1D18A6FCA8FF@ddn.com>
- <CACzn6-WdPLPGhCmu8ZEJs21Fvogp8KiPfTAUP=c0Nrh22rLRTw@mail.gmail.com>
- <5C1FCECB-995B-47BA-9D98-DA00CAF42B3F@ddn.com>
- <CAKoKPbx_4oZ=gcv6bCB7GyxQ7zsnTSE9SL3+BgQjyH-+4jK1zg@mail.gmail.com>
- <F6063C20-6184-41A4-9762-95056821150C@ddn.com>
-In-Reply-To: <F6063C20-6184-41A4-9762-95056821150C@ddn.com>
-Date: Mon, 2 Aug 2021 11:12:29 +0800
-Message-ID: <CAKoKPby3NA9btXRZ2q1SL4VSWobsrMreBL078QNyvHth_fhtww@mail.gmail.com>
-To: Peter Jones <pjones@whamcloud.com>
-Subject: Re: [lustre-devel] Lustre Arm64 Development and Release
+Subject: [lustre-devel] [LAD21] Submit a presentation before your summer
+ holidays!
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -75,627 +64,150 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Xinliang Liu <xinliang.liu@linaro.org>
-Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============7842685498681783715=="
+Reply-To: "lad@eofs.eu" <lad@eofs.eu>
+Content-Type: multipart/mixed; boundary="===============6117954339203177051=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7842685498681783715==
-Content-Type: multipart/alternative; boundary="000000000000aad72505c88af221"
+--===============6117954339203177051==
+Content-Language: fr-FR
+Content-Type: multipart/alternative;
+	boundary="_000_8e74e0fdcacf49c9ae3beffbcc6e0a07UMYKONOS3difdamintracea_"
 
---000000000000aad72505c88af221
-Content-Type: text/plain; charset="UTF-8"
-
-On Fri, 30 Jul 2021 at 20:46, Peter Jones <pjones@whamcloud.com> wrote:
-
-> Xinliang
->
->
->
-> There are presently no specific plans/timeline around providing an aarch64
-> release. This would certainly be something that we could look into if there
-> remains consistent interest/engagement on this. Most of the issues on that
-> short list of tickets have been around for some years  already. I suggest
-> that we revisit this topic when the list is down to 1-2 remaining issues.
->
-
-Hi Peter, got it. We will continue fixing the arm bug list. Hope we will
-make good progress soon.
-
-Xinliang
-
-
-
->
->
-> Peter
->
->
->
-> *From: *Xinliang Liu <xinliang.liu@linaro.org>
-> *Date: *Thursday, July 29, 2021 at 8:49 PM
-> *To: *Peter Jones <pjones@whamcloud.com>
-> *Cc: *Kevin Zhao <kevin.zhao@linaro.org>, "lustre-devel@lists.lustre.org"
-> <lustre-devel@lists.lustre.org>
-> *Subject: *Re: [lustre-devel] Lustre Arm64 Development and Release
->
->
->
-> Hi Peter and Lustre team,
->
->
->
-> On Tue, 29 Jun 2021 at 20:47, Peter Jones <pjones@whamcloud.com> wrote:
->
-> Kevin
->
->
->
-> This would be a good starting point -
-> https://jira.whamcloud.com/issues/?filter=15555
->
->
->
-> Recently, we've set up all-in-one and multi-node CentOS8 aarch64 Lustre
-> test environments which include both server and client.
-> And we've done some basic file read/write manual tests and verified the
-> first bug #LU-10073 of the filter bug list, it's very exciting that no
-> issues were found on aarch64 CentOS8.
->
-> We will continue to verify other bugs on the filter list. But we currently
-> are very interested in the goal of arm64 release. So that users can
-> directly download aarch64 release from Lustre web site without building by
-> themself. And we eager to know more details about the aarch64 release:
->
-> 1) Any schedule timeline or plan for aarch64 release?
-> 2) If there is no now, how to make it happen?
-> 3) What are things we need to offer aarch64 releases? Or what resources
-> are missing?
-> We are looking forward to your reply. And will continue to contribute more
-> to the Lustre community. Thanks.
->
->
->
-> Xinliang
->
->
->
->
->
-> Peter
->
->
->
-> *From: *Kevin Zhao <kevin.zhao@linaro.org>
-> *Date: *Tuesday, June 29, 2021 at 5:44 AM
-> *To: *Peter Jones <pjones@whamcloud.com>
-> *Cc: *"lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
-> Xinliang Liu <xinliang.liu@linaro.org>
-> *Subject: *Re: [lustre-devel] Lustre Arm64 Development and Release
->
->
->
-> Hi Peter,
->
->
->
-> That's great! We can help to follow and fix test failures. Could you point
-> us some test failure links or logs? So that we can kick off our work and
-> reproduce the failure in our local lab.
->
-> Thanks!
->
->
->
-> On Tue, 29 Jun 2021 at 20:41, Peter Jones <pjones@whamcloud.com> wrote:
->
-> Hi Kevin
->
->
->
-> Various people have asked this question over the last couple of years. We
-> have machines that could be used for CI (Arm clients are being routinely
-> tested) but the challenge has been to have someone follow through and work
-> through test failures and take responsibility for vetting the tests in an
-> ongoing basis.
->
->
->
-> Peter
->
->
->
-> *From: *lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of
-> Kevin Zhao via lustre-devel <lustre-devel@lists.lustre.org>
-> *Reply-To: *Kevin Zhao <kevin.zhao@linaro.org>
-> *Date: *Tuesday, June 29, 2021 at 5:29 AM
-> *To: *"lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-> *Cc: *Xinliang Liu <xinliang.liu@linaro.org>
-> *Subject: *[lustre-devel] Lustre Arm64 Development and Release
->
->
->
-> Hi Lustre,
->
->
->
-> Greetings!
->
-> I'm Kevin Zhao, and cc'ed Xinliang Liu, we are from Linaro. We are working
-> on Arm64 storage enablement and Lustre is definitely on top of our list.
-> We've received some requests from our members about Lustre support on
-> Arm64.
->
->
->
-> So I'm writing to ask the current status of Lustre on Arm64. I noticed
-> that there are some pages recording Lustre build method on Arm64 as Link
-> <https://wiki.whamcloud.com/pages/viewpage.action?pageId=154144662> and
-> some Jira cards <https://jira.whamcloud.com/browse/LU-11200>. But I don't
-> see official or experimental release on Arm64. So my question is:
->
-> 1. if there some gap or effort needs to be done in order to offer arm64
-> release? We are very interested and can help to work on that.
->
-> 2. If there CI resources needs in order to achieve this? At Linaro we also
-> have some machine resources to serve as the CI machines.
->
->
->
-> Thanks a lot for your reply in advance and look forward to work with you
-> in the community!
->
->
->
-> --
->
-> *Best Regards*
->
-> *Kevin Zhao*
->
-> Tech Lead, LDCG Cloud Infrastructure
->
-> Linaro Vertical Technologies
->
-> IRC(freenode): kevinz
->
-> Slack(kubernetes.slack.com): kevinz
->
-> kevin.zhao@linaro.org <elsie.wahlig@linaro.org> | Mobile/Direct/Wechat:
-> +86 18818270915
->
->
->
->
->
->
-> --
->
-> *Best Regards*
->
-> *Kevin Zhao*
->
-> Tech Lead, LDCG Cloud Infrastructure
->
-> Linaro Vertical Technologies
->
-> IRC(freenode): kevinz
->
-> Slack(kubernetes.slack.com): kevinz
->
-> kevin.zhao@linaro.org <elsie.wahlig@linaro.org> | Mobile/Direct/Wechat:
-> +86 18818270915
->
->
->
->
-
---000000000000aad72505c88af221
-Content-Type: text/html; charset="UTF-8"
+--_000_8e74e0fdcacf49c9ae3beffbcc6e0a07UMYKONOS3difdamintracea_
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
-<div dir=3D"ltr"><div dir=3D"ltr">On Fri, 30 Jul 2021 at 20:46, Peter Jones=
- &lt;<a href=3D"mailto:pjones@whamcloud.com">pjones@whamcloud.com</a>&gt; w=
-rote:<br></div><div class=3D"gmail_quote"><blockquote class=3D"gmail_quote"=
- style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);p=
-adding-left:1ex">
+Only one month left to propose a presentation for LAD21!
+Just take a few minutes to write a short summary on this portal: https://ea=
+sychair.org/conferences/?conf=3Dlad21
 
+We will be grateful! This year, speakers will be rewarded with a great excl=
+usive goodie of LAD'21!
 
+Topics
+We invite members of the Lustre community to send proposals for a 20-25min =
+presentation about:
+    - feedback / news about a particular Lustre feature;
+    - a good Lustre success (/ failure) story;
+    - tools of the Lustre ecosystem;
+    - administration experiences, configuration, tunings...
 
+Pre-recorded presentations will be aired online from September 28th to Sept=
+ember 30th. A chat platform will make it possible to ask questions to prese=
+nters and discuss with other members of the Lustre community.
 
+About LAD
+Lustre Admins & Devs Workshop is a great opportunity for Lustre worldwide a=
+dministrators and developers to gather and exchange their experiences, deve=
+lopments, tools, good practices and more. It usually takes place in Europe/=
+France, but due to the current pandemic context, it takes place in the form=
+ of a webinar (free of charge).
 
-<div lang=3D"EN-CA">
-<div class=3D"gmail-m_-7531286100030640131WordSection1">
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Xinlia=
-ng<u></u><u></u></span></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt"><u></u=
->=C2=A0<u></u></span></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">There =
-are presently no specific plans/timeline around providing an aarch64 releas=
-e. This would certainly be something that we could look into if there remai=
-ns consistent interest/engagement on
- this. Most of the issues on that short list of tickets have been around fo=
-r some years =C2=A0already. I suggest that we revisit this topic when the l=
-ist is down to 1-2 remaining issues.</span></p></div></div></blockquote><di=
-v><br></div><div>Hi Peter, got it. We will continue fixing the arm bug list=
-. Hope we will make good progress soon.</div><div><br></div><div>Xinliang</=
-div><div><br></div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=
-=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding=
--left:1ex"><div lang=3D"EN-CA"><div class=3D"gmail-m_-7531286100030640131Wo=
-rdSection1"><p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:=
-14pt"><u></u><u></u></span></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt"><u></u=
->=C2=A0<u></u></span></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Peter<=
-u></u><u></u></span></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt"><u></u=
->=C2=A0<u></u></span></p>
-<div style=3D"border-right:none;border-bottom:none;border-left:none;border-=
-top:1pt solid rgb(181,196,223);padding:3pt 0cm 0cm">
-<p class=3D"MsoNormal"><b><span style=3D"font-size:12pt;color:black">From: =
-</span></b><span style=3D"font-size:12pt;color:black">Xinliang Liu &lt;<a h=
-ref=3D"mailto:xinliang.liu@linaro.org" target=3D"_blank">xinliang.liu@linar=
-o.org</a>&gt;<br>
-<b>Date: </b>Thursday, July 29, 2021 at 8:49 PM<br>
-<b>To: </b>Peter Jones &lt;<a href=3D"mailto:pjones@whamcloud.com" target=
-=3D"_blank">pjones@whamcloud.com</a>&gt;<br>
-<b>Cc: </b>Kevin Zhao &lt;<a href=3D"mailto:kevin.zhao@linaro.org" target=
-=3D"_blank">kevin.zhao@linaro.org</a>&gt;, &quot;<a href=3D"mailto:lustre-d=
-evel@lists.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org</a>&=
-quot; &lt;<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank=
-">lustre-devel@lists.lustre.org</a>&gt;<br>
-<b>Subject: </b>Re: [lustre-devel] Lustre Arm64 Development and Release<u><=
-/u><u></u></span></p>
-</div>
-<div>
-<p class=3D"MsoNormal"><u></u>=C2=A0<u></u></p>
-</div>
-<div>
-<div>
-<p class=3D"MsoNormal">Hi Peter and Lustre team,<u></u><u></u></p>
-</div>
-<p class=3D"MsoNormal"><u></u>=C2=A0<u></u></p>
-<div>
-<div>
-<p class=3D"MsoNormal">On Tue, 29 Jun 2021 at 20:47, Peter Jones &lt;<a hre=
-f=3D"mailto:pjones@whamcloud.com" target=3D"_blank">pjones@whamcloud.com</a=
->&gt; wrote:<u></u><u></u></p>
-</div>
-<blockquote style=3D"border-top:none;border-right:none;border-bottom:none;b=
-order-left:1pt solid rgb(204,204,204);padding:0cm 0cm 0cm 6pt;margin-left:4=
-.8pt;margin-right:0cm">
-<div>
-<div>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Kevin<=
-/span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">This w=
-ould be a good starting point -
-<a href=3D"https://jira.whamcloud.com/issues/?filter=3D15555" target=3D"_bl=
-ank">https://jira.whamcloud.com/issues/?filter=3D15555</a></span><u></u><u>=
-</u></p>
-</div>
-</div>
-</blockquote>
-<div>
-<p class=3D"MsoNormal"><u></u>=C2=A0<u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Recently, we&#39;ve set up all-in-one and multi-node=
- CentOS8 aarch64 Lustre test environments which include both server and cli=
-ent.
-<br>
-And we&#39;ve done some basic file read/write manual tests and verified the=
- first bug #LU-10073 of the filter bug list, it&#39;s very exciting that no=
- issues were found on aarch64 CentOS8.<br>
-=C2=A0<br>
-We will continue to verify other bugs on the filter list. But we currently =
-are very interested in the goal of arm64 release. So that users can directl=
-y download aarch64 release from Lustre web site without building by themsel=
-f. And we eager to know more details
- about the aarch64 release:<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">1) Any schedule timeline or plan for aarch64 release=
-?<br>
-2) If there is no now, how to make it happen? <br>
-3) What are things we need to offer aarch64 releases? Or what resources are=
- missing?
-<br>
-We are looking forward to your reply. And will continue to contribute more =
-to the Lustre community. Thanks.<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal"><u></u>=C2=A0<u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Xinliang<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<blockquote style=3D"border-top:none;border-right:none;border-bottom:none;b=
-order-left:1pt solid rgb(204,204,204);padding:0cm 0cm 0cm 6pt;margin-left:4=
-.8pt;margin-right:0cm">
-<div>
-<div>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Peter<=
-/span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<div style=3D"border-right:none;border-bottom:none;border-left:none;border-=
-top:1pt solid rgb(181,196,223);padding:3pt 0cm 0cm">
-<p class=3D"MsoNormal"><b><span style=3D"font-size:12pt;color:black">From:
-</span></b><span style=3D"font-size:12pt;color:black">Kevin Zhao &lt;<a hre=
-f=3D"mailto:kevin.zhao@linaro.org" target=3D"_blank">kevin.zhao@linaro.org<=
-/a>&gt;<br>
-<b>Date: </b>Tuesday, June 29, 2021 at 5:44 AM<br>
-<b>To: </b>Peter Jones &lt;<a href=3D"mailto:pjones@whamcloud.com" target=
-=3D"_blank">pjones@whamcloud.com</a>&gt;<br>
-<b>Cc: </b>&quot;<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D=
-"_blank">lustre-devel@lists.lustre.org</a>&quot; &lt;<a href=3D"mailto:lust=
-re-devel@lists.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org<=
-/a>&gt;, Xinliang Liu &lt;<a href=3D"mailto:xinliang.liu@linaro.org" target=
-=3D"_blank">xinliang.liu@linaro.org</a>&gt;<br>
-<b>Subject: </b>Re: [lustre-devel] Lustre Arm64 Development and Release</sp=
-an><u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Hi Peter,<u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">That&#39;s great! We can help to follow and fix test=
- failures. Could you point us some test failure links or logs? So that we c=
-an kick off our work and reproduce the failure in our
- local lab.<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Thanks!<u></u><u></u></p>
-</div>
-</div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-<div>
-<div>
-<p class=3D"MsoNormal">On Tue, 29 Jun 2021 at 20:41, Peter Jones &lt;<a hre=
-f=3D"mailto:pjones@whamcloud.com" target=3D"_blank">pjones@whamcloud.com</a=
->&gt; wrote:<u></u><u></u></p>
-</div>
-<blockquote style=3D"border-top:none;border-right:none;border-bottom:none;b=
-order-left:1pt solid rgb(204,204,204);padding:0cm 0cm 0cm 6pt;margin:5pt 0c=
-m 5pt 4.8pt">
-<div>
-<div>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Hi Kev=
-in</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Variou=
-s people have asked this question over the last couple of years. We have ma=
-chines that could be used for CI (Arm clients are being
- routinely tested) but the challenge has been to have someone follow throug=
-h and work through test failures and take responsibility for vetting the te=
-sts in an ongoing basis.</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">Peter<=
-/span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span lang=3D"EN-US" style=3D"font-size:14pt">=C2=A0=
-</span><u></u><u></u></p>
-<div style=3D"border-right:none;border-bottom:none;border-left:none;border-=
-top:1pt solid rgb(181,196,223);padding:3pt 0cm 0cm">
-<p class=3D"MsoNormal"><b><span style=3D"font-size:12pt;color:black">From:
-</span></b><span style=3D"font-size:12pt;color:black">lustre-devel &lt;<a h=
-ref=3D"mailto:lustre-devel-bounces@lists.lustre.org" target=3D"_blank">lust=
-re-devel-bounces@lists.lustre.org</a>&gt; on behalf of Kevin Zhao via lustr=
-e-devel &lt;<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_bla=
-nk">lustre-devel@lists.lustre.org</a>&gt;<br>
-<b>Reply-To: </b>Kevin Zhao &lt;<a href=3D"mailto:kevin.zhao@linaro.org" ta=
-rget=3D"_blank">kevin.zhao@linaro.org</a>&gt;<br>
-<b>Date: </b>Tuesday, June 29, 2021 at 5:29 AM<br>
-<b>To: </b>&quot;<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D=
-"_blank">lustre-devel@lists.lustre.org</a>&quot; &lt;<a href=3D"mailto:lust=
-re-devel@lists.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org<=
-/a>&gt;<br>
-<b>Cc: </b>Xinliang Liu &lt;<a href=3D"mailto:xinliang.liu@linaro.org" targ=
-et=3D"_blank">xinliang.liu@linaro.org</a>&gt;<br>
-<b>Subject: </b>[lustre-devel] Lustre Arm64 Development and Release</span><=
-u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Hi Lustre,<u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Greetings!<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">I&#39;m Kevin Zhao, and cc&#39;ed Xinliang Liu, we a=
-re from Linaro. We are working on Arm64 storage enablement and Lustre is de=
-finitely on top of our list. We&#39;ve received some requests
- from our members about Lustre support on Arm64.=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">So I&#39;m writing to ask the current status of Lust=
-re on Arm64. I noticed that there are some pages recording Lustre build met=
-hod on Arm64 as
-<a href=3D"https://wiki.whamcloud.com/pages/viewpage.action?pageId=3D154144=
-662" target=3D"_blank">
-Link</a> and some <a href=3D"https://jira.whamcloud.com/browse/LU-11200" ta=
-rget=3D"_blank">
-Jira cards</a>. But I don&#39;t see official or experimental=C2=A0release o=
-n Arm64. So my question is:<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">1. if there some gap or effort needs to be done in o=
-rder to offer arm64 release? We are very interested and can help to work on=
- that.<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">2. If there CI resources needs in order to achieve t=
-his? At Linaro we also have some machine resources to serve as the CI machi=
-nes.<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<div>
-<p class=3D"MsoNormal">Thanks a lot for your reply in=C2=A0advance and look=
- forward to work with you in the community!<br clear=3D"all">
-<u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<p class=3D"MsoNormal">--
-<u></u><u></u></p>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<p class=3D"MsoNormal"><b>Best Regards</b><u></u><u></u></p>
-<div>
-<div>
-<div>
-<div style=3D"margin-top:6pt">
-<div>
-<div>
-<div>
-<div>
-<p class=3D"MsoNormal"><b><span style=3D"font-family:Helvetica;color:rgb(56=
-,118,29)">Kevin Zhao</span></b><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">Tech Lead, LDCG Cloud Infrastructure</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">Linaro Vertical Technologies</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">IRC(freenode): kevinz</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(136,1=
-36,136)">Slack(</span><span style=3D"font-family:Helvetica;color:rgb(117,12=
-3,128)"><a href=3D"http://kubernetes.slack.com" target=3D"_blank">kubernete=
-s.slack.com</a>)</span><span style=3D"font-family:Helvetica;color:rgb(136,1=
-36,136)">:
- kevinz</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)"><a href=3D"mailto:elsie.wahlig@linaro.org" target=3D"_blank">kevin=
-.zhao@linaro.org</a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915=C2=
-=A0</span><u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal"><span style=3D"font-size:13.5pt;font-family:Helvetic=
-a;color:rgb(136,136,136)">=C2=A0</span><u></u><u></u></p>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</blockquote>
-</div>
-<p class=3D"MsoNormal"><br clear=3D"all">
-<u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal">=C2=A0<u></u><u></u></p>
-</div>
-<p class=3D"MsoNormal">--
-<u></u><u></u></p>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<div>
-<p class=3D"MsoNormal"><b>Best Regards</b><u></u><u></u></p>
-<div>
-<div>
-<div>
-<div style=3D"margin-top:6pt">
-<div>
-<div>
-<div>
-<div>
-<p class=3D"MsoNormal"><b><span style=3D"font-family:Helvetica;color:rgb(56=
-,118,29)">Kevin Zhao</span></b><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">Tech Lead, LDCG Cloud Infrastructure</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">Linaro Vertical Technologies</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)">IRC(freenode): kevinz</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(136,1=
-36,136)">Slack(</span><span style=3D"font-family:Helvetica;color:rgb(117,12=
-3,128)"><a href=3D"http://kubernetes.slack.com" target=3D"_blank">kubernete=
-s.slack.com</a>)</span><span style=3D"font-family:Helvetica;color:rgb(136,1=
-36,136)">:
- kevinz</span><u></u><u></u></p>
-<p class=3D"MsoNormal"><span style=3D"font-family:Helvetica;color:rgb(117,1=
-23,128)"><a href=3D"mailto:elsie.wahlig@linaro.org" target=3D"_blank">kevin=
-.zhao@linaro.org</a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915=C2=
-=A0</span><u></u><u></u></p>
-<div>
-<p class=3D"MsoNormal"><span style=3D"font-size:13.5pt;font-family:Helvetic=
-a;color:rgb(136,136,136)">=C2=A0</span><u></u><u></u></p>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</blockquote>
-</div>
-</div>
-</div>
-</div>
+More information about LAD21: https://www.eofs.eu/events/lad21
 
-</blockquote></div></div>
+Best regards,
+Thomas
 
---000000000000aad72505c88af221--
+--_000_8e74e0fdcacf49c9ae3beffbcc6e0a07UMYKONOS3difdamintracea_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
---===============7842685498681783715==
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
+osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+<meta name=3D"Generator" content=3D"Microsoft Word 14 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0cm;
+	margin-bottom:.0001pt;
+	font-size:11.0pt;
+	font-family:"Calibri","sans-serif";}
+a:link, span.MsoHyperlink
+	{mso-style-priority:99;
+	color:blue;
+	text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+	{mso-style-priority:99;
+	color:purple;
+	text-decoration:underline;}
+span.EmailStyle17
+	{mso-style-type:personal-compose;
+	font-family:"Calibri","sans-serif";
+	color:windowtext;}
+.MsoChpDefault
+	{mso-style-type:export-only;}
+@page WordSection1
+	{size:612.0pt 792.0pt;
+	margin:70.85pt 70.85pt 70.85pt 70.85pt;}
+div.WordSection1
+	{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang=3D"EN-US" link=3D"blue" vlink=3D"purple">
+<div class=3D"WordSection1">
+<p class=3D"MsoNormal">Only one month left to propose a presentation for LA=
+D21!<o:p></o:p></p>
+<p class=3D"MsoNormal">Just take a few minutes to write a short summary on =
+this portal:
+<a href=3D"https://easychair.org/conferences/?conf=3Dlad21">https://easycha=
+ir.org/conferences/?conf=3Dlad21</a><o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal">We will be grateful! This year, speakers will be rew=
+arded with a great exclusive goodie of LAD'21!<o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal"><u>Topics<o:p></o:p></u></p>
+<p class=3D"MsoNormal">We invite members of the Lustre community to send pr=
+oposals for a 20-25min presentation about:<o:p></o:p></p>
+<p class=3D"MsoNormal">&nbsp;&nbsp;&nbsp; - feedback / news about a particu=
+lar Lustre feature;<o:p></o:p></p>
+<p class=3D"MsoNormal">&nbsp;&nbsp;&nbsp; - a good Lustre success (/ failur=
+e) story;<o:p></o:p></p>
+<p class=3D"MsoNormal">&nbsp;&nbsp;&nbsp; - tools of the Lustre ecosystem;<=
+o:p></o:p></p>
+<p class=3D"MsoNormal">&nbsp;&nbsp;&nbsp; - administration experiences, con=
+figuration, tunings...<o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal">Pre-recorded presentations will be aired online from=
+ September 28th to September 30th. A chat platform will make it possible to=
+ ask questions to presenters and discuss with other members of the Lustre c=
+ommunity.<o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal"><u>About LAD<o:p></o:p></u></p>
+<p class=3D"MsoNormal">Lustre Admins &amp; Devs Workshop is a great opportu=
+nity for Lustre worldwide administrators and developers to gather and excha=
+nge their experiences, developments, tools, good practices and more. It usu=
+ally takes place in Europe/France, but
+ due to the current pandemic context, it takes place in the form of a webin=
+ar (free of charge).<o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal">More information about LAD21: <a href=3D"https://www=
+.eofs.eu/events/lad21">
+https://www.eofs.eu/events/lad21</a><o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal">Best regards,<o:p></o:p></p>
+<p class=3D"MsoNormal">Thomas<o:p></o:p></p>
+</div>
+</body>
+</html>
+
+--_000_8e74e0fdcacf49c9ae3beffbcc6e0a07UMYKONOS3difdamintracea_--
+
+--===============6117954339203177051==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -706,4 +218,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============7842685498681783715==--
+--===============6117954339203177051==--
