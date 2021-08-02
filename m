@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E7275C4320A
-	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 558B9C4338F
+	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:35 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADA0B60FC2
-	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:27 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org ADA0B60FC2
+	by mail.kernel.org (Postfix) with ESMTPS id A4B7260F36
+	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:34 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org A4B7260F36
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0A7A5352DF4;
-	Mon,  2 Aug 2021 12:54:23 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CA473352F18;
+	Mon,  2 Aug 2021 12:54:25 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4B6D635286A
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 13D5335286A
  for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 12:50:56 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5C93D1007AA7;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5A74F1007AA6;
  Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 557FCC2F57; Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
+ id 528E0C2F56; Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  2 Aug 2021 15:50:26 -0400
-Message-Id: <1627933851-7603-7-git-send-email-jsimmons@infradead.org>
+Date: Mon,  2 Aug 2021 15:50:25 -0400
+Message-Id: <1627933851-7603-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1627933851-7603-1-git-send-email-jsimmons@infradead.org>
 References: <1627933851-7603-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 06/25] lustre: lmv: getattr_name("..") under
- striped directory
+Subject: [lustre-devel] [PATCH 05/25] lnet: print device status in net show
+ command
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lai Siyao <lai.siyao@whamcloud.com>,
+Cc: Cyril Bordage <cbordage@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,49 +58,54 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Cyril Bordage <cbordage@whamcloud.com>
 
-For getattr_name(".."), it should return FID of the master object for
-striped directories. This includes changes on both client and server:
-* lmv_getattr_name() should use master object FID if it's looking up
-  "..".
-* mdt_raw_lookup() should check parent object is sub stripe, if so
-  it needs to lookup again to get master object FID. For old client
-  without above change this needs to be checked twice.
+A device can be in fatal state, if the cable was disconnected, or the
+port brought down on the switch side. In these cases, the LND (o2iblnd
+for now), will flag the device in fatal state. That device will not be
+used any further. However, it's health will not be decremented. This
+causes some confusion when examining the state of the node.
+It is better to print the device status in the output of the lnetctl
+net show command.
 
-This is needed by NFS export, because ll_get_parent() find parent by
-getattr_name("..").
-
-Reenable check_fhandle_syscall and update sanityn test_102.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14826
-Lustre-commit: cbc62b0b829afdce ("LU-14826 mdt: getattr_name("..") under striped directory")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/44168
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14114
+Lustre-commit: f75ff33d9fbefd69 ("LU-14114 lnet: print device status in net show command")
+Signed-off-by: Cyril Bordage <cbordage@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/44169
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/lmv/lmv_obd.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ include/uapi/linux/lnet/lnet-dlc.h | 1 +
+ net/lnet/lnet/api-ni.c             | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 2f84028..1d9b830 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -1945,7 +1945,11 @@ int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
- 	int rc;
- 
- retry:
--	tgt = lmv_locate_tgt(lmv, op_data);
-+	if (op_data->op_namelen == 2 &&
-+	    op_data->op_name[0] == '.' && op_data->op_name[1] == '.')
-+		tgt = lmv_fid2tgt(lmv, &op_data->op_fid1);
-+	else
-+		tgt = lmv_locate_tgt(lmv, op_data);
- 	if (IS_ERR(tgt))
- 		return PTR_ERR(tgt);
- 
+diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
+index c1c063f..ef60224 100644
+--- a/include/uapi/linux/lnet/lnet-dlc.h
++++ b/include/uapi/linux/lnet/lnet-dlc.h
+@@ -190,6 +190,7 @@ struct lnet_ioctl_local_ni_hstats {
+ 	__u32 hlni_local_no_route;
+ 	__u32 hlni_local_timeout;
+ 	__u32 hlni_local_error;
++	__s32 hlni_fatal_error;
+ 	__s32 hlni_health_value;
+ 	__u32 hlni_ping_count;
+ 	__u64 hlni_next_ping;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index ec28139..4513d8d 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -3692,6 +3692,8 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		atomic_read(&ni->ni_hstats.hlt_local_timeout);
+ 	stats->hlni_local_error =
+ 		atomic_read(&ni->ni_hstats.hlt_local_error);
++	stats->hlni_fatal_error =
++		atomic_read(&ni->ni_fatal_error_on);
+ 	stats->hlni_health_value =
+ 		atomic_read(&ni->ni_healthv);
+ 	stats->hlni_ping_count = ni->ni_ping_count;
 -- 
 1.8.3.1
 
