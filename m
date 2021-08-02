@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.7 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 558B9C4338F
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E277BC4320A
 	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:35 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4B7260F36
-	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:34 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org A4B7260F36
+	by mail.kernel.org (Postfix) with ESMTPS id A65FF60F36
+	for <lustre-devel@archiver.kernel.org>; Mon,  2 Aug 2021 19:54:35 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org A65FF60F36
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CA473352F18;
-	Mon,  2 Aug 2021 12:54:25 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 672BE352F40;
+	Mon,  2 Aug 2021 12:54:26 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 13D5335286A
- for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 12:50:56 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B1D7235286A
+ for <lustre-devel@lists.lustre.org>; Mon,  2 Aug 2021 12:50:57 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 5A74F1007AA6;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 68BAA100804B;
  Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 528E0C2F56; Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
+ id 6604CC2F55; Mon,  2 Aug 2021 15:50:53 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  2 Aug 2021 15:50:25 -0400
-Message-Id: <1627933851-7603-6-git-send-email-jsimmons@infradead.org>
+Date: Mon,  2 Aug 2021 15:50:31 -0400
+Message-Id: <1627933851-7603-12-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1627933851-7603-1-git-send-email-jsimmons@infradead.org>
 References: <1627933851-7603-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 05/25] lnet: print device status in net show
- command
+Subject: [lustre-devel] [PATCH 11/25] lustre: llite: Remove transient page
+ counting
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Cyril Bordage <cbordage@whamcloud.com>,
+Cc: Patrick Farrell <farr0186@gmail.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,54 +58,113 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Cyril Bordage <cbordage@whamcloud.com>
+From: Patrick Farrell <farr0186@gmail.com>
 
-A device can be in fatal state, if the cable was disconnected, or the
-port brought down on the switch side. In these cases, the LND (o2iblnd
-for now), will flag the device in fatal state. That device will not be
-used any further. However, it's health will not be decremented. This
-causes some confusion when examining the state of the node.
-It is better to print the device status in the output of the lnetctl
-net show command.
+Transient page counting is not used for anything, as
+already noted in the commit message, but costs something
+like 4% of the time in DIO page submission.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14114
-Lustre-commit: f75ff33d9fbefd69 ("LU-14114 lnet: print device status in net show command")
-Signed-off-by: Cyril Bordage <cbordage@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/44169
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Remove it.
+
+mpirun -np 1  $IOR -w -r -t 64M -b 64G -o ./iorfile --posix.odirect
+
+This patch reduces i/o time in ms/GiB by:
+Write: 6 ms/GiB
+Read: 11 ms/GiB
+
+Totals:
+Write: 174 ms/GiB
+Read: 167 ms/GiB
+
+With previous patches in series:
+write     5703 MiB/s
+read      5756 MiB/s
+
+Plus this patch:
+write     5900 MiB/s
+read      6136 MiB/s
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13799
+Lustre-commit: 587e5aa8342980f7 ("LU-13799 llite: Remove transient page counting")
+Signed-off-by: Patrick Farrell <farr0186@gmail.com>
+Reviewed-on: https://review.whamcloud.com/39441
+Reviewed-by: Wang Shilong <wshilong@whamcloud.com>
+Reviewed-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lnet/lnet-dlc.h | 1 +
- net/lnet/lnet/api-ni.c             | 2 ++
- 2 files changed, 3 insertions(+)
+ fs/lustre/llite/vvp_internal.h | 7 -------
+ fs/lustre/llite/vvp_object.c   | 4 +---
+ fs/lustre/llite/vvp_page.c     | 5 -----
+ 3 files changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
-index c1c063f..ef60224 100644
---- a/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/include/uapi/linux/lnet/lnet-dlc.h
-@@ -190,6 +190,7 @@ struct lnet_ioctl_local_ni_hstats {
- 	__u32 hlni_local_no_route;
- 	__u32 hlni_local_timeout;
- 	__u32 hlni_local_error;
-+	__s32 hlni_fatal_error;
- 	__s32 hlni_health_value;
- 	__u32 hlni_ping_count;
- 	__u64 hlni_next_ping;
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index ec28139..4513d8d 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -3692,6 +3692,8 @@ u32 lnet_get_dlc_seq_locked(void)
- 		atomic_read(&ni->ni_hstats.hlt_local_timeout);
- 	stats->hlni_local_error =
- 		atomic_read(&ni->ni_hstats.hlt_local_error);
-+	stats->hlni_fatal_error =
-+		atomic_read(&ni->ni_fatal_error_on);
- 	stats->hlni_health_value =
- 		atomic_read(&ni->ni_healthv);
- 	stats->hlni_ping_count = ni->ni_ping_count;
+diff --git a/fs/lustre/llite/vvp_internal.h b/fs/lustre/llite/vvp_internal.h
+index f2599be..b5e1df2 100644
+--- a/fs/lustre/llite/vvp_internal.h
++++ b/fs/lustre/llite/vvp_internal.h
+@@ -189,13 +189,6 @@ struct vvp_object {
+ 	struct inode	       *vob_inode;
+ 
+ 	/**
+-	 * Number of transient pages.  This is no longer protected by i_sem,
+-	 * and needs to be atomic.  This is not actually used for anything,
+-	 * and can probably be removed.
+-	 */
+-	atomic_t		vob_transient_pages;
+-
+-	/**
+ 	 * Number of outstanding mmaps on this file.
+ 	 *
+ 	 * \see ll_vm_open(), ll_vm_close().
+diff --git a/fs/lustre/llite/vvp_object.c b/fs/lustre/llite/vvp_object.c
+index 096d996..294df88 100644
+--- a/fs/lustre/llite/vvp_object.c
++++ b/fs/lustre/llite/vvp_object.c
+@@ -63,8 +63,7 @@ static int vvp_object_print(const struct lu_env *env, void *cookie,
+ 	struct inode *inode = obj->vob_inode;
+ 	struct ll_inode_info *lli;
+ 
+-	(*p)(env, cookie, "(%d %d) inode: %p ",
+-	     atomic_read(&obj->vob_transient_pages),
++	(*p)(env, cookie, "(%d) inode: %p ",
+ 	     atomic_read(&obj->vob_mmap_cnt), inode);
+ 	if (inode) {
+ 		lli = ll_i2info(inode);
+@@ -228,7 +227,6 @@ static int __vvp_object_init(const struct lu_env *env,
+ 			     const struct cl_object_conf *conf)
+ {
+ 	vob->vob_inode = conf->coc_inode;
+-	atomic_set(&vob->vob_transient_pages, 0);
+ 	cl_object_page_init(&vob->vob_cl, sizeof(struct vvp_page));
+ 	return 0;
+ }
+diff --git a/fs/lustre/llite/vvp_page.c b/fs/lustre/llite/vvp_page.c
+index 2ecd414..9e14898 100644
+--- a/fs/lustre/llite/vvp_page.c
++++ b/fs/lustre/llite/vvp_page.c
+@@ -437,10 +437,8 @@ static void vvp_transient_page_fini(const struct lu_env *env,
+ 				    struct pagevec *pvec)
+ {
+ 	struct vvp_page *vpg = cl2vvp_page(slice);
+-	struct vvp_object *clobj = cl2vvp(slice->cpl_obj);
+ 
+ 	vvp_page_fini_common(vpg, pvec);
+-	atomic_dec(&clobj->vob_transient_pages);
+ }
+ 
+ static const struct cl_page_operations vvp_transient_page_ops = {
+@@ -469,11 +467,8 @@ int vvp_page_init(const struct lu_env *env, struct cl_object *obj,
+ 		cl_page_slice_add(page, &vpg->vpg_cl, obj,
+ 				  &vvp_page_ops);
+ 	} else {
+-		struct vvp_object *clobj = cl2vvp(obj);
+-
+ 		cl_page_slice_add(page, &vpg->vpg_cl, obj,
+ 				  &vvp_transient_page_ops);
+-		atomic_inc(&clobj->vob_transient_pages);
+ 	}
+ 	return 0;
+ }
 -- 
 1.8.3.1
 
