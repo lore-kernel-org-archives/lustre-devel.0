@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BF120C4338F
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93ED5C432BE
+	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:32 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 721EF611F2
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:31 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 721EF611F2
+	by mail.kernel.org (Postfix) with ESMTPS id 52CF0611F2
+	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:32 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 52CF0611F2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 015CE21CB69;
-	Sun, 22 Aug 2021 19:28:12 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A47AA21E0B9;
+	Sun, 22 Aug 2021 19:28:13 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CF52B21CAB2
- for <lustre-devel@lists.lustre.org>; Sun, 22 Aug 2021 19:27:53 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B471421CAB1
+ for <lustre-devel@lists.lustre.org>; Sun, 22 Aug 2021 19:27:50 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 34B0F100BB01;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 206A0100BAF6;
  Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 2A30AB6C7F; Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
+ id 101EEB6C80; Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 22 Aug 2021 22:27:41 -0400
-Message-Id: <1629685666-4533-11-git-send-email-jsimmons@infradead.org>
+Date: Sun, 22 Aug 2021 22:27:33 -0400
+Message-Id: <1629685666-4533-3-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1629685666-4533-1-git-send-email-jsimmons@infradead.org>
 References: <1629685666-4533-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 10/15] lnet: Provide kernel API for adding
- peers
+Subject: [lustre-devel] [PATCH 02/15] lustre: pcc: add LCM_FL_PCC_RDONLY
+ layout flag
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,177 +50,98 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Chris Horn <chris.horn@hpe.com>
+From: Qian Yingjin <qian@ddn.com>
 
-Implement LNetAddPeer() API to allow other kernel modules to add
-peers to LNet.
+The upcoming new feature PCC-RO is combined with FLR and extend
+the on-disk data strucutre 'enum lov_comp_md_flags' for layout
+components. It adds a new layout flag: LCM_FL_PCC_RDONLY.
 
-Peers created via this API are not marked as having been configured
-by DLC. As such, they can be overwritten by discovery.
+enum lov_comp_md_flags {
+        LCM_FL_NONE             = 0x0,
+        LCM_FL_RDONLY           = 0x1,
+        LCM_FL_WRITE_PENDING    = 0x2,
+        LCM_FL_SYNC_PENDING     = 0x3,
+        LCM_FL_PCC_RDONLY       = 0x8,
+        LCM_FL_FLR_MASK         = 0xB,
+};
 
-HPE-bug-id: LUS-9293
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14661
-Lustre-commit: ac201366ad5700ed ("LU-14661 lnet: Provide kernel API for adding peers")
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/43509
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+The LCM_FL_PCC_RDONLY flag, which is dedicated for PCC-RO, is
+different from LCM_FL_RDONLY.
+A PCC-RO cached file could be in the state:
+- LCM_FL_PCC_RDONLY | LCM_FL_RDONLY: it means that all FLR
+  components are synced and in up-to-date state. The replicated
+  file is on read-only state. And then one client attaches the
+  file into the PCC backend with PCC-RO mode.
+- LCM_FL_PCC_RDONLY | LCM_FL_WRITE_PENDING: it means the file was
+  once modified, the data content of layout components are not
+  synced. MDT has already picked a promary replica and marked
+  other components as STALE. At this time, a client can still
+  PCC-RO attach the file. On this client, the primary component
+  and the PCC copy are both in up-to-date state.
+
+As a new LCM_FL_PCC_RDONLY flag is added, the old client may not
+understand this new FLR layout flag, and may result in
+inconsistent data access.
+
+This patch adds this new flag for the purpose of compatibility and
+interoperability.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13602
+Lustre-commit: adc1bbbf20e0a8a5 ("LU-13602 pcc: add LCM_FL_PCC_RDONLY layout flag")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/40813
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/api.h      |  1 +
- include/linux/lnet/lib-lnet.h |  2 +-
- net/lnet/lnet/api-ni.c        |  2 +-
- net/lnet/lnet/peer.c          | 60 ++++++++++++++++++++++++++++++++++++++++---
- 4 files changed, 59 insertions(+), 6 deletions(-)
+ fs/lustre/ptlrpc/wiretest.c             |  2 ++
+ include/uapi/linux/lustre/lustre_user.h | 13 +++++++------
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/lnet/api.h b/include/linux/lnet/api.h
-index 891c4a6..d32c7c1 100644
---- a/include/linux/lnet/api.h
-+++ b/include/linux/lnet/api.h
-@@ -164,6 +164,7 @@ int LNetGet(lnet_nid_t self,
- int LNetCtl(unsigned int cmd, void *arg);
- void LNetDebugPeer(struct lnet_process_id id);
- int LNetGetPeerDiscoveryStatus(void);
-+int LNetAddPeer(lnet_nid_t *nids, u32 num_nids);
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 7d504bd..b063cb9 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -1727,6 +1727,8 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)LCM_FL_WRITE_PENDING);
+ 	LASSERTF(LCM_FL_SYNC_PENDING == 3, "found %lld\n",
+ 		 (long long)LCM_FL_SYNC_PENDING);
++	LASSERTF(LCM_FL_PCC_RDONLY == 8, "found %lld\n",
++		 (long long)LCM_FL_PCC_RDONLY);
  
- /** @} lnet_misc */
- 
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 760c093..37489ae 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -854,7 +854,7 @@ struct lnet_peer_net *lnet_peer_get_net_locked(struct lnet_peer *peer,
- void lnet_peer_clr_pref_rtrs(struct lnet_peer_ni *lpni);
- int lnet_peer_add_pref_rtr(struct lnet_peer_ni *lpni, lnet_nid_t nid);
- int lnet_peer_ni_set_non_mr_pref_nid(struct lnet_peer_ni *lpni, lnet_nid_t nid);
--int lnet_add_peer_ni(lnet_nid_t key_nid, lnet_nid_t nid, bool mr);
-+int lnet_add_peer_ni(lnet_nid_t key_nid, lnet_nid_t nid, bool mr, bool temp);
- int lnet_del_peer_ni(lnet_nid_t key_nid, lnet_nid_t nid);
- int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk);
- int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
-diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index bb5fb56..41d2d26 100644
---- a/net/lnet/lnet/api-ni.c
-+++ b/net/lnet/lnet/api-ni.c
-@@ -4015,7 +4015,7 @@ u32 lnet_get_dlc_seq_locked(void)
- 		mutex_lock(&the_lnet.ln_api_mutex);
- 		rc = lnet_add_peer_ni(cfg->prcfg_prim_nid,
- 				      cfg->prcfg_cfg_nid,
--				      cfg->prcfg_mr);
-+				      cfg->prcfg_mr, false);
- 		mutex_unlock(&the_lnet.ln_api_mutex);
- 		return rc;
- 	}
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 224f4e2..c2f5d8b 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -1320,6 +1320,51 @@ struct lnet_peer_ni *
- 	return rc;
- }
- 
-+int
-+LNetAddPeer(lnet_nid_t *nids, u32 num_nids)
-+{
-+	lnet_nid_t pnid = 0;
-+	bool mr;
-+	int i, rc;
-+
-+	if (!nids || num_nids < 1)
-+		return -EINVAL;
-+
-+	rc = LNetNIInit(LNET_PID_ANY);
-+	if (rc < 0)
-+		return rc;
-+
-+	mutex_lock(&the_lnet.ln_api_mutex);
-+
-+	mr = lnet_peer_discovery_disabled == 0;
-+
-+	rc = 0;
-+	for (i = 0; i < num_nids; i++) {
-+		if (nids[i] == LNET_NID_LO_0)
-+			continue;
-+
-+		if (!pnid) {
-+			pnid = nids[i];
-+			rc = lnet_add_peer_ni(pnid, LNET_NID_ANY, mr, true);
-+		} else if (lnet_peer_discovery_disabled) {
-+			rc = lnet_add_peer_ni(nids[i], LNET_NID_ANY, mr, true);
-+		} else {
-+			rc = lnet_add_peer_ni(pnid, nids[i], mr, true);
-+		}
-+
-+		if (rc && rc != -EEXIST)
-+			goto unlock;
-+	}
-+
-+unlock:
-+	mutex_unlock(&the_lnet.ln_api_mutex);
-+
-+	LNetNIFini();
-+
-+	return rc == -EEXIST ? 0 : rc;
-+}
-+EXPORT_SYMBOL(LNetAddPeer);
-+
- lnet_nid_t
- LNetPrimaryNID(lnet_nid_t nid)
- {
-@@ -1538,6 +1583,11 @@ struct lnet_peer_net *
- 			else if ((lp->lp_state ^ flags) & LNET_PEER_MULTI_RAIL)
- 				rc = -EPERM;
- 			goto out;
-+		} else if (!(flags & LNET_PEER_CONFIGURED)) {
-+			if (lp->lp_primary_nid == nid) {
-+				rc = -EEXIST;
-+				goto out;
-+			}
- 		}
- 		/* Delete and recreate as a configured peer. */
- 		lnet_peer_del(lp);
-@@ -1777,17 +1827,19 @@ struct lnet_peer_net *
-  * being created/modified/deleted by a different thread.
+ 	/* Checks for struct lmv_mds_md_v1 */
+ 	LASSERTF((int)sizeof(struct lmv_mds_md_v1) == 56, "found %lld\n",
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 7fcc009..1940e52 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -622,12 +622,13 @@ static inline __u16 mirror_id_of(__u32 id)
+  * on-disk data for lcm_flags. Valid if lcm_magic is LOV_MAGIC_COMP_V1.
   */
- int
--lnet_add_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid, bool mr)
-+lnet_add_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid, bool mr, bool temp)
- {
- 	struct lnet_peer *lp = NULL;
- 	struct lnet_peer_ni *lpni;
--	unsigned int flags;
-+	unsigned int flags = 0;
+ enum lov_comp_md_flags {
+-	/* the least 2 bits are used by FLR to record file state */
+-	LCM_FL_NONE             = 0,
+-	LCM_FL_RDONLY           = 1,
+-	LCM_FL_WRITE_PENDING    = 2,
+-	LCM_FL_SYNC_PENDING     = 3,
+-	LCM_FL_FLR_MASK         = 0x3,
++	/* the least 4 bits are used by FLR to record file state */
++	LCM_FL_NONE             = 0x0,
++	LCM_FL_RDONLY           = 0x1,
++	LCM_FL_WRITE_PENDING    = 0x2,
++	LCM_FL_SYNC_PENDING     = 0x3,
++	LCM_FL_PCC_RDONLY	= 0x8,
++	LCM_FL_FLR_MASK         = 0xB,
+ };
  
- 	/* The prim_nid must always be specified */
- 	if (prim_nid == LNET_NID_ANY)
- 		return -EINVAL;
- 
--	flags = LNET_PEER_CONFIGURED;
-+	if (!temp)
-+		flags = LNET_PEER_CONFIGURED;
-+
- 	if (mr)
- 		flags |= LNET_PEER_MULTI_RAIL;
- 
-@@ -1806,7 +1858,7 @@ struct lnet_peer_net *
- 	lp = lpni->lpni_peer_net->lpn_peer;
- 
- 	/* Peer must have been configured. */
--	if (!(lp->lp_state & LNET_PEER_CONFIGURED)) {
-+	if (!temp && !(lp->lp_state & LNET_PEER_CONFIGURED)) {
- 		CDEBUG(D_NET, "peer %s was not configured\n",
- 		       libcfs_nid2str(prim_nid));
- 		return -ENOENT;
+ struct lov_comp_md_v1 {
 -- 
 1.8.3.1
 
