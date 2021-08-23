@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5489FC432BE
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4E9EC4338F
+	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:03 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0546B61360
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:27:59 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 0546B61360
+	by mail.kernel.org (Postfix) with ESMTPS id 618B0611F2
+	for <lustre-devel@archiver.kernel.org>; Mon, 23 Aug 2021 02:28:03 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 618B0611F2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A3A4F21CAB4;
-	Sun, 22 Aug 2021 19:27:56 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7C42521CBB1;
+	Sun, 22 Aug 2021 19:27:58 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B35DE21CAB1
- for <lustre-devel@lists.lustre.org>; Sun, 22 Aug 2021 19:27:51 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 95A9721CAB9
+ for <lustre-devel@lists.lustre.org>; Sun, 22 Aug 2021 19:27:52 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 29787100BAF9;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 300CB100BAFC;
  Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 1C4CEB6C93; Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
+ id 276E8B6C67; Sun, 22 Aug 2021 22:27:48 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 22 Aug 2021 22:27:37 -0400
-Message-Id: <1629685666-4533-7-git-send-email-jsimmons@infradead.org>
+Date: Sun, 22 Aug 2021 22:27:40 -0400
+Message-Id: <1629685666-4533-10-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1629685666-4533-1-git-send-email-jsimmons@infradead.org>
 References: <1629685666-4533-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 06/15] lnet: keep in insync to change due to
- GPU Direct Support
+Subject: [lustre-devel] [PATCH 09/15] lnet: socklnd: allow dynamic setting
+ of conns_per_peer
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +50,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Amir Shehata <ashehata@whamcloud.com>,
+Cc: Serguei Smirnov <ssmirnov@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,358 +58,422 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Serguei Smirnov <ssmirnov@whamcloud.com>
 
-Since in the HPC community most people run 10+ year old kernels
-Nvidia created their own version of PCI peer2peer which sites
-want to use. The OpenSFS supports this special one off out of
-tree driver which impacts the LNet code. To keep in sync we
-port to the Linux proper tree these changes. This also allows
-the potential to support the support PCI peer2peer in the
-future. This initial abstract was poorly done so it will have
-to be revisted.
+Modify lnetctl and associated code to allow dynamic setting
+of conns_per_peer lnd parameter per ni.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14798
-Lustre-commit: a7a889f77cec3ad44 ("LU-14798 lnet: add LNet GPU Direct Support")
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-lustre-change: https://review.whamcloud.com/37368
-Reviewed-by: Wang Shilong <wshilong@ddn.com>
-Reviewed-by: Li Xi <lixi@ddn.com>
-Whamcloud-bug-id: EX-773
-Reviewed-on: https://review.whamcloud.com/44110
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+The parameter can be set for a specific active nid:
+        lnetctl net set --nid 192.168.122.10@tcp --conns-per-peer=4
+
+Or when adding a new net, taking effect on the new nid:
+        lnetctl net add --net tcp --if eth0 --conns-per-peer=1
+
+By default, conns_per_peer value specified as the module parameter
+shall be used.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12815
+Lustre-commit: a5cbe7883db6d77b ("LU-12815 socklnd: allow dynamic setting of conns_per_peer")
+Signed-off-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/41463
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-types.h      | 25 +++++++++++++++
- net/lnet/klnds/o2iblnd/o2iblnd.c    |  1 +
- net/lnet/klnds/o2iblnd/o2iblnd.h    |  9 +++---
- net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 16 ++++++++--
- net/lnet/lnet/lib-move.c            | 62 ++++++++++++++++++++++++++++++-------
- 5 files changed, 95 insertions(+), 18 deletions(-)
+ include/linux/lnet/lib-lnet.h              |  3 ++
+ include/uapi/linux/lnet/libcfs_ioctl.h     |  3 +-
+ include/uapi/linux/lnet/lnet-dlc.h         | 14 ++++++
+ net/lnet/klnds/socklnd/socklnd.c           | 70 +++++++++++++++---------------
+ net/lnet/klnds/socklnd/socklnd.h           |  4 ++
+ net/lnet/klnds/socklnd/socklnd_modparams.c | 55 +++++++++++++++++++++--
+ net/lnet/lnet/api-ni.c                     | 43 ++++++++++++++++++
+ 7 files changed, 154 insertions(+), 38 deletions(-)
 
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index e951e02..6b97ab9 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -312,8 +312,33 @@ struct lnet_lnd {
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index ed54477..760c093 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -86,6 +86,9 @@
+ #define DEFAULT_PEER_CREDITS	8
+ #define DEFAULT_CREDITS	256
  
- 	/* accept a new connection */
- 	int (*lnd_accept)(struct lnet_ni *ni, struct socket *sock);
++/* default number of connections per peer */
++#define DEFAULT_CONNS_PER_PEER	1
 +
-+	/* get dma_dev priority */
-+	unsigned int (*lnd_get_dev_prio)(struct lnet_ni *ni,
-+					 unsigned int dev_idx);
+ int choose_ipv4_src(u32 *ret, int interface, u32 dst_ipaddr, struct net *ns);
+ 
+ bool lnet_is_route_alive(struct lnet_route *route);
+diff --git a/include/uapi/linux/lnet/libcfs_ioctl.h b/include/uapi/linux/lnet/libcfs_ioctl.h
+index 7b1c880..f2ae76c 100644
+--- a/include/uapi/linux/lnet/libcfs_ioctl.h
++++ b/include/uapi/linux/lnet/libcfs_ioctl.h
+@@ -156,6 +156,7 @@ struct libcfs_ioctl_data {
+ #define IOC_LIBCFS_GET_UDSP		_IOWR(IOC_LIBCFS_TYPE, 108, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_GET_CONST_UDSP_INFO	_IOWR(IOC_LIBCFS_TYPE, 109, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_RESET_LNET_STATS	_IOWR(IOC_LIBCFS_TYPE, 110, IOCTL_CONFIG_SIZE)
+-#define IOC_LIBCFS_MAX_NR				       110
++#define IOC_LIBCFS_SET_CONNS_PER_PEER	_IOWR(IOC_LIBCFS_TYPE, 111, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_MAX_NR				       111
+ 
+ #endif /* __LIBCFS_IOCTL_H__ */
+diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
+index ef60224..2ca70eb 100644
+--- a/include/uapi/linux/lnet/lnet-dlc.h
++++ b/include/uapi/linux/lnet/lnet-dlc.h
+@@ -81,9 +81,16 @@ struct lnet_ioctl_config_o2iblnd_tunables {
+ 	__u16 lnd_ntx;
  };
  
-+/* FIXME !!!!! The abstract for GPU page support (PCI peer2peer)
-+ * was done for only the external NVIDIA driver and done very
-+ * poorly. Once DRI / TTM supports peer2peer we can redo this
-+ * right.
-+ */
-+static inline unsigned int lnet_get_dev_prio(struct device *dev,
-+					     unsigned int dev_idx)
-+{
-+	return UINT_MAX;
-+}
++struct lnet_ioctl_config_socklnd_tunables {
++	__u32 lnd_version;
++	__u16 lnd_conns_per_peer;
++	__u16 lnd_pad;
++};
 +
-+static inline bool lnet_is_rdma_only_page(struct page *page)
-+{
-+	return false;
-+}
-+
-+static inline unsigned int lnet_get_dev_idx(struct page *page)
-+{
-+	return false;
-+}
-+
- struct lnet_tx_queue {
- 	int			tq_credits;	/* # tx credits free */
- 	int			tq_credits_min;	/* lowest it's been */
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 686581a..a4949d8 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2953,6 +2953,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	.lnd_ctl	= kiblnd_ctl,
- 	.lnd_send	= kiblnd_send,
- 	.lnd_recv	= kiblnd_recv,
-+	.lnd_get_dev_prio = kiblnd_get_dev_prio,
+ struct lnet_lnd_tunables {
+ 	union {
+ 		struct lnet_ioctl_config_o2iblnd_tunables lnd_o2ib;
++		struct lnet_ioctl_config_socklnd_tunables lnd_sock;
+ 	} lnd_tun_u;
  };
  
- static void ko2inlnd_assert_wire_constants(void)
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 3691bfe..5066f7b 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -858,18 +858,18 @@ static inline void kiblnd_dma_unmap_single(struct ib_device *dev,
- #define KIBLND_UNMAP_ADDR_SET(p, m, a)	do {} while (0)
- #define KIBLND_UNMAP_ADDR(p, m, a)	(a)
+@@ -280,6 +287,13 @@ struct lnet_ioctl_reset_health_cfg {
+ 	lnet_nid_t rh_nid;
+ };
  
--static inline int kiblnd_dma_map_sg(struct ib_device *dev,
-+static inline int kiblnd_dma_map_sg(struct kib_hca_dev *hdev,
- 				    struct scatterlist *sg, int nents,
- 				    enum dma_data_direction direction)
- {
--	return ib_dma_map_sg(dev, sg, nents, direction);
-+	return ib_dma_map_sg(hdev->ibh_ibdev, sg, nents, direction);
++struct lnet_ioctl_reset_conns_per_peer_cfg {
++	struct libcfs_ioctl_hdr rcpp_hdr;
++	__u16 rcpp_all:1;
++	__s16 rcpp_value;
++	lnet_nid_t rcpp_nid;
++};
++
+ struct lnet_ioctl_recovery_list {
+ 	struct libcfs_ioctl_hdr rlst_hdr;
+ 	enum lnet_health_type rlst_type:32;
+diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
+index cbbbb0c..96cb0e0 100644
+--- a/net/lnet/klnds/socklnd/socklnd.c
++++ b/net/lnet/klnds/socklnd/socklnd.c
+@@ -37,7 +37,7 @@
+  * Author: Eric Barton <eric@bartonsoftware.com>
+  */
+ 
+-#include <linux/pci.h>
++#include <linux/ethtool.h>
+ #include <linux/inetdevice.h>
+ #include <linux/sunrpc/addr.h>
+ #include "socklnd.h"
+@@ -135,6 +135,7 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
+ 	conn_cb->ksnr_ctrl_conn_count = 0;
+ 	conn_cb->ksnr_blki_conn_count = 0;
+ 	conn_cb->ksnr_blko_conn_count = 0;
++	conn_cb->ksnr_max_conns = 0;
+ 
+ 	return conn_cb;
+ }
+@@ -394,6 +395,19 @@ struct ksock_peer_ni *
+ 	return count;
  }
  
--static inline void kiblnd_dma_unmap_sg(struct ib_device *dev,
-+static inline void kiblnd_dma_unmap_sg(struct kib_hca_dev *hdev,
- 				       struct scatterlist *sg, int nents,
- 				       enum dma_data_direction direction)
- {
--	ib_dma_unmap_sg(dev, sg, nents, direction);
-+	ib_dma_unmap_sg(hdev->ibh_ibdev, sg, nents, direction);
- }
- 
- static inline u64 kiblnd_sg_dma_address(struct ib_device *dev,
-@@ -959,3 +959,4 @@ void kiblnd_pack_msg(struct lnet_ni *ni, struct kib_msg *msg, int version,
- int kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg);
- int kiblnd_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
- 		int delayed, struct iov_iter *to, unsigned int rlen);
-+unsigned int kiblnd_get_dev_prio(struct lnet_ni *ni, unsigned int dev_idx);
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 193e75b..8ccd2ab 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -615,7 +615,7 @@ static void kiblnd_unmap_tx(struct kib_tx *tx)
- 		kiblnd_fmr_pool_unmap(&tx->tx_fmr, tx->tx_status);
- 
- 	if (tx->tx_nfrags) {
--		kiblnd_dma_unmap_sg(tx->tx_pool->tpo_hdev->ibh_ibdev,
-+		kiblnd_dma_unmap_sg(tx->tx_pool->tpo_hdev,
- 				    tx->tx_frags, tx->tx_nfrags, tx->tx_dmadir);
- 		tx->tx_nfrags = 0;
- 	}
-@@ -636,7 +636,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	tx->tx_dmadir = (rd != tx->tx_rd) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
- 	tx->tx_nfrags = nfrags;
- 
--	rd->rd_nfrags = kiblnd_dma_map_sg(hdev->ibh_ibdev, tx->tx_frags,
-+	rd->rd_nfrags = kiblnd_dma_map_sg(hdev, tx->tx_frags,
- 					  tx->tx_nfrags, tx->tx_dmadir);
- 
- 	for (i = 0, nob = 0; i < rd->rd_nfrags; i++) {
-@@ -1721,6 +1721,18 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	lnet_finalize(lntmsg, -EIO);
- }
- 
-+unsigned int
-+kiblnd_get_dev_prio(struct lnet_ni *ni, unsigned int dev_idx)
++static unsigned int
++ksocknal_get_conns_per_peer(struct ksock_peer_ni *peer_ni)
 +{
-+	struct kib_net *net = ni->ni_data;
-+	struct device *dev = NULL;
++	struct lnet_ni *ni = peer_ni->ksnp_ni;
++	struct lnet_ioctl_config_socklnd_tunables *tunables;
 +
-+	if (net)
-+		dev = net->ibn_dev->ibd_hdev->ibh_ibdev->dma_device;
++	LASSERT(ni);
 +
-+	return lnet_get_dev_prio(dev, dev_idx);
++	tunables = &ni->ni_lnd_tunables.lnd_tun_u.lnd_sock;
++
++	return tunables->lnd_conns_per_peer;
 +}
 +
- int
- kiblnd_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
- 	    int delayed, struct iov_iter *to, unsigned int rlen)
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 33d7e78..035bda3 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -1420,16 +1420,38 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	return best_route;
- }
- 
-+static inline unsigned int
-+lnet_dev_prio_of_md(struct lnet_ni *ni, unsigned int dev_idx)
-+{
-+	if (dev_idx == UINT_MAX)
-+		return UINT_MAX;
-+
-+	if (!ni || !ni->ni_net || !ni->ni_net->net_lnd ||
-+	    !ni->ni_net->net_lnd->lnd_get_dev_prio)
-+		return UINT_MAX;
-+
-+	return ni->ni_net->net_lnd->lnd_get_dev_prio(ni, dev_idx);
-+}
-+
- static struct lnet_ni *
- lnet_get_best_ni(struct lnet_net *local_net, struct lnet_ni *best_ni,
- 		 struct lnet_peer *peer, struct lnet_peer_net *peer_net,
--		 int md_cpt)
-+		 struct lnet_msg *msg, int md_cpt)
- {
--	struct lnet_ni *ni = NULL;
-+	struct lnet_libmd *md = msg->msg_md;
-+	unsigned int offset = msg->msg_offset;
- 	unsigned int shortest_distance;
-+	struct lnet_ni *ni = NULL;
- 	int best_credits;
- 	int best_healthv;
- 	u32 best_sel_prio;
-+	unsigned int best_dev_prio;
-+	unsigned int dev_idx = UINT_MAX;
-+	struct page *page = lnet_get_first_page(md, offset);
-+
-+	msg->msg_rdma_force = lnet_is_rdma_only_page(page);
-+	if (msg->msg_rdma_force)
-+		dev_idx = lnet_get_dev_idx(page);
- 
- 	/* If there is no peer_ni that we can send to on this network,
- 	 * then there is no point in looking for a new best_ni here.
-@@ -1440,9 +1462,11 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	if (!best_ni) {
- 		best_sel_prio = LNET_MAX_SELECTION_PRIORITY;
- 		shortest_distance = UINT_MAX;
-+		best_dev_prio = UINT_MAX;
- 		best_credits = INT_MIN;
- 		best_healthv = 0;
- 	} else {
-+		best_dev_prio = lnet_dev_prio_of_md(best_ni, dev_idx);
- 		shortest_distance = cfs_cpt_distance(lnet_cpt_table(), md_cpt,
- 						     best_ni->ni_dev_cpt);
- 		best_credits = atomic_read(&best_ni->ni_tx_credits);
-@@ -1456,6 +1480,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		int ni_healthv;
- 		int ni_fatal;
- 		u32 ni_sel_prio;
-+		unsigned int ni_dev_prio;
- 
- 		ni_credits = atomic_read(&ni->ni_tx_credits);
- 		ni_healthv = atomic_read(&ni->ni_healthv);
-@@ -1471,6 +1496,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 					    md_cpt,
- 					    ni->ni_dev_cpt);
- 
-+		ni_dev_prio = lnet_dev_prio_of_md(ni, dev_idx);
-+
- 		/*
- 		 * All distances smaller than the NUMA range
- 		 * are treated equally.
-@@ -1478,22 +1505,21 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		if (distance < lnet_numa_range)
- 			distance = lnet_numa_range;
- 
--		/*
--		 * Select on health, shorter distance, available
--		 * credits, then round-robin.
-+		/* * Select on health, selection policy, direct dma prio,
-+		 * shorter distance, available credits, then round-robin.
- 		 */
- 		if (ni_fatal)
- 			continue;
- 
- 		if (best_ni)
- 			CDEBUG(D_NET,
--			       "compare ni %s [c:%d, d:%d, s:%d, p:%u] with best_ni %s [c:%d, d:%d, s:%d, p:%u]\n",
-+			       "compare ni %s [c:%d, d:%d, s:%d, p:%u, g:%u] with best_ni %s [c:%d, d:%d, s:%d, p:%u, g:%u]\n",
- 			       libcfs_nid2str(ni->ni_nid), ni_credits, distance,
--			       ni->ni_seq, ni_sel_prio,
-+			       ni->ni_seq, ni_sel_prio, ni_dev_prio,
- 			       (best_ni) ? libcfs_nid2str(best_ni->ni_nid)
- 			       : "not selected", best_credits, shortest_distance,
- 			       (best_ni) ? best_ni->ni_seq : 0,
--			       best_sel_prio);
-+			       best_sel_prio, best_dev_prio);
- 		else
- 			goto select_ni;
- 
-@@ -1507,6 +1533,11 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		else if (ni_sel_prio < best_sel_prio)
- 			goto select_ni;
- 
-+		if (ni_dev_prio > best_dev_prio)
-+			continue;
-+		else if (ni_dev_prio < best_dev_prio)
-+			goto select_ni;
-+
- 		if (distance > shortest_distance)
- 			continue;
- 		else if (distance < shortest_distance)
-@@ -1522,6 +1553,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 
- select_ni:
- 		best_sel_prio = ni_sel_prio;
-+		best_dev_prio = ni_dev_prio;
- 		shortest_distance = distance;
- 		best_healthv = ni_healthv;
- 		best_ni = ni;
-@@ -1812,6 +1844,7 @@ struct lnet_ni *
- lnet_find_best_ni_on_spec_net(struct lnet_ni *cur_best_ni,
- 			      struct lnet_peer *peer,
- 			      struct lnet_peer_net *peer_net,
-+			      struct lnet_msg *msg,
- 			      int cpt)
- {
- 	struct lnet_net *local_net;
-@@ -1829,7 +1862,7 @@ struct lnet_ni *
- 	 *	3. Round Robin
- 	 */
- 	best_ni = lnet_get_best_ni(local_net, cur_best_ni,
--				   peer, peer_net, cpt);
-+				   peer, peer_net, msg, cpt);
- 
- 	return best_ni;
- }
-@@ -2064,6 +2097,7 @@ struct lnet_ni *
- 	if (!sd->sd_best_ni) {
- 		lpn = gwni->lpni_peer_net;
- 		sd->sd_best_ni = lnet_find_best_ni_on_spec_net(NULL, gw, lpn,
-+							       sd->sd_msg,
- 							       sd->sd_md_cpt);
- 		if (!sd->sd_best_ni) {
- 			CERROR("Internal Error. Expected local ni on %s but non found :%s\n",
-@@ -2143,7 +2177,7 @@ struct lnet_ni *
- 
- struct lnet_ni *
- lnet_find_best_ni_on_local_net(struct lnet_peer *peer, int md_cpt,
--			       bool discovery)
-+			       struct lnet_msg *msg, bool discovery)
- {
- 	struct lnet_peer_net *lpn = NULL;
- 	struct lnet_peer_net *best_lpn = NULL;
-@@ -2237,8 +2271,8 @@ struct lnet_ni *
- 		/* Select the best NI on the same net as best_lpn chosen
- 		 * above
- 		 */
--		best_ni = lnet_find_best_ni_on_spec_net(NULL, peer,
--							best_lpn, md_cpt);
-+		best_ni = lnet_find_best_ni_on_spec_net(NULL, peer, best_lpn,
-+							msg, md_cpt);
+ static void
+ ksocknal_incr_conn_count(struct ksock_conn_cb *conn_cb,
+ 			 int type)
+@@ -409,19 +423,16 @@ struct ksock_peer_ni *
+ 		break;
+ 	case SOCKLND_CONN_BULK_IN:
+ 		conn_cb->ksnr_blki_conn_count++;
+-		if (conn_cb->ksnr_blki_conn_count >=
+-		    *ksocknal_tunables.ksnd_conns_per_peer)
++		if (conn_cb->ksnr_blki_conn_count >= conn_cb->ksnr_max_conns)
+ 			conn_cb->ksnr_connected |= BIT(type);
+ 		break;
+ 	case SOCKLND_CONN_BULK_OUT:
+ 		conn_cb->ksnr_blko_conn_count++;
+-		if (conn_cb->ksnr_blko_conn_count >=
+-		    *ksocknal_tunables.ksnd_conns_per_peer)
++		if (conn_cb->ksnr_blko_conn_count >= conn_cb->ksnr_max_conns)
+ 			conn_cb->ksnr_connected |= BIT(type);
+ 		break;
+ 	case SOCKLND_CONN_ANY:
+-		if (conn_cb->ksnr_conn_count >=
+-		    *ksocknal_tunables.ksnd_conns_per_peer)
++		if (conn_cb->ksnr_conn_count >= conn_cb->ksnr_max_conns)
+ 			conn_cb->ksnr_connected |= BIT(type);
+ 		break;
+ 	default:
+@@ -429,9 +440,8 @@ struct ksock_peer_ni *
+ 		break;
  	}
  
- 	return best_ni;
-@@ -2298,6 +2332,7 @@ struct lnet_ni *
- 		best_ni =
- 			lnet_find_best_ni_on_spec_net(NULL, sd->sd_peer,
- 						      sd->sd_best_lpni->lpni_peer_net,
-+						      sd->sd_msg,
- 						      sd->sd_md_cpt);
- 		/* If there is no best_ni we don't have a route */
- 		if (!best_ni) {
-@@ -2350,6 +2385,7 @@ struct lnet_ni *
- 		sd->sd_best_ni = lnet_find_best_ni_on_spec_net(NULL,
- 							       sd->sd_peer,
- 							       sd->sd_best_lpni->lpni_peer_net,
-+							       sd->sd_msg,
- 							       sd->sd_md_cpt);
- 		if (!sd->sd_best_ni) {
- 			CERROR("Unable to forward message to %s. No local NI available\n",
-@@ -2382,6 +2418,7 @@ struct lnet_ni *
- 		sd->sd_best_ni =
- 		  lnet_find_best_ni_on_spec_net(NULL, sd->sd_peer,
- 						sd->sd_best_lpni->lpni_peer_net,
-+						sd->sd_msg,
- 						sd->sd_md_cpt);
+-	CDEBUG(D_NET, "Add conn type %d, ksnr_connected %x conns_per_peer %d\n",
+-	       type, conn_cb->ksnr_connected,
+-	       *ksocknal_tunables.ksnd_conns_per_peer);
++	CDEBUG(D_NET, "Add conn type %d, ksnr_connected %x ksnr_max_conns %d\n",
++	       type, conn_cb->ksnr_connected, conn_cb->ksnr_max_conns);
+ }
  
- 		if (!sd->sd_best_ni) {
-@@ -2403,6 +2440,7 @@ struct lnet_ni *
- 	 */
- 	sd->sd_best_ni = lnet_find_best_ni_on_local_net(sd->sd_peer,
- 					sd->sd_md_cpt,
-+					sd->sd_msg,
- 					lnet_msg_discovery(sd->sd_msg));
- 	if (sd->sd_best_ni) {
- 		sd->sd_best_lpni =
+ static void
+@@ -597,6 +607,13 @@ struct ksock_peer_ni *
+ 
+ 	ksocknal_add_conn_cb_locked(peer_ni, conn_cb);
+ 
++	/* Remember conns_per_peer setting at the time
++	 * of connection initiation. It will define the
++	 * max number of conns per type for this conn_cb
++	 * while it's in use.
++	 */
++	conn_cb->ksnr_max_conns = ksocknal_get_conns_per_peer(peer_ni);
++
+ 	write_unlock_bh(&ksocknal_data.ksnd_global_lock);
+ 
+ 	return 0;
+@@ -1002,7 +1019,13 @@ struct ksock_peer_ni *
+ 				continue;
+ 
+ 			num_dup++;
+-			if (num_dup < *ksocknal_tunables.ksnd_conns_per_peer)
++			/* If max conns per type is not registered in conn_cb
++			 * as ksnr_max_conns, use ni's conns_per_peer
++			 */
++			if ((peer_ni->ksnp_conn_cb &&
++			     num_dup < peer_ni->ksnp_conn_cb->ksnr_max_conns) ||
++			    (!peer_ni->ksnp_conn_cb &&
++			     num_dup < ksocknal_get_conns_per_peer(peer_ni)))
+ 				continue;
+ 
+ 			/* Reply on a passive connection attempt so the peer_ni
+@@ -1229,7 +1252,7 @@ struct ksock_peer_ni *
+ 		 * of the given type got created
+ 		 */
+ 		if (ksocknal_get_conn_count_by_type(conn_cb, conn->ksnc_type) ==
+-		    *ksocknal_tunables.ksnd_conns_per_peer)
++		    conn_cb->ksnr_max_conns)
+ 			LASSERT((conn_cb->ksnr_connected &
+ 				BIT(conn->ksnc_type)) != 0);
+ 
+@@ -2288,7 +2311,6 @@ static int ksocknal_device_event(struct notifier_block *unused,
+ ksocknal_startup(struct lnet_ni *ni)
+ {
+ 	struct ksock_net *net;
+-	struct lnet_ioctl_config_lnd_cmn_tunables *net_tunables;
+ 	struct ksock_interface *ksi = NULL;
+ 	struct lnet_inetdev *ifaces = NULL;
+ 	struct sockaddr_in *sa;
+@@ -2309,28 +2331,8 @@ static int ksocknal_device_event(struct notifier_block *unused,
+ 
+ 	net->ksnn_incarnation = ktime_get_real_ns();
+ 	ni->ni_data = net;
+-	net_tunables = &ni->ni_net->net_tunables;
+-
+-	if (net_tunables->lct_peer_timeout == -1)
+-		net_tunables->lct_peer_timeout =
+-			*ksocknal_tunables.ksnd_peertimeout;
+-
+-	if (net_tunables->lct_max_tx_credits == -1)
+-		net_tunables->lct_max_tx_credits =
+-			*ksocknal_tunables.ksnd_credits;
+-
+-	if (net_tunables->lct_peer_tx_credits == -1)
+-		net_tunables->lct_peer_tx_credits =
+-			*ksocknal_tunables.ksnd_peertxcredits;
+-
+-	if (net_tunables->lct_peer_tx_credits >
+-	    net_tunables->lct_max_tx_credits)
+-		net_tunables->lct_peer_tx_credits =
+-			net_tunables->lct_max_tx_credits;
+ 
+-	if (net_tunables->lct_peer_rtr_credits == -1)
+-		net_tunables->lct_peer_rtr_credits =
+-			*ksocknal_tunables.ksnd_peerrtrcredits;
++	ksocknal_tunables_setup(ni);
+ 
+ 	rc = lnet_inet_enumerate(&ifaces, ni->ni_net_ns);
+ 	if (rc < 0)
+diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
+index 45103a3..7a55492 100644
+--- a/net/lnet/klnds/socklnd/socklnd.h
++++ b/net/lnet/klnds/socklnd/socklnd.h
+@@ -403,6 +403,9 @@ struct ksock_conn_cb {
+ 	int			ksnr_conn_count;	/* total # conns for
+ 							 * this cb
+ 							 */
++	unsigned int		ksnr_max_conns;		/* conns_per_peer at
++							 * peer creation
++							 */
+ };
+ 
+ #define SOCKNAL_KEEPALIVE_PING	1	/* cookie for keepalive ping */
+@@ -696,6 +699,7 @@ int ksocknal_lib_get_conn_tunables(struct ksock_conn *conn, int *txmem,
+ void ksocknal_write_callback(struct ksock_conn *conn);
+ 
+ int ksocknal_tunables_init(void);
++void ksocknal_tunables_setup(struct lnet_ni *ni);
+ 
+ void ksocknal_lib_csum_tx(struct ksock_tx *tx);
+ 
+diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
+index bc772e4..c6cce1e 100644
+--- a/net/lnet/klnds/socklnd/socklnd_modparams.c
++++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
+@@ -24,6 +24,8 @@
+ #include <asm/hypervisor.h>
+ #endif
+ 
++#define CURRENT_LND_VERSION 1
++
+ static int sock_timeout;
+ module_param(sock_timeout, int, 0644);
+ MODULE_PARM_DESC(sock_timeout, "dead socket timeout (seconds)");
+@@ -139,8 +141,8 @@
+ module_param(zc_recv_min_nfrags, int, 0644);
+ MODULE_PARM_DESC(zc_recv_min_nfrags, "minimum # of fragments to enable ZC recv");
+ 
+-static unsigned int conns_per_peer = 1;
+-module_param(conns_per_peer, uint, 0444);
++static unsigned int conns_per_peer = DEFAULT_CONNS_PER_PEER;
++module_param(conns_per_peer, uint, 0644);
+ MODULE_PARM_DESC(conns_per_peer, "number of connections per peer");
+ 
+ #if SOCKNAL_VERSION_DEBUG
+@@ -150,9 +152,13 @@
+ #endif
+ 
+ struct ksock_tunables ksocknal_tunables;
++static struct lnet_ioctl_config_socklnd_tunables default_tunables;
+ 
+ int ksocknal_tunables_init(void)
+ {
++	default_tunables.lnd_version = CURRENT_LND_VERSION;
++	default_tunables.lnd_conns_per_peer = conns_per_peer;
++
+ 	/* initialize ksocknal_tunables structure */
+ 	ksocknal_tunables.ksnd_timeout = &sock_timeout;
+ 	ksocknal_tunables.ksnd_nscheds = &nscheds;
+@@ -201,4 +207,47 @@ int ksocknal_tunables_init(void)
+ 		*ksocknal_tunables.ksnd_zc_min_payload = (16 << 20) + 1;
+ 
+ 	return 0;
+-};
++}
++
++void ksocknal_tunables_setup(struct lnet_ni *ni)
++{
++	struct lnet_ioctl_config_socklnd_tunables *tunables;
++	struct lnet_ioctl_config_lnd_cmn_tunables *net_tunables;
++
++	/* If no tunables specified, setup default tunables */
++	if (!ni->ni_lnd_tunables_set)
++		memcpy(&ni->ni_lnd_tunables.lnd_tun_u.lnd_sock,
++		       &default_tunables, sizeof(*tunables));
++
++	tunables = &ni->ni_lnd_tunables.lnd_tun_u.lnd_sock;
++
++	/* Current API version */
++	tunables->lnd_version = CURRENT_LND_VERSION;
++
++	net_tunables = &ni->ni_net->net_tunables;
++
++	if (net_tunables->lct_peer_timeout == -1)
++		net_tunables->lct_peer_timeout =
++			*ksocknal_tunables.ksnd_peertimeout;
++
++	if (net_tunables->lct_max_tx_credits == -1)
++		net_tunables->lct_max_tx_credits =
++			*ksocknal_tunables.ksnd_credits;
++
++	if (net_tunables->lct_peer_tx_credits == -1)
++		net_tunables->lct_peer_tx_credits =
++			*ksocknal_tunables.ksnd_peertxcredits;
++
++	if (net_tunables->lct_peer_tx_credits >
++	    net_tunables->lct_max_tx_credits)
++		net_tunables->lct_peer_tx_credits =
++			net_tunables->lct_max_tx_credits;
++
++	if (net_tunables->lct_peer_rtr_credits == -1)
++		net_tunables->lct_peer_rtr_credits =
++			*ksocknal_tunables.ksnd_peerrtrcredits;
++
++	if (!tunables->lnd_conns_per_peer)
++		tunables->lnd_conns_per_peer = (conns_per_peer) ?
++			conns_per_peer : DEFAULT_CONNS_PER_PEER;
++}
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 370c1d6..bb5fb56 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -3657,6 +3657,30 @@ u32 lnet_get_dlc_seq_locked(void)
+ 	lnet_net_unlock(LNET_LOCK_EX);
+ }
+ 
++static void
++lnet_ni_set_conns_per_peer(lnet_nid_t nid, int value, bool all)
++{
++	struct lnet_net *net;
++	struct lnet_ni *ni;
++
++	lnet_net_lock(LNET_LOCK_EX);
++	list_for_each_entry(net, &the_lnet.ln_nets, net_list) {
++		list_for_each_entry(ni, &net->net_ni_list, ni_netlist) {
++			if (ni->ni_nid != nid && !all)
++				continue;
++			if (LNET_NETTYP(net->net_id) == SOCKLND)
++				ni->ni_lnd_tunables.lnd_tun_u.lnd_sock.lnd_conns_per_peer = value;
++			else if (LNET_NETTYP(net->net_id) == O2IBLND)
++				ni->ni_lnd_tunables.lnd_tun_u.lnd_o2ib.lnd_conns_per_peer = value;
++			if (!all) {
++				lnet_net_unlock(LNET_LOCK_EX);
++				return;
++			}
++		}
++	}
++	lnet_net_unlock(LNET_LOCK_EX);
++}
++
+ static int
+ lnet_get_local_ni_hstats(struct lnet_ioctl_local_ni_hstats *stats)
+ {
+@@ -4086,6 +4110,25 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		return 0;
+ 	}
+ 
++	case IOC_LIBCFS_SET_CONNS_PER_PEER: {
++		struct lnet_ioctl_reset_conns_per_peer_cfg *cfg = arg;
++		int value;
++
++		if (cfg->rcpp_hdr.ioc_len < sizeof(*cfg))
++			return -EINVAL;
++		if (cfg->rcpp_value < 0)
++			value = 1;
++		else
++			value = cfg->rcpp_value;
++		CDEBUG(D_NET,
++		       "Setting conns_per_peer to %d for %s. all = %d\n",
++		       value, libcfs_nid2str(cfg->rcpp_nid), cfg->rcpp_all);
++		mutex_lock(&the_lnet.ln_api_mutex);
++		lnet_ni_set_conns_per_peer(cfg->rcpp_nid, value, cfg->rcpp_all);
++		mutex_unlock(&the_lnet.ln_api_mutex);
++		return 0;
++	}
++
+ 	case IOC_LIBCFS_NOTIFY_ROUTER: {
+ 		time64_t deadline = ktime_get_real_seconds() - data->ioc_u64[0];
+ 
 -- 
 1.8.3.1
 
