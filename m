@@ -1,54 +1,39 @@
-Return-Path: <SRS0=otIW=N6=lists.lustre.org=lustre-devel-bounces@kernel.org>
+Return-Path: <SRS0=2ypu=OM=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=BAYES_00,
-	HEADER_FROM_DIFFERENT_DOMAINS,HTML_MESSAGE,MAILING_LIST_MULTI,SPF_HELO_NONE,
-	SPF_PASS autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.8 required=3.0 tests=BAYES_00,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_HELO_NONE,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2EEF5C4332F
-	for <lustre-devel@archiver.kernel.org>; Wed,  8 Sep 2021 15:57:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A951C433EF
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:08 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B57C76113D
-	for <lustre-devel@archiver.kernel.org>; Wed,  8 Sep 2021 15:57:48 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org B57C76113D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=CEA.FR
+	by mail.kernel.org (Postfix) with ESMTPS id 361546112F
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:08 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 361546112F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5131421F349;
-	Wed,  8 Sep 2021 08:57:48 -0700 (PDT)
-Received: from oxalide-smtp-out.extra.cea.fr (oxalide-smtp-out.extra.cea.fr
- [132.168.224.13])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 635C421F2E0
- for <lustre-devel@lists.lustre.org>; Wed,  8 Sep 2021 08:57:46 -0700 (PDT)
-Received: from pisaure.intra.cea.fr (pisaure.intra.cea.fr [132.166.88.21])
- by oxalide-sys.extra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with ESMTP
- id 188Fvihd008503
- for <lustre-devel@lists.lustre.org>; Wed, 8 Sep 2021 17:57:44 +0200
-Received: from pisaure.intra.cea.fr (localhost [127.0.0.1])
- by localhost (Postfix) with SMTP id 6EE52205AFE
- for <lustre-devel@lists.lustre.org>; Wed,  8 Sep 2021 17:57:44 +0200 (CEST)
-Received: from muguet1-smtp-out.intra.cea.fr (muguet1-smtp-out.intra.cea.fr
- [132.166.192.12])
- by pisaure.intra.cea.fr (Postfix) with ESMTP id 6308220573D
- for <lustre-devel@lists.lustre.org>; Wed,  8 Sep 2021 17:57:44 +0200 (CEST)
-Received: from zia.cdc.esteban.ctsi (out.dam.intra.cea.fr [132.165.76.10])
- by muguet1-sys.intra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with SMTP
- id 188FviFR003818
- for <lustre-devel@lists.lustre.org>; Wed, 8 Sep 2021 17:57:44 +0200
-Received: (qmail 7905 invoked from network); 8 Sep 2021 15:57:44 -0000
-From: "Thomas.LEIBOVICI@CEA.FR" <Thomas.LEIBOVICI@CEA.FR>
-To: "'lustre-devel@lists.lustre.org'" <lustre-devel@lists.lustre.org>
-Thread-Topic: [LAD'21] Registration is open! (and it's free)
-Thread-Index: AdekyjgohVqrJ23eQ4Wrlz8y7KDjuA==
-Date: Wed, 8 Sep 2021 15:57:42 +0000
-Message-ID: <34791cd0c40741c39ad95d64cb8c3471@U-MYKONOS3.dif.dam.intra.cea.fr>
-Accept-Language: fr-FR, en-US
-Content-Language: fr-FR
-MIME-Version: 1.0
-Subject: [lustre-devel] [LAD'21] Registration is open! (and it's free)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7B6D421E009;
+	Tue, 21 Sep 2021 19:20:07 -0700 (PDT)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2251221C9A7
+ for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:05 -0700 (PDT)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id F2D83349;
+ Tue, 21 Sep 2021 22:20:03 -0400 (EDT)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id E870EFF4A3; Tue, 21 Sep 2021 22:20:03 -0400 (EDT)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Tue, 21 Sep 2021 22:19:37 -0400
+Message-Id: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+Subject: [lustre-devel] [PATCH 00/24] lustre: Update to OpenSFS Sept 21, 2021
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -61,149 +46,124 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Reply-To: "lad@eofs.eu" <lad@eofs.eu>
-Content-Type: multipart/mixed; boundary="===============7790751354908010575=="
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7790751354908010575==
-Content-Language: fr-FR
-Content-Type: multipart/alternative;
-	boundary="_000_34791cd0c40741c39ad95d64cb8c3471UMYKONOS3difdamintracea_"
+Merge latest new OpenSFS work to native Linux client. Biggest
+change is the native support of the Lustre utilites with the
+Linux client!!!! I do see new test failures due to the debugfs
+root only issues which will be addressed later.
 
---_000_34791cd0c40741c39ad95d64cb8c3471UMYKONOS3difdamintracea_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+Alex Zhuravlev (1):
+  lustre: obdclass: EAGAIN after rhashtable_walk_next()
 
-Dear Lustre community,
+Alexander Boyko (1):
+  lustre: llite: don't touch vma after filemap_fault
 
-Registration for LAD'21 is now open!
+Amir Shehata (1):
+  lnet: Lock primary NID logic
 
-It will take place on a Zoom webinar platform on September 28, 29 and 30.
-To provide maximum coverage of the different time zones, sessions will be b=
-roadcast twice a day, once at 8AM UTC (10AM CEST), and once at 4PM UTC (6PM=
- CEST).
+Chris Horn (1):
+  lnet: Check for -ESHUTDOWN in lnet_parse
 
--              To register for morning sessions (8AM UTC), use this URL: ht=
-tps://zoom.us/webinar/register/WN_4z991jNdRiKDJNL80HIs5Q
--              To register for afternoon sessions (4PM UTC), use this URL: =
-https://zoom.us/webinar/register/WN_oBnF-DMvRBuxgwcH8yjcUQ
-(of course, you can register to both if you like).
+Hongchao Zhang (2):
+  lustre: quota: enforce block quota for chgrp
+  lustre: llite: check read only mount for setquota
 
-Once registered on Zoom, you will receive an invitation to the chat platfor=
-m which we will use for Q&As.
+James Simmons (2):
+  lustre: uapi: fixup UAPI headers for native Linux client.
+  lustre: ptlrpc: separate out server code for wiretest
 
-The final agenda of LAD21 is now available on the LAD website at this addre=
-ss: https://www.eofs.eu/events/lad21
+Mr NeilBrown (10):
+  lnet: introduce struct lnet_nid
+  lnet: add string formating/parsing for IPv6 nids
+  lnet: change lpni_nid in lnet_peer_ni to lnet_nid
+  lnet: change lp_primary_nid to struct lnet_nid
+  lnet: change lp_disc_*_nid to struct lnet_nid
+  lnet: socklnd: factor out key calculation for ksnd_peers
+  lnet: introduce lnet_processid for ksock_peer_ni
+  lnet: enhance connect/accept to support large addr
+  lnet: change lr_nid to struct lnet_nid
+  lnet: extend rspt_next_hop_nid in lnet_rsp_tracker
 
-We hope that many of you will attend the program that we and the speakers h=
-ave prepared for you!
+Oleg Drokin (1):
+  lustre: llite: Remove inode locking in ll_fsync
 
-Best regards,
-The LAD organization team
+Patrick Farrell (1):
+  lustre: llite: Always do lookup on ENOENT in open
 
---_000_34791cd0c40741c39ad95d64cb8c3471UMYKONOS3difdamintracea_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+Qian Yingjin (1):
+  lustre: pcc: VM_WRITE should not trigger layout write
 
-<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
-osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
-xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
-//www.w3.org/TR/REC-html40">
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-<meta name=3D"Generator" content=3D"Microsoft Word 14 (filtered medium)">
-<style><!--
-/* Font Definitions */
-@font-face
-	{font-family:Calibri;
-	panose-1:2 15 5 2 2 2 4 3 2 4;}
-/* Style Definitions */
-p.MsoNormal, li.MsoNormal, div.MsoNormal
-	{margin:0cm;
-	margin-bottom:.0001pt;
-	font-size:11.0pt;
-	font-family:"Calibri","sans-serif";}
-a:link, span.MsoHyperlink
-	{mso-style-priority:99;
-	color:blue;
-	text-decoration:underline;}
-a:visited, span.MsoHyperlinkFollowed
-	{mso-style-priority:99;
-	color:purple;
-	text-decoration:underline;}
-span.EmailStyle17
-	{mso-style-type:personal-compose;
-	font-family:"Calibri","sans-serif";
-	color:windowtext;}
-.MsoChpDefault
-	{mso-style-type:export-only;}
-@page WordSection1
-	{size:612.0pt 792.0pt;
-	margin:70.85pt 70.85pt 70.85pt 70.85pt;}
-div.WordSection1
-	{page:WordSection1;}
---></style><!--[if gte mso 9]><xml>
-<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
-</xml><![endif]--><!--[if gte mso 9]><xml>
-<o:shapelayout v:ext=3D"edit">
-<o:idmap v:ext=3D"edit" data=3D"1" />
-</o:shapelayout></xml><![endif]-->
-</head>
-<body lang=3D"EN-US" link=3D"blue" vlink=3D"purple">
-<div class=3D"WordSection1">
-<p class=3D"MsoNormal">Dear Lustre community,<o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">Registration for LAD'21 is now open!<o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">It will take place on a Zoom webinar platform on Sep=
-tember 28, 29 and 30.<o:p></o:p></p>
-<p class=3D"MsoNormal">To provide maximum coverage of the different time zo=
-nes, sessions will be broadcast twice a day, once at 8AM UTC (10AM CEST), a=
-nd once at 4PM UTC (6PM CEST).<o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
-sp;&nbsp;&nbsp;&nbsp;&nbsp; To register for morning sessions (8AM UTC), use=
- this URL:
-<a href=3D"https://zoom.us/webinar/register/WN_4z991jNdRiKDJNL80HIs5Q">http=
-s://zoom.us/webinar/register/WN_4z991jNdRiKDJNL80HIs5Q</a><o:p></o:p></p>
-<p class=3D"MsoNormal">-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
-sp;&nbsp;&nbsp;&nbsp;&nbsp; To register for afternoon sessions (4PM UTC), u=
-se this URL:
-<a href=3D"https://zoom.us/webinar/register/WN_oBnF-DMvRBuxgwcH8yjcUQ">http=
-s://zoom.us/webinar/register/WN_oBnF-DMvRBuxgwcH8yjcUQ</a><o:p></o:p></p>
-<p class=3D"MsoNormal">(of course, you can register to both if you like).<o=
-:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">Once registered on Zoom, you will receive an invitat=
-ion to the chat platform which we will use for Q&amp;As.<o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">The final agenda of LAD21 is now available on the LA=
-D website at this address:
-<a href=3D"https://www.eofs.eu/events/lad21">https://www.eofs.eu/events/lad=
-21</a><o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">We hope that many of you will attend the program tha=
-t we and the speakers have prepared for you!<o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
-<p class=3D"MsoNormal">Best regards,<o:p></o:p></p>
-<p class=3D"MsoNormal">The LAD organization team<o:p></o:p></p>
-</div>
-</body>
-</html>
+Sebastien Buisson (1):
+  lustre: sec: filename encryption
 
---_000_34791cd0c40741c39ad95d64cb8c3471UMYKONOS3difdamintracea_--
+Serguei Smirnov (1):
+  lnet: socklnd: fix link state detection
 
---===============7790751354908010575==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Vitaly Fertman (1):
+  lustre: ptlrpc: two replay lock threads
+
+ fs/lustre/include/cl_object.h           |   5 -
+ fs/lustre/include/lustre_swab.h         |   1 -
+ fs/lustre/include/obd.h                 |   4 +
+ fs/lustre/include/obd_support.h         |   1 +
+ fs/lustre/ldlm/ldlm_request.c           |  10 +-
+ fs/lustre/llite/crypto.c                | 144 +++++++++
+ fs/lustre/llite/dcache.c                |   8 +
+ fs/lustre/llite/dir.c                   |  52 +++-
+ fs/lustre/llite/file.c                  |  56 ++--
+ fs/lustre/llite/llite_internal.h        |  29 +-
+ fs/lustre/llite/llite_lib.c             |  63 +++-
+ fs/lustre/llite/llite_mmap.c            |  31 +-
+ fs/lustre/llite/namei.c                 |  47 ++-
+ fs/lustre/llite/statahead.c             |  48 +++
+ fs/lustre/llite/vvp_dev.c               |   6 +
+ fs/lustre/llite/vvp_io.c                |   3 +-
+ fs/lustre/lov/lov_io.c                  |   6 +-
+ fs/lustre/mdc/mdc_lib.c                 |   6 +-
+ fs/lustre/obdclass/jobid.c              |   5 +
+ fs/lustre/obdclass/llog_swab.c          |  33 ---
+ fs/lustre/obdclass/obd_config.c         |   4 +-
+ fs/lustre/ptlrpc/layout.c               |   5 +-
+ fs/lustre/ptlrpc/pack_generic.c         |  13 +-
+ fs/lustre/ptlrpc/wiretest.c             | 210 ++++++-------
+ include/linux/lnet/lib-lnet.h           |  39 ++-
+ include/linux/lnet/lib-types.h          |  18 +-
+ include/uapi/linux/lnet/lnet-idl.h      |  39 ++-
+ include/uapi/linux/lnet/lnet-types.h    | 106 ++++++-
+ include/uapi/linux/lnet/nidstr.h        |  12 +-
+ include/uapi/linux/lustre/lustre_idl.h  |  78 +----
+ include/uapi/linux/lustre/lustre_user.h |  20 ++
+ net/lnet/klnds/o2iblnd/o2iblnd.c        |  13 +-
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c     |  17 +-
+ net/lnet/klnds/socklnd/socklnd.c        | 353 +++++++++++++++-------
+ net/lnet/klnds/socklnd/socklnd.h        |  14 +-
+ net/lnet/klnds/socklnd/socklnd_cb.c     | 119 ++++----
+ net/lnet/klnds/socklnd/socklnd_proto.c  |  14 +-
+ net/lnet/lnet/acceptor.c                | 112 ++++---
+ net/lnet/lnet/api-ni.c                  | 178 ++++++++---
+ net/lnet/lnet/config.c                  |  20 +-
+ net/lnet/lnet/lib-move.c                | 155 +++++-----
+ net/lnet/lnet/lib-msg.c                 |  13 +-
+ net/lnet/lnet/lib-socket.c              |  32 +-
+ net/lnet/lnet/lo.c                      |   3 +-
+ net/lnet/lnet/net_fault.c               |   4 +-
+ net/lnet/lnet/nidstrings.c              | 163 ++++++++++-
+ net/lnet/lnet/peer.c                    | 503 +++++++++++++++++++-------------
+ net/lnet/lnet/router.c                  |  88 +++---
+ net/lnet/lnet/router_proc.c             |  12 +-
+ net/lnet/lnet/udsp.c                    |  39 +--
+ 50 files changed, 1997 insertions(+), 957 deletions(-)
+
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============7790751354908010575==--
