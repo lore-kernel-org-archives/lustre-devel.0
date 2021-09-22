@@ -7,37 +7,36 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 724E7C433EF
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A96A5C433EF
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:19 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 83FA56112F
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:10 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 83FA56112F
+	by mail.kernel.org (Postfix) with ESMTPS id 61D6361168
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:20:19 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 61D6361168
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AC31C21F176;
-	Tue, 21 Sep 2021 19:20:08 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6169021F280;
+	Tue, 21 Sep 2021 19:20:14 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B8F4521CB9F
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0503121C8F2
  for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:05 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 03ABB34E;
- Tue, 21 Sep 2021 22:20:03 -0400 (EDT)
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 0665F34F;
+ Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id EE6ECFF4BC; Tue, 21 Sep 2021 22:20:03 -0400 (EDT)
+ id EB351FF4A8; Tue, 21 Sep 2021 22:20:03 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Tue, 21 Sep 2021 22:19:39 -0400
-Message-Id: <1632277201-6920-3-git-send-email-jsimmons@infradead.org>
+Date: Tue, 21 Sep 2021 22:19:38 -0400
+Message-Id: <1632277201-6920-2-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
 References: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 02/24] lustre: quota: enforce block quota for
- chgrp
+Subject: [lustre-devel] [PATCH 01/24] lnet: Lock primary NID logic
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -50,7 +49,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Hongchao Zhang <hongchao@whamcloud.com>,
+Cc: Amir Shehata <ashehata@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -58,57 +57,166 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Hongchao Zhang <hongchao@whamcloud.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-In patch https://review.whamcloud.com/30146 "LU-5152 quota: enforce
-block quota for chgrp", problems were introduced due to synchronous
-requests from the MDS to the OSS to change the quota assignment of
-files during chgrp operations. However, in some cases, the OSTs are
-themselves out of grant and may send a quota request to the MDS,
-which may result in a deadlock. Another issue is the slow performance
-caused by the synchronous operation between MDT and OSTs.
+If a peer is created by Lustre make sure to lock that peer's
+primary NID. This peer can be discovered in the background.
+There is no need to block until discovery is complete, as Lustre
+can continue on with the primary NID it provided.
 
-This patch drops the synchronous RPC requirement of the original
-patch #30146 to avoid this problem.
+Discovery will populate the peer with other interfaces the peer has
+but will not change the peer's primary NID. It can also delete
+peer's NIDs which Lustre told it about (not the Primary NID).
 
-Previously, problems in quota tracking related to chgrp were introduced
-due to synchronous RPCs from the MDS to the OSS when changing the group
-ownership of objects for quota tracking since
-Fixes: ("LU-5152 quota: enforce block quota for chgrp")
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11303
-Lustre-commit: 83f5544d8518ad12 ("LU-11303 quota: enforce block quota for chgrp")
-Signed-off-by: Hongchao Zhang <hongchao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/33996
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Wang Shilong <wangshilong1991@gmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14668
+Lustre-commit: 024f9303bc6f32a31 ("LU-14668 lnet: Lock primary NID logic")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/43563
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_lib.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ net/lnet/lnet/peer.c | 69 ++++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 53 insertions(+), 16 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index f540caf..cc50503 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -1714,6 +1714,16 @@ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data)
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
- 
-+	/* If this is a chgrp of a regular file, we want to reserve enough
-+	 * quota to cover the entire file size.
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index c2f5d8b..720af99 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -530,6 +530,16 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 			goto out;
+ 		}
+ 	}
++
++	/* If we're asked to lock down the primary NID we shouldn't be
++	 * deleting it
 +	 */
-+	if (S_ISREG(inode->i_mode) && op_data->op_attr.ia_valid & ATTR_GID &&
-+	    from_kgid(&init_user_ns, op_data->op_attr.ia_gid) !=
-+	    from_kgid(&init_user_ns, inode->i_gid)) {
-+		op_data->op_xvalid |= OP_XVALID_BLOCKS;
-+		op_data->op_attr_blocks = inode->i_blocks;
++	if (lp->lp_state & LNET_PEER_LOCK_PRIMARY &&
++	    primary_nid == nid) {
++		rc = -EPERM;
++		goto out;
 +	}
 +
- 	rc = md_setattr(sbi->ll_md_exp, op_data, NULL, 0, &request);
+ 	lpni = lnet_find_peer_ni_locked(nid);
+ 	if (!lpni) {
+ 		rc = -ENOENT;
+@@ -1388,13 +1398,18 @@ struct lnet_peer_ni *
+ 	 * down then this discovery can introduce long delays into the mount
+ 	 * process, so skip it if it isn't necessary.
+ 	 */
+-	while (!lnet_peer_discovery_disabled && !lnet_peer_is_uptodate(lp)) {
++	if (!lnet_peer_discovery_disabled && !lnet_peer_is_uptodate(lp)) {
+ 		spin_lock(&lp->lp_lock);
+ 		/* force a full discovery cycle */
+-		lp->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH;
++		lp->lp_state |= LNET_PEER_FORCE_PING | LNET_PEER_FORCE_PUSH |
++				LNET_PEER_LOCK_PRIMARY;
+ 		spin_unlock(&lp->lp_lock);
+ 
+-		rc = lnet_discover_peer_locked(lpni, cpt, true);
++		/* start discovery in the background. Messages to that
++		 * peer will not go through until the discovery is
++		 * complete
++		 */
++		rc = lnet_discover_peer_locked(lpni, cpt, false);
+ 		if (rc)
+ 			goto out_decref;
+ 		/* The lpni (or lp) for this NID may have changed and our ref is
+@@ -1408,14 +1423,6 @@ struct lnet_peer_ni *
+ 			goto out_unlock;
+ 		}
+ 		lp = lpni->lpni_peer_net->lpn_peer;
+-
+-		/* If we find that the peer has discovery disabled then we will
+-		 * not modify whatever primary NID is currently set for this
+-		 * peer. Thus, we can break out of this loop even if the peer
+-		 * is not fully up to date.
+-		 */
+-		if (lnet_is_discovery_disabled(lp))
+-			break;
+ 	}
+ 	primary_nid = lp->lp_primary_nid;
+ out_decref:
+@@ -1522,6 +1529,8 @@ struct lnet_peer_net *
+ 			lnet_peer_clr_non_mr_pref_nids(lp);
+ 		}
+ 	}
++	if (flags & LNET_PEER_LOCK_PRIMARY)
++		lp->lp_state |= LNET_PEER_LOCK_PRIMARY;
+ 	spin_unlock(&lp->lp_lock);
+ 
+ 	lp->lp_nnis++;
+@@ -1676,9 +1685,27 @@ struct lnet_peer_net *
+ 		}
+ 		/* If this is the primary NID, destroy the peer. */
+ 		if (lnet_peer_ni_is_primary(lpni)) {
+-			struct lnet_peer *rtr_lp =
++			struct lnet_peer *lp2 =
+ 				lpni->lpni_peer_net->lpn_peer;
+-			int rtr_refcount = rtr_lp->lp_rtr_refcount;
++			int rtr_refcount = lp2->lp_rtr_refcount;
++
++			/* If the new peer that this NID belongs to is
++			 * a primary NID for another peer which we're
++			 * suppose to preserve the Primary for then we
++			 * don't want to mess with it. But the
++			 * configuration is wrong at this point, so we
++			 * should flag both of these peers as in a bad
++			 * state
++			 */
++			if (lp2->lp_state & LNET_PEER_LOCK_PRIMARY) {
++				spin_lock(&lp->lp_lock);
++				lp->lp_state |= LNET_PEER_BAD_CONFIG;
++				spin_unlock(&lp->lp_lock);
++				spin_lock(&lp2->lp_lock);
++				lp2->lp_state |= LNET_PEER_BAD_CONFIG;
++				spin_unlock(&lp2->lp_lock);
++				goto out_free_lpni;
++			}
+ 
+ 			/* if we're trying to delete a router it means
+ 			 * we're moving this peer NI to a new peer so must
+@@ -1686,9 +1713,9 @@ struct lnet_peer_net *
+ 			 */
+ 			if (rtr_refcount > 0) {
+ 				flags |= LNET_PEER_RTR_NI_FORCE_DEL;
+-				lnet_rtr_transfer_to_peer(rtr_lp, lp);
++				lnet_rtr_transfer_to_peer(lp2, lp);
+ 			}
+-			lnet_peer_del(lpni->lpni_peer_net->lpn_peer);
++			lnet_peer_del(lp2);
+ 			lnet_peer_ni_decref_locked(lpni);
+ 			lpni = lnet_peer_ni_alloc(nid);
+ 			if (!lpni) {
+@@ -1746,7 +1773,8 @@ struct lnet_peer_net *
+ 	if (lp->lp_primary_nid == nid)
+ 		goto out;
+ 
+-	lp->lp_primary_nid = nid;
++	if (!(lp->lp_state & LNET_PEER_LOCK_PRIMARY))
++		lp->lp_primary_nid = nid;
+ 
+ 	rc = lnet_peer_add_nid(lp, nid, flags);
  	if (rc) {
- 		ptlrpc_req_finished(request);
+@@ -1754,8 +1782,17 @@ struct lnet_peer_net *
+ 		goto out;
+ 	}
+ out:
++	/* if this is a configured peer or the primary for that peer has
++	 * been locked, then we don't want to flag this scenario as
++	 * a failure
++	 */
++	if (lp->lp_state & LNET_PEER_CONFIGURED ||
++	    lp->lp_state & LNET_PEER_LOCK_PRIMARY)
++		return 0;
++
+ 	CDEBUG(D_NET, "peer %s NID %s: %d\n",
+ 	       libcfs_nid2str(old), libcfs_nid2str(nid), rc);
++
+ 	return rc;
+ }
+ 
 -- 
 1.8.3.1
 
