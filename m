@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 176A4C433EF
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91BE7C433F5
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:39 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CCC5E6112F
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:32 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org CCC5E6112F
+	by mail.kernel.org (Postfix) with ESMTPS id 5374A610A1
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:39 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 5374A610A1
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 715F321EBE2;
-	Tue, 21 Sep 2021 19:21:32 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 74EE921F253;
+	Tue, 21 Sep 2021 19:21:38 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 68B0121E0B4
- for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:08 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 70C9121CBCE
+ for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:07 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 161CE35A;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 14444357;
  Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 12F91FF4A8; Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
+ id 08136FF4C2; Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Tue, 21 Sep 2021 22:19:46 -0400
-Message-Id: <1632277201-6920-10-git-send-email-jsimmons@infradead.org>
+Date: Tue, 21 Sep 2021 22:19:43 -0400
+Message-Id: <1632277201-6920-7-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
 References: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 09/24] lnet: introduce lnet_processid for
- ksock_peer_ni
+Subject: [lustre-devel] [PATCH 06/24] lnet: change lp_primary_nid to struct
+ lnet_nid
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -59,1207 +59,1334 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Mr NeilBrown <neilb@suse.de>
 
-struct lnet_processid (without the '_') is like lnet_process_id, but
-contains a 'struct lnet_nid' rather than lnet_nid_t.
-
-So far it is only used for ksnp_id in struct ksock_peer_ni, and
-related functions.
+Change lp_primary_nid in struct lnet_peer to struct lnet_nid.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: e1dbfdd53e2ce9543 ("LU-10391 lnet: introduce lnet_processid for ksock_peer_ni")
+Lustre-commit: 36dd83ee8e143a472 ("LU-10391 lnet: change lp_primary_nid to struct lnet_nid")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/42104
+Reviewed-on: https://review.whamcloud.com/42102
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h          |   1 +
- include/uapi/linux/lnet/lnet-types.h   |  36 +++++-
- include/uapi/linux/lnet/nidstr.h       |   1 +
- net/lnet/klnds/socklnd/socklnd.c       | 208 ++++++++++++++++++---------------
- net/lnet/klnds/socklnd/socklnd.h       |  14 +--
- net/lnet/klnds/socklnd/socklnd_cb.c    | 111 ++++++++++--------
- net/lnet/klnds/socklnd/socklnd_proto.c |  14 +--
- net/lnet/lnet/api-ni.c                 |  21 +++-
- net/lnet/lnet/nidstrings.c             |  18 +++
- 9 files changed, 259 insertions(+), 165 deletions(-)
+ include/linux/lnet/lib-lnet.h  |  10 +-
+ include/linux/lnet/lib-types.h |   2 +-
+ net/lnet/lnet/api-ni.c         |  46 +++++--
+ net/lnet/lnet/lib-move.c       |   7 +-
+ net/lnet/lnet/peer.c           | 297 +++++++++++++++++++++++------------------
+ net/lnet/lnet/router.c         |  38 +++---
+ net/lnet/lnet/router_proc.c    |   4 +-
+ net/lnet/lnet/udsp.c           |   6 +-
+ 8 files changed, 238 insertions(+), 172 deletions(-)
 
 diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index a4ec067..3842976 100644
+index 05c099d..a4ec067 100644
 --- a/include/linux/lnet/lib-lnet.h
 +++ b/include/linux/lnet/lib-lnet.h
-@@ -484,6 +484,7 @@ unsigned int lnet_nid_cpt_hash(struct lnet_nid *nid,
- 			       unsigned int number);
+@@ -480,7 +480,8 @@ struct lnet_ni *
+ extern struct lnet_lnd the_lolnd;
+ extern int avoid_asym_router_failure;
+ 
+-unsigned int lnet_nid_cpt_hash(lnet_nid_t nid, unsigned int number);
++unsigned int lnet_nid_cpt_hash(struct lnet_nid *nid,
++			       unsigned int number);
  int lnet_cpt_of_nid_locked(struct lnet_nid *nid, struct lnet_ni *ni);
  int lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni);
-+int lnet_nid2cpt(struct lnet_nid *nid, struct lnet_ni *ni);
  struct lnet_ni *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
- struct lnet_ni *lnet_nid2ni_addref(lnet_nid_t nid);
- struct lnet_ni *lnet_net2ni_locked(u32 net, int cpt);
-diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
-index 5538d4e..ec0c4ef 100644
---- a/include/uapi/linux/lnet/lnet-types.h
-+++ b/include/uapi/linux/lnet/lnet-types.h
-@@ -164,12 +164,14 @@ static inline int nid_same(const struct lnet_nid *n1,
+@@ -838,6 +839,7 @@ struct lnet_peer_ni *lnet_nid2peerni_locked(lnet_nid_t nid, lnet_nid_t pref,
+ struct lnet_peer_ni *lnet_peer_get_ni_locked(struct lnet_peer *lp,
+ 					     lnet_nid_t nid);
+ struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
++struct lnet_peer_ni *lnet_peer_ni_find_locked(struct lnet_nid *nid);
+ struct lnet_peer *lnet_find_peer(lnet_nid_t nid);
+ void lnet_peer_net_added(struct lnet_net *net);
+ lnet_nid_t lnet_peer_primary_nid_locked(lnet_nid_t nid);
+@@ -905,8 +907,8 @@ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
+ static inline bool
+ lnet_peer_ni_is_primary(struct lnet_peer_ni *lpni)
+ {
+-	return lnet_nid_to_nid4(&lpni->lpni_nid) ==
+-			lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
++	return nid_same(&lpni->lpni_nid,
++			 &lpni->lpni_peer_net->lpn_peer->lp_primary_nid);
  }
  
- /* This can be used when we need to hash a nid */
--static inline unsigned long nidhash(lnet_nid_t nid)
-+static inline unsigned long nidhash(const struct lnet_nid *nid)
- {
-+	int i;
- 	unsigned long hash = 0;
- 
--	hash ^= LNET_NIDNET(nid);
--	hash ^= LNET_NIDADDR(nid);
-+	hash ^= LNET_NID_NET(nid);
-+	for (i = 0; i < 4; i++)
-+		hash ^= nid->nid_addr[i];
- 	return hash;
+ bool lnet_peer_is_uptodate(struct lnet_peer *lp);
+@@ -1081,7 +1083,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	if (old != alive)
+ 		CERROR("route to %s through %s has gone from %s to %s\n",
+ 		       libcfs_net2str(route->lr_net),
+-		       libcfs_nid2str(route->lr_gateway->lp_primary_nid),
++		       libcfs_nidstr(&route->lr_gateway->lp_primary_nid),
+ 		       old ? "up" : "down",
+ 		       alive ? "up" : "down");
  }
- 
-@@ -241,6 +243,34 @@ struct lnet_process_id {
- 	/** process id */
- 	lnet_pid_t pid;
- };
-+
-+/**
-+ * Global process ID - with large addresses
-+ */
-+struct lnet_processid {
-+	/** node id */
-+	struct lnet_nid nid;
-+	/** process id */
-+	lnet_pid_t pid;
-+};
-+
-+static inline void
-+lnet_pid4_to_pid(struct lnet_process_id pid4, struct lnet_processid *pid)
-+{
-+	pid->pid = pid4.pid;
-+	lnet_nid4_to_nid(pid4.nid, &pid->nid);
-+}
-+
-+static inline struct lnet_process_id
-+lnet_pid_to_pid4(struct lnet_processid *pid)
-+{
-+	struct lnet_process_id ret;
-+
-+	ret.pid = pid->pid;
-+	ret.nid = lnet_nid_to_nid4(&pid->nid);
-+	return ret;
-+}
-+
- /** @} lnet_addr */
- 
- /** \addtogroup lnet_me
-diff --git a/include/uapi/linux/lnet/nidstr.h b/include/uapi/linux/lnet/nidstr.h
-index 13a0d10..bfc9644 100644
---- a/include/uapi/linux/lnet/nidstr.h
-+++ b/include/uapi/linux/lnet/nidstr.h
-@@ -103,6 +103,7 @@ static inline char *libcfs_nidstr(const struct lnet_nid *nid)
- int libcfs_strnid(struct lnet_nid *nid, const char *str);
- int libcfs_str2anynid(lnet_nid_t *nid, const char *str);
- char *libcfs_id2str(struct lnet_process_id id);
-+char *libcfs_idstr(struct lnet_processid *id);
- void cfs_free_nidlist(struct list_head *list);
- int cfs_parse_nidlist(char *str, int len, struct list_head *list);
- int cfs_print_nidlist(char *buffer, int count, struct list_head *list);
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 08d1cf4..7397ac7 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -152,14 +152,14 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
- }
- 
- static struct ksock_peer_ni *
--ksocknal_create_peer(struct lnet_ni *ni, struct lnet_process_id id)
-+ksocknal_create_peer(struct lnet_ni *ni, struct lnet_processid *id)
- {
--	int cpt = lnet_cpt_of_nid(id.nid, ni);
-+	int cpt = lnet_nid2cpt(&id->nid, ni);
- 	struct ksock_net *net = ni->ni_data;
- 	struct ksock_peer_ni *peer_ni;
- 
--	LASSERT(id.nid != LNET_NID_ANY);
--	LASSERT(id.pid != LNET_PID_ANY);
-+	LASSERT(!LNET_NID_IS_ANY(&id->nid));
-+	LASSERT(id->pid != LNET_PID_ANY);
- 	LASSERT(!in_interrupt());
- 
- 	if (!atomic_inc_unless_negative(&net->ksnn_npeers)) {
-@@ -174,7 +174,7 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
- 	}
- 
- 	peer_ni->ksnp_ni = ni;
--	peer_ni->ksnp_id = id;
-+	peer_ni->ksnp_id = *id;
- 	refcount_set(&peer_ni->ksnp_refcount, 1);   /* 1 ref for caller */
- 	peer_ni->ksnp_closing = 0;
- 	peer_ni->ksnp_accepting = 0;
-@@ -197,7 +197,7 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
- 	struct ksock_net *net = peer_ni->ksnp_ni->ni_data;
- 
- 	CDEBUG(D_NET, "peer_ni %s %p deleted\n",
--	       libcfs_id2str(peer_ni->ksnp_id), peer_ni);
-+	       libcfs_idstr(&peer_ni->ksnp_id), peer_ni);
- 
- 	LASSERT(!refcount_read(&peer_ni->ksnp_refcount));
- 	LASSERT(!peer_ni->ksnp_accepting);
-@@ -218,10 +218,10 @@ static int ksocknal_ip2index(struct sockaddr *addr, struct lnet_ni *ni)
- }
- 
- struct ksock_peer_ni *
--ksocknal_find_peer_locked(struct lnet_ni *ni, struct lnet_process_id id)
-+ksocknal_find_peer_locked(struct lnet_ni *ni, struct lnet_processid *id)
- {
- 	struct ksock_peer_ni *peer_ni;
--	unsigned long hash = nidhash(id.nid);
-+	unsigned long hash = nidhash(&id->nid);
- 
- 	hash_for_each_possible(ksocknal_data.ksnd_peers, peer_ni,
- 			       ksnp_list, hash) {
-@@ -230,12 +230,12 @@ struct ksock_peer_ni *
- 		if (peer_ni->ksnp_ni != ni)
- 			continue;
- 
--		if (peer_ni->ksnp_id.nid != id.nid ||
--		    peer_ni->ksnp_id.pid != id.pid)
-+		if (!nid_same(&peer_ni->ksnp_id.nid, &id->nid) ||
-+		    peer_ni->ksnp_id.pid != id->pid)
- 			continue;
- 
- 		CDEBUG(D_NET, "got peer_ni [%p] -> %s (%d)\n",
--		       peer_ni, libcfs_id2str(id),
-+		       peer_ni, libcfs_idstr(id),
- 		       refcount_read(&peer_ni->ksnp_refcount));
- 		return peer_ni;
- 	}
-@@ -243,7 +243,7 @@ struct ksock_peer_ni *
- }
- 
- struct ksock_peer_ni *
--ksocknal_find_peer(struct lnet_ni *ni, struct lnet_process_id id)
-+ksocknal_find_peer(struct lnet_ni *ni, struct lnet_processid *id)
- {
- 	struct ksock_peer_ni *peer_ni;
- 
-@@ -312,7 +312,8 @@ struct ksock_peer_ni *
- 			if (index-- > 0)
- 				continue;
- 
--			*id = peer_ni->ksnp_id;
-+			id->pid = peer_ni->ksnp_id.pid;
-+			id->nid = lnet_nid_to_nid4(&peer_ni->ksnp_id.nid);
- 			*myip = 0;
- 			*peer_ip = 0;
- 			*port = 0;
-@@ -326,7 +327,8 @@ struct ksock_peer_ni *
- 			if (index-- > 0)
- 				continue;
- 
--			*id = peer_ni->ksnp_id;
-+			id->pid = peer_ni->ksnp_id.pid;
-+			id->nid = lnet_nid_to_nid4(&peer_ni->ksnp_id.nid);
- 			*myip = peer_ni->ksnp_passive_ips[j];
- 			*peer_ip = 0;
- 			*port = 0;
-@@ -342,7 +344,8 @@ struct ksock_peer_ni *
- 
- 			conn_cb = peer_ni->ksnp_conn_cb;
- 
--			*id = peer_ni->ksnp_id;
-+			id->pid = peer_ni->ksnp_id.pid;
-+			id->nid = lnet_nid_to_nid4(&peer_ni->ksnp_id.nid);
- 			if (conn_cb->ksnr_addr.ss_family == AF_INET) {
- 				struct sockaddr_in *sa;
- 
-@@ -465,13 +468,13 @@ struct ksock_peer_ni *
- 			 * conn_cb)
- 			 */
- 			CDEBUG(D_NET, "Binding %s %pIS to interface %d\n",
--			       libcfs_id2str(peer_ni->ksnp_id),
-+			       libcfs_idstr(&peer_ni->ksnp_id),
- 			       &conn_cb->ksnr_addr,
- 			       conn_iface);
- 		} else {
- 			CDEBUG(D_NET,
- 			       "Rebinding %s %pIS from interface %d to %d\n",
--			       libcfs_id2str(peer_ni->ksnp_id),
-+			       libcfs_idstr(&peer_ni->ksnp_id),
- 			       &conn_cb->ksnr_addr,
- 			       conn_cb->ksnr_myiface,
- 			       conn_iface);
-@@ -567,26 +570,27 @@ struct ksock_peer_ni *
- }
- 
- int
--ksocknal_add_peer(struct lnet_ni *ni, struct lnet_process_id id, u32 ipaddr,
--		  int port)
-+ksocknal_add_peer(struct lnet_ni *ni, struct lnet_process_id id4,
-+		  struct sockaddr *addr)
- {
- 	struct ksock_peer_ni *peer_ni;
- 	struct ksock_peer_ni *peer2;
- 	struct ksock_conn_cb *conn_cb;
--	struct sockaddr_in sa = {.sin_family = AF_INET};
-+	struct lnet_processid id;
- 
--	if (id.nid == LNET_NID_ANY ||
--	    id.pid == LNET_PID_ANY)
-+	if (id4.nid == LNET_NID_ANY ||
-+	    id4.pid == LNET_PID_ANY)
- 		return -EINVAL;
- 
-+	id.pid = id4.pid;
-+	lnet_nid4_to_nid(id4.nid, &id.nid);
-+
- 	/* Have a brand new peer_ni ready... */
--	peer_ni = ksocknal_create_peer(ni, id);
-+	peer_ni = ksocknal_create_peer(ni, &id);
- 	if (IS_ERR(peer_ni))
- 		return PTR_ERR(peer_ni);
- 
--	sa.sin_addr.s_addr = htonl(ipaddr);
--	sa.sin_port = htons(port);
--	conn_cb = ksocknal_create_conn_cb((struct sockaddr *)&sa);
-+	conn_cb = ksocknal_create_conn_cb(addr);
- 	if (!conn_cb) {
- 		ksocknal_peer_decref(peer_ni);
- 		return -ENOMEM;
-@@ -597,14 +601,14 @@ struct ksock_peer_ni *
- 	/* always called with a ref on ni, so shutdown can't have started */
- 	LASSERT(atomic_read(&((struct ksock_net *)ni->ni_data)->ksnn_npeers) >= 0);
- 
--	peer2 = ksocknal_find_peer_locked(ni, id);
-+	peer2 = ksocknal_find_peer_locked(ni, &id);
- 	if (peer2) {
- 		ksocknal_peer_decref(peer_ni);
- 		peer_ni = peer2;
- 	} else {
- 		/* peer_ni table takes my ref on peer_ni */
- 		hash_add(ksocknal_data.ksnd_peers, &peer_ni->ksnp_list,
--			 nidhash(id.nid));
-+			 nidhash(&id.nid));
- 	}
- 
- 	ksocknal_add_conn_cb_locked(peer_ni, conn_cb);
-@@ -645,7 +649,7 @@ struct ksock_peer_ni *
- }
- 
- static int
--ksocknal_del_peer(struct lnet_ni *ni, struct lnet_process_id id, u32 ip)
-+ksocknal_del_peer(struct lnet_ni *ni, struct lnet_process_id id4, u32 ip)
- {
- 	LIST_HEAD(zombies);
- 	struct hlist_node *pnxt;
-@@ -654,11 +658,15 @@ struct ksock_peer_ni *
- 	int hi;
- 	int i;
- 	int rc = -ENOENT;
-+	struct lnet_processid id;
-+
-+	id.pid = id4.pid;
-+	lnet_nid4_to_nid(id4.nid, &id.nid);
- 
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
- 
--	if (id.nid != LNET_NID_ANY) {
--		lo = hash_min(nidhash(id.nid),
-+	if (!LNET_NID_IS_ANY(&id.nid)) {
-+		lo = hash_min(nidhash(&id.nid),
- 			      HASH_BITS(ksocknal_data.ksnd_peers));
- 		hi = lo;
- 	} else {
-@@ -673,8 +681,8 @@ struct ksock_peer_ni *
- 			if (peer_ni->ksnp_ni != ni)
- 				continue;
- 
--			if (!((id.nid == LNET_NID_ANY ||
--			       peer_ni->ksnp_id.nid == id.nid) &&
-+			if (!((LNET_NID_IS_ANY(&id.nid) ||
-+			       nid_same(&peer_ni->ksnp_id.nid, &id.nid)) &&
- 			      (id.pid == LNET_PID_ANY ||
- 			       peer_ni->ksnp_id.pid == id.pid)))
- 				continue;
-@@ -805,7 +813,7 @@ struct ksock_peer_ni *
- {
- 	rwlock_t *global_lock = &ksocknal_data.ksnd_global_lock;
- 	LIST_HEAD(zombies);
--	struct lnet_process_id peerid;
-+	struct lnet_process_id peerid4;
- 	u64 incarnation;
- 	struct ksock_conn *conn;
- 	struct ksock_conn *conn2;
-@@ -879,7 +887,7 @@ struct ksock_peer_ni *
- 
- 		/* Active connection sends HELLO eagerly */
- 		hello->kshm_nips =  0;
--		peerid = peer_ni->ksnp_id;
-+		peerid4 = lnet_pid_to_pid4(&peer_ni->ksnp_id);
- 
- 		write_lock_bh(global_lock);
- 		conn->ksnc_proto = peer_ni->ksnp_proto;
-@@ -895,32 +903,35 @@ struct ksock_peer_ni *
- #endif
- 		}
- 
--		rc = ksocknal_send_hello(ni, conn, peerid.nid, hello);
-+		rc = ksocknal_send_hello(ni, conn, peerid4.nid, hello);
- 		if (rc)
- 			goto failed_1;
- 	} else {
--		peerid.nid = LNET_NID_ANY;
--		peerid.pid = LNET_PID_ANY;
-+		peerid4.nid = LNET_NID_ANY;
-+		peerid4.pid = LNET_PID_ANY;
- 
- 		/* Passive, get protocol from peer_ni */
- 		conn->ksnc_proto = NULL;
- 	}
- 
--	rc = ksocknal_recv_hello(ni, conn, hello, &peerid, &incarnation);
-+	rc = ksocknal_recv_hello(ni, conn, hello, &peerid4, &incarnation);
- 	if (rc < 0)
- 		goto failed_1;
- 
- 	LASSERT(!rc || active);
- 	LASSERT(conn->ksnc_proto);
--	LASSERT(peerid.nid != LNET_NID_ANY);
-+	LASSERT(peerid4.nid != LNET_NID_ANY);
- 
--	cpt = lnet_cpt_of_nid(peerid.nid, ni);
-+	cpt = lnet_cpt_of_nid(peerid4.nid, ni);
- 
- 	if (active) {
- 		ksocknal_peer_addref(peer_ni);
- 		write_lock_bh(global_lock);
- 	} else {
--		peer_ni = ksocknal_create_peer(ni, peerid);
-+		struct lnet_processid peerid;
-+
-+		lnet_pid4_to_pid(peerid4, &peerid);
-+		peer_ni = ksocknal_create_peer(ni, &peerid);
- 		if (IS_ERR(peer_ni)) {
- 			rc = PTR_ERR(peer_ni);
- 			goto failed_1;
-@@ -931,14 +942,14 @@ struct ksock_peer_ni *
- 		/* called with a ref on ni, so shutdown can't have started */
- 		LASSERT(atomic_read(&((struct ksock_net *)ni->ni_data)->ksnn_npeers) >= 0);
- 
--		peer2 = ksocknal_find_peer_locked(ni, peerid);
-+		peer2 = ksocknal_find_peer_locked(ni, &peerid);
- 		if (!peer2) {
- 			/*
- 			 * NB this puts an "empty" peer_ni in the peer
- 			 * table (which takes my ref)
- 			 */
- 			hash_add(ksocknal_data.ksnd_peers,
--				 &peer_ni->ksnp_list, nidhash(peerid.nid));
-+				 &peer_ni->ksnp_list, nidhash(&peerid.nid));
- 		} else {
- 			ksocknal_peer_decref(peer_ni);
- 			peer_ni = peer2;
-@@ -952,7 +963,7 @@ struct ksock_peer_ni *
- 		 * Am I already connecting to this guy?  Resolve in
- 		 * favour of higher NID...
- 		 */
--		if (peerid.nid < lnet_nid_to_nid4(&ni->ni_nid) &&
-+		if (peerid4.nid < lnet_nid_to_nid4(&ni->ni_nid) &&
- 		    ksocknal_connecting(peer_ni->ksnp_conn_cb,
- 					((struct sockaddr *)&conn->ksnc_peeraddr))) {
- 			rc = EALREADY;
-@@ -1051,7 +1062,7 @@ struct ksock_peer_ni *
- 	    !rpc_cmp_addr((struct sockaddr *)&conn_cb->ksnr_addr,
- 			  (struct sockaddr *)&conn->ksnc_peeraddr)) {
- 		CERROR("Route %s %pIS connected to %pIS\n",
--		       libcfs_id2str(peer_ni->ksnp_id),
-+		       libcfs_idstr(&peer_ni->ksnp_id),
- 		       &conn_cb->ksnr_addr,
- 		       &conn->ksnc_peeraddr);
- 	}
-@@ -1123,13 +1134,13 @@ struct ksock_peer_ni *
- 	 */
- 	CDEBUG(D_NET,
- 	       "New conn %s p %d.x %pIS -> %pISp incarnation:%lld sched[%d]\n",
--	       libcfs_id2str(peerid), conn->ksnc_proto->pro_version,
-+	       libcfs_id2str(peerid4), conn->ksnc_proto->pro_version,
- 	       &conn->ksnc_myaddr, &conn->ksnc_peeraddr,
- 	       incarnation, cpt);
- 
- 	if (!active) {
- 		hello->kshm_nips = 0;
--		rc = ksocknal_send_hello(ni, conn, peerid.nid, hello);
-+		rc = ksocknal_send_hello(ni, conn, peerid4.nid, hello);
- 	}
- 
- 	kvfree(hello);
-@@ -1185,10 +1196,10 @@ struct ksock_peer_ni *
- 	if (warn) {
- 		if (rc < 0)
- 			CERROR("Not creating conn %s type %d: %s\n",
--			       libcfs_id2str(peerid), conn->ksnc_type, warn);
-+			       libcfs_id2str(peerid4), conn->ksnc_type, warn);
- 		else
- 			CDEBUG(D_NET, "Not creating conn %s type %d: %s\n",
--			       libcfs_id2str(peerid), conn->ksnc_type, warn);
-+			       libcfs_id2str(peerid4), conn->ksnc_type, warn);
- 	}
- 
- 	if (!active) {
-@@ -1199,7 +1210,7 @@ struct ksock_peer_ni *
- 			 */
- 			conn->ksnc_type = SOCKLND_CONN_NONE;
- 			hello->kshm_nips = 0;
--			ksocknal_send_hello(ni, conn, peerid.nid, hello);
-+			ksocknal_send_hello(ni, conn, peerid4.nid, hello);
- 		}
- 
- 		write_lock_bh(global_lock);
-@@ -1338,7 +1349,8 @@ struct ksock_peer_ni *
- 	read_unlock(&ksocknal_data.ksnd_global_lock);
- 
- 	if (notify)
--		lnet_notify(peer_ni->ksnp_ni, peer_ni->ksnp_id.nid,
-+		lnet_notify(peer_ni->ksnp_ni,
-+			    lnet_nid_to_nid4(&peer_ni->ksnp_id.nid),
- 			    false, false, last_alive);
- }
- 
-@@ -1481,7 +1493,8 @@ struct ksock_peer_ni *
- 		last_rcv = conn->ksnc_rx_deadline -
- 			   ksocknal_timeout();
- 		CERROR("Completing partial receive from %s[%d], ip %pISp, with error, wanted: %zd, left: %d, last alive is %lld secs ago\n",
--		       libcfs_id2str(conn->ksnc_peer->ksnp_id), conn->ksnc_type,
-+		       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
-+		       conn->ksnc_type,
- 		       &conn->ksnc_peeraddr,
- 		       iov_iter_count(&conn->ksnc_rx_to), conn->ksnc_rx_nob_left,
- 		       ktime_get_seconds() - last_rcv);
-@@ -1493,21 +1506,21 @@ struct ksock_peer_ni *
- 	case SOCKNAL_RX_LNET_HEADER:
- 		if (conn->ksnc_rx_started)
- 			CERROR("Incomplete receive of lnet header from %s, ip %pISp, with error, protocol: %d.x.\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr,
- 			       conn->ksnc_proto->pro_version);
- 		break;
- 	case SOCKNAL_RX_KSM_HEADER:
- 		if (conn->ksnc_rx_started)
- 			CERROR("Incomplete receive of ksock message from %s, ip %pISp, with error, protocol: %d.x.\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr,
- 			       conn->ksnc_proto->pro_version);
- 		break;
- 	case SOCKNAL_RX_SLOP:
- 		if (conn->ksnc_rx_started)
- 			CERROR("Incomplete receive of slops from %s, ip %pISp, with error\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr);
- 	       break;
- 	default:
-@@ -1557,7 +1570,7 @@ struct ksock_peer_ni *
- }
- 
- int
--ksocknal_close_matching_conns(struct lnet_process_id id, u32 ipaddr)
-+ksocknal_close_matching_conns(struct lnet_processid *id, u32 ipaddr)
- {
- 	struct ksock_peer_ni *peer_ni;
- 	struct hlist_node *pnxt;
-@@ -1569,8 +1582,8 @@ struct ksock_peer_ni *
- 
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
- 
--	if (id.nid != LNET_NID_ANY) {
--		lo = hash_min(nidhash(id.nid),
-+	if (!LNET_NID_IS_ANY(&id->nid)) {
-+		lo = hash_min(nidhash(&id->nid),
- 			      HASH_BITS(ksocknal_data.ksnd_peers));
- 		hi = lo;
- 	} else {
-@@ -1583,10 +1596,10 @@ struct ksock_peer_ni *
- 		hlist_for_each_entry_safe(peer_ni, pnxt,
- 					  &ksocknal_data.ksnd_peers[i],
- 					  ksnp_list) {
--			if (!((id.nid == LNET_NID_ANY ||
--			       id.nid == peer_ni->ksnp_id.nid) &&
--			      (id.pid == LNET_PID_ANY ||
--			       id.pid == peer_ni->ksnp_id.pid)))
-+			if (!((LNET_NID_IS_ANY(&id->nid) ||
-+			       nid_same(&id->nid, &peer_ni->ksnp_id.nid)) &&
-+			      (id->pid == LNET_PID_ANY ||
-+			       id->pid == peer_ni->ksnp_id.pid)))
- 				continue;
- 
- 			count += ksocknal_close_peer_conns_locked(peer_ni,
-@@ -1598,7 +1611,8 @@ struct ksock_peer_ni *
- 	write_unlock_bh(&ksocknal_data.ksnd_global_lock);
- 
- 	/* wildcards always succeed */
--	if (id.nid == LNET_NID_ANY || id.pid == LNET_PID_ANY || !ipaddr)
-+	if (LNET_NID_IS_ANY(&id->nid) || id->pid == LNET_PID_ANY ||
-+	    !ipaddr)
- 		return 0;
- 
- 	return count ? 0 : -ENOENT;
-@@ -1611,15 +1625,15 @@ struct ksock_peer_ni *
- 	 * The router is telling me she's been notified of a change in
- 	 * gateway state....
- 	 */
--	struct lnet_process_id id = {0};
--
--	id.nid = gw_nid;
--	id.pid = LNET_PID_ANY;
-+	struct lnet_processid id = {
-+		.pid	= LNET_PID_ANY,
-+	};
- 
- 	CDEBUG(D_NET, "gw %s down\n", libcfs_nid2str(gw_nid));
- 
-+	lnet_nid4_to_nid(gw_nid, &id.nid);
- 	/* If the gateway crashed, close all open connections... */
--	ksocknal_close_matching_conns(id, 0);
-+	ksocknal_close_matching_conns(&id, 0);
- 	return;
- 
- 	/*
-@@ -1658,15 +1672,15 @@ struct ksock_peer_ni *
- 	}
- }
- 
--static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
-+static int ksocknal_push(struct lnet_ni *ni, struct lnet_processid *id)
- {
- 	int lo;
- 	int hi;
- 	int bkt;
- 	int rc = -ENOENT;
- 
--	if (id.nid != LNET_NID_ANY) {
--		lo = hash_min(nidhash(id.nid),
-+	if (!LNET_NID_IS_ANY(&id->nid)) {
-+		lo = hash_min(nidhash(&id->nid),
- 			      HASH_BITS(ksocknal_data.ksnd_peers));
- 		hi = lo;
- 	} else {
-@@ -1685,10 +1699,11 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 			hlist_for_each_entry(peer_ni,
- 					     &ksocknal_data.ksnd_peers[bkt],
- 					     ksnp_list) {
--				if (!((id.nid == LNET_NID_ANY ||
--				       id.nid == peer_ni->ksnp_id.nid) &&
--				      (id.pid == LNET_PID_ANY ||
--				       id.pid == peer_ni->ksnp_id.pid)))
-+				if (!((LNET_NID_IS_ANY(&id->nid) ||
-+				       nid_same(&id->nid,
-+						&peer_ni->ksnp_id.nid)) &&
-+				      (id->pid == LNET_PID_ANY ||
-+				       id->pid == peer_ni->ksnp_id.pid)))
- 					continue;
- 
- 				if (i++ == peer_off) {
-@@ -1712,7 +1727,8 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- int
- ksocknal_ctl(struct lnet_ni *ni, unsigned int cmd, void *arg)
- {
--	struct lnet_process_id id = {0};
-+	struct lnet_process_id id4 = {};
-+	struct lnet_processid id = {};
- 	struct libcfs_ioctl_data *data = arg;
- 	int rc;
- 
-@@ -1752,32 +1768,34 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 		int share_count = 0;
- 
- 		rc = ksocknal_get_peer_info(ni, data->ioc_count,
--					    &id, &myip, &ip, &port,
-+					    &id4, &myip, &ip, &port,
- 					    &conn_count,  &share_count);
- 		if (rc)
- 			return rc;
- 
--		data->ioc_nid  = id.nid;
-+		data->ioc_nid = id4.nid;
- 		data->ioc_count = share_count;
- 		data->ioc_u32[0] = ip;
- 		data->ioc_u32[1] = port;
- 		data->ioc_u32[2] = myip;
- 		data->ioc_u32[3] = conn_count;
--		data->ioc_u32[4] = id.pid;
-+		data->ioc_u32[4] = id4.pid;
- 		return 0;
- 	}
- 
--	case IOC_LIBCFS_ADD_PEER:
--		id.nid = data->ioc_nid;
--		id.pid = LNET_PID_LUSTRE;
--		return ksocknal_add_peer(ni, id,
--					 data->ioc_u32[0], /* IP */
--					 data->ioc_u32[1]); /* port */
-+	case IOC_LIBCFS_ADD_PEER: {
-+		struct sockaddr_in sa = {.sin_family = AF_INET};
- 
-+		id4.nid = data->ioc_nid;
-+		id4.pid = LNET_PID_LUSTRE;
-+		sa.sin_addr.s_addr = htonl(data->ioc_u32[0]);
-+		sa.sin_port = htons(data->ioc_u32[1]);
-+		return ksocknal_add_peer(ni, id4, (struct sockaddr *)&sa);
-+	}
- 	case IOC_LIBCFS_DEL_PEER:
--		id.nid = data->ioc_nid;
--		id.pid = LNET_PID_ANY;
--		return ksocknal_del_peer(ni, id,
-+		id4.nid = data->ioc_nid;
-+		id4.pid = LNET_PID_ANY;
-+		return ksocknal_del_peer(ni, id4,
- 					 data->ioc_u32[0]); /* IP */
- 
- 	case IOC_LIBCFS_GET_CONN: {
-@@ -1797,7 +1815,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 		ksocknal_lib_get_conn_tunables(conn, &txmem, &rxmem, &nagle);
- 
- 		data->ioc_count = txmem;
--		data->ioc_nid = conn->ksnc_peer->ksnp_id.nid;
-+		data->ioc_nid = lnet_nid_to_nid4(&conn->ksnc_peer->ksnp_id.nid);
- 		data->ioc_flags = nagle;
- 		if (psa->sin_family == AF_INET)
- 			data->ioc_u32[0] = ntohl(psa->sin_addr.s_addr);
-@@ -1818,9 +1836,9 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 	}
- 
- 	case IOC_LIBCFS_CLOSE_CONNECTION:
--		id.nid = data->ioc_nid;
-+		lnet_nid4_to_nid(data->ioc_nid, &id.nid);
- 		id.pid = LNET_PID_ANY;
--		return ksocknal_close_matching_conns(id,
-+		return ksocknal_close_matching_conns(&id,
- 						     data->ioc_u32[0]);
- 
- 	case IOC_LIBCFS_REGISTER_MYNID:
-@@ -1835,9 +1853,9 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 		return -EINVAL;
- 
- 	case IOC_LIBCFS_PUSH_CONNECTION:
--		id.nid = data->ioc_nid;
-+		lnet_nid4_to_nid(data->ioc_nid, &id.nid);
- 		id.pid = LNET_PID_ANY;
--		return ksocknal_push(ni, id);
-+		return ksocknal_push(ni, &id);
- 
- 	default:
- 		return -EINVAL;
-@@ -2145,7 +2163,7 @@ static int ksocknal_device_event(struct notifier_block *unused,
- 			continue;
- 
- 		CWARN("Active peer_ni on shutdown: %s, ref %d, closing %d, accepting %d, err %d, zcookie %llu, txq %d, zc_req %d\n",
--		      libcfs_id2str(peer_ni->ksnp_id),
-+		      libcfs_idstr(&peer_ni->ksnp_id),
- 		      refcount_read(&peer_ni->ksnp_refcount),
- 		      peer_ni->ksnp_closing,
- 		      peer_ni->ksnp_accepting, peer_ni->ksnp_error,
-diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
-index 7a55492..fe1bc7d 100644
---- a/net/lnet/klnds/socklnd/socklnd.h
-+++ b/net/lnet/klnds/socklnd/socklnd.h
-@@ -415,7 +415,7 @@ struct ksock_peer_ni {
- 	time64_t		ksnp_last_alive;	/* when (in seconds) I was last
- 							 * alive
- 							 */
--	struct lnet_process_id	ksnp_id;		/* who's on the other end(s) */
-+	struct lnet_processid	ksnp_id;		/* who's on the other end(s) */
- 	refcount_t		ksnp_refcount;		/* # users */
- 	int			ksnp_closing;		/* being closed */
- 	int			ksnp_accepting;		/* # passive connections pending
-@@ -625,12 +625,12 @@ int ksocknal_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
- 		  int delayed, struct iov_iter *to, unsigned int rlen);
- int ksocknal_accept(struct lnet_ni *ni, struct socket *sock);
- 
--int ksocknal_add_peer(struct lnet_ni *ni, struct lnet_process_id id, u32 ip,
--		      int port);
-+int ksocknal_add_peer(struct lnet_ni *ni, struct lnet_process_id id,
-+		      struct sockaddr *addr);
- struct ksock_peer_ni *ksocknal_find_peer_locked(struct lnet_ni *ni,
--					        struct lnet_process_id id);
-+						struct lnet_processid *id);
- struct ksock_peer_ni *ksocknal_find_peer(struct lnet_ni *ni,
--				         struct lnet_process_id id);
-+					 struct lnet_processid *id);
- void ksocknal_peer_failed(struct ksock_peer_ni *peer_ni);
- int ksocknal_create_conn(struct lnet_ni *ni, struct ksock_conn_cb *conn_cb,
- 			 struct socket *sock, int type);
-@@ -640,12 +640,12 @@ int ksocknal_create_conn(struct lnet_ni *ni, struct ksock_conn_cb *conn_cb,
- int ksocknal_close_peer_conns_locked(struct ksock_peer_ni *peer_ni,
- 				     struct sockaddr *peer, int why);
- int ksocknal_close_conn_and_siblings(struct ksock_conn *conn, int why);
--int ksocknal_close_matching_conns(struct lnet_process_id id, u32 ipaddr);
-+int ksocknal_close_matching_conns(struct lnet_processid *id, u32 ipaddr);
- struct ksock_conn *ksocknal_find_conn_locked(struct ksock_peer_ni *peer_ni,
- 					     struct ksock_tx *tx, int nonblk);
- 
- int ksocknal_launch_packet(struct lnet_ni *ni, struct ksock_tx *tx,
--			   struct lnet_process_id id);
-+			   struct lnet_processid *id);
- struct ksock_tx *ksocknal_alloc_tx(int type, int size);
- void ksocknal_free_tx(struct ksock_tx *tx);
- struct ksock_tx *ksocknal_alloc_tx_noop(u64 cookie, int nonblk);
-diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
-index e6cd976..a2298275 100644
---- a/net/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/net/lnet/klnds/socklnd/socklnd_cb.c
-@@ -542,7 +542,7 @@ struct ksock_tx *
- 			break;
- 		}
- 		CDEBUG(D_NET, "[%p] Error %d on write to %s ip %pISp\n",
--		       conn, rc, libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+		       conn, rc, libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 		       &conn->ksnc_peeraddr);
- 	}
- 
-@@ -677,7 +677,7 @@ struct ksock_conn *
- 	LASSERT(!conn->ksnc_closing);
- 
- 	CDEBUG(D_NET, "Sending to %s ip %pISp\n",
--	       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+	       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 	       &conn->ksnc_peeraddr);
- 
- 	ksocknal_tx_prep(conn, tx);
-@@ -804,10 +804,11 @@ struct ksock_conn_cb *
- 
- int
- ksocknal_launch_packet(struct lnet_ni *ni, struct ksock_tx *tx,
--		       struct lnet_process_id id)
-+		       struct lnet_processid *id)
- {
- 	struct ksock_peer_ni *peer_ni;
- 	struct ksock_conn *conn;
-+	struct sockaddr_in sa;
- 	rwlock_t *g_lock;
- 	int retry;
- 	int rc;
-@@ -846,23 +847,31 @@ struct ksock_conn_cb *
- 
- 		write_unlock_bh(g_lock);
- 
--		if (id.pid & LNET_PID_USERFLAG) {
-+		if (id->pid & LNET_PID_USERFLAG) {
- 			CERROR("Refusing to create a connection to userspace process %s\n",
--			       libcfs_id2str(id));
-+			       libcfs_idstr(id));
- 			return -EHOSTUNREACH;
- 		}
- 
- 		if (retry) {
--			CERROR("Can't find peer_ni %s\n", libcfs_id2str(id));
-+			CERROR("Can't find peer_ni %s\n", libcfs_idstr(id));
- 			return -EHOSTUNREACH;
- 		}
- 
--		rc = ksocknal_add_peer(ni, id,
--				       LNET_NIDADDR(id.nid),
--				       lnet_acceptor_port());
-+		memset(&sa, 0, sizeof(sa));
-+		sa.sin_family = AF_INET;
-+		sa.sin_addr.s_addr = id->nid.nid_addr[0];
-+		sa.sin_port = htons(lnet_acceptor_port());
-+		{
-+			struct lnet_process_id id4 = {
-+				.pid = id->pid,
-+				.nid = lnet_nid_to_nid4(&id->nid),
-+			};
-+			rc = ksocknal_add_peer(ni, id4, (struct sockaddr *)&sa);
-+		}
- 		if (rc) {
- 			CERROR("Can't add peer_ni %s: %d\n",
--			       libcfs_id2str(id), rc);
-+			       libcfs_idstr(id), rc);
- 			return rc;
- 		}
- 	}
-@@ -892,7 +901,7 @@ struct ksock_conn_cb *
- 	write_unlock_bh(g_lock);
- 
- 	/* NB Routes may be ignored if connections to them failed recently */
--	CNETERR("No usable routes to %s\n", libcfs_id2str(id));
-+	CNETERR("No usable routes to %s\n", libcfs_idstr(id));
- 	tx->tx_hstatus = LNET_MSG_STATUS_REMOTE_ERROR;
- 	return -EHOSTUNREACH;
- }
-@@ -902,7 +911,7 @@ struct ksock_conn_cb *
- {
- 	unsigned int mpflag = 0;
- 	int type = lntmsg->msg_type;
--	struct lnet_process_id target = lntmsg->msg_target;
-+	struct lnet_processid target;
- 	unsigned int payload_niov = lntmsg->msg_niov;
- 	struct bio_vec *payload_kiov = lntmsg->msg_kiov;
- 	unsigned int payload_offset = lntmsg->msg_offset;
-@@ -911,12 +920,14 @@ struct ksock_conn_cb *
- 	int desc_size;
- 	int rc;
- 
--	/*
--	 * NB 'private' is different depending on what we're sending.
-+	/* NB 'private' is different depending on what we're sending.
- 	 * Just ignore it...
- 	 */
-+	target.pid = lntmsg->msg_target.pid;
-+	lnet_nid4_to_nid(lntmsg->msg_target.nid, &target.nid);
-+
- 	CDEBUG(D_NET, "sending %u bytes in %d frags to %s\n",
--	       payload_nob, payload_niov, libcfs_id2str(target));
-+	       payload_nob, payload_niov, libcfs_idstr(&target));
- 
- 	LASSERT(!payload_nob || payload_niov > 0);
- 	LASSERT(payload_niov <= LNET_MAX_IOV);
-@@ -954,7 +965,7 @@ struct ksock_conn_cb *
- 	tx->tx_msg.ksm_zc_cookies[1] = 0;
- 
- 	/* The first fragment will be set later in pro_pack */
--	rc = ksocknal_launch_packet(ni, tx, target);
-+	rc = ksocknal_launch_packet(ni, tx, &target);
- 	if (mpflag)
- 		memalloc_noreclaim_restore(mpflag);
- 
-@@ -1051,7 +1062,7 @@ struct ksock_conn_cb *
- {
- 	struct kvec *kvec = conn->ksnc_rx_iov_space;
- 	struct lnet_hdr *lhdr;
--	struct lnet_process_id *id;
-+	struct lnet_processid *id;
- 	int rc;
- 
- 	LASSERT(refcount_read(&conn->ksnc_conn_refcount) > 0);
-@@ -1067,19 +1078,19 @@ struct ksock_conn_cb *
- 		rc = ksocknal_receive(conn);
- 
- 		if (rc <= 0) {
--			struct lnet_process_id ksnp_id;
-+			struct lnet_processid *ksnp_id;
- 
--			ksnp_id = conn->ksnc_peer->ksnp_id;
-+			ksnp_id = &conn->ksnc_peer->ksnp_id;
- 
- 			LASSERT(rc != -EAGAIN);
- 
- 			if (!rc)
- 				CDEBUG(D_NET, "[%p] EOF from %s ip %pISp\n",
--				       conn, libcfs_id2str(ksnp_id),
-+				       conn, libcfs_idstr(ksnp_id),
- 				       &conn->ksnc_peeraddr);
- 			else if (!conn->ksnc_closing)
- 				CERROR("[%p] Error %d on read from %s ip %pISp\n",
--				       conn, rc, libcfs_id2str(ksnp_id),
-+				       conn, rc, libcfs_idstr(ksnp_id),
- 				       &conn->ksnc_peeraddr);
- 
- 			/* it's not an error if conn is being closed */
-@@ -1105,7 +1116,7 @@ struct ksock_conn_cb *
- 		if (conn->ksnc_msg.ksm_type != KSOCK_MSG_NOOP &&
- 		    conn->ksnc_msg.ksm_type != KSOCK_MSG_LNET) {
- 			CERROR("%s: Unknown message type: %x\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       conn->ksnc_msg.ksm_type);
- 			ksocknal_new_packet(conn, 0);
- 			ksocknal_close_conn_and_siblings(conn, -EPROTO);
-@@ -1117,7 +1128,7 @@ struct ksock_conn_cb *
- 		    conn->ksnc_msg.ksm_csum != conn->ksnc_rx_csum) {
- 			/* NOOP Checksum error */
- 			CERROR("%s: Checksum error, wire:0x%08X data:0x%08X\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       conn->ksnc_msg.ksm_csum, conn->ksnc_rx_csum);
- 			ksocknal_new_packet(conn, 0);
- 			ksocknal_close_conn_and_siblings(conn, -EPROTO);
-@@ -1133,12 +1144,12 @@ struct ksock_conn_cb *
- 				cookie = conn->ksnc_msg.ksm_zc_cookies[0];
- 
- 			rc = conn->ksnc_proto->pro_handle_zcack(conn, cookie,
--					       conn->ksnc_msg.ksm_zc_cookies[1]);
--
-+								conn->ksnc_msg.ksm_zc_cookies[1]);
- 			if (rc) {
- 				CERROR("%s: Unknown ZC-ACK cookie: %llu, %llu\n",
--				       libcfs_id2str(conn->ksnc_peer->ksnp_id),
--				       cookie, conn->ksnc_msg.ksm_zc_cookies[1]);
-+				       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
-+				       cookie,
-+				       conn->ksnc_msg.ksm_zc_cookies[1]);
- 				ksocknal_new_packet(conn, 0);
- 				ksocknal_close_conn_and_siblings(conn, -EPROTO);
- 				return rc;
-@@ -1172,7 +1183,7 @@ struct ksock_conn_cb *
- 
- 			/* Substitute process ID assigned at connection time */
- 			lhdr->src_pid = cpu_to_le32(id->pid);
--			lhdr->src_nid = cpu_to_le64(id->nid);
-+			lhdr->src_nid = cpu_to_le64(lnet_nid_to_nid4(&id->nid));
- 		}
- 
- 		conn->ksnc_rx_state = SOCKNAL_RX_PARSE;
-@@ -1180,7 +1191,8 @@ struct ksock_conn_cb *
- 
- 		rc = lnet_parse(conn->ksnc_peer->ksnp_ni,
- 				&conn->ksnc_msg.ksm_u.lnetmsg.ksnm_hdr,
--				conn->ksnc_peer->ksnp_id.nid, conn, 0);
-+				lnet_nid_to_nid4(&conn->ksnc_peer->ksnp_id.nid),
-+				conn, 0);
- 		if (rc < 0) {
- 			/* I just received garbage: give up on this conn */
- 			ksocknal_new_packet(conn, 0);
-@@ -1207,7 +1219,7 @@ struct ksock_conn_cb *
- 		    conn->ksnc_msg.ksm_csum &&  /* has checksum */
- 		    conn->ksnc_msg.ksm_csum != conn->ksnc_rx_csum) {
- 			CERROR("%s: Checksum error, wire:0x%08X data:0x%08X\n",
--			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-+			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       conn->ksnc_msg.ksm_csum, conn->ksnc_rx_csum);
- 			rc = -EIO;
- 		}
-@@ -1219,9 +1231,10 @@ struct ksock_conn_cb *
- 			id = &conn->ksnc_peer->ksnp_id;
- 
- 			rc = conn->ksnc_proto->pro_handle_zcreq(conn,
--					conn->ksnc_msg.ksm_zc_cookies[0],
--					*ksocknal_tunables.ksnd_nonblk_zcack ||
--					le64_to_cpu(lhdr->src_nid) != id->nid);
-+								conn->ksnc_msg.ksm_zc_cookies[0],
-+								*ksocknal_tunables.ksnd_nonblk_zcack ||
-+								le64_to_cpu(lhdr->src_nid) !=
-+								lnet_nid_to_nid4(&id->nid));
- 		}
- 
- 		if (rc && conn->ksnc_lnet_msg)
-@@ -1796,7 +1809,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 		if (peer_ni->ksnp_accepting > 0) {
- 			CDEBUG(D_NET,
- 			       "peer_ni %s(%d) already connecting to me, retry later.\n",
--			       libcfs_nid2str(peer_ni->ksnp_id.nid),
-+			       libcfs_nidstr(&peer_ni->ksnp_id.nid),
- 			       peer_ni->ksnp_accepting);
- 			retry_later = true;
- 		}
-@@ -1820,13 +1833,13 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 
- 		if (ktime_get_seconds() >= deadline) {
- 			rc = -ETIMEDOUT;
--			lnet_connect_console_error(rc, peer_ni->ksnp_id.nid,
--						   (struct sockaddr *)
--						   &conn_cb->ksnr_addr);
-+			lnet_connect_console_error(rc,
-+						   lnet_nid_to_nid4(&peer_ni->ksnp_id.nid),
-+						   (struct sockaddr *)&conn_cb->ksnr_addr);
- 			goto failed;
- 		}
- 
--		sock = lnet_connect(peer_ni->ksnp_id.nid,
-+		sock = lnet_connect(lnet_nid_to_nid4(&peer_ni->ksnp_id.nid),
- 				    conn_cb->ksnr_myiface,
- 				    (struct sockaddr *)&conn_cb->ksnr_addr,
- 				    peer_ni->ksnp_ni->ni_net_ns);
-@@ -1838,9 +1851,9 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 		rc = ksocknal_create_conn(peer_ni->ksnp_ni, conn_cb, sock,
- 					  type);
- 		if (rc < 0) {
--			lnet_connect_console_error(rc, peer_ni->ksnp_id.nid,
--						   (struct sockaddr *)
--						   &conn_cb->ksnr_addr);
-+			lnet_connect_console_error(rc,
-+						   lnet_nid_to_nid4(&peer_ni->ksnp_id.nid),
-+						   (struct sockaddr *)&conn_cb->ksnr_addr);
- 			goto failed;
- 		}
- 
-@@ -1851,7 +1864,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 		retry_later = (rc);
- 		if (retry_later)
- 			CDEBUG(D_NET, "peer_ni %s: conn race, retry later.\n",
--			       libcfs_nid2str(peer_ni->ksnp_id.nid));
-+			       libcfs_nidstr(&peer_ni->ksnp_id.nid));
- 
- 		write_lock_bh(&ksocknal_data.ksnd_global_lock);
- 	}
-@@ -2191,18 +2204,18 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 			switch (error) {
- 			case ECONNRESET:
- 				CNETERR("A connection with %s (%pISp) was reset; it may have rebooted.\n",
--					libcfs_id2str(peer_ni->ksnp_id),
-+					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
- 				break;
- 			case ETIMEDOUT:
- 				CNETERR("A connection with %s (%pISp) timed out; the network or node may be down.\n",
--					libcfs_id2str(peer_ni->ksnp_id),
-+					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
- 				break;
- 			default:
- 				CNETERR("An unexpected network error %d occurred with %s (%pISp\n",
- 					error,
--					libcfs_id2str(peer_ni->ksnp_id),
-+					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
- 				break;
- 			}
-@@ -2215,7 +2228,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 			/* Timed out incomplete incoming message */
- 			ksocknal_conn_addref(conn);
- 			CNETERR("Timeout receiving from %s (%pISp), state %d wanted %zd left %d\n",
--				libcfs_id2str(peer_ni->ksnp_id),
-+				libcfs_idstr(&peer_ni->ksnp_id),
- 				&conn->ksnc_peeraddr,
- 				conn->ksnc_rx_state,
- 				iov_iter_count(&conn->ksnc_rx_to),
-@@ -2236,7 +2249,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 				tx->tx_hstatus =
- 					LNET_MSG_STATUS_LOCAL_TIMEOUT;
- 			CNETERR("Timeout sending data to %s (%pISp) the network or that node may be down.\n",
--				libcfs_id2str(peer_ni->ksnp_id),
-+				libcfs_idstr(&peer_ni->ksnp_id),
- 				&conn->ksnc_peeraddr);
- 			return conn;
- 		}
-@@ -2322,7 +2335,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 		return -ENOMEM;
- 	}
- 
--	if (!ksocknal_launch_packet(peer_ni->ksnp_ni, tx, peer_ni->ksnp_id)) {
-+	if (!ksocknal_launch_packet(peer_ni->ksnp_ni, tx, &peer_ni->ksnp_id)) {
- 		read_lock(&ksocknal_data.ksnd_global_lock);
- 		return 1;
- 	}
-@@ -2423,7 +2436,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 		read_unlock(&ksocknal_data.ksnd_global_lock);
- 
- 		CERROR("Total %d stale ZC_REQs for peer_ni %s detected; the oldest(%p) timed out %lld secs ago, resid: %d, wmem: %d\n",
--		       n, libcfs_nid2str(peer_ni->ksnp_id.nid), tx_stale,
-+		       n, libcfs_nidstr(&peer_ni->ksnp_id.nid), tx_stale,
- 		       ktime_get_seconds() - deadline,
- 		       resid, conn->ksnc_sock->sk->sk_wmem_queued);
- 
-diff --git a/net/lnet/klnds/socklnd/socklnd_proto.c b/net/lnet/klnds/socklnd/socklnd_proto.c
-index 0a6072b..c3ba070 100644
---- a/net/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/net/lnet/klnds/socklnd/socklnd_proto.c
-@@ -189,7 +189,7 @@
- 	if (cookie == tx->tx_msg.ksm_zc_cookies[0] ||
- 	    cookie == tx->tx_msg.ksm_zc_cookies[1]) {
- 		CWARN("%s: duplicated ZC cookie: %llu\n",
--		      libcfs_id2str(conn->ksnc_peer->ksnp_id), cookie);
-+		      libcfs_idstr(&conn->ksnc_peer->ksnp_id), cookie);
- 		return 1; /* XXX return error in the future */
- 	}
- 
-@@ -243,14 +243,14 @@
- 		}
- 
- 	} else {
--		/*
--		 * ksm_zc_cookies[0] < ksm_zc_cookies[1],
--		 * it is range of cookies
-+		/* ksm_zc_cookies[0] < ksm_zc_cookies[1], it is range
-+		 * of cookies
- 		 */
- 		if (cookie >= tx->tx_msg.ksm_zc_cookies[0] &&
- 		    cookie <= tx->tx_msg.ksm_zc_cookies[1]) {
- 			CWARN("%s: duplicated ZC cookie: %llu\n",
--			      libcfs_id2str(conn->ksnc_peer->ksnp_id), cookie);
-+			      libcfs_idstr(&conn->ksnc_peer->ksnp_id),
-+			      cookie);
- 			return 1; /* XXX: return error in the future */
- 		}
- 
-@@ -398,8 +398,8 @@
- 	if (!tx)
- 		return -ENOMEM;
- 
--	rc = ksocknal_launch_packet(peer_ni->ksnp_ni, tx, peer_ni->ksnp_id);
--	if (!rc)
-+	rc = ksocknal_launch_packet(peer_ni->ksnp_ni, tx, &peer_ni->ksnp_id);
-+	if (rc == 0)
- 		return 0;
- 
- 	ksocknal_free_tx(tx);
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index a6223d2..f980f2f 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -669,7 +669,7 @@ struct lnet_peer {
+ 	struct list_head	lp_rtr_list;
+ 
+ 	/* primary NID of the peer */
+-	lnet_nid_t		lp_primary_nid;
++	struct lnet_nid		lp_primary_nid;
+ 
+ 	/* source NID to use during discovery */
+ 	lnet_nid_t		lp_disc_src_nid;
 diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index f5b022f..1f053b3 100644
+index 3ae88fc..f5b022f 100644
 --- a/net/lnet/lnet/api-ni.c
 +++ b/net/lnet/lnet/api-ni.c
-@@ -1509,22 +1509,35 @@ struct lnet_net *
+@@ -1433,8 +1433,8 @@ struct lnet_net *
+ 	return false;
+ }
+ 
+-unsigned int
+-lnet_nid_cpt_hash(lnet_nid_t nid, unsigned int number)
++static unsigned int
++lnet_nid4_cpt_hash(lnet_nid_t nid, unsigned int number)
+ {
+ 	u64 key = nid;
+ 	unsigned int val;
+@@ -1452,12 +1452,33 @@ struct lnet_net *
+ 	return (unsigned int)(key + val + (val >> 1)) % number;
+ }
+ 
++unsigned int
++lnet_nid_cpt_hash(struct lnet_nid *nid, unsigned int number)
++{
++	unsigned int val;
++	u32 h = 0;
++	int i;
++
++	LASSERT(number >= 1 && number <= LNET_CPT_NUMBER);
++
++	if (number == 1)
++		return 0;
++
++	if (nid_is_nid4(nid))
++		return lnet_nid4_cpt_hash(lnet_nid_to_nid4(nid), number);
++
++	for (i = 0; i < 4; i++)
++		h = hash_32(nid->nid_addr[i] ^ h, 32);
++	val = hash_32(LNET_NID_NET(nid) ^ h, LNET_CPT_BITS);
++	if (val < number)
++		return val;
++	return (unsigned int)(h + val + (val >> 1)) % number;
++}
++
+ int
+ lnet_cpt_of_nid_locked(struct lnet_nid *nid, struct lnet_ni *ni)
+ {
+ 	struct lnet_net *net;
+-	/* FIXME handle long-addr nid */
+-	lnet_nid_t nid4 = lnet_nid_to_nid4(nid);
+ 
+ 	/* must called with hold of lnet_net_lock */
+ 	if (LNET_CPT_NUMBER == 1)
+@@ -1472,20 +1493,19 @@ struct lnet_net *
+ 	 */
+ 	if (ni) {
+ 		if (ni->ni_cpts)
+-			return ni->ni_cpts[lnet_nid_cpt_hash(nid4,
++			return ni->ni_cpts[lnet_nid_cpt_hash(nid,
+ 							     ni->ni_ncpts)];
+ 		else
+-			return lnet_nid_cpt_hash(nid4, LNET_CPT_NUMBER);
++			return lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
+ 	}
+ 
+ 	/* no NI provided so look at the net */
+ 	net = lnet_get_net_locked(LNET_NID_NET(nid));
+ 
+-	if (net && net->net_cpts) {
+-		return net->net_cpts[lnet_nid_cpt_hash(nid4, net->net_ncpts)];
+-	}
++	if (net && net->net_cpts)
++		return net->net_cpts[lnet_nid_cpt_hash(nid, net->net_ncpts)];
+ 
+-	return lnet_nid_cpt_hash(nid4, LNET_CPT_NUMBER);
++	return lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
  }
  
  int
--lnet_cpt_of_nid(lnet_nid_t nid4, struct lnet_ni *ni)
-+lnet_nid2cpt(struct lnet_nid *nid, struct lnet_ni *ni)
+@@ -4240,7 +4260,8 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		mutex_lock(&the_lnet.ln_api_mutex);
+ 		lp = lnet_find_peer(ping->ping_id.nid);
+ 		if (lp) {
+-			ping->ping_id.nid = lp->lp_primary_nid;
++			ping->ping_id.nid =
++				lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 			ping->mr_info = lnet_peer_is_multi_rail(lp);
+ 			lnet_peer_decref_locked(lp);
+ 		}
+@@ -4263,7 +4284,8 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		mutex_lock(&the_lnet.ln_api_mutex);
+ 		lp = lnet_find_peer(discover->ping_id.nid);
+ 		if (lp) {
+-			discover->ping_id.nid = lp->lp_primary_nid;
++			discover->ping_id.nid =
++				lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 			discover->mr_info = lnet_peer_is_multi_rail(lp);
+ 			lnet_peer_decref_locked(lp);
+ 		}
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 9a2fdb6..8c8db31 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -1324,7 +1324,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 	list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
+ 		if (!lnet_is_route_alive(route))
+ 			continue;
+-		gw_pnid = route->lr_gateway->lp_primary_nid;
++		gw_pnid = lnet_nid_to_nid4(&route->lr_gateway->lp_primary_nid);
+ 
+ 		/* no protection on below fields, but it's harmless */
+ 		if (last_route && (last_route->lr_seq - route->lr_seq < 0))
+@@ -1938,7 +1938,7 @@ struct lnet_ni *
+ 	lnet_peer_ni_decref_locked(new_lpni);
+ 
+ 	CDEBUG(D_NET, "msg %p delayed. %s pending discovery\n",
+-	       msg, libcfs_nid2str(peer->lp_primary_nid));
++	       msg, libcfs_nidstr(&peer->lp_primary_nid));
+ 
+ 	return LNET_DC_WAIT;
+ }
+@@ -4831,7 +4831,8 @@ struct lnet_msg *
+ 	       libcfs_nidstr(&ni->ni_nid), libcfs_id2str(peer_id), getmd);
+ 
+ 	/* setup information for lnet_build_msg_event */
+-	msg->msg_initiator = getmsg->msg_txpeer->lpni_peer_net->lpn_peer->lp_primary_nid;
++	msg->msg_initiator =
++		lnet_nid_to_nid4(&getmsg->msg_txpeer->lpni_peer_net->lpn_peer->lp_primary_nid);
+ 	msg->msg_from = peer_id.nid;
+ 	msg->msg_type = LNET_MSG_GET; /* flag this msg as an "optimized" GET */
+ 	msg->msg_hdr.src_nid = peer_id.nid;
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 4629a8b..7f2c6f3 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -107,13 +107,15 @@
+ }
+ 
+ static struct lnet_peer_ni *
+-lnet_peer_ni_alloc(lnet_nid_t nid)
++lnet_peer_ni_alloc(lnet_nid_t nid4)
  {
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_net *net;
++	struct lnet_nid nid;
  	int cpt;
- 	int cpt2;
--	struct lnet_nid nid;
  
- 	if (LNET_CPT_NUMBER == 1)
- 		return 0; /* the only one */
+-	cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
++	lnet_nid4_to_nid(nid4, &nid);
++	cpt = lnet_nid_cpt_hash(&nid, LNET_CPT_NUMBER);
  
--	lnet_nid4_to_nid(nid4, &nid);
- 	cpt = lnet_net_lock_current();
--	cpt2 = lnet_cpt_of_nid_locked(&nid, ni);
+ 	lpni = kzalloc_cpt(sizeof(*lpni), GFP_KERNEL, cpt);
+ 	if (!lpni)
+@@ -136,11 +138,11 @@
+ 	else
+ 		lpni->lpni_ns_status = LNET_NI_STATUS_UP;
+ 	lpni->lpni_ping_feats = LNET_PING_FEAT_INVAL;
+-	lnet_nid4_to_nid(nid, &lpni->lpni_nid);
++	lpni->lpni_nid = nid;
+ 	lpni->lpni_cpt = cpt;
+ 	atomic_set(&lpni->lpni_healthv, LNET_MAX_HEALTH_VALUE);
+ 
+-	net = lnet_get_net_locked(LNET_NIDNET(nid));
++	net = lnet_get_net_locked(LNET_NID_NET(&nid));
+ 	lpni->lpni_net = net;
+ 	if (net) {
+ 		lpni->lpni_txcredits = net->net_tunables.lct_peer_tx_credits;
+@@ -202,10 +204,12 @@
+ }
+ 
+ static struct lnet_peer *
+-lnet_peer_alloc(lnet_nid_t nid)
++lnet_peer_alloc(lnet_nid_t nid4)
+ {
+ 	struct lnet_peer *lp;
++	struct lnet_nid nid;
+ 
++	lnet_nid4_to_nid(nid4, &nid);
+ 	lp = kzalloc_cpt(sizeof(*lp), GFP_KERNEL, CFS_CPT_ANY);
+ 	if (!lp)
+ 		return NULL;
+@@ -239,11 +243,11 @@
+ 	 * to ever use a different interface when sending messages to
+ 	 * myself.
+ 	 */
+-	if (nid == LNET_NID_LO_0)
++	if (nid_is_lo0(&nid))
+ 		lp->lp_state = LNET_PEER_NO_DISCOVERY;
+-	lp->lp_cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
++	lp->lp_cpt = lnet_nid_cpt_hash(&nid, LNET_CPT_NUMBER);
+ 
+-	CDEBUG(D_NET, "%p nid %s\n", lp, libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "%p nid %s\n", lp, libcfs_nidstr(&lp->lp_primary_nid));
+ 
+ 	return lp;
+ }
+@@ -251,7 +255,7 @@
+ void
+ lnet_destroy_peer_locked(struct lnet_peer *lp)
+ {
+-	CDEBUG(D_NET, "%p nid %s\n", lp, libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "%p nid %s\n", lp, libcfs_nidstr(&lp->lp_primary_nid));
+ 
+ 	LASSERT(atomic_read(&lp->lp_refcount) == 0);
+ 	LASSERT(lp->lp_rtr_refcount == 0);
+@@ -333,7 +337,7 @@
+ 		wake_up(&the_lnet.ln_dc_waitq);
+ 	}
+ 	CDEBUG(D_NET, "peer %s NID %s\n",
+-	       libcfs_nid2str(lp->lp_primary_nid),
++	       libcfs_nidstr(&lp->lp_primary_nid),
+ 	       libcfs_nidstr(&lpni->lpni_nid));
+ }
+ 
+@@ -448,7 +452,7 @@ void lnet_peer_uninit(void)
+ 	struct lnet_peer_ni *lpni = NULL, *lpni2;
+ 	int rc = 0, rc2 = 0;
+ 
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(peer->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&peer->lp_primary_nid));
+ 
+ 	spin_lock(&peer->lp_lock);
+ 	peer->lp_state |= LNET_PEER_MARK_DELETED;
+@@ -517,13 +521,15 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+  *  -EBUSY:  The lnet_peer_ni is the primary, and not the only peer_ni.
+  */
+ static int
+-lnet_peer_del_nid(struct lnet_peer *lp, lnet_nid_t nid, unsigned int flags)
++lnet_peer_del_nid(struct lnet_peer *lp, lnet_nid_t nid4, unsigned int flags)
+ {
+ 	struct lnet_peer_ni *lpni;
+-	lnet_nid_t primary_nid = lp->lp_primary_nid;
++	struct lnet_nid primary_nid = lp->lp_primary_nid;
++	struct lnet_nid nid;
+ 	int rc = 0;
+ 	bool force = (flags & LNET_PEER_RTR_NI_FORCE_DEL) ? true : false;
+ 
++	lnet_nid4_to_nid(nid4, &nid);
+ 	if (!(flags & LNET_PEER_CONFIGURED)) {
+ 		if (lp->lp_state & LNET_PEER_CONFIGURED) {
+ 			rc = -EPERM;
+@@ -535,12 +541,12 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 	 * deleting it
+ 	 */
+ 	if (lp->lp_state & LNET_PEER_LOCK_PRIMARY &&
+-	    primary_nid == nid) {
++	    nid_same(&primary_nid, &nid)) {
+ 		rc = -EPERM;
+ 		goto out;
+ 	}
+ 
+-	lpni = lnet_find_peer_ni_locked(nid);
++	lpni = lnet_peer_ni_find_locked(&nid);
+ 	if (!lpni) {
+ 		rc = -ENOENT;
+ 		goto out;
+@@ -555,19 +561,19 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 	 * This function only allows deletion of the primary NID if it
+ 	 * is the only NID.
+ 	 */
+-	if (nid == lp->lp_primary_nid && lp->lp_nnis != 1 && !force) {
++	if (nid_same(&nid, &lp->lp_primary_nid) && lp->lp_nnis != 1 && !force) {
+ 		rc = -EBUSY;
+ 		goto out;
+ 	}
+ 
+ 	lnet_net_lock(LNET_LOCK_EX);
+ 
+-	if (nid == lp->lp_primary_nid && lp->lp_nnis != 1 && force) {
++	if (nid_same(&nid, &lp->lp_primary_nid) && lp->lp_nnis != 1 && force) {
+ 		struct lnet_peer_ni *lpni2;
+ 		/* assign the next peer_ni to be the primary */
+ 		lpni2 = lnet_get_next_peer_ni_locked(lp, NULL, lpni);
+ 		LASSERT(lpni2);
+-		lp->lp_primary_nid = lnet_nid_to_nid4(&lpni2->lpni_nid);
++		lp->lp_primary_nid = lpni2->lpni_nid;
+ 	}
+ 	rc = lnet_peer_ni_del_locked(lpni, force);
+ 
+@@ -575,7 +581,8 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 
+ out:
+ 	CDEBUG(D_NET, "peer %s NID %s flags %#x: %d\n",
+-	       libcfs_nid2str(primary_nid), libcfs_nid2str(nid), flags, rc);
++	       libcfs_nidstr(&primary_nid), libcfs_nidstr(&nid),
++	       flags, rc);
+ 
+ 	return rc;
+ }
+@@ -596,8 +603,8 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 				continue;
+ 
+ 			peer = lpni->lpni_peer_net->lpn_peer;
+-			if (peer->lp_primary_nid !=
+-			    lnet_nid_to_nid4(&lpni->lpni_nid)) {
++			if (!nid_same(&peer->lp_primary_nid,
++				      &lpni->lpni_nid)) {
+ 				lnet_peer_ni_del_locked(lpni, false);
+ 				continue;
+ 			}
+@@ -643,8 +650,8 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
+ 			if (!lnet_isrouter(lp))
+ 				continue;
+ 
+-			gw_nid = lp->lpni_peer_net->lpn_peer->lp_primary_nid;
+-
++			/* FIXME handle large-addr nid */
++			gw_nid = lnet_nid_to_nid4(&lp->lpni_peer_net->lpn_peer->lp_primary_nid);
+ 			lnet_net_unlock(LNET_LOCK_EX);
+ 			lnet_del_route(LNET_NET_ANY, gw_nid);
+ 			lnet_net_lock(LNET_LOCK_EX);
+@@ -712,7 +719,7 @@ struct lnet_peer_ni *
+ 
+ 	lnet_nid4_to_nid(nid4, &nid);
+ 
+-	cpt = lnet_nid_cpt_hash(nid4, LNET_CPT_NUMBER);
++	cpt = lnet_nid_cpt_hash(&nid, LNET_CPT_NUMBER);
+ 
+ 	ptable = the_lnet.ln_peer_tables[cpt];
+ 	lpni = lnet_get_peer_ni_locked(ptable, &nid);
+@@ -721,6 +728,21 @@ struct lnet_peer_ni *
+ }
+ 
+ struct lnet_peer_ni *
++lnet_peer_ni_find_locked(struct lnet_nid *nid)
++{
++	struct lnet_peer_ni *lpni;
++	struct lnet_peer_table *ptable;
++	int cpt;
 +
-+	cpt2 = lnet_cpt_of_nid_locked(nid, ni);
++	cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
 +
++	ptable = the_lnet.ln_peer_tables[cpt];
++	lpni = lnet_get_peer_ni_locked(ptable, nid);
++
++	return lpni;
++}
++
++struct lnet_peer_ni *
+ lnet_peer_get_ni_locked(struct lnet_peer *lp, lnet_nid_t nid)
+ {
+ 	struct lnet_peer_net *lpn;
+@@ -896,9 +918,11 @@ struct lnet_peer_ni *
+ 	for (cpt = 0; cpt < lncpt; cpt++) {
+ 		ptable = the_lnet.ln_peer_tables[cpt];
+ 		list_for_each_entry(lp, &ptable->pt_peer_list, lp_peer_list) {
++			if (!nid_is_nid4(&lp->lp_primary_nid))
++				continue;
+ 			if (i >= count)
+ 				goto done;
+-			id.nid = lp->lp_primary_nid;
++			id.nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 			if (copy_to_user(&ids[i], &id, sizeof(id)))
+ 				goto done;
+ 			i++;
+@@ -1205,7 +1229,7 @@ struct lnet_peer_ni *
+ 		spin_unlock(&lpni->lpni_lock);
+ 	}
+ 	CDEBUG(D_NET, "peer %s nid %s: %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid), rc);
++	       libcfs_nidstr(&lp->lp_primary_nid), libcfs_nid2str(nid), rc);
+ 	return rc;
+ }
+ 
+@@ -1263,7 +1287,7 @@ struct lnet_peer_ni *
+ 	kfree(ne);
+ out:
+ 	CDEBUG(D_NET, "peer %s nid %s: %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid), rc);
++	       libcfs_nidstr(&lp->lp_primary_nid), libcfs_nid2str(nid), rc);
+ 	return rc;
+ }
+ 
+@@ -1293,12 +1317,13 @@ struct lnet_peer_ni *
+ lnet_nid_t
+ lnet_peer_primary_nid_locked(lnet_nid_t nid)
+ {
++	/* FIXME handle large-addr nid */
+ 	struct lnet_peer_ni *lpni;
+ 	lnet_nid_t primary_nid = nid;
+ 
+ 	lpni = lnet_find_peer_ni_locked(nid);
+ 	if (lpni) {
+-		primary_nid = lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
++		primary_nid = lnet_nid_to_nid4(&lpni->lpni_peer_net->lpn_peer->lp_primary_nid);
+ 		lnet_peer_ni_decref_locked(lpni);
+ 	}
+ 
+@@ -1379,6 +1404,7 @@ struct lnet_peer_ni *
+ }
+ EXPORT_SYMBOL(LNetAddPeer);
+ 
++/* FIXME support large-addr nid */
+ lnet_nid_t
+ LNetPrimaryNID(lnet_nid_t nid)
+ {
+@@ -1428,7 +1454,7 @@ struct lnet_peer_ni *
+ 		}
+ 		lp = lpni->lpni_peer_net->lpn_peer;
+ 	}
+-	primary_nid = lp->lp_primary_nid;
++	primary_nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
+ out_decref:
+ 	lnet_peer_ni_decref_locked(lpni);
+ out_unlock:
+@@ -1495,7 +1521,7 @@ struct lnet_peer_net *
+ 
+ 	/* Add peer_ni to peer_net */
+ 	lpni->lpni_peer_net = lpn;
+-	if (lp->lp_primary_nid == lnet_nid_to_nid4(&lpni->lpni_nid))
++	if (nid_same(&lp->lp_primary_nid, &lpni->lpni_nid))
+ 		list_add(&lpni->lpni_peer_nis, &lpn->lpn_peer_nis);
+ 	else
+ 		list_add_tail(&lpni->lpni_peer_nis, &lpn->lpn_peer_nis);
+@@ -1506,7 +1532,7 @@ struct lnet_peer_net *
+ 	if (!lpn->lpn_peer) {
+ 		new_lpn = true;
+ 		lpn->lpn_peer = lp;
+-		if (lp->lp_primary_nid == lnet_nid_to_nid4(&lpni->lpni_nid))
++		if (nid_same(&lp->lp_primary_nid, &lpni->lpni_nid))
+ 			list_add(&lpn->lpn_peer_nets, &lp->lp_peer_nets);
+ 		else
+ 			list_add_tail(&lpn->lpn_peer_nets, &lp->lp_peer_nets);
+@@ -1552,7 +1578,7 @@ struct lnet_peer_net *
+ 		       libcfs_nidstr(&lpni->lpni_nid));
+ 
+ 	CDEBUG(D_NET, "peer %s NID %s flags %#x\n",
+-	       libcfs_nid2str(lp->lp_primary_nid),
++	       libcfs_nidstr(&lp->lp_primary_nid),
+ 	       libcfs_nidstr(&lpni->lpni_nid), flags);
+ 	lnet_peer_ni_decref_locked(lpni);
+ 	lnet_net_unlock(LNET_LOCK_EX);
+@@ -1591,13 +1617,13 @@ struct lnet_peer_net *
+ 		 * that an existing peer is being modified.
+ 		 */
+ 		if (lp->lp_state & LNET_PEER_CONFIGURED) {
+-			if (lp->lp_primary_nid != nid)
++			if (lnet_nid_to_nid4(&lp->lp_primary_nid) != nid)
+ 				rc = -EEXIST;
+ 			else if ((lp->lp_state ^ flags) & LNET_PEER_MULTI_RAIL)
+ 				rc = -EPERM;
+ 			goto out;
+ 		} else if (!(flags & LNET_PEER_CONFIGURED)) {
+-			if (lp->lp_primary_nid == nid) {
++			if (lnet_nid_to_nid4(&lp->lp_primary_nid) == nid) {
+ 				rc = -EEXIST;
+ 				goto out;
+ 			}
+@@ -1757,7 +1783,7 @@ struct lnet_peer_net *
+ 	lnet_peer_ni_decref_locked(lpni);
+ out:
+ 	CDEBUG(D_NET, "peer %s NID %s flags %#x: %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid),
++	       libcfs_nidstr(&lp->lp_primary_nid), libcfs_nid2str(nid),
+ 	       flags, rc);
+ 	return rc;
+ }
+@@ -1771,14 +1797,14 @@ struct lnet_peer_net *
+ lnet_peer_set_primary_nid(struct lnet_peer *lp, lnet_nid_t nid,
+ 			  unsigned int flags)
+ {
+-	lnet_nid_t old = lp->lp_primary_nid;
++	struct lnet_nid old = lp->lp_primary_nid;
+ 	int rc = 0;
+ 
+-	if (lp->lp_primary_nid == nid)
++	if (lnet_nid_to_nid4(&lp->lp_primary_nid) == nid)
+ 		goto out;
+ 
+ 	if (!(lp->lp_state & LNET_PEER_LOCK_PRIMARY))
+-		lp->lp_primary_nid = nid;
++		lnet_nid4_to_nid(nid, &lp->lp_primary_nid);
+ 
+ 	rc = lnet_peer_add_nid(lp, nid, flags);
+ 	if (rc) {
+@@ -1795,7 +1821,7 @@ struct lnet_peer_net *
+ 		return 0;
+ 
+ 	CDEBUG(D_NET, "peer %s NID %s: %d\n",
+-	       libcfs_nid2str(old), libcfs_nid2str(nid), rc);
++	       libcfs_nidstr(&old), libcfs_nid2str(nid), rc);
+ 
+ 	return rc;
+ }
+@@ -1906,10 +1932,10 @@ struct lnet_peer_net *
+ 	}
+ 
+ 	/* Primary NID must match */
+-	if (lp->lp_primary_nid != prim_nid) {
++	if (lnet_nid_to_nid4(&lp->lp_primary_nid) != prim_nid) {
+ 		CDEBUG(D_NET, "prim_nid %s is not primary for peer %s\n",
+ 		       libcfs_nid2str(prim_nid),
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 		return -ENODEV;
+ 	}
+ 
+@@ -1950,10 +1976,10 @@ struct lnet_peer_net *
+ 	lnet_peer_ni_decref_locked(lpni);
+ 	lp = lpni->lpni_peer_net->lpn_peer;
+ 
+-	if (prim_nid != lp->lp_primary_nid) {
++	if (prim_nid != lnet_nid_to_nid4(&lp->lp_primary_nid)) {
+ 		CDEBUG(D_NET, "prim_nid %s is not primary for peer %s\n",
+ 		       libcfs_nid2str(prim_nid),
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 		return -ENODEV;
+ 	}
+ 
+@@ -1966,7 +1992,7 @@ struct lnet_peer_net *
+ 	}
+ 	lnet_net_unlock(LNET_LOCK_EX);
+ 
+-	if (nid == LNET_NID_ANY || nid == lp->lp_primary_nid)
++	if (nid == LNET_NID_ANY || nid == lnet_nid_to_nid4(&lp->lp_primary_nid))
+ 		return lnet_peer_del(lp);
+ 
+ 	flags = LNET_PEER_CONFIGURED;
+@@ -2222,7 +2248,7 @@ static int lnet_peer_queue_for_discovery(struct lnet_peer *lp)
+ 	}
+ 
+ 	CDEBUG(D_NET, "Queue peer %s: %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), rc);
++	       libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 
+ 	return rc;
+ }
+@@ -2238,7 +2264,7 @@ static void lnet_peer_discovery_complete(struct lnet_peer *lp)
+ 	LIST_HEAD(pending_msgs);
+ 
+ 	CDEBUG(D_NET, "Discovery complete. Dequeue peer %s\n",
+-	       libcfs_nid2str(lp->lp_primary_nid));
++	       libcfs_nidstr(&lp->lp_primary_nid));
+ 
+ 	list_del_init(&lp->lp_dc_list);
+ 	spin_lock(&lp->lp_lock);
+@@ -2310,7 +2336,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 		lp->lp_state |= LNET_PEER_FORCE_PING;
+ 		CDEBUG(D_NET, "Push Put error %d from %s (source %s)\n",
+ 		       ev->status,
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       libcfs_nid2str(ev->source.nid));
+ 		goto out;
+ 	}
+@@ -2323,7 +2349,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 		lp->lp_state &= ~LNET_PEER_NIDS_UPTODATE;
+ 		lp->lp_state |= LNET_PEER_FORCE_PING;
+ 		CDEBUG(D_NET, "Corrupted Push from %s\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 		goto out;
+ 	}
+ 
+@@ -2340,43 +2366,32 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 	 */
+ 	if (!(pbuf->pb_info.pi_features & LNET_PING_FEAT_MULTI_RAIL)) {
+ 		CERROR("Push from non-Multi-Rail peer %s dropped\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 		goto out;
+ 	}
+ 
+ 	/* The peer may have discovery disabled at its end. Set
+ 	 * NO_DISCOVERY as appropriate.
+ 	 */
+-	if (!(pbuf->pb_info.pi_features & LNET_PING_FEAT_DISCOVERY) ||
+-	    lnet_peer_discovery_disabled) {
++	if (!(pbuf->pb_info.pi_features & LNET_PING_FEAT_DISCOVERY)) {
+ 		CDEBUG(D_NET, "Peer %s has discovery disabled\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 
+-		/* Detect whether this peer has toggled discovery from on to
+-		 * off and whether we can delete and re-create the peer. Peers
+-		 * that were manually configured cannot be deleted by discovery.
+-		 * We need to delete this peer and re-create it if the peer was
+-		 * not configured manually, is currently considered DD capable,
+-		 * and either:
+-		 * 1. We've already discovered the peer (the peer has toggled
+-		 *    the discovery feature from on to off), or
+-		 * 2. The peer is considered MR, but it was not user configured
+-		 *    (this was a "temporary" peer created via the kernel APIs
+-		 *     that we're discovering for the first time)
++		/* Mark the peer for deletion if we already know about it
++		 * and it's going from discovery set to no discovery set
+ 		 */
+-		if (!(lp->lp_state & (LNET_PEER_CONFIGURED |
+-				      LNET_PEER_NO_DISCOVERY)) &&
+-		    (lp->lp_state & (LNET_PEER_DISCOVERED |
+-				     LNET_PEER_MULTI_RAIL))) {
++		if (!(lp->lp_state & (LNET_PEER_NO_DISCOVERY |
++				      LNET_PEER_DISCOVERING)) &&
++		     lp->lp_state & LNET_PEER_DISCOVERED) {
+ 			CDEBUG(D_NET, "Marking %s:0x%x for deletion\n",
+-			       libcfs_nid2str(lp->lp_primary_nid),
++			       libcfs_nidstr(&lp->lp_primary_nid),
+ 			       lp->lp_state);
+ 			lp->lp_state |= LNET_PEER_MARK_DELETION;
+ 		}
+ 		lp->lp_state |= LNET_PEER_NO_DISCOVERY;
+-	} else {
++	} else if (lp->lp_state & LNET_PEER_NO_DISCOVERY) {
+ 		CDEBUG(D_NET, "Peer %s has discovery enabled\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 		lp->lp_state &= ~LNET_PEER_NO_DISCOVERY;
+ 	}
+ 
+@@ -2387,19 +2402,19 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 	 */
+ 	if (lp->lp_state & LNET_PEER_MULTI_RAIL) {
+ 		CDEBUG(D_NET, "peer %s(%p) is MR\n",
+-		       libcfs_nid2str(lp->lp_primary_nid), lp);
++		       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 	} else if (lp->lp_state & LNET_PEER_CONFIGURED) {
+ 		CWARN("Push says %s is Multi-Rail, DLC says not\n",
+-		      libcfs_nid2str(lp->lp_primary_nid));
++		      libcfs_nidstr(&lp->lp_primary_nid));
+ 	} else if (lnet_peer_discovery_disabled) {
+ 		CDEBUG(D_NET, "peer %s(%p) not MR: DD disabled locally\n",
+-		       libcfs_nid2str(lp->lp_primary_nid), lp);
++		       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 	} else if (lp->lp_state & LNET_PEER_NO_DISCOVERY) {
+ 		CDEBUG(D_NET, "peer %s(%p) not MR: DD disabled remotely\n",
+-		       libcfs_nid2str(lp->lp_primary_nid), lp);
++		       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 	} else {
+ 		CDEBUG(D_NET, "peer %s(%p) is MR capable\n",
+-		       libcfs_nid2str(lp->lp_primary_nid), lp);
++		       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 		lp->lp_state |= LNET_PEER_MULTI_RAIL;
+ 		lnet_peer_clr_non_mr_pref_nids(lp);
+ 	}
+@@ -2414,7 +2429,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 		lp->lp_state &= ~LNET_PEER_NIDS_UPTODATE;
+ 		lp->lp_state |= LNET_PEER_FORCE_PING;
+ 		CDEBUG(D_NET, "Truncated Push from %s (%d nids)\n",
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       pbuf->pb_info.pi_nnis);
+ 		goto out;
+ 	}
+@@ -2436,7 +2451,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 			memcpy(&lp->lp_data->pb_info, &pbuf->pb_info,
+ 			       LNET_PING_INFO_SIZE(pbuf->pb_info.pi_nnis));
+ 			CDEBUG(D_NET, "Ping/Push race from %s: %u vs %u\n",
+-			       libcfs_nid2str(lp->lp_primary_nid),
++			       libcfs_nidstr(&lp->lp_primary_nid),
+ 			       LNET_PING_BUFFER_SEQNO(pbuf),
+ 			       LNET_PING_BUFFER_SEQNO(lp->lp_data));
+ 		}
+@@ -2452,7 +2467,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 	if (!lp->lp_data) {
+ 		lp->lp_state |= LNET_PEER_FORCE_PING;
+ 		CDEBUG(D_NET, "Cannot allocate Push buffer for %s %u\n",
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       LNET_PING_BUFFER_SEQNO(pbuf));
+ 		goto out;
+ 	}
+@@ -2462,7 +2477,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 	       LNET_PING_INFO_SIZE(pbuf->pb_info.pi_nnis));
+ 	lp->lp_state |= LNET_PEER_DATA_PRESENT;
+ 	CDEBUG(D_NET, "Received Push %s %u\n",
+-	       libcfs_nid2str(lp->lp_primary_nid),
++	       libcfs_nidstr(&lp->lp_primary_nid),
+ 	       LNET_PING_BUFFER_SEQNO(pbuf));
+ 
+ out:
+@@ -2584,7 +2599,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		goto again;
+ 
+ 	CDEBUG(D_NET, "peer %s NID %s: %d. %s\n",
+-	       (lp ? libcfs_nid2str(lp->lp_primary_nid) : "(none)"),
++	       (lp ? libcfs_nidstr(&lp->lp_primary_nid) : "(none)"),
+ 	       libcfs_nidstr(&lpni->lpni_nid), rc,
+ 	       (!block) ? "pending discovery" : "discovery complete");
+ 
+@@ -2608,7 +2623,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 	spin_unlock(&lp->lp_lock);
+ 
+ 	CDEBUG(D_NET, "peer %s ev->status %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), ev->status);
++	       libcfs_nidstr(&lp->lp_primary_nid), ev->status);
+ }
+ 
+ /* Handle a Reply message. This is the reply to a Ping message. */
+@@ -2632,7 +2647,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lp->lp_ping_error = ev->status;
+ 		CDEBUG(D_NET, "Ping Reply error %d from %s (source %s)\n",
+ 		       ev->status,
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       libcfs_nid2str(ev->source.nid));
+ 		goto out;
+ 	}
+@@ -2650,7 +2665,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lp->lp_state |= LNET_PEER_PING_FAILED;
+ 		lp->lp_ping_error = 0;
+ 		CDEBUG(D_NET, "Corrupted Ping Reply from %s: %d\n",
+-		       libcfs_nid2str(lp->lp_primary_nid), rc);
++		       libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 		goto out;
+ 	}
+ 
+@@ -2658,15 +2673,37 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 	 * The peer may have discovery disabled at its end. Set
+ 	 * NO_DISCOVERY as appropriate.
+ 	 */
+-	if ((pbuf->pb_info.pi_features & LNET_PING_FEAT_DISCOVERY) &&
+-	    !lnet_peer_discovery_disabled) {
++	if (!(pbuf->pb_info.pi_features & LNET_PING_FEAT_DISCOVERY) &&
++	    lnet_peer_discovery_disabled) {
+ 		CDEBUG(D_NET, "Peer %s has discovery enabled\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
+-		lp->lp_state &= ~LNET_PEER_NO_DISCOVERY;
+-	} else {
+-		CDEBUG(D_NET, "Peer %s has discovery disabled\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
++
++		/* Detect whether this peer has toggled discovery from on to
++		 * off and whether we can delete and re-create the peer. Peers
++		 * that were manually configured cannot be deleted by discovery.
++		 * We need to delete this peer and re-create it if the peer was
++		 * not configured manually, is currently considered DD capable,
++		 * and either:
++		 * 1. We've already discovered the peer (the peer has toggled
++		 *    the discovery feature from on to off), or
++		 * 2. The peer is considered MR, but it was not user configured
++		 *    (this was a "temporary" peer created via the kernel APIs
++		 *     that we're discovering for the first time)
++		 */
++		if (!(lp->lp_state & (LNET_PEER_CONFIGURED |
++				      LNET_PEER_NO_DISCOVERY)) &&
++		    (lp->lp_state & (LNET_PEER_DISCOVERED |
++				     LNET_PEER_MULTI_RAIL))) {
++			CDEBUG(D_NET, "Marking %s:0x%x for deletion\n",
++			       libcfs_nidstr(&lp->lp_primary_nid),
++			       lp->lp_state);
++			lp->lp_state |= LNET_PEER_MARK_DELETION;
++		}
+ 		lp->lp_state |= LNET_PEER_NO_DISCOVERY;
++	} else {
++		CDEBUG(D_NET, "Peer %s has discovery enabled\n",
++		       libcfs_nidstr(&lp->lp_primary_nid));
++		lp->lp_state &= ~LNET_PEER_NO_DISCOVERY;
+ 	}
+ 
+ 	/*
+@@ -2677,31 +2714,31 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 	if (pbuf->pb_info.pi_features & LNET_PING_FEAT_MULTI_RAIL) {
+ 		if (lp->lp_state & LNET_PEER_MULTI_RAIL) {
+ 			CDEBUG(D_NET, "peer %s(%p) is MR\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp);
++			       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 		} else if (lp->lp_state & LNET_PEER_CONFIGURED) {
+ 			CWARN("Reply says %s is Multi-Rail, DLC says not\n",
+-			      libcfs_nid2str(lp->lp_primary_nid));
++			      libcfs_nidstr(&lp->lp_primary_nid));
+ 		} else if (lnet_peer_discovery_disabled) {
+ 			CDEBUG(D_NET,
+ 			       "peer %s(%p) not MR: DD disabled locally\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp);
++			       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 		} else if (lp->lp_state & LNET_PEER_NO_DISCOVERY) {
+ 			CDEBUG(D_NET,
+ 			       "peer %s(%p) not MR: DD disabled remotely\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp);
++			       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 		} else {
+ 			CDEBUG(D_NET, "peer %s(%p) is MR capable\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp);
++			       libcfs_nidstr(&lp->lp_primary_nid), lp);
+ 			lp->lp_state |= LNET_PEER_MULTI_RAIL;
+ 			lnet_peer_clr_non_mr_pref_nids(lp);
+ 		}
+ 	} else if (lp->lp_state & LNET_PEER_MULTI_RAIL) {
+ 		if (lp->lp_state & LNET_PEER_CONFIGURED) {
+ 			CWARN("DLC says %s is Multi-Rail, Reply says not\n",
+-			      libcfs_nid2str(lp->lp_primary_nid));
++			      libcfs_nidstr(&lp->lp_primary_nid));
+ 		} else {
+ 			CERROR("Multi-Rail state vanished from %s\n",
+-			       libcfs_nid2str(lp->lp_primary_nid));
++			       libcfs_nidstr(&lp->lp_primary_nid));
+ 			lp->lp_state &= ~LNET_PEER_MULTI_RAIL;
+ 		}
+ 	}
+@@ -2723,7 +2760,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lp->lp_state |= LNET_PEER_PING_FAILED;
+ 		lp->lp_ping_error = 0;
+ 		CDEBUG(D_NET, "Truncated Reply from %s (%d nids)\n",
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       pbuf->pb_info.pi_nnis);
+ 		goto out;
+ 	}
+@@ -2734,11 +2771,12 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 	 */
+ 	if (pbuf->pb_info.pi_features & LNET_PING_FEAT_MULTI_RAIL &&
+ 	    pbuf->pb_info.pi_nnis > 1 &&
+-	    lp->lp_primary_nid == pbuf->pb_info.pi_ni[1].ns_nid) {
++	    lnet_nid_to_nid4(&lp->lp_primary_nid) ==
++	    pbuf->pb_info.pi_ni[1].ns_nid) {
+ 		if (LNET_PING_BUFFER_SEQNO(pbuf) < lp->lp_peer_seqno)
+ 			CDEBUG(D_NET,
+ 			       "peer %s: seq# got %u have %u. peer rebooted?\n",
+-			       libcfs_nid2str(lp->lp_primary_nid),
++			       libcfs_nidstr(&lp->lp_primary_nid),
+ 			       LNET_PING_BUFFER_SEQNO(pbuf),
+ 			       lp->lp_peer_seqno);
+ 
+@@ -2747,7 +2785,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 
+ 	/* We're happy with the state of the data in the buffer. */
+ 	CDEBUG(D_NET, "peer %s data present %u. state = 0x%x\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), lp->lp_peer_seqno,
++	       libcfs_nidstr(&lp->lp_primary_nid), lp->lp_peer_seqno,
+ 	       lp->lp_state);
+ 	if (lp->lp_state & LNET_PEER_DATA_PRESENT)
+ 		lnet_ping_buffer_decref(lp->lp_data);
+@@ -2817,7 +2855,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lp->lp_state |= LNET_PEER_PING_FAILED;
+ 		lp->lp_ping_error = -ETIMEDOUT;
+ 		CDEBUG(D_NET, "Ping Unlink for message to peer %s\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 	}
+ 	/* We've passed through LNetPut() */
+ 	if (lp->lp_state & LNET_PEER_PUSH_SENT) {
+@@ -2825,7 +2863,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		lp->lp_state |= LNET_PEER_PUSH_FAILED;
+ 		lp->lp_push_error = -ETIMEDOUT;
+ 		CDEBUG(D_NET, "Push Unlink for message to peer %s\n",
+-		       libcfs_nid2str(lp->lp_primary_nid));
++		       libcfs_nidstr(&lp->lp_primary_nid));
+ 	}
+ 	spin_unlock(&lp->lp_lock);
+ }
+@@ -3003,7 +3041,7 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
+ 		if (rc) {
+ 			CERROR("Error adding NID %s to peer %s: %d\n",
+ 			       libcfs_nid2str(addnis[i].ns_nid),
+-			       libcfs_nid2str(lp->lp_primary_nid), rc);
++			       libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 			if (rc == -ENOMEM)
+ 				goto out;
+ 		}
+@@ -3026,7 +3064,7 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
+ 		if (rc) {
+ 			CERROR("Error deleting NID %s from peer %s: %d\n",
+ 			       libcfs_nid2str(delnis[i]),
+-			       libcfs_nid2str(lp->lp_primary_nid), rc);
++			       libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 			if (rc == -ENOMEM)
+ 				goto out;
+ 		}
+@@ -3064,8 +3102,8 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
+ 	kfree(addnis);
+ 	kfree(delnis);
+ 	lnet_ping_buffer_decref(pbuf);
+-	CDEBUG(D_NET, "peer %s (%p): %d\n", libcfs_nid2str(lp->lp_primary_nid),
+-	       lp, rc);
++	CDEBUG(D_NET, "peer %s (%p): %d\n",
++	       libcfs_nidstr(&lp->lp_primary_nid), lp, rc);
+ 
+ 	if (rc) {
+ 		spin_lock(&lp->lp_lock);
+@@ -3134,7 +3172,7 @@ static int lnet_peer_merge_data(struct lnet_peer *lp,
+ 	if (pbuf)
+ 		return lnet_peer_merge_data(lp, pbuf);
+ 
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&lp->lp_primary_nid));
+ 	return 0;
+ }
+ 
+@@ -3170,7 +3208,7 @@ static int lnet_peer_deletion(struct lnet_peer *lp)
+ 	lp->lp_state &= ~(LNET_PEER_DISCOVERING | LNET_PEER_FORCE_PING |
+ 			  LNET_PEER_FORCE_PUSH);
+ 	CDEBUG(D_NET, "peer %s(%p) state %#x\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), lp, lp->lp_state);
++	       libcfs_nidstr(&lp->lp_primary_nid), lp, lp->lp_state);
+ 
+ 	/* no-op if lnet_peer_del() has already been called on this peer */
+ 	if (lp->lp_state & LNET_PEER_MARK_DELETED)
+@@ -3280,7 +3318,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
+ 	if (pbuf->pb_info.pi_nnis <= 1)
+ 		goto out;
+ 	nid = pbuf->pb_info.pi_ni[1].ns_nid;
+-	if (lp->lp_primary_nid == LNET_NID_LO_0) {
++	if (nid_is_lo0(&lp->lp_primary_nid)) {
+ 		rc = lnet_peer_set_primary_nid(lp, nid, flags);
+ 		if (!rc)
+ 			rc = lnet_peer_merge_data(lp, pbuf);
+@@ -3291,8 +3329,8 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
+ 	 * to update the status of the nids that we currently have
+ 	 * recorded in that peer.
+ 	 */
+-	} else if (lp->lp_primary_nid == nid ||
+-		   (lnet_is_nid_in_ping_info(lp->lp_primary_nid,
++	} else if (lnet_nid_to_nid4(&lp->lp_primary_nid) == nid ||
++		   (lnet_is_nid_in_ping_info(lnet_nid_to_nid4(&lp->lp_primary_nid),
+ 					     &pbuf->pb_info) &&
+ 		    lnet_is_discovery_disabled(lp))) {
+ 		rc = lnet_peer_merge_data(lp, pbuf);
+@@ -3302,7 +3340,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
+ 			rc = lnet_peer_set_primary_nid(lp, nid, flags);
+ 			if (rc) {
+ 				CERROR("Primary NID error %s versus %s: %d\n",
+-				       libcfs_nid2str(lp->lp_primary_nid),
++				       libcfs_nidstr(&lp->lp_primary_nid),
+ 				       libcfs_nid2str(nid), rc);
+ 			} else {
+ 				rc = lnet_peer_merge_data(lp, pbuf);
+@@ -3343,7 +3381,7 @@ static int lnet_peer_data_present(struct lnet_peer *lp)
+ 	}
+ out:
+ 	CDEBUG(D_NET, "peer %s(%p): %d. state = 0x%x\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), lp, rc,
++	       libcfs_nidstr(&lp->lp_primary_nid), lp, rc,
+ 	       lp->lp_state);
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
+ 
+@@ -3377,7 +3415,7 @@ static int lnet_peer_ping_failed(struct lnet_peer *lp)
+ 		LNetMDUnlink(mdh);
+ 
+ 	CDEBUG(D_NET, "peer %s:%d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), rc);
++	       libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 
+ 	spin_lock(&lp->lp_lock);
+ 	return rc ? rc : LNET_REDISCOVER_PEER;
+@@ -3402,7 +3440,8 @@ static int lnet_peer_send_ping(struct lnet_peer *lp)
+ 
+ 	nnis = max_t(int, lp->lp_data_nnis, LNET_INTERFACES_MIN);
+ 
+-	rc = lnet_send_ping(lp->lp_primary_nid, &lp->lp_ping_mdh, nnis, lp,
++	rc = lnet_send_ping(lnet_nid_to_nid4(&lp->lp_primary_nid),
++			    &lp->lp_ping_mdh, nnis, lp,
+ 			    the_lnet.ln_dc_handler, false);
+ 	/* if LNetMDBind in lnet_send_ping fails we need to decrement the
+ 	 * refcount on the peer, otherwise LNetMDUnlink will be called
+@@ -3418,13 +3457,13 @@ static int lnet_peer_send_ping(struct lnet_peer *lp)
+ 		goto fail_error;
+ 	}
+ 
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&lp->lp_primary_nid));
+ 
+ 	spin_lock(&lp->lp_lock);
+ 	return 0;
+ 
+ fail_error:
+-	CDEBUG(D_NET, "peer %s: %d\n", libcfs_nid2str(lp->lp_primary_nid), rc);
++	CDEBUG(D_NET, "peer %s: %d\n", libcfs_nidstr(&lp->lp_primary_nid), rc);
+ 	/*
+ 	 * The errors that get us here are considered hard errors and
+ 	 * cause Discovery to terminate. So we clear PING_SENT, but do
+@@ -3457,7 +3496,7 @@ static int lnet_peer_push_failed(struct lnet_peer *lp)
+ 	if (!LNetMDHandleIsInvalid(mdh))
+ 		LNetMDUnlink(mdh);
+ 
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&lp->lp_primary_nid));
+ 	spin_lock(&lp->lp_lock);
+ 	return rc ? rc : LNET_REDISCOVER_PEER;
+ }
+@@ -3472,7 +3511,7 @@ static int lnet_peer_discovered(struct lnet_peer *lp)
+ 
+ 	lp->lp_dc_error = 0;
+ 
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&lp->lp_primary_nid));
+ 
+ 	return 0;
+ }
+@@ -3531,7 +3570,7 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ 	if (lp->lp_disc_dst_nid != LNET_NID_ANY)
+ 		id.nid = lp->lp_disc_dst_nid;
+ 	else
+-		id.nid = lp->lp_primary_nid;
++		id.nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
  	lnet_net_unlock(cpt);
  
- 	return cpt2;
- }
-+EXPORT_SYMBOL(lnet_nid2cpt);
-+
-+int
-+lnet_cpt_of_nid(lnet_nid_t nid4, struct lnet_ni *ni)
-+{
-+	struct lnet_nid nid;
-+
-+	if (LNET_CPT_NUMBER == 1)
-+		return 0; /* the only one */
-+
-+	lnet_nid4_to_nid(nid4, &nid);
-+	return lnet_nid2cpt(&nid, ni);
-+}
- EXPORT_SYMBOL(lnet_cpt_of_nid);
+ 	rc = LNetPut(lp->lp_disc_src_nid, lp->lp_push_mdh,
+@@ -3547,7 +3586,7 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ 	if (rc)
+ 		goto fail_unlink;
  
- int
-diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
-index 08f828b..d91815d 100644
---- a/net/lnet/lnet/nidstrings.c
-+++ b/net/lnet/lnet/nidstrings.c
-@@ -1139,6 +1139,24 @@ int cfs_print_nidlist(char *buffer, int count, struct list_head *nidlist)
- }
- EXPORT_SYMBOL(libcfs_id2str);
+-	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(lp->lp_primary_nid));
++	CDEBUG(D_NET, "peer %s\n", libcfs_nidstr(&lp->lp_primary_nid));
  
-+char *
-+libcfs_idstr(struct lnet_processid *id)
-+{
-+	char *str = libcfs_next_nidstring();
-+
-+	if (id->pid == LNET_PID_ANY) {
-+		snprintf(str, LNET_NIDSTR_SIZE,
-+			 "LNET_PID_ANY-%s", libcfs_nidstr(&id->nid));
-+		return str;
-+	}
-+
-+	snprintf(str, LNET_NIDSTR_SIZE, "%s%u-%s",
-+		 ((id->pid & LNET_PID_USERFLAG) != 0) ? "U" : "",
-+		 (id->pid & ~LNET_PID_USERFLAG), libcfs_nidstr(&id->nid));
-+	return str;
-+}
-+EXPORT_SYMBOL(libcfs_idstr);
-+
- int
- libcfs_str2anynid(lnet_nid_t *nidp, const char *str)
+ 	spin_lock(&lp->lp_lock);
+ 	return 0;
+@@ -3556,8 +3595,8 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ 	LNetMDUnlink(lp->lp_push_mdh);
+ 	LNetInvalidateMDHandle(&lp->lp_push_mdh);
+ fail_error:
+-	CDEBUG(D_NET, "peer %s(%p): %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), lp, rc);
++	CDEBUG(D_NET, "peer %s(%p): %d\n", libcfs_nidstr(&lp->lp_primary_nid),
++	       lp, rc);
+ 	/*
+ 	 * The errors that get us here are considered hard errors and
+ 	 * cause Discovery to terminate. So we clear PUSH_SENT, but do
+@@ -3577,7 +3616,7 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ static void lnet_peer_discovery_error(struct lnet_peer *lp, int error)
  {
+ 	CDEBUG(D_NET, "Discovery error %s: %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), error);
++	       libcfs_nidstr(&lp->lp_primary_nid), error);
+ 
+ 	spin_lock(&lp->lp_lock);
+ 	lp->lp_dc_error = error;
+@@ -3738,7 +3777,7 @@ static int lnet_peer_discovery(void *arg)
+ 			 */
+ 			spin_lock(&lp->lp_lock);
+ 			CDEBUG(D_NET, "peer %s(%p) state %#x\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp,
++			       libcfs_nidstr(&lp->lp_primary_nid), lp,
+ 			       lp->lp_state);
+ 			if (lp->lp_state & (LNET_PEER_MARK_DELETION |
+ 					    LNET_PEER_MARK_DELETED))
+@@ -3760,7 +3799,7 @@ static int lnet_peer_discovery(void *arg)
+ 			else
+ 				rc = lnet_peer_discovered(lp);
+ 			CDEBUG(D_NET, "peer %s(%p) state %#x rc %d\n",
+-			       libcfs_nid2str(lp->lp_primary_nid), lp,
++			       libcfs_nidstr(&lp->lp_primary_nid), lp,
+ 			       lp->lp_state, rc);
+ 			spin_unlock(&lp->lp_lock);
+ 
+@@ -4008,9 +4047,9 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 		goto out_lp_decref;
+ 	}
+ 
+-	cfg->prcfg_prim_nid = lp->lp_primary_nid;
++	cfg->prcfg_prim_nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 	cfg->prcfg_mr = lnet_peer_is_multi_rail(lp);
+-	cfg->prcfg_cfg_nid = lp->lp_primary_nid;
++	cfg->prcfg_cfg_nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 	cfg->prcfg_count = lp->lp_nnis;
+ 	cfg->prcfg_size = size;
+ 	cfg->prcfg_state = lp->lp_state;
+diff --git a/net/lnet/lnet/router.c b/net/lnet/lnet/router.c
+index f6fcc93..2d5f0b6 100644
+--- a/net/lnet/lnet/router.c
++++ b/net/lnet/lnet/router.c
+@@ -175,7 +175,7 @@ static void lnet_del_route_from_rnet(lnet_nid_t gw_nid,
+ 	/* use the gateway's lp_primary_nid to delete the route as the
+ 	 * lr_nid can be a constituent NID of the peer
+ 	 */
+-	lnet_del_route_from_rnet(route->lr_gateway->lp_primary_nid,
++	lnet_del_route_from_rnet(lnet_nid_to_nid4(&route->lr_gateway->lp_primary_nid),
+ 				 &rnet->lrn_routes, l);
+ 
+ 	if (lp) {
+@@ -201,11 +201,11 @@ static void lnet_del_route_from_rnet(lnet_nid_t gw_nid,
+ 
+ 	lnet_net_lock(LNET_LOCK_EX);
+ 	CDEBUG(D_NET, "transferring routes from %s -> %s\n",
+-	       libcfs_nid2str(src->lp_primary_nid),
+-	       libcfs_nid2str(target->lp_primary_nid));
++	       libcfs_nidstr(&src->lp_primary_nid),
++	       libcfs_nidstr(&target->lp_primary_nid));
+ 	list_for_each_entry(route, &src->lp_routes, lr_gwlist) {
+ 		CDEBUG(D_NET, "%s: %s->%s\n",
+-		       libcfs_nid2str(src->lp_primary_nid),
++		       libcfs_nidstr(&src->lp_primary_nid),
+ 		       libcfs_net2str(route->lr_net),
+ 		       libcfs_nid2str(route->lr_nid));
+ 	}
+@@ -331,7 +331,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 		spin_unlock(&gw->lp_lock);
+ 		if (gw->lp_rtr_refcount > 0)
+ 			CERROR("peer %s is being used as a gateway but routing feature is not turned on\n",
+-			       libcfs_nid2str(gw->lp_primary_nid));
++			       libcfs_nidstr(&gw->lp_primary_nid));
+ 		return false;
+ 	}
+ 	spin_unlock(&gw->lp_lock);
+@@ -372,7 +372,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 	    (route->lr_hops == 1 || route->lr_hops == LNET_UNDEFINED_HOPS)) {
+ 		CWARN("route %s->%s is detected to be multi-hop but hop count is set to %d\n",
+ 		      libcfs_net2str(route->lr_net),
+-		      libcfs_nid2str(route->lr_gateway->lp_primary_nid),
++		      libcfs_nidstr(&route->lr_gateway->lp_primary_nid),
+ 		      (int)route->lr_hops);
+ 	}
+ }
+@@ -420,7 +420,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 	if (lp_state & LNET_PEER_PING_FAILED ||
+ 	    pbuf->pb_info.pi_features & LNET_PING_FEAT_RTE_DISABLED) {
+ 		CDEBUG(D_NET, "Set routes down for gw %s because %s %d\n",
+-		       libcfs_nid2str(lp->lp_primary_nid),
++		       libcfs_nidstr(&lp->lp_primary_nid),
+ 		       lp_state & LNET_PEER_PING_FAILED ? "ping failed" :
+ 		       "route feature is disabled", lp->lp_ping_error);
+ 		/* If the ping failed or the peer has routing disabled then
+@@ -432,7 +432,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 	}
+ 
+ 	CDEBUG(D_NET, "Discovery is disabled. Processing reply for gw: %s:%d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), pbuf->pb_info.pi_nnis);
++	       libcfs_nidstr(&lp->lp_primary_nid), pbuf->pb_info.pi_nnis);
+ 
+ 	/* examine the ping response to determine if the routes on that
+ 	 * gateway should be declared alive.
+@@ -521,7 +521,7 @@ bool lnet_is_route_alive(struct lnet_route *route)
+ 	 * determine otherwise.
+ 	 */
+ 	CDEBUG(D_NET, "%s: Router discovery failed %d\n",
+-	       libcfs_nid2str(lp->lp_primary_nid), lp->lp_dc_error);
++	       libcfs_nidstr(&lp->lp_primary_nid), lp->lp_dc_error);
+ 	while ((lpni = lnet_get_next_peer_ni_locked(lp, NULL, lpni)) != NULL)
+ 		lpni->lpni_ns_status = LNET_NI_STATUS_DOWN;
+ 
+@@ -741,7 +741,8 @@ static void lnet_shuffle_seed(void)
+ 		}
+ 
+ 		/* our lookups must be true */
+-		LASSERT(route2->lr_gateway->lp_primary_nid != gateway);
++		LASSERT(lnet_nid_to_nid4(&route2->lr_gateway->lp_primary_nid) !=
++			gateway);
+ 	}
+ 
+ 	/* It is possible to add multiple routes through the same peer,
+@@ -790,7 +791,7 @@ static void lnet_shuffle_seed(void)
+ 	list_for_each_entry_safe(route, tmp, route_list, lr_list) {
+ 		gateway = route->lr_gateway;
+ 		if (gw_nid != LNET_NID_ANY &&
+-		    gw_nid != gateway->lp_primary_nid)
++		    gw_nid != lnet_nid_to_nid4(&gateway->lp_primary_nid))
+ 			continue;
+ 
+ 		/* move to zombie to delete outside the lock
+@@ -834,7 +835,7 @@ static void lnet_shuffle_seed(void)
+ 	if (lpni) {
+ 		lp = lpni->lpni_peer_net->lpn_peer;
+ 		LASSERT(lp);
+-		gw_nid = lp->lp_primary_nid;
++		gw_nid = lnet_nid_to_nid4(&lp->lp_primary_nid);
+ 		lnet_peer_ni_decref_locked(lpni);
+ 	}
+ 
+@@ -1142,7 +1143,7 @@ bool lnet_router_checker_active(void)
+ 			lpn = lnet_get_next_peer_net_locked(rtr, net_id);
+ 			if (!lpn) {
+ 				CERROR("gateway %s has no networks\n",
+-				       libcfs_nid2str(rtr->lp_primary_nid));
++				       libcfs_nidstr(&rtr->lp_primary_nid));
+ 				break;
+ 			}
+ 
+@@ -1159,7 +1160,7 @@ bool lnet_router_checker_active(void)
+ 			found_lpn = true;
+ 
+ 			CDEBUG(D_NET, "rtr %s(%p) %s(%p) next ping %lld\n",
+-			       libcfs_nid2str(rtr->lp_primary_nid), rtr,
++			       libcfs_nidstr(&rtr->lp_primary_nid), rtr,
+ 			       libcfs_net2str(net_id), lpn,
+ 			       lpn->lpn_next_ping);
+ 
+@@ -1169,7 +1170,7 @@ bool lnet_router_checker_active(void)
+ 
+ 		if (!found_lpn || !lpn) {
+ 			CERROR("no local network found for gateway %s\n",
+-			       libcfs_nid2str(rtr->lp_primary_nid));
++			       libcfs_nidstr(&rtr->lp_primary_nid));
+ 			continue;
+ 		}
+ 
+@@ -1184,11 +1185,12 @@ bool lnet_router_checker_active(void)
+ 		spin_unlock(&rtr->lp_lock);
+ 
+ 		/* find the peer_ni associated with the primary NID */
+-		lpni = lnet_peer_get_ni_locked(rtr, rtr->lp_primary_nid);
++		lpni = lnet_peer_get_ni_locked(rtr,
++					       lnet_nid_to_nid4(&rtr->lp_primary_nid));
+ 		if (!lpni) {
+ 			CDEBUG(D_NET,
+ 			       "Expected to find an lpni for %s, but non found\n",
+-			       libcfs_nid2str(rtr->lp_primary_nid));
++			       libcfs_nidstr(&rtr->lp_primary_nid));
+ 			continue;
+ 		}
+ 		lnet_peer_ni_addref_locked(lpni);
+@@ -1208,7 +1210,7 @@ bool lnet_router_checker_active(void)
+ 			lpn->lpn_next_ping = now + alive_router_check_interval;
+ 		else
+ 			CERROR("Failed to discover router %s\n",
+-			       libcfs_nid2str(rtr->lp_primary_nid));
++			       libcfs_nidstr(&rtr->lp_primary_nid));
+ 
+ 		/* NB cpt lock was dropped in lnet_discover_peer_locked() */
+ 		if (version != the_lnet.ln_routers_version) {
+diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
+index 1a04ac4..2e3c802 100644
+--- a/net/lnet/lnet/router_proc.c
++++ b/net/lnet/lnet/router_proc.c
+@@ -310,7 +310,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 		}
+ 
+ 		if (peer) {
+-			lnet_nid_t nid = peer->lp_primary_nid;
++			struct lnet_nid *nid = &peer->lp_primary_nid;
+ 			int nrefs = atomic_read(&peer->lp_refcount);
+ 			int nrtrrefs = peer->lp_rtr_refcount;
+ 			int alive = lnet_is_gateway_alive(peer);
+@@ -319,7 +319,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 				       "%-4d %7d %5s %s\n",
+ 				       nrefs, nrtrrefs,
+ 				       alive ? "up" : "down",
+-				       libcfs_nid2str(nid));
++				       libcfs_nidstr(nid));
+ 		}
+ 
+ 		lnet_net_unlock(0);
+diff --git a/net/lnet/lnet/udsp.c b/net/lnet/lnet/udsp.c
+index 03669e6..977a6a6 100644
+--- a/net/lnet/lnet/udsp.c
++++ b/net/lnet/lnet/udsp.c
+@@ -248,7 +248,7 @@ enum udsp_apply {
+ 		list_for_each_entry(rnet, rn_list, lrn_list) {
+ 			list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
+ 				/* look if gw nid on the same net matches */
+-				gw_prim_nid = route->lr_gateway->lp_primary_nid;
++				gw_prim_nid = lnet_nid_to_nid4(&route->lr_gateway->lp_primary_nid);
+ 				lpni = NULL;
+ 				while ((lpni = lnet_get_next_peer_ni_locked(route->lr_gateway,
+ 									    NULL,
+@@ -425,7 +425,7 @@ enum udsp_apply {
+ 		rn_list = &the_lnet.ln_remote_nets_hash[i];
+ 		list_for_each_entry(rnet, rn_list, lrn_list) {
+ 			list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
+-				gw_nid = route->lr_gateway->lp_primary_nid;
++				gw_nid = lnet_nid_to_nid4(&route->lr_gateway->lp_primary_nid);
+ 				rc = cfs_match_nid_net(gw_nid,
+ 						       rte_action->ud_net_id.udn_net_type,
+ 						       &rte_action->ud_net_id.udn_net_num_range,
+@@ -608,7 +608,7 @@ enum udsp_apply {
+ 		ptable = the_lnet.ln_peer_tables[cpt];
+ 		list_for_each_entry(lp, &ptable->pt_peer_list, lp_peer_list) {
+ 			CDEBUG(D_NET, "udsp examining lp %s\n",
+-			       libcfs_nid2str(lp->lp_primary_nid));
++			       libcfs_nidstr(&lp->lp_primary_nid));
+ 			list_for_each_entry(lpn,
+ 					    &lp->lp_peer_nets,
+ 					    lpn_peer_nets) {
 -- 
 1.8.3.1
 
