@@ -7,37 +7,37 @@ X-Spam-Status: No, score=-16.8 required=3.0 tests=BAYES_00,
 	MAILING_LIST_MULTI,SPF_HELO_NONE,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 736D3C433EF
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 638B0C433EF
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:50 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E373610A1
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:48 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 3E373610A1
+	by mail.kernel.org (Postfix) with ESMTPS id 2C50B6112F
+	for <lustre-devel@archiver.kernel.org>; Wed, 22 Sep 2021 02:21:50 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 2C50B6112F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5777521CBD5;
-	Tue, 21 Sep 2021 19:21:47 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4849321F1C6;
+	Tue, 21 Sep 2021 19:21:49 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CDB4D21CB9F
- for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:12 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7FC3221F222
+ for <lustre-devel@lists.lustre.org>; Tue, 21 Sep 2021 19:20:09 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 47211491;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 20C7D465;
  Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 45C25FF4BF; Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
+ id 1CE30FF4BF; Tue, 21 Sep 2021 22:20:04 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Tue, 21 Sep 2021 22:20:01 -0400
-Message-Id: <1632277201-6920-25-git-send-email-jsimmons@infradead.org>
+Date: Tue, 21 Sep 2021 22:19:49 -0400
+Message-Id: <1632277201-6920-13-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
 References: <1632277201-6920-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 24/24] lustre: pcc: VM_WRITE should not
- trigger layout write
+Subject: [lustre-devel] [PATCH 12/24] lnet: extend rspt_next_hop_nid in
+ lnet_rsp_tracker
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -57,154 +57,79 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Qian Yingjin <qian@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-VM area marked with VM_WRITE means that pages may be written, but
-mmap page write may never happen.
-It should delay layout write until the actual modification on the
-file happen in ->page_mkwrite().
-Otherwise, it will trigger panic for PCC-RO sanity-pcc test_21f().
+rspt_next_hop_nid in 'struct lnet_rsp_tracker' is now
+a 'struct lnet_nid'.
 
-Fixes: 0b5ce361e ("lustre: flr: mmap write/punch does not stale other mirrors")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14709
-Lustre-commit: 373475a4f448c8e26 ("LU-14709 pcc: VM_WRITE should not trigger layout write")
-Signed-off-by: Qian Yingjin <qian@ddn.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/44483
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
+Lustre-commit: a34afe7f20ec7d618 ("LU-10391 lnet: extend rspt_next_hop_nid in lnet_rsp_tracker")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/43594
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h |  5 -----
- fs/lustre/llite/llite_mmap.c  | 19 ++++++++++---------
- fs/lustre/llite/vvp_io.c      |  3 +--
- fs/lustre/lov/lov_io.c        |  6 ++----
- 4 files changed, 13 insertions(+), 20 deletions(-)
+ include/linux/lnet/lib-types.h |  2 +-
+ net/lnet/lnet/lib-move.c       | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index d068454..a65240b 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -2465,11 +2465,6 @@ int cl_io_lru_reserve(const struct lu_env *env, struct cl_io *io,
- int cl_io_read_ahead(const struct lu_env *env, struct cl_io *io,
- 		     pgoff_t start, struct cl_read_ahead *ra);
- 
--static inline int cl_io_is_fault_writable(const struct cl_io *io)
--{
--	return io->ci_type == CIT_FAULT && io->u.ci_fault.ft_writable;
--}
--
- /**
-  * True, if @io is an O_APPEND write(2).
-  */
-diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-index 85a082c..8238a4e 100644
---- a/fs/lustre/llite/llite_mmap.c
-+++ b/fs/lustre/llite/llite_mmap.c
-@@ -83,11 +83,13 @@ struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
-  * @vma		virtual memory area addressed to page fault
-  * @env		corespondent lu_env to processing
-  * @index	page index corespondent to fault.
-+ * @mkwrite	whether it is mmap write.
-  *
-  * RETURN	error codes from cl_io_init.
-  */
- static struct cl_io *
--ll_fault_io_init(struct lu_env *env, struct vm_area_struct *vma, pgoff_t index)
-+ll_fault_io_init(struct lu_env *env, struct vm_area_struct *vma,
-+		 pgoff_t index, bool mkwrite)
- {
- 	struct file *file = vma->vm_file;
- 	struct inode *inode = file_inode(file);
-@@ -107,6 +109,11 @@ struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
- 	fio->ft_index = index;
- 	fio->ft_executable = vma->vm_flags & VM_EXEC;
- 
-+	if (mkwrite) {
-+		fio->ft_mkwrite = 1;
-+		fio->ft_writable = 1;
-+	}
-+
- 	CDEBUG(D_MMAP,
- 	       DFID": vma=%p start=%#lx end=%#lx vm_flags=%#lx idx=%lu\n",
- 	       PFID(&ll_i2info(inode)->lli_fid), vma, vma->vm_start,
-@@ -117,9 +124,6 @@ struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
- 	else if (vma->vm_flags & VM_RAND_READ)
- 		io->ci_rand_read = 1;
- 
--	if (vma->vm_flags & VM_WRITE)
--		fio->ft_writable = 1;
--
- 	rc = cl_io_init(env, io, CIT_FAULT, io->ci_obj);
- 	if (rc == 0) {
- 		struct vvp_io *vio = vvp_env_io(env);
-@@ -157,7 +161,7 @@ static int __ll_page_mkwrite(struct vm_area_struct *vma, struct page *vmpage,
- 	if (IS_ERR(env))
- 		return PTR_ERR(env);
- 
--	io = ll_fault_io_init(env, vma, vmpage->index);
-+	io = ll_fault_io_init(env, vma, vmpage->index, true);
- 	if (IS_ERR(io)) {
- 		result = PTR_ERR(io);
- 		goto out;
-@@ -167,9 +171,6 @@ static int __ll_page_mkwrite(struct vm_area_struct *vma, struct page *vmpage,
- 	if (result < 0)
- 		goto out_io;
- 
--	io->u.ci_fault.ft_mkwrite = 1;
--	io->u.ci_fault.ft_writable = 1;
--
- 	vio = vvp_env_io(env);
- 	vio->u.fault.ft_vma = vma;
- 	vio->u.fault.ft_vmpage = vmpage;
-@@ -309,7 +310,7 @@ static vm_fault_t __ll_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
- 		fault_ret = 0;
+diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
+index 1e1ddd7..380a7b9 100644
+--- a/include/linux/lnet/lib-types.h
++++ b/include/linux/lnet/lib-types.h
+@@ -87,7 +87,7 @@ struct lnet_rsp_tracker {
+ 	/* cpt to lock */
+ 	int rspt_cpt;
+ 	/* nid of next hop */
+-	lnet_nid_t rspt_next_hop_nid;
++	struct lnet_nid rspt_next_hop_nid;
+ 	/* deadline of the REPLY/ACK */
+ 	ktime_t rspt_deadline;
+ 	/* parent MD */
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 2454a0c..f2978eb 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -1755,9 +1755,9 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		rspt = msg->msg_md->md_rspt_ptr;
+ 		if (rspt) {
+ 			rspt->rspt_next_hop_nid =
+-				lnet_nid_to_nid4(&msg->msg_txpeer->lpni_nid);
++				msg->msg_txpeer->lpni_nid;
+ 			CDEBUG(D_NET, "rspt_next_hop_nid = %s\n",
+-			       libcfs_nid2str(rspt->rspt_next_hop_nid));
++			       libcfs_nidstr(&rspt->rspt_next_hop_nid));
+ 		}
  	}
  
--	io = ll_fault_io_init(env, vma, vmf->pgoff);
-+	io = ll_fault_io_init(env, vma, vmf->pgoff, false);
- 	if (IS_ERR(io)) {
- 		fault_ret = to_fault_error(PTR_ERR(io));
- 		goto out;
-diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
-index a117800..d8951ac 100644
---- a/fs/lustre/llite/vvp_io.c
-+++ b/fs/lustre/llite/vvp_io.c
-@@ -363,8 +363,7 @@ static void vvp_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
- 		io->ci_need_write_intent = 0;
+@@ -2969,7 +2969,7 @@ struct lnet_mt_event_info {
+ 			if (ktime_compare(now, rspt->rspt_deadline) >= 0 ||
+ 			    the_lnet.ln_mt_state == LNET_MT_STATE_SHUTDOWN) {
+ 				struct lnet_peer_ni *lpni;
+-				lnet_nid_t nid;
++				struct lnet_nid nid;
  
- 		LASSERT(io->ci_type == CIT_WRITE || cl_io_is_fallocate(io) ||
--			cl_io_is_trunc(io) || cl_io_is_mkwrite(io) ||
--			cl_io_is_fault_writable(io));
-+			cl_io_is_trunc(io) || cl_io_is_mkwrite(io));
+ 				md = lnet_handle2md(&rspt->rspt_mdh);
+ 				if (!md) {
+@@ -3028,14 +3028,14 @@ struct lnet_mt_event_info {
  
- 		CDEBUG(D_VFSTRACE, DFID" write layout, type %u " DEXT "\n",
- 		       PFID(lu_object_fid(&obj->co_lu)), io->ci_type,
-diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
-index 2885943..eb71d7a 100644
---- a/fs/lustre/lov/lov_io.c
-+++ b/fs/lustre/lov/lov_io.c
-@@ -222,8 +222,7 @@ static int lov_io_mirror_write_intent(struct lov_io *lio,
- 	io->ci_need_write_intent = 0;
+ 				CDEBUG(D_NET,
+ 				       "Response timeout: md = %p: nid = %s\n",
+-				       md, libcfs_nid2str(nid));
++				       md, libcfs_nidstr(&nid));
  
- 	if (!(io->ci_type == CIT_WRITE || cl_io_is_mkwrite(io) ||
--	      cl_io_is_fallocate(io) || cl_io_is_trunc(io) ||
--	      cl_io_is_fault_writable(io)))
-+	      cl_io_is_fallocate(io) || cl_io_is_trunc(io)))
- 		return 0;
- 
- 	/* FLR: check if it needs to send a write intent RPC to server.
-@@ -575,8 +574,7 @@ static int lov_io_slice_init(struct lov_io *lio, struct lov_object *obj,
- 	/* check if it needs to instantiate layout */
- 	if (!(io->ci_type == CIT_WRITE || cl_io_is_mkwrite(io) ||
- 	      cl_io_is_fallocate(io) ||
--	      (cl_io_is_trunc(io) && io->u.ci_setattr.sa_attr.lvb_size > 0)) ||
--	      cl_io_is_fault_writable(io)) {
-+	      (cl_io_is_trunc(io) && io->u.ci_setattr.sa_attr.lvb_size > 0))) {
- 		result = 0;
- 		goto out;
- 	}
+ 				/* If there is a timeout on the response
+ 				 * from the next hop decrement its health
+ 				 * value so that we don't use it
+ 				 */
+ 				lnet_net_lock(0);
+-				lpni = lnet_find_peer_ni_locked(nid);
++				lpni = lnet_peer_ni_find_locked(&nid);
+ 				if (lpni) {
+ 					lnet_handle_remote_failure_locked(lpni);
+ 					lnet_peer_ni_decref_locked(lpni);
 -- 
 1.8.3.1
 
