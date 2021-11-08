@@ -2,37 +2,37 @@ Return-Path: <SRS0=Xi2l=P3=lists.lustre.org=lustre-devel-bounces@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78F79C433EF
-	for <lustre-devel@archiver.kernel.org>; Mon,  8 Nov 2021 15:08:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81E35C433EF
+	for <lustre-devel@archiver.kernel.org>; Mon,  8 Nov 2021 15:08:46 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3A42F6105A
-	for <lustre-devel@archiver.kernel.org>; Mon,  8 Nov 2021 15:08:40 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 3A42F6105A
+	by mail.kernel.org (Postfix) with ESMTPS id 4D6A761027
+	for <lustre-devel@archiver.kernel.org>; Mon,  8 Nov 2021 15:08:46 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.1 mail.kernel.org 4D6A761027
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=pass smtp.mailfrom=lists.lustre.org
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id BA30521F412;
-	Mon,  8 Nov 2021 07:08:23 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5974521F432;
+	Mon,  8 Nov 2021 07:08:28 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (SMTP3.CCS.ORNL.GOV [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CF41B21C967
- for <lustre-devel@lists.lustre.org>; Mon,  8 Nov 2021 07:07:49 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5B4A721C967
+ for <lustre-devel@lists.lustre.org>; Mon,  8 Nov 2021 07:07:51 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 1D7CD2224;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 311F8222B;
  Mon,  8 Nov 2021 10:07:46 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 10272E0815; Mon,  8 Nov 2021 10:07:46 -0500 (EST)
+ id 2F607E07E4; Mon,  8 Nov 2021 10:07:46 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  8 Nov 2021 10:07:33 -0500
-Message-Id: <1636384063-13838-6-git-send-email-jsimmons@infradead.org>
+Date: Mon,  8 Nov 2021 10:07:40 -0500
+Message-Id: <1636384063-13838-13-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1636384063-13838-1-git-send-email-jsimmons@infradead.org>
 References: <1636384063-13838-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 05/15] lustre: ptlrpc: align function names
- with param names
+Subject: [lustre-devel] [PATCH 12/15] lustre: ptlrpc: remove LASSERT in
+ nrs_polices debugfs handler
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -45,191 +45,123 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lei Feng <flei@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Lei Feng <flei@whamcloud.com>
 
-Change the internal function names for the ptlrpc proc tunables
-to match the parameter names exposed to userspace.  Otherwise it
-is needlessly complex to find the function that implements the
-"nrs_policies" parameter, since the parameter use itself is wrapped
-in a macro that generates the proc handling structure.
+It's not necessary to LASSERT() in nrs_polices debugfs handler.
+CERROR() and returning error is good enough.
 
-Clean up code style in related functions.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14976
-Lustre-commit: 7fe49f1e7cf0586da ("LU-14976 ptlrpc: align function names with param names")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/44817
-Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14587
+Lustre-commit: 9997f94d4b6ee335d ("LU-14587 ptlrpc: remove LASSERT in nrs_polices proc handler")
+Signed-off-by: Lei Feng <flei@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/45200
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Li Xi <lixi@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/lproc_ptlrpc.c | 49 ++++++++++++++++++++++-------------------
- 1 file changed, 26 insertions(+), 23 deletions(-)
+ fs/lustre/ptlrpc/lproc_ptlrpc.c | 51 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 41 insertions(+), 10 deletions(-)
 
 diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-index b291374..0323291 100644
+index 0323291..b2daf1f 100644
 --- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
 +++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -158,21 +158,22 @@
- 
- const char *ll_opcode2str(u32 opcode)
- {
-+	u32 offset = opcode_offset(opcode);
+@@ -570,6 +570,8 @@ static int ptlrpc_lprocfs_nrs_policies_seq_show(struct seq_file *m, void *n)
+ 			if (i == 0) {
+ 				memcpy(infos[pol_idx].pi_name, tmp.pi_name,
+ 				       NRS_POL_NAME_MAX);
++				memcpy(infos[pol_idx].pi_arg, tmp.pi_arg,
++				       sizeof(tmp.pi_arg));
+ 				memcpy(&infos[pol_idx].pi_state, &tmp.pi_state,
+ 				       sizeof(tmp.pi_state));
+ 				infos[pol_idx].pi_fallback = tmp.pi_fallback;
+@@ -578,17 +580,39 @@ static int ptlrpc_lprocfs_nrs_policies_seq_show(struct seq_file *m, void *n)
+ 				 * sanity-check the values we get.
+ 				 */
+ 			} else {
+-				LASSERT(strncmp(infos[pol_idx].pi_name,
+-						tmp.pi_name,
+-						NRS_POL_NAME_MAX) == 0);
++				if (strncmp(infos[pol_idx].pi_name,
++					    tmp.pi_name,
++					    NRS_POL_NAME_MAX) != 0) {
++					spin_unlock(&nrs->nrs_lock);
++					rc = -EINVAL;
++					CERROR("%s: failed to check pi_name: rc = %d\n",
++					       svc->srv_thread_name, rc);
++					goto unlock;
++				}
++				if (strncmp(infos[pol_idx].pi_arg,
++					    tmp.pi_arg,
++					    sizeof(tmp.pi_arg)) != 0) {
++					spin_unlock(&nrs->nrs_lock);
++					rc = -EINVAL;
++					CERROR("%s: failed to check pi_arg: rc = %d\n",
++					       svc->srv_thread_name, rc);
++					goto unlock;
++				}
+ 				/**
+-				 * Not asserting ptlrpc_nrs_pol_info::pi_state,
++				 * Not checking ptlrpc_nrs_pol_info::pi_state,
+ 				 * because it may be different between
+ 				 * instances of the same policy in different
+ 				 * service partitions.
+ 				 */
+-				LASSERT(infos[pol_idx].pi_fallback ==
+-					tmp.pi_fallback);
 +
- 	/* When one of the assertions below fail, chances are that:
- 	 *     1) A new opcode was added in include/lustre/lustre_idl.h,
--	 *	but is missing from the table above.
-+	 *	  but is missing from the table above.
- 	 * or  2) The opcode space was renumbered or rearranged,
--	 *	and the opcode_offset() function in
--	 *	ptlrpc_internal.h needs to be modified.
-+	 *	  and the opcode_offset() function in
-+	 *	  ptlrpc_internal.h needs to be modified.
- 	 */
--	u32 offset = opcode_offset(opcode);
--
- 	LASSERTF(offset < LUSTRE_MAX_OPCODES,
- 		 "offset %u >= LUSTRE_MAX_OPCODES %u\n",
- 		 offset, LUSTRE_MAX_OPCODES);
- 	LASSERTF(ll_rpc_opcode_table[offset].opcode == opcode,
- 		 "ll_rpc_opcode_table[%u].opcode %u != opcode %u\n",
- 		 offset, ll_rpc_opcode_table[offset].opcode, opcode);
++				if (infos[pol_idx].pi_fallback !=
++				    tmp.pi_fallback) {
++					spin_unlock(&nrs->nrs_lock);
++					rc = -EINVAL;
++					CERROR("%s: failed to check pi_fallback: rc = %d\n",
++					       svc->srv_thread_name, rc);
++					goto unlock;
++				}
+ 			}
+ 
+ 			infos[pol_idx].pi_req_queued += tmp.pi_req_queued;
+@@ -633,12 +657,18 @@ static int ptlrpc_lprocfs_nrs_policies_seq_show(struct seq_file *m, void *n)
+ 		   !hp ?  "\nregular_requests:" : "high_priority_requests:");
+ 
+ 	for (pol_idx = 0; pol_idx < num_pols; pol_idx++) {
+-		seq_printf(m,  "  - name: %s\n"
+-			       "    state: %s\n"
++		if (strlen(infos[pol_idx].pi_arg) > 0)
++			seq_printf(m, "  - name: %s %s\n",
++				   infos[pol_idx].pi_name,
++				   infos[pol_idx].pi_arg);
++		else
++			seq_printf(m, "  - name: %s\n",
++				   infos[pol_idx].pi_name);
 +
- 	return ll_rpc_opcode_table[offset].opname;
- }
++		seq_printf(m,  "    state: %s\n"
+ 			       "    fallback: %s\n"
+ 			       "    queued: %-20d\n"
+ 			       "    active: %-20d\n\n",
+-			       infos[pol_idx].pi_name,
+ 			       nrs_state2str(infos[pol_idx].pi_state),
+ 			       infos[pol_idx].pi_fallback ? "yes" : "no",
+ 			       (int)infos[pol_idx].pi_req_queued,
+@@ -655,8 +685,9 @@ static int ptlrpc_lprocfs_nrs_policies_seq_show(struct seq_file *m, void *n)
+ 		goto again;
+ 	}
  
-@@ -249,7 +250,7 @@ static const char *ll_eopcode2str(u32 opcode)
- }
- 
- static int
--ptlrpc_lprocfs_req_history_len_seq_show(struct seq_file *m, void *v)
-+ptlrpc_lprocfs_req_buffer_history_len_seq_show(struct seq_file *m, void *v)
- {
- 	struct ptlrpc_service *svc = m->private;
- 	struct ptlrpc_service_part *svcpt;
-@@ -260,13 +261,14 @@ static const char *ll_eopcode2str(u32 opcode)
- 		total += svcpt->scp_hist_nrqbds;
- 
- 	seq_printf(m, "%d\n", total);
+-	kfree(infos);
+ unlock:
++	kfree(infos);
 +
- 	return 0;
- }
+ 	mutex_unlock(&nrs_core.nrs_mutex);
  
--LDEBUGFS_SEQ_FOPS_RO(ptlrpc_lprocfs_req_history_len);
-+LDEBUGFS_SEQ_FOPS_RO(ptlrpc_lprocfs_req_buffer_history_len);
- 
- static int
--ptlrpc_lprocfs_req_history_max_seq_show(struct seq_file *m, void *n)
-+ptlrpc_lprocfs_req_buffer_history_max_seq_show(struct seq_file *m, void *n)
- {
- 	struct ptlrpc_service *svc = m->private;
- 	struct ptlrpc_service_part *svcpt;
-@@ -281,9 +283,9 @@ static const char *ll_eopcode2str(u32 opcode)
- }
- 
- static ssize_t
--ptlrpc_lprocfs_req_history_max_seq_write(struct file *file,
--					 const char __user *buffer,
--					 size_t count, loff_t *off)
-+ptlrpc_lprocfs_req_buffer_history_max_seq_write(struct file *file,
-+						const char __user *buffer,
-+						size_t count, loff_t *off)
- {
- 	struct seq_file *m = file->private_data;
- 	struct ptlrpc_service *svc = m->private;
-@@ -325,7 +327,7 @@ static const char *ll_eopcode2str(u32 opcode)
- 	return count;
- }
- 
--LDEBUGFS_SEQ_FOPS(ptlrpc_lprocfs_req_history_max);
-+LDEBUGFS_SEQ_FOPS(ptlrpc_lprocfs_req_buffer_history_max);
- 
- static int
- ptlrpc_lprocfs_req_buffers_max_seq_show(struct seq_file *m, void *n)
-@@ -513,7 +515,7 @@ static void nrs_policy_get_info_locked(struct ptlrpc_nrs_policy *policy,
-  * Reads and prints policy status information for all policies of a PTLRPC
-  * service.
-  */
--static int ptlrpc_lprocfs_nrs_seq_show(struct seq_file *m, void *n)
-+static int ptlrpc_lprocfs_nrs_policies_seq_show(struct seq_file *m, void *n)
- {
- 	struct ptlrpc_service *svc = m->private;
- 	struct ptlrpc_service_part *svcpt;
-@@ -660,11 +662,13 @@ static int ptlrpc_lprocfs_nrs_seq_show(struct seq_file *m, void *n)
  	return rc;
- }
- 
-+#define LPROCFS_NRS_WR_MAX_ARG (1024)
- /**
-  * The longest valid command string is the maximum policy name size, plus the
-  * length of the " reg" substring
-  */
--#define LPROCFS_NRS_WR_MAX_CMD	(NRS_POL_NAME_MAX + sizeof(" reg") - 1)
-+#define LPROCFS_NRS_WR_MAX_CMD	(NRS_POL_NAME_MAX + sizeof(" reg") - 1 + \
-+				 LPROCFS_NRS_WR_MAX_ARG)
- 
- /**
-  * Starts and stops a given policy on a PTLRPC service.
-@@ -673,9 +677,9 @@ static int ptlrpc_lprocfs_nrs_seq_show(struct seq_file *m, void *n)
-  * if the optional token is omitted, the operation is performed on both the
-  * regular and high-priority (if the service has one) NRS head.
-  */
--static ssize_t ptlrpc_lprocfs_nrs_seq_write(struct file *file,
--					    const char __user *buffer,
--					    size_t count, loff_t *off)
-+static ssize_t ptlrpc_lprocfs_nrs_policies_seq_write(struct file *file,
-+						     const char __user *buffer,
-+						     size_t count, loff_t *off)
- {
- 	struct seq_file *m = file->private_data;
- 	struct ptlrpc_service *svc = m->private;
-@@ -753,7 +757,7 @@ static ssize_t ptlrpc_lprocfs_nrs_seq_write(struct file *file,
- 	return rc < 0 ? rc : count;
- }
- 
--LDEBUGFS_SEQ_FOPS(ptlrpc_lprocfs_nrs);
-+LDEBUGFS_SEQ_FOPS(ptlrpc_lprocfs_nrs_policies);
- 
- /** @} nrs */
- 
-@@ -777,8 +781,7 @@ struct ptlrpc_srh_iterator {
- 		 * we're searching for a seq on or after it (i.e. more
- 		 * recent), search from it onwards.
- 		 * Since the service history is LRU (i.e. culled reqs will
--		 * be near the head), we shouldn't have to do long
--		 * re-scans
-+		 * be near the head), we shouldn't have to do long re-scans
- 		 */
- 		LASSERTF(srhi->srhi_seq == srhi->srhi_req->rq_history_seq,
- 			 "%s:%d: seek seq %llu, request seq %llu\n",
-@@ -1136,16 +1139,16 @@ void ptlrpc_ldebugfs_register_service(struct dentry *entry,
- {
- 	struct ldebugfs_vars lproc_vars[] = {
- 		{ .name		= "req_buffer_history_len",
--		  .fops		= &ptlrpc_lprocfs_req_history_len_fops,
-+		  .fops		= &ptlrpc_lprocfs_req_buffer_history_len_fops,
- 		  .data		= svc },
- 		{ .name		= "req_buffer_history_max",
--		  .fops		= &ptlrpc_lprocfs_req_history_max_fops,
-+		  .fops		= &ptlrpc_lprocfs_req_buffer_history_max_fops,
- 		  .data		= svc },
- 		{ .name		= "timeouts",
- 		  .fops		= &ptlrpc_lprocfs_timeouts_fops,
- 		  .data		= svc },
- 		{ .name		= "nrs_policies",
--		  .fops		= &ptlrpc_lprocfs_nrs_fops,
-+		  .fops		= &ptlrpc_lprocfs_nrs_policies_fops,
- 		  .data		= svc },
- 		{ .name		= "req_buffers_max",
- 		  .fops		= &ptlrpc_lprocfs_req_buffers_max_fops,
 -- 
 1.8.3.1
 
