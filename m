@@ -4,29 +4,57 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 76FEDC433F5
-	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id C83D3C433F5
+	for <lustre-devel@archiver.kernel.org>; Mon,  6 Dec 2021 20:45:06 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A0148200F4A;
-	Sun, 28 Nov 2021 15:28:41 -0800 (PST)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id DE44E200EB1
- for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:27:59 -0800 (PST)
-Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 8E181243;
- Sun, 28 Nov 2021 18:27:56 -0500 (EST)
-Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 818EFC1ACE; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>
-Date: Sun, 28 Nov 2021 18:27:37 -0500
-Message-Id: <1638142074-5945-3-git-send-email-jsimmons@infradead.org>
-X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
-References: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 02/19] lnet: change tp_nid to 16byte in
- lnet_test_peer.
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4EBC221F85E;
+	Mon,  6 Dec 2021 12:45:06 -0800 (PST)
+Received: from smtp-fw-80006.amazon.com (smtp-fw-80006.amazon.com
+ [99.78.197.217])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 41DF23891FD
+ for <lustre-devel@lists.lustre.org>; Wed, 24 Nov 2021 09:33:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amazon.fr; i=@amazon.fr; q=dns/txt; s=amazon201209;
+ t=1637775229; x=1669311229;
+ h=from:to:subject:date:message-id:content-id:
+ content-transfer-encoding:mime-version;
+ bh=d7Keq/DDaAOI2tyce3gyUEDllRhUDwVfhAcJFZlvKcg=;
+ b=msehL3HsdQI79pDSHDt6xnpkFWNEWzFVxRGJ1rRYZVInDulXeLEpdV1J
+ pqH2Rm6qfqBbM88VqQE5gXlCOxkmYSbV3HjwFgDq2AzzqMtwKCDg7HgB3
+ 3o6P0zFKeGJHdwYGU9ajmSOZjBq6h2Cg5pmGY+migoO+sQIu8sS9EgDYo A=;
+X-IronPort-AV: E=Sophos;i="5.87,260,1631577600"; d="scan'208";a="43981659"
+Received: from pdx4-co-svc-p1-lb2-vlan3.amazon.com (HELO
+ email-inbound-relay-pdx-1box-2b-eee1d651.us-west-2.amazon.com)
+ ([10.25.36.214])
+ by smtp-border-fw-80006.pdx80.corp.amazon.com with ESMTP;
+ 24 Nov 2021 17:33:31 +0000
+Received: from EX13D21EUA001.ant.amazon.com
+ (pdx1-ws-svc-p6-lb9-vlan3.pdx.amazon.com [10.236.137.198])
+ by email-inbound-relay-pdx-1box-2b-eee1d651.us-west-2.amazon.com (Postfix)
+ with ESMTPS id 050FE81115
+ for <lustre-devel@lists.lustre.org>; Wed, 24 Nov 2021 17:33:31 +0000 (UTC)
+Received: from EX13D21EUA004.ant.amazon.com (10.43.165.59) by
+ EX13D21EUA001.ant.amazon.com (10.43.165.41) with Microsoft SMTP Server (TLS)
+ id 15.0.1497.26; Wed, 24 Nov 2021 17:33:29 +0000
+Received: from EX13D21EUA004.ant.amazon.com ([10.43.165.59]) by
+ EX13D21EUA004.ant.amazon.com ([10.43.165.59]) with mapi id 15.00.1497.026;
+ Wed, 24 Nov 2021 17:33:29 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: Recommendation for hsm_restore for directories
+Thread-Index: AQHX4Vllf3Bwnicwgkmxm9xoW0myMA==
+Date: Wed, 24 Nov 2021 17:33:29 +0000
+Message-ID: <4A74832B-D0A9-435D-AF63-EA0ABF8D626E@amazon.com>
+Accept-Language: fr-FR, en-US
+Content-Language: fr-FR
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.43.164.131]
+Content-ID: <D1D4FE425B4F854799146AC565F55935@amazon.com>
+MIME-Version: 1.0
+X-Mailman-Approved-At: Mon, 06 Dec 2021 12:45:04 -0800
+Subject: [lustre-devel] Recommendation for hsm_restore for directories
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,111 +67,28 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+From: "Degremont, Aurelien via lustre-devel" <lustre-devel@lists.lustre.org>
+Reply-To: "Degremont, Aurelien" <degremoa@amazon.fr>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
-
-This updates 'struct lnet_test_peer' to store a large address nid.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: 7e89b556ea7dc4b4c ("LU-10391 lnet: change tp_nid to 16byte in lnet_test_peer.")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/43595
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- include/linux/lnet/lib-types.h |  2 +-
- net/lnet/lnet/lib-move.c       | 18 +++++++++++-------
- 2 files changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/include/linux/lnet/lib-types.h b/include/linux/lnet/lib-types.h
-index 380a7b9..1901ad2 100644
---- a/include/linux/lnet/lib-types.h
-+++ b/include/linux/lnet/lib-types.h
-@@ -233,7 +233,7 @@ struct lnet_libmd {
- struct lnet_test_peer {
- 	/* info about peers we are trying to fail */
- 	struct list_head	tp_list;	/* ln_test_peers */
--	lnet_nid_t		tp_nid;		/* matching nid */
-+	struct lnet_nid		tp_nid;		/* matching nid */
- 	unsigned int		tp_threshold;	/* # failures to simulate */
- };
- 
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 170d684..b9f5973 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -190,13 +190,15 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- }
- 
- int
--lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
-+lnet_fail_nid(lnet_nid_t nid4, unsigned int threshold)
- {
- 	struct lnet_test_peer *tp;
- 	struct list_head *el;
- 	struct list_head *next;
-+	struct lnet_nid nid;
- 	LIST_HEAD(cull);
- 
-+	lnet_nid4_to_nid(nid4, &nid);
- 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
- 	if (threshold) {
- 		/* Adding a new entry */
-@@ -218,9 +220,9 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	list_for_each_safe(el, next, &the_lnet.ln_test_peers) {
- 		tp = list_entry(el, struct lnet_test_peer, tp_list);
- 
--		if (!tp->tp_threshold ||    /* needs culling anyway */
--		    nid == LNET_NID_ANY ||       /* removing all entries */
--		    tp->tp_nid == nid) {	  /* matched this one */
-+		if (!tp->tp_threshold ||	/* needs culling anyway */
-+		    LNET_NID_IS_ANY(&nid) ||	/* removing all entries */
-+		    nid_same(&tp->tp_nid, &nid)) {	/* matched this one */
- 			list_move(&tp->tp_list, &cull);
- 		}
- 	}
-@@ -237,14 +239,16 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- }
- 
- static int
--fail_peer(lnet_nid_t nid, int outgoing)
-+fail_peer(lnet_nid_t nid4, int outgoing)
- {
- 	struct lnet_test_peer *tp;
- 	struct list_head *el;
- 	struct list_head *next;
-+	struct lnet_nid nid;
- 	LIST_HEAD(cull);
- 	int fail = 0;
- 
-+	lnet_nid4_to_nid(nid4, &nid);
- 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
- 	lnet_net_lock(0);
- 
-@@ -264,8 +268,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 			continue;
- 		}
- 
--		if (tp->tp_nid == LNET_NID_ANY || /* fail every peer */
--		    nid == tp->tp_nid) {	/* fail this peer */
-+		if (LNET_NID_IS_ANY(&tp->tp_nid) ||	/* fail every peer */
-+		    nid_same(&nid, &tp->tp_nid)) {	/* fail this peer */
- 			fail = 1;
- 
- 			if (tp->tp_threshold != LNET_MD_THRESH_INF) {
--- 
-1.8.3.1
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+SGVsbG8gYWxsDQoNCkknbSBkb2luZyBzb21lIGVhcmx5IHdvcmsgdG93YXJkIGltcGxlbWVudGlu
+ZyBhIGRpcmVjdG9yeS9uYW1lc3BhY2Ugc3VwcG9ydCBmb3IgTHVzdHJlL0hTTS4gVGhlIGlkZWEg
+d291bGQgYmUgdG8gc3VwcG9ydCBzb21ldGhpbmcgc2ltaWxhciB0byBoc21fcmVzdG9yZS9oc21f
+cmVsZWFzZSBidXQgZm9yIGRpcmVjdG9yaWVzLg0KDQpNeSBmaXJzdCB0aG91Z2h0IHdhcyBmb3Ig
+dGhlIE1EVCB0byBub3QgZ3JhbnQgTERMTSBsb2NrIGZvciB0aGlzIGRpcmVjdG9yeSBhbmQgaG9s
+ZCBpdCwgd2hpbGUgdGhlIGRpcmVjdG9yeSBpcyBnZXR0aW5nIHJlc3RvcmVkIGJ5IGNvcHl0b29s
+LCBpbiBhIHNpbWlsYXIgZmFzaGlvbiB0aGFuIHdoYXQgaXMgZG9uZSBmb3IgZmlsZXMuIEJ1dCB0
+aGUgaGFyZCBwYXJ0IGhlcmUsIGlzIHRvIGhhdmUgYSB3YXkgZm9yIGNvcHl0b29sIHRvIGFjY2Vz
+cyB0aGUgZGlyZWN0b3J5IHdoaWxlIGl0cyBhY2Nlc3MgaXMgYWN0dWFsbHkgcHJldmVudGVkIGJ5
+IHRoZSBhYm92ZSBsb2NraW5nLg0KUmVzdG9yaW5nIGEgZmlsZSBpcyB1c2luZyB0aGlzIHNtYXJ0
+IHRyaWNrIG9mIHJlc3RvcmluZyBpdCBpbiBhIGRpZmZlcmVudCB0ZW1wb3JhcnkgZmlsZSBhbmQg
+dXNpbmcgbGF5b3V0IHN3YXAgYXQgdGhlIGVuZCB0byBtb3ZlIGRhdGEgdG8gdGhlIGFjdHVhbCBy
+ZWFsIGZpbGUuIEl0IGxvb2tzIGRpZmZpY3VsdCB0byBkbyB0aGUgc2FtZSB0aGluZyBoZXJlLg0K
+DQpEbyB5b3UgaGF2ZSBhbnkgcmVjb21tZW5kYXRpb24gb24gdGhlIHJpZ2h0IHdheSB0byBmcmFt
+ZSB0aGlzIGRpcmVjdG9yeSBhY2Nlc3MgZm9yIGNvcHl0b29scz8NCg0KQXVyw6lsaWVuDQoNCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmx1c3RyZS1kZXZl
+bCBtYWlsaW5nIGxpc3QKbHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmcKaHR0cDovL2xpc3Rz
+Lmx1c3RyZS5vcmcvbGlzdGluZm8uY2dpL2x1c3RyZS1kZXZlbC1sdXN0cmUub3JnCg==
