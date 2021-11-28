@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id E1298C433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8D110C433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:45 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 331F421C905;
-	Sun, 28 Nov 2021 15:28:27 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1BA6B200DEA;
+	Sun, 28 Nov 2021 15:28:28 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 012F9200F3F
- for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:01 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 73384200F3F
+ for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:02 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id A7BC525D;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id B0CC8264;
  Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id A4C30C1ADA; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
+ id AD60FC1ACE; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 28 Nov 2021 18:27:46 -0500
-Message-Id: <1638142074-5945-12-git-send-email-jsimmons@infradead.org>
+Date: Sun, 28 Nov 2021 18:27:48 -0500
+Message-Id: <1638142074-5945-14-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
 References: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 11/19] lnet: Fail peer add for existing gw
- peer
+Subject: [lustre-devel] [PATCH 13/19] lustre: quota: optimize capability
+ check for root squash
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,88 +39,72 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Chris Horn <chris.horn@hpe.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-If there's an existing peer entry for a peer that is being added
-via CLI, and that existing peer was not created via the CLI, then
-DLC will attempt to delete the existing peer before creating a new
-one. The exit status of the peer deletion was not being checked.
-This results in the ability to add duplicate peers for gateways,
-because gateways cannot be deleted via lnetctl unless the routes
-for that gateway have been removed first.
+On client side, checking for owner/group quota can be directly
+bypassed if this is for root and there is no root squash.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15138
-Lustre-commit: 79a4b69adb1e365b1 ("LU-15138 lnet: Fail peer add for existing gw peer")
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/45337
-Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
-Reviewed-by: Andriy Skulysh <andriy.skulysh@hpe.com>
+Fixes: cd633cfc96 ("lustre: quota: nodemap squashed root cannot bypass quota")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15141
+Lustre-commit: f5fd5a363cc48e38c ("LU-15141 quota: optimize capability check for root squash")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/45322
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/peer.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ fs/lustre/osc/osc_cache.c | 23 ++++++++---------------
+ 1 file changed, 8 insertions(+), 15 deletions(-)
 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 1853388..a9f33c0 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -499,12 +499,14 @@ static void lnet_peer_cancel_discovery(struct lnet_peer *lp)
- static int
- lnet_peer_del(struct lnet_peer *peer)
- {
-+	int rc;
-+
- 	lnet_peer_cancel_discovery(peer);
- 	lnet_net_lock(LNET_LOCK_EX);
--	lnet_peer_del_locked(peer);
-+	rc = lnet_peer_del_locked(peer);
- 	lnet_net_unlock(LNET_LOCK_EX);
- 
--	return 0;
-+	return rc;
- }
- 
- /*
-@@ -1648,7 +1650,9 @@ struct lnet_peer_net *
- 			}
- 		}
- 		/* Delete and recreate as a configured peer. */
--		lnet_peer_del(lp);
-+		rc = lnet_peer_del(lp);
-+		if (rc)
-+			goto out;
+diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
+index 1211438..7b7b49f 100644
+--- a/fs/lustre/osc/osc_cache.c
++++ b/fs/lustre/osc/osc_cache.c
+@@ -2385,7 +2385,12 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
  	}
  
- 	/* Create peer, peer_net, and peer_ni. */
-@@ -3238,6 +3242,7 @@ static int lnet_peer_deletion(struct lnet_peer *lp)
- 	struct list_head rlist;
- 	struct lnet_route *route, *tmp;
- 	int sensitivity = lp->lp_health_sensitivity;
-+	int rc;
- 
- 	INIT_LIST_HEAD(&rlist);
- 
-@@ -3271,7 +3276,10 @@ static int lnet_peer_deletion(struct lnet_peer *lp)
- 	lnet_net_unlock(LNET_LOCK_EX);
- 
- 	/* lnet_peer_del() deletes all the peer NIs owned by this peer */
--	lnet_peer_del(lp);
-+	rc = lnet_peer_del(lp);
-+	if (rc)
-+		CNETERR("Internal error: Unable to delete peer %s rc %d\n",
-+			libcfs_nidstr(&lp->lp_primary_nid), rc);
- 
- 	list_for_each_entry_safe(route, tmp,
- 				 &rlist, lr_list) {
+ 	/* check if the file's owner/group is over quota */
+-	if (!io->ci_noquota) {
++	/* do not check for root without root squash, because in this case
++	 * we should bypass quota
++	 */
++	if ((!oio->oi_cap_sys_resource ||
++	     cli->cl_root_squash) &&
++	    !io->ci_noquota) {
+ 		struct cl_object *obj;
+ 		struct cl_attr *attr;
+ 		unsigned int qid[MAXQUOTAS];
+@@ -2400,20 +2405,8 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+ 		qid[USRQUOTA] = attr->cat_uid;
+ 		qid[GRPQUOTA] = attr->cat_gid;
+ 		qid[PRJQUOTA] = attr->cat_projid;
+-		/*
+-		 * if EDQUOT returned for root, we double check
+-		 * if root squash enabled or not updated from server side.
+-		 * without root squash, we should bypass quota for root.
+-		 */
+-		if (rc == 0 && osc_quota_chkdq(cli, qid) == -EDQUOT) {
+-			if (oio->oi_cap_sys_resource &&
+-			    !cli->cl_root_squash) {
+-				io->ci_noquota = 1;
+-				rc = 0;
+-			} else {
+-				rc = -EDQUOT;
+-			}
+-		}
++		if (rc == 0 && osc_quota_chkdq(cli, qid) == -EDQUOT)
++			rc = -EDQUOT;
+ 		if (rc)
+ 			return rc;
+ 	}
 -- 
 1.8.3.1
 
