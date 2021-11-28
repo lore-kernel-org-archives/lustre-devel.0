@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id DEE84C433EF
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E7E38C433FE
 	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:29 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 673AC201112;
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 81F0620573A;
 	Sun, 28 Nov 2021 15:28:17 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 73785200EC0
- for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:03 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B4833200E02
+ for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:00 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id C59EB26F;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 95CF1246;
  Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id BEE61C1ACE; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
+ id 88D63C1AEC; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 28 Nov 2021 18:27:52 -0500
-Message-Id: <1638142074-5945-18-git-send-email-jsimmons@infradead.org>
+Date: Sun, 28 Nov 2021 18:27:40 -0500
+Message-Id: <1638142074-5945-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
 References: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 17/19] lustre: llite: mend the
- trunc_sem_up_write()
+Subject: [lustre-devel] [PATCH 05/19] lnet: libcfs: add timeout to
+ cfs_race() to fix race
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,66 +46,49 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Bobi Jam <bobijam@whamcloud.com>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-The original lli_trunc_sem replace change (commit ae9e437745) fixed a
-lock scenario:
+there is no guarantee for the branches in cfs_race() to be executed
+in strict order, thus it's possible that the second branch (with
+cfs_race_state=1) is executed before the first branch and then another
+thread executing the first branch gets stuck.
 
-t1 (page fault)          t2 (dio read)              t3 (truncate)
-|- vm_mmap_pgoff()       |- vvp_io_read_start()     |- vvp_io_setattr
-|- down_write(mmap_sem)  |- down_read(trunc_sem)            _start()
-|- do_map()              |- ll_direct_IO_impl()
-|- vvp_io_fault_start    |- ll_get_user_pages()
+this construction is used for testing only and as a
+workaround it's enough to timeout.
 
-                                                    |- down_write(
-                         |- down_read(mmap_sem)        trunc_sem)
-|- down_read(trunc_sem)
-
-t1 waits for read semaphore of trunc_sem which is hindered by t3,
-since t3 is waiting for the write semaphore while t2 take its read
-semaphore,and t2 is waiting for mmap_sem which has been taken by t1,
-and a deadlock ensues.
-
-commit ae9e437745 changes the down_read(trunc_sem) to
-trunc_sem_down_read_nowait() in page fault path, to make it ignore
-that there is a down_write(trunc_sem) waiting, just takes the read
-semaphore if no writer has taken the semaphore, and breaks the
-deadlock.
-
-But there is a delicacy in using wake_up_var(), wake_up_var()->
-__wake_up_bit()->waitqueue_active() locklessly test for waiters on the
-queue, and if it's called without explicit smp_mb() it's possible for
-the waitqueue_active() to ge hoisted before the condition store such
-that we'll observe an empty wait list and the waiter might not
-observe the condition, and the waiter won't get woke up whereafter.
-
-Fixes: ae9e437745 ("lustre: llite: replace lli_trunc_sem")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14713
-Lustre-commit: 39745c8b5493159bb ("LU-14713 llite: mend the trunc_sem_up_write()")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/43844
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13358
+Lustre-commit: 2d2d381f35ee00431 ("LU-13358 libcfs: add timeout to cfs_race() to fix race")
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/43161
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Neil Brown <neilb@suse.de>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/libcfs/libcfs_fail.h | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 7768c99..ce7431f 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -365,6 +365,8 @@ static inline void trunc_sem_down_write(struct ll_trunc_sem *sem)
- static inline void trunc_sem_up_write(struct ll_trunc_sem *sem)
- {
- 	atomic_set(&sem->ll_trunc_readers, 0);
-+	/* match the smp_mb() in wait_var_event()->prepare_to_wait() */
-+	smp_mb();
- 	wake_up_var(&sem->ll_trunc_readers);
- }
+diff --git a/include/linux/libcfs/libcfs_fail.h b/include/linux/libcfs/libcfs_fail.h
+index 45166c5..731401b 100644
+--- a/include/linux/libcfs/libcfs_fail.h
++++ b/include/linux/libcfs/libcfs_fail.h
+@@ -213,8 +213,14 @@ static inline void cfs_race_wait(u32 id)
  
+ 			cfs_race_state = 0;
+ 			CERROR("cfs_race id %x sleeping\n", id);
+-			rc = wait_event_interruptible(cfs_race_waitq,
+-						      cfs_race_state != 0);
++			/*
++			 * XXX: don't wait forever as there is no guarantee
++			 * that this branch is executed first. for testing
++			 * purposes this construction works good enough
++			 */
++			rc = wait_event_interruptible_timeout(cfs_race_waitq,
++							      cfs_race_state != 0,
++							      5 * HZ);
+ 			CERROR("cfs_fail_race id %x awake: rc=%d\n", id, rc);
+ 		}
+ 	}
 -- 
 1.8.3.1
 
