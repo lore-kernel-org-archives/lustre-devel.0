@@ -4,29 +4,28 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 16171C433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id DC120C433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 28 Nov 2021 23:28:41 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2F422205743;
-	Sun, 28 Nov 2021 15:28:21 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AA10C20111A;
+	Sun, 28 Nov 2021 15:28:24 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7D046200E3B
- for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:00 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3AD19200F3F
+ for <lustre-devel@lists.lustre.org>; Sun, 28 Nov 2021 15:28:02 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 95AB9245;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id AA438260;
  Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 8F167C1AC4; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
+ id A8F67C1AC9; Sun, 28 Nov 2021 18:27:56 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 28 Nov 2021 18:27:41 -0500
-Message-Id: <1638142074-5945-7-git-send-email-jsimmons@infradead.org>
+Date: Sun, 28 Nov 2021 18:27:47 -0500
+Message-Id: <1638142074-5945-13-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
 References: <1638142074-5945-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 06/19] lustre: llite: tighten condition for
- fault not drop mmap_sem
+Subject: [lustre-devel] [PATCH 12/19] lustre: ptlrpc: remove bogus LASSERT
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,66 +45,64 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Bobi Jam <bobijam@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-As __lock_page_or_retry() indicates, filemap_fault() will return
-VM_FAULT_RETRY without releasing mmap_sem iff flags contains
-FAULT_FLAG_ALLOW_RETRY and FAULT_FLAG_RETRY_NOWAIT.
+In the error case, it isn't possible for rc to be both -ENOMEM and
+0 at the same time, so remove the incorrect LASSERT(rc == 0) to
+avoid crashing the system on an allocation failure.
 
-So ll_fault0() should pass in FAULT_FLAG_ALLOW_RETRY |
-FAULT_FLAG_RETRY_NOWAIT in ll_filemap_fault() so that when it
-returns VM_FAULT_RETRY, we can pass on trying normal fault
-under DLM lock as mmap_sem is still being held.
+Improve error messages to conform to code style.
 
-While in Linux 5.1 (6b4c9f4469819) FAULT_FLAG_RETRY_NOWAIT is enough
-to not drop mmap_sem when failed to lock the page.
-
-Fixes: 22cceab961 ("lustre: llite: Avoid eternel retry loops with MAP_POPULATE")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-14713
-Lustre-commit: 81aec05103558f57a ("LU-14713 llite: tighten condition for fault not drop mmap_sem")
-Signed-off-by: Bobi Jam <bobijam@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/44715
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
+Fixes: c8c95f49fd73 ("lnet: me: discard struct lnet_handle_me")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
+Lustre-commit: 49769c1eea52e067d ("LU-12678 ptlrpc: remove bogus LASSERT")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/45421
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_mmap.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ fs/lustre/ptlrpc/niobuf.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-index 8047786..0009c5f 100644
---- a/fs/lustre/llite/llite_mmap.c
-+++ b/fs/lustre/llite/llite_mmap.c
-@@ -285,18 +285,25 @@ static vm_fault_t __ll_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index c5bbf5a..da04d4e 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -774,7 +774,7 @@ int ptlrpc_register_rqbd(struct ptlrpc_request_buffer_desc *rqbd)
+ 	struct lnet_md md;
+ 	struct lnet_me *me;
  
- 	if (ll_sbi_has_fast_read(ll_i2sbi(inode))) {
- 		/* do fast fault */
-+		bool allow_retry = vmf->flags & FAULT_FLAG_ALLOW_RETRY;
- 		bool has_retry = vmf->flags & FAULT_FLAG_RETRY_NOWAIT;
+-	CDEBUG(D_NET, "LNetMEAttach: portal %d\n",
++	CDEBUG(D_NET, "%s: registering portal %d\n", service->srv_name,
+ 	       service->srv_req_portal);
  
- 		/* To avoid loops, instruct downstream to not drop mmap_sem */
--		vmf->flags |= FAULT_FLAG_RETRY_NOWAIT;
-+		/**
-+		 * only need FAULT_FLAG_ALLOW_RETRY prior to Linux 5.1
-+		 * (6b4c9f4469819), where FAULT_FLAG_RETRY_NOWAIT is enough
-+		 * to not drop mmap_sem when failed to lock the page.
-+		 */
-+		vmf->flags |= FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_RETRY_NOWAIT;
- 		ll_cl_add(inode, env, NULL, LCC_MMAP);
- 		fault_ret = filemap_fault(vmf);
- 		ll_cl_remove(inode, env);
- 		if (has_retry)
- 			vmf->flags &= ~FAULT_FLAG_RETRY_NOWAIT;
-+		if (!allow_retry)
-+			vmf->flags &= ~FAULT_FLAG_ALLOW_RETRY;
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_RQBD))
+@@ -789,8 +789,9 @@ int ptlrpc_register_rqbd(struct ptlrpc_request_buffer_desc *rqbd)
+ 			  rqbd->rqbd_svcpt->scp_cpt >= 0 ?
+ 			  LNET_INS_LOCAL : LNET_INS_AFTER);
+ 	if (IS_ERR(me)) {
+-		CERROR("LNetMEAttach failed: %ld\n", PTR_ERR(me));
+-		return -ENOMEM;
++		CERROR("%s: LNetMEAttach failed: rc = %ld\n",
++		       service->srv_name, PTR_ERR(me));
++		return PTR_ERR(me);
+ 	}
  
--		/*
--		 * - If there is no error, then the page was found in cache and
-+		/* - If there is no error, then the page was found in cache and
- 		 *   uptodate;
- 		 * - If VM_FAULT_RETRY is set, the page existed but failed to
- 		 *   lock. We will try slow path to avoid loops.
+ 	LASSERT(rqbd->rqbd_refcount == 0);
+@@ -810,9 +811,9 @@ int ptlrpc_register_rqbd(struct ptlrpc_request_buffer_desc *rqbd)
+ 		return 0;
+ 	}
+ 
+-	CERROR("ptlrpc: LNetMDAttach failed: rc = %d\n", rc);
++	CERROR("%s: LNetMDAttach failed: rc = %d\n", service->srv_name, rc);
+ 	LASSERT(rc == -ENOMEM);
+ 	rqbd->rqbd_refcount = 0;
+ 
+-	return -ENOMEM;
++	return rc;
+ }
 -- 
 1.8.3.1
 
