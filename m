@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 3D98CC433F5
-	for <lustre-devel@archiver.kernel.org>; Sun, 12 Dec 2021 15:09:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id EB883C433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 12 Dec 2021 15:09:18 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 84CCF21F524;
-	Sun, 12 Dec 2021 07:08:26 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4276221F549;
+	Sun, 12 Dec 2021 07:08:29 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9F3CD21F487
- for <lustre-devel@lists.lustre.org>; Sun, 12 Dec 2021 07:08:09 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6C6BD21CBC4
+ for <lustre-devel@lists.lustre.org>; Sun, 12 Dec 2021 07:08:07 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id CB0E410084F7;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id B6DA610084C0;
  Sun, 12 Dec 2021 10:08:04 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id C6299E07E6; Sun, 12 Dec 2021 10:08:04 -0500 (EST)
+ id A93CBE07E6; Sun, 12 Dec 2021 10:08:04 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 12 Dec 2021 10:08:03 -0500
-Message-Id: <1639321683-22909-13-git-send-email-jsimmons@infradead.org>
+Date: Sun, 12 Dec 2021 10:07:54 -0500
+Message-Id: <1639321683-22909-4-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1639321683-22909-1-git-send-email-jsimmons@infradead.org>
 References: <1639321683-22909-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/12] lustre: llite: avoid needless large
- stats alloc
+Subject: [lustre-devel] [PATCH 03/12] lustre: ptlrpc: Do not unlink
+ difficult reply until sent
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,7 +39,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Alexander Zarochentsev <alexander.zarochentsev@hpe.com>,
+Cc: Chris Horn <chris.horn@hpe.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -47,517 +47,189 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Chris Horn <chris.horn@hpe.com>
 
-Allocate the ll_rw_extents_info (5896 bytes), ll_rw_offset_info
-(6400 bytes), and ll_rw_process_info (640 bytes) structs only
-when these stats are enabled, which is very rarely.
+If a difficult reply is queued in LNet, or the PUT for it is
+otherwise delayed, then it is possible for the commit callback
+to unlink the reply MD which will abort the send. This results in
+client hitting "slow reply" timeout for the associated RPC and
+an unnecessary reconnect (and possibly resend).
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15217
-Lustre-commit: 9490fd9bb84dc277b ("LU-13601 llite: avoid needless large stats alloc")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Signed-off-by: Alexander Zarochentsev <alexander.zarochentsev@hpe.com>
-Reviewed-on: https://review.whamcloud.com/40901
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+This patch replaces the rs_on_net flag with rs_sent and rs_unlinked.
+These flags indicate whether the send event for the reply MD has
+been generated, and whether the MD has been unlinked, respectively.
+
+If rs_sent is set, but rs_unlinked has not been set, then ptlrpc_hr
+is free to unlink the reply MD as a result of the commit callback.
+The reply-ack will simply be dropped by the server.
+
+If ptlrpc_hr is processing the reply because of commit callback, and
+rs_sent has not been set, then ptlrpc_hr will not unlink the reply
+MD. This means that the reply_out_callback must also be modified to
+check for this case when the send event occurs. Otherwise, if the ACK
+never arrives from the client, then the MD would never be unlinked.
+Thus when the send event occurs, and rs_handled is set, the
+reply_out_callback will schedule the reply for handling by ptlrpc_hr.
+
+HPE-bug-id: LUS-10505
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15068
+Lustre-commit: 5c156b48425aae245 ("LU-15068 ptlrpc: Do not unlink difficult reply until sent")
+Signed-off-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-on: https://review.whamcloud.com/45138
+Reviewed-by: Andriy Skulysh <andriy.skulysh@hpe.com>
+Reviewed-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h |   7 +-
- fs/lustre/llite/llite_lib.c      |  10 +-
- fs/lustre/llite/lproc_llite.c    | 238 ++++++++++++++++++++++++++++-----------
- 3 files changed, 177 insertions(+), 78 deletions(-)
+ fs/lustre/include/lustre_net.h  |  3 ++-
+ fs/lustre/ldlm/ldlm_lib.c       | 11 +++++++----
+ fs/lustre/ptlrpc/events.c       | 19 ++++++++++++++++---
+ fs/lustre/ptlrpc/pack_generic.c |  2 +-
+ fs/lustre/ptlrpc/service.c      | 10 +++++++---
+ 5 files changed, 33 insertions(+), 12 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index ce7431f..01672b8 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -701,12 +701,12 @@ struct ll_sb_info {
- 	struct cl_device	*ll_cl;
+diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
+index f72f7c6..78df59b 100644
+--- a/fs/lustre/include/lustre_net.h
++++ b/fs/lustre/include/lustre_net.h
+@@ -492,7 +492,8 @@ struct ptlrpc_reply_state {
+ 	unsigned long		rs_scheduled:1; /* being handled? */
+ 	unsigned long		rs_scheduled_ever:1; /* any schedule attempts? */
+ 	unsigned long		rs_handled:1;	/* been handled yet? */
+-	unsigned long		rs_on_net:1;	/* reply_out_callback pending? */
++	unsigned long		rs_sent:1;	/* Got LNET_EVENT_SEND? */
++	unsigned long		rs_unlinked:1;	/* Reply MD unlinked? */
+ 	unsigned long		rs_prealloc:1;	/* rs from prealloc list */
+ 	unsigned long		rs_committed:1;	/* the transaction was committed
+ 						 * and the rs was dispatched
+diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+index 90bad71..9aa87d1 100644
+--- a/fs/lustre/ldlm/ldlm_lib.c
++++ b/fs/lustre/ldlm/ldlm_lib.c
+@@ -813,7 +813,8 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
+ 	LASSERT(!rs->rs_scheduled);
+ 	LASSERT(!rs->rs_scheduled_ever);
+ 	LASSERT(!rs->rs_handled);
+-	LASSERT(!rs->rs_on_net);
++	LASSERT(!rs->rs_sent);
++	LASSERT(!rs->rs_unlinked);
+ 	LASSERT(!rs->rs_export);
+ 	LASSERT(list_empty(&rs->rs_obd_list));
+ 	LASSERT(list_empty(&rs->rs_exp_list));
+@@ -822,7 +823,8 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
  
- 	/* Statistics */
--	struct ll_rw_extents_info ll_rw_extents_info;
-+	struct ll_rw_extents_info *ll_rw_extents_info;
- 	int			ll_extent_process_count;
- 	unsigned int		ll_offset_process_count;
-+	struct ll_rw_process_info *ll_rw_process_info;
-+	struct ll_rw_process_info *ll_rw_offset_info;
- 	ktime_t			ll_process_stats_init;
--	struct ll_rw_process_info ll_rw_process_info[LL_PROCESS_HIST_MAX];
--	struct ll_rw_process_info ll_rw_offset_info[LL_OFFSET_HIST_MAX];
- 	unsigned int		ll_rw_offset_entry_count;
- 	int			ll_stats_track_id;
- 	enum stats_track_type	ll_stats_track_type;
-@@ -997,6 +997,7 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 		       struct ll_file_data *file, loff_t pos,
- 		       size_t count, int rw);
-+void ll_free_rw_stats_info(struct ll_sb_info *sbi);
- 
- enum {
- 	LPROC_LL_READ_BYTES,
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 147e680..dddbe7a 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -85,7 +85,6 @@ static struct ll_sb_info *ll_init_sbi(void)
- 	unsigned long lru_page_max;
- 	struct sysinfo si;
- 	int rc;
--	int i;
- 
- 	sbi = kzalloc(sizeof(*sbi), GFP_NOFS);
- 	if (!sbi)
-@@ -161,14 +160,6 @@ static struct ll_sb_info *ll_init_sbi(void)
- 	set_bit(LL_SBI_LRU_RESIZE, sbi->ll_flags);
- 	set_bit(LL_SBI_LAZYSTATFS, sbi->ll_flags);
- 
--	for (i = 0; i <= LL_PROCESS_HIST_MAX; i++) {
--		struct per_process_info *pp_ext;
--
--		pp_ext = &sbi->ll_rw_extents_info.pp_extents[i];
--		spin_lock_init(&pp_ext->pp_r_hist.oh_lock);
--		spin_lock_init(&pp_ext->pp_w_hist.oh_lock);
--	}
--
- 	/* metadata statahead is enabled by default */
- 	sbi->ll_sa_running_max = LL_SA_RUNNING_DEF;
- 	sbi->ll_sa_max = LL_SA_RPC_DEF;
-@@ -241,6 +232,7 @@ static void ll_free_sbi(struct super_block *sb)
- 		kvfree(items);
- 		sbi->ll_foreign_symlink_upcall_items = NULL;
- 	}
-+	ll_free_rw_stats_info(sbi);
- 	pcc_super_fini(&sbi->ll_pcc_super);
- 	kfree(sbi);
- }
-diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
-index a7eb8e1..ce715b4 100644
---- a/fs/lustre/llite/lproc_llite.c
-+++ b/fs/lustre/llite/lproc_llite.c
-@@ -1924,15 +1924,16 @@ void ll_debugfs_unregister_super(struct super_block *sb)
- 	lprocfs_free_stats(&sbi->ll_stats);
- }
- 
--static void ll_display_extents_info(struct ll_rw_extents_info *io_extents,
-+static void ll_display_extents_info(struct ll_rw_extents_info *rw_extents,
- 				    struct seq_file *seq, int which)
- {
- 	unsigned long read_tot = 0, write_tot = 0, read_cum, write_cum;
- 	unsigned long start, end, r, w;
- 	char *unitp = "KMGTPEZY";
- 	int i, units = 10;
--	struct per_process_info *pp_info = &io_extents->pp_extents[which];
-+	struct per_process_info *pp_info;
- 
-+	pp_info = &rw_extents->pp_extents[which];
- 	read_cum = 0;
- 	write_cum = 0;
- 	start = 0;
-@@ -1968,39 +1969,103 @@ static void ll_display_extents_info(struct ll_rw_extents_info *io_extents,
- static int ll_rw_extents_stats_pp_seq_show(struct seq_file *seq, void *v)
- {
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_extents_info *io_extents = &sbi->ll_rw_extents_info;
-+	struct ll_rw_extents_info *rw_extents = sbi->ll_rw_extents_info;
- 	int k;
- 
--	if (!sbi->ll_rw_stats_on) {
--		seq_puts(seq, "disabled\n"
--			 "write anything in this file to activate, then '0' or 'disabled' to deactivate\n");
-+	if (!sbi->ll_rw_stats_on || !rw_extents) {
-+		seq_puts(seq, "disabled\n write anything in this file to activate, then '0' or 'disabled' to deactivate\n");
- 		return 0;
- 	}
--	lprocfs_stats_header(seq, ktime_get(), io_extents->pp_init, 25, ":", 1);
-+
-+	spin_lock(&sbi->ll_pp_extent_lock);
-+	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":", 1);
- 	seq_printf(seq, "%15s %19s       | %20s\n", " ", "read", "write");
- 	seq_printf(seq, "%13s   %14s %4s %4s  | %14s %4s %4s\n",
--		   "extents", "calls", "%", "cum%",
--		   "calls", "%", "cum%");
--	spin_lock(&sbi->ll_pp_extent_lock);
-+		   "extents", "calls", "%", "cum%", "calls", "%", "cum%");
-+
- 	for (k = 0; k < LL_PROCESS_HIST_MAX; k++) {
--		if (io_extents->pp_extents[k].pid != 0) {
-+		if (rw_extents->pp_extents[k].pid != 0) {
- 			seq_printf(seq, "\nPID: %d\n",
--				   io_extents->pp_extents[k].pid);
--			ll_display_extents_info(io_extents, seq, k);
-+				   rw_extents->pp_extents[k].pid);
-+			ll_display_extents_info(rw_extents, seq, k);
- 		}
- 	}
- 	spin_unlock(&sbi->ll_pp_extent_lock);
- 	return 0;
- }
- 
-+static int alloc_rw_stats_info(struct ll_sb_info *sbi)
-+{
-+	struct ll_rw_extents_info *rw_extents;
-+	struct ll_rw_process_info *offset;
-+	struct ll_rw_process_info *process;
-+	int i, rc = 0;
-+
-+	rw_extents = kzalloc(sizeof(*rw_extents), GFP_KERNEL);
-+	if (!rw_extents)
-+		return -ENOMEM;
-+
-+	for (i = 0; i <= LL_PROCESS_HIST_MAX; i++) {
-+		spin_lock_init(&rw_extents->pp_extents[i].pp_r_hist.oh_lock);
-+		spin_lock_init(&rw_extents->pp_extents[i].pp_w_hist.oh_lock);
-+	}
-+
-+	spin_lock(&sbi->ll_pp_extent_lock);
-+	if (!sbi->ll_rw_extents_info)
-+		sbi->ll_rw_extents_info = rw_extents;
-+	spin_unlock(&sbi->ll_pp_extent_lock);
-+	/* another writer allocated the struct before we got the lock */
-+	if (sbi->ll_rw_extents_info != rw_extents)
-+		kfree(rw_extents);
-+
-+	process = kzalloc(sizeof(*process) * LL_PROCESS_HIST_MAX,
-+			  GFP_KERNEL);
-+	if (!process) {
-+		rc = -ENOMEM;
-+		goto out;
-+	}
-+	offset = kzalloc(sizeof(*offset) * LL_OFFSET_HIST_MAX,
-+			 GFP_KERNEL);
-+	if (!offset) {
-+		rc = -ENOMEM;
-+		goto out_free;
-+	}
-+
-+	spin_lock(&sbi->ll_process_lock);
-+	if (!sbi->ll_rw_process_info)
-+		sbi->ll_rw_process_info = process;
-+	if (!sbi->ll_rw_offset_info)
-+		sbi->ll_rw_offset_info = offset;
-+	spin_unlock(&sbi->ll_process_lock);
-+
-+	/* another writer allocated the structs before we got the lock */
-+	if (sbi->ll_rw_offset_info != offset)
-+		kfree(offset);
-+	if (sbi->ll_rw_process_info != process) {
-+out_free:
-+		kfree(process);
-+	}
-+out:
-+	return rc;
-+}
-+
-+void ll_free_rw_stats_info(struct ll_sb_info *sbi)
-+{
-+	kfree(sbi->ll_rw_extents_info);
-+	sbi->ll_rw_extents_info = NULL;
-+	kfree(sbi->ll_rw_offset_info);
-+	sbi->ll_rw_offset_info = NULL;
-+	kfree(sbi->ll_rw_process_info);
-+	sbi->ll_rw_process_info = NULL;
-+}
-+
- static ssize_t ll_rw_extents_stats_pp_seq_write(struct file *file,
- 						const char __user *buf,
--						size_t len,
--						loff_t *off)
-+						size_t len, loff_t *off)
- {
- 	struct seq_file *seq = file->private_data;
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_extents_info *io_extents = &sbi->ll_rw_extents_info;
-+	struct ll_rw_extents_info *rw_extents;
- 	int i;
- 	s64 value;
- 
-@@ -2009,19 +2074,31 @@ static ssize_t ll_rw_extents_stats_pp_seq_write(struct file *file,
- 
- 	value = ll_stats_pid_write(buf, len);
- 
--	if (value == 0)
-+	if (value == 0) {
- 		sbi->ll_rw_stats_on = 0;
--	else
-+	} else {
-+		if (!sbi->ll_rw_extents_info) {
-+			int rc = alloc_rw_stats_info(sbi);
-+
-+			if (rc)
-+				return rc;
-+		}
- 		sbi->ll_rw_stats_on = 1;
-+	}
-+
- 
- 	spin_lock(&sbi->ll_pp_extent_lock);
--	io_extents->pp_init = ktime_get();
--	for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
--		io_extents->pp_extents[i].pid = 0;
--		lprocfs_oh_clear(&io_extents->pp_extents[i].pp_r_hist);
--		lprocfs_oh_clear(&io_extents->pp_extents[i].pp_w_hist);
-+	rw_extents = sbi->ll_rw_extents_info;
-+	if (rw_extents) {
-+		rw_extents->pp_init = ktime_get();
-+		for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
-+			rw_extents->pp_extents[i].pid = 0;
-+			lprocfs_oh_clear(&rw_extents->pp_extents[i].pp_r_hist);
-+			lprocfs_oh_clear(&rw_extents->pp_extents[i].pp_w_hist);
-+		}
- 	}
- 	spin_unlock(&sbi->ll_pp_extent_lock);
-+
- 	return len;
- }
- 
-@@ -2030,22 +2107,22 @@ static ssize_t ll_rw_extents_stats_pp_seq_write(struct file *file,
- static int ll_rw_extents_stats_seq_show(struct seq_file *seq, void *v)
- {
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_extents_info *io_extents = &sbi->ll_rw_extents_info;
-+	struct ll_rw_extents_info *rw_extents = sbi->ll_rw_extents_info;
- 
--	if (!sbi->ll_rw_stats_on) {
--		seq_puts(seq, "disabled\n"
--			 "write anything in this file to activate, then '0' or 'disabled' to deactivate\n");
-+	if (!sbi->ll_rw_stats_on || !rw_extents) {
-+		seq_puts(seq, "disabled\n write anything in this file to activate, then '0' or 'disabled' to deactivate\n");
- 		return 0;
+ 	/* disable reply scheduling while I'm setting up */
+ 	rs->rs_scheduled = 1;
+-	rs->rs_on_net = 1;
++	rs->rs_sent = 0;
++	rs->rs_unlinked = 0;
+ 	rs->rs_xid = req->rq_xid;
+ 	rs->rs_transno = req->rq_transno;
+ 	rs->rs_export = exp;
+@@ -856,13 +858,14 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
+ 		 * would have been +1 ref for the net, which
+ 		 * reply_out_callback leaves alone)
+ 		 */
+-		rs->rs_on_net = 0;
++		rs->rs_sent = 1;
++		rs->rs_unlinked = 1;
+ 		ptlrpc_rs_addref(rs);
  	}
  
--	lprocfs_stats_header(seq, ktime_get(), io_extents->pp_init, 25, ":", 1);
-+	spin_lock(&sbi->ll_lock);
-+	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":", 1);
+ 	spin_lock(&rs->rs_lock);
+ 	if (rs->rs_transno <= exp->exp_last_committed ||
+-	    (!rs->rs_on_net && !rs->rs_no_ack) ||
++	    (rs->rs_unlinked && !rs->rs_no_ack) ||
+ 	    list_empty(&rs->rs_exp_list) ||     /* completed already */
+ 	    list_empty(&rs->rs_obd_list)) {
+ 		CDEBUG(D_HA, "Schedule reply immediately\n");
+diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
+index 559d811..dbf9f9d 100644
+--- a/fs/lustre/ptlrpc/events.c
++++ b/fs/lustre/ptlrpc/events.c
+@@ -401,6 +401,7 @@ void reply_out_callback(struct lnet_event *ev)
+ 	struct ptlrpc_cb_id *cbid = ev->md_user_ptr;
+ 	struct ptlrpc_reply_state *rs = cbid->cbid_arg;
+ 	struct ptlrpc_service_part *svcpt = rs->rs_svcpt;
++	bool need_schedule = false;
  
- 	seq_printf(seq, "%15s %19s       | %20s\n", " ", "read", "write");
- 	seq_printf(seq, "%13s   %14s %4s %4s  | %14s %4s %4s\n",
- 		   "extents", "calls", "%", "cum%",
- 		   "calls", "%", "cum%");
--	spin_lock(&sbi->ll_lock);
--	ll_display_extents_info(io_extents, seq, LL_PROCESS_HIST_MAX);
-+
-+	ll_display_extents_info(rw_extents, seq, LL_PROCESS_HIST_MAX);
- 	spin_unlock(&sbi->ll_lock);
- 
- 	return 0;
-@@ -2057,7 +2134,7 @@ static ssize_t ll_rw_extents_stats_seq_write(struct file *file,
- {
- 	struct seq_file *seq = file->private_data;
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_extents_info *io_extents = &sbi->ll_rw_extents_info;
-+	struct ll_rw_extents_info *rw_extents;
- 	int i;
- 	s64 value;
- 
-@@ -2066,17 +2143,27 @@ static ssize_t ll_rw_extents_stats_seq_write(struct file *file,
- 
- 	value = ll_stats_pid_write(buf, len);
- 
--	if (value == 0)
-+	if (value == 0) {
- 		sbi->ll_rw_stats_on = 0;
--	else
-+	} else {
-+		if (!sbi->ll_rw_extents_info) {
-+			int rc = alloc_rw_stats_info(sbi);
-+
-+			if (rc)
-+				return rc;
-+		}
- 		sbi->ll_rw_stats_on = 1;
-+	}
- 
- 	spin_lock(&sbi->ll_pp_extent_lock);
--	io_extents->pp_init = ktime_get();
--	for (i = 0; i <= LL_PROCESS_HIST_MAX; i++) {
--		io_extents->pp_extents[i].pid = 0;
--		lprocfs_oh_clear(&io_extents->pp_extents[i].pp_r_hist);
--		lprocfs_oh_clear(&io_extents->pp_extents[i].pp_w_hist);
-+	rw_extents = sbi->ll_rw_extents_info;
-+	if (rw_extents) {
-+		rw_extents->pp_init = ktime_get();
-+		for (i = 0; i <= LL_PROCESS_HIST_MAX; i++) {
-+			rw_extents->pp_extents[i].pid = 0;
-+			lprocfs_oh_clear(&rw_extents->pp_extents[i].pp_r_hist);
-+			lprocfs_oh_clear(&rw_extents->pp_extents[i].pp_w_hist);
-+		}
- 	}
- 	spin_unlock(&sbi->ll_pp_extent_lock);
- 
-@@ -2094,17 +2181,21 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 	struct ll_rw_process_info *offset;
- 	int *off_count = &sbi->ll_rw_offset_entry_count;
- 	int *process_count = &sbi->ll_offset_process_count;
--	struct ll_rw_extents_info *io_extents = &sbi->ll_rw_extents_info;
-+	struct ll_rw_extents_info *rw_extents;
- 
- 	if (!sbi->ll_rw_stats_on)
+ 	LASSERT(ev->type == LNET_EVENT_SEND ||
+ 		ev->type == LNET_EVENT_ACK ||
+@@ -415,16 +416,28 @@ void reply_out_callback(struct lnet_event *ev)
  		return;
--	process = sbi->ll_rw_process_info;
--	offset = sbi->ll_rw_offset_info;
+ 	}
  
- 	spin_lock(&sbi->ll_pp_extent_lock);
-+	rw_extents = sbi->ll_rw_extents_info;
-+	if (!rw_extents) {
-+		spin_unlock(&sbi->ll_pp_extent_lock);
-+		return;
+-	LASSERT(rs->rs_on_net);
++	if (ev->type == LNET_EVENT_SEND) {
++		spin_lock(&rs->rs_lock);
++		rs->rs_sent = 1;
++		/* If transaction was committed before the SEND, and the ACK
++		 * is lost, then we need to schedule so ptlrpc_hr can unlink
++		 * the MD.
++		 */
++		if (rs->rs_handled)
++			need_schedule = true;
++		spin_unlock(&rs->rs_lock);
 +	}
 +
- 	/* Extent statistics */
- 	for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
--		if (io_extents->pp_extents[i].pid == pid) {
-+		if (rw_extents->pp_extents[i].pid == pid) {
- 			cur = i;
- 			break;
++	if (ev->unlinked || need_schedule) {
++		LASSERT(rs->rs_sent);
+ 
+-	if (ev->unlinked) {
+ 		/* Last network callback. The net's ref on 'rs' stays put
+ 		 * until ptlrpc_handle_rs() is done with it
+ 		 */
+ 		spin_lock(&svcpt->scp_rep_lock);
+ 		spin_lock(&rs->rs_lock);
+ 
+-		rs->rs_on_net = 0;
++		rs->rs_unlinked = ev->unlinked;
+ 		if (!rs->rs_no_ack ||
+ 		    rs->rs_transno <=
+ 		    rs->rs_export->exp_obd->obd_last_committed ||
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 62e060d..23b36de 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -458,7 +458,7 @@ void lustre_free_reply_state(struct ptlrpc_reply_state *rs)
+ 
+ 	LASSERT(atomic_read(&rs->rs_refcount) == 0);
+ 	LASSERT(!rs->rs_difficult || rs->rs_handled);
+-	LASSERT(!rs->rs_on_net);
++	LASSERT(!rs->rs_difficult || rs->rs_unlinked);
+ 	LASSERT(!rs->rs_scheduled);
+ 	LASSERT(!rs->rs_export);
+ 	LASSERT(rs->rs_nlocks == 0);
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index 2917ca3..dbe2347 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -1940,10 +1940,14 @@ static int ptlrpc_handle_rs(struct ptlrpc_reply_state *rs)
+ 		       libcfs_nid2str(exp->exp_connection->c_peer.nid));
+ 	}
+ 
+-	if ((!been_handled && rs->rs_on_net) || nlocks > 0) {
++	if ((rs->rs_sent && !rs->rs_unlinked) || nlocks > 0) {
+ 		spin_unlock(&rs->rs_lock);
+ 
+-		if (!been_handled && rs->rs_on_net) {
++		/* We can unlink if the LNET_EVENT_SEND has occurred.
++		 * If rs_unlinked is set then MD is already unlinked and no
++		 * need to do so here.
++		 */
++		if ((rs->rs_sent && !rs->rs_unlinked)) {
+ 			LNetMDUnlink(rs->rs_md_h);
+ 			/* Ignore return code; we're racing with completion */
  		}
-@@ -2115,24 +2206,29 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 		sbi->ll_extent_process_count =
- 			(sbi->ll_extent_process_count + 1) % LL_PROCESS_HIST_MAX;
- 		cur = sbi->ll_extent_process_count;
--		io_extents->pp_extents[cur].pid = pid;
--		lprocfs_oh_clear(&io_extents->pp_extents[cur].pp_r_hist);
--		lprocfs_oh_clear(&io_extents->pp_extents[cur].pp_w_hist);
-+		rw_extents->pp_extents[cur].pid = pid;
-+		lprocfs_oh_clear(&rw_extents->pp_extents[cur].pp_r_hist);
-+		lprocfs_oh_clear(&rw_extents->pp_extents[cur].pp_w_hist);
- 	}
+@@ -1957,7 +1961,7 @@ static int ptlrpc_handle_rs(struct ptlrpc_reply_state *rs)
  
- 	for (i = 0; (count >= 1 << (LL_HIST_START + i)) &&
- 	     (i < (LL_HIST_MAX - 1)); i++)
- 		;
- 	if (rw == 0) {
--		io_extents->pp_extents[cur].pp_r_hist.oh_buckets[i]++;
--		io_extents->pp_extents[LL_PROCESS_HIST_MAX].pp_r_hist.oh_buckets[i]++;
-+		rw_extents->pp_extents[cur].pp_r_hist.oh_buckets[i]++;
-+		rw_extents->pp_extents[LL_PROCESS_HIST_MAX].pp_r_hist.oh_buckets[i]++;
- 	} else {
--		io_extents->pp_extents[cur].pp_w_hist.oh_buckets[i]++;
--		io_extents->pp_extents[LL_PROCESS_HIST_MAX].pp_w_hist.oh_buckets[i]++;
-+		rw_extents->pp_extents[cur].pp_w_hist.oh_buckets[i]++;
-+		rw_extents->pp_extents[LL_PROCESS_HIST_MAX].pp_w_hist.oh_buckets[i]++;
- 	}
- 	spin_unlock(&sbi->ll_pp_extent_lock);
+ 	rs->rs_scheduled = 0;
  
- 	spin_lock(&sbi->ll_process_lock);
-+	process = sbi->ll_rw_process_info;
-+	offset = sbi->ll_rw_offset_info;
-+	if (!process || !offset)
-+		goto out_unlock;
-+
- 	/* Offset statistics */
- 	for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
- 		if (process[i].rw_pid == pid) {
-@@ -2143,8 +2239,7 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 				process[i].rw_largest_extent = count;
- 				process[i].rw_offset = 0;
- 				process[i].rw_last_file = file;
--				spin_unlock(&sbi->ll_process_lock);
--				return;
-+				goto out_unlock;
- 			}
- 			if (process[i].rw_last_file_pos != pos) {
- 				*off_count =
-@@ -2173,8 +2268,7 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 			if (process[i].rw_largest_extent < count)
- 				process[i].rw_largest_extent = count;
- 			process[i].rw_last_file_pos = pos + count;
--			spin_unlock(&sbi->ll_process_lock);
--			return;
-+			goto out_unlock;
- 		}
- 	}
- 	*process_count = (*process_count + 1) % LL_PROCESS_HIST_MAX;
-@@ -2186,14 +2280,16 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 	process[*process_count].rw_largest_extent = count;
- 	process[*process_count].rw_offset = 0;
- 	process[*process_count].rw_last_file = file;
-+
-+out_unlock:
- 	spin_unlock(&sbi->ll_process_lock);
- }
+-	if (!rs->rs_on_net) {
++	if (rs->rs_unlinked) {
+ 		/* Off the net */
+ 		spin_unlock(&rs->rs_lock);
  
- static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
- {
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_process_info *offset = sbi->ll_rw_offset_info;
--	struct ll_rw_process_info *process = sbi->ll_rw_process_info;
-+	struct ll_rw_process_info *offset;
-+	struct ll_rw_process_info *process;
- 	int i;
- 
- 	if (!sbi->ll_rw_stats_on) {
-@@ -2204,12 +2300,13 @@ static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
- 	spin_lock(&sbi->ll_process_lock);
- 	lprocfs_stats_header(seq, ktime_get(), sbi->ll_process_stats_init, 25,
- 			     ":", true);
--
- 	seq_printf(seq, "%3s %10s %14s %14s %17s %17s %14s\n",
- 		   "R/W", "PID", "RANGE START", "RANGE END",
- 		   "SMALLEST EXTENT", "LARGEST EXTENT", "OFFSET");
-+
- 	/* We stored the discontiguous offsets here; print them first */
--	for (i = 0; i < LL_OFFSET_HIST_MAX; i++) {
-+	offset = sbi->ll_rw_offset_info;
-+	for (i = 0; offset && i < LL_OFFSET_HIST_MAX; i++) {
- 		if (offset[i].rw_pid != 0)
- 			seq_printf(seq,
- 				   "%3c %10d %14llu %14llu %17lu %17lu %14lld\n",
-@@ -2221,8 +2318,10 @@ static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
- 				   (unsigned long)offset[i].rw_largest_extent,
- 				   offset[i].rw_offset);
- 	}
-+
- 	/* Then print the current offsets for each process */
--	for (i = 0; i < LL_PROCESS_HIST_MAX; i++) {
-+	process = sbi->ll_rw_process_info;
-+	for (i = 0; process && i < LL_PROCESS_HIST_MAX; i++) {
- 		if (process[i].rw_pid != 0)
- 			seq_printf(seq,
- 				   "%3c %10d %14llu %14llu %17lu %17lu %14lld\n",
-@@ -2245,8 +2344,6 @@ static ssize_t ll_rw_offset_stats_seq_write(struct file *file,
- {
- 	struct seq_file *seq = file->private_data;
- 	struct ll_sb_info *sbi = seq->private;
--	struct ll_rw_process_info *process_info = sbi->ll_rw_process_info;
--	struct ll_rw_process_info *offset_info = sbi->ll_rw_offset_info;
- 	s64 value;
- 
- 	if (len == 0)
-@@ -2254,19 +2351,28 @@ static ssize_t ll_rw_offset_stats_seq_write(struct file *file,
- 
- 	value = ll_stats_pid_write(buf, len);
- 
--	if (value == 0)
-+	if (value == 0) {
- 		sbi->ll_rw_stats_on = 0;
--	else
-+	} else {
-+		if (!sbi->ll_rw_process_info || !sbi->ll_rw_offset_info) {
-+			int rc = alloc_rw_stats_info(sbi);
-+
-+			if (rc)
-+				return rc;
-+		}
- 		sbi->ll_rw_stats_on = 1;
-+	}
- 
- 	spin_lock(&sbi->ll_process_lock);
- 	sbi->ll_offset_process_count = 0;
- 	sbi->ll_rw_offset_entry_count = 0;
- 	sbi->ll_process_stats_init = ktime_get();
--	memset(process_info, 0, sizeof(struct ll_rw_process_info) *
--	       LL_PROCESS_HIST_MAX);
--	memset(offset_info, 0, sizeof(struct ll_rw_process_info) *
--	       LL_OFFSET_HIST_MAX);
-+	if (sbi->ll_rw_process_info)
-+		memset(sbi->ll_rw_process_info, 0,
-+		       sizeof(struct ll_rw_process_info) * LL_PROCESS_HIST_MAX);
-+	if (sbi->ll_rw_offset_info)
-+		memset(sbi->ll_rw_offset_info, 0,
-+		       sizeof(struct ll_rw_process_info) * LL_OFFSET_HIST_MAX);
- 	spin_unlock(&sbi->ll_process_lock);
- 
- 	return len;
 -- 
 1.8.3.1
 
