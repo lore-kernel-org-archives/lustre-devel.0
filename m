@@ -4,48 +4,114 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 0FDA8C433EF
-	for <lustre-devel@archiver.kernel.org>; Mon, 20 Dec 2021 02:31:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id AA164C433FE
+	for <lustre-devel@archiver.kernel.org>; Thu, 23 Dec 2021 07:43:07 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B738421C968;
-	Sun, 19 Dec 2021 18:31:34 -0800 (PST)
-Received: from mail-yb1-f169.google.com (mail-yb1-f169.google.com
- [209.85.219.169])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 92D7D21C905
- for <lustre-devel@lists.lustre.org>; Sun, 19 Dec 2021 18:31:32 -0800 (PST)
-Received: by mail-yb1-f169.google.com with SMTP id j2so24281647ybg.9
- for <lustre-devel@lists.lustre.org>; Sun, 19 Dec 2021 18:31:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=YKUavU646tV5kCMpDUnmFrjfimJs1Y3ZkK/2dhw9A2A=;
- b=xytZmP+305NacqoLwdVml5Mej8pCRUaw0H3yX6iX5A0Gt7bsBfx3/pjZp0j69pe3wy
- TMl0Qxza9mdZBx3/so9Al7M3zNz9MT6sH0w1tsccbxwP7qVAajPnOXufjvlVH1qxXHdk
- XJu5tg8ag4YWFs659Gphj0N6ZjG4fz2yeenTjzrH2cYMEGgXWDsQJ8BemK/P72sBtwWd
- xc8w/u1ct6IrVkMEf+4PnGkcRu8h17ixx4Vg82jXemh/mzVSnepkHdOQkpB27Ekpi/5V
- X84l7MNnCjAVXFIeT0zV/yt2p7jQGAZ/Qg00io14/AxXh0R+At6N42QDqsUurIfkidjr
- 5rzQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20210112;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=YKUavU646tV5kCMpDUnmFrjfimJs1Y3ZkK/2dhw9A2A=;
- b=3bafq7JTJeV+W40HMOmSDJC7fe4BKGzVdYtqb4lKWwy8qKMZtD2lt3TENa1UbpkQiX
- 5xUrctj16yFXX18woHyHwv7dJoUm5OaPFxQ9pmypIUyCQoXhOIPNViHrSibM9LibylhU
- YswP5sFGM753Eh/gb09t6CwmgnRuX4B4WuS0woz6MPlxz91ZyH6yqdS0+uj6oshslw+h
- hkOD+OT08VI5vmpJsxWbK+yx5augbrMHYJ6okNi6wh4wWvd1veSrOADL7dNLRUH5rexu
- QgQ8lcqsuVRDD7lk3CTPU05G41x6Mhp8tEh5alryVniX3FUev3SKrJUOAdRm6sqEfDdQ
- BDGQ==
-X-Gm-Message-State: AOAM532j7AC5XmTQkrHOqluagx0D0D3szkNYiD9+jKVqIGp+Q9ZPP1mG
- iy9FqqisGi7Wm25ZPgQoDVcXCJfnPZyQUMDcB5HihA==
-X-Google-Smtp-Source: ABdhPJwBZcUkyJXZ58Mdm0C6Siyz4S29WJk6cM91IwRaUIoATyrxTalys1oLiG9VVIWUNeQHVFyX7OWldYdo+FMg5As=
-X-Received: by 2002:a25:6402:: with SMTP id y2mr20656200ybb.673.1639967491825; 
- Sun, 19 Dec 2021 18:31:31 -0800 (PST)
-MIME-Version: 1.0
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 49FAC21F601;
+	Wed, 22 Dec 2021 23:43:06 -0800 (PST)
+Received: from NAM10-DM6-obe.outbound.protection.outlook.com
+ (mail-dm6nam10on2066.outbound.protection.outlook.com [40.107.93.66])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2C64021F518
+ for <lustre-devel@lists.lustre.org>; Wed, 22 Dec 2021 23:43:04 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=lwxw9aSenlUM3N1/ISpdoSVK7LfuJ/bNvsPpCKaLDzDfLkGKTFOd2QLEvorY+ruyX9vsDLG1tWlgwjBxLH3Z/LfHlzlFazcnFIRvFr4U1sy2kzpsHeMmQkuma2tTxuWmrRp/tSwaERrFtxyV4FhvHNc5Ya90EYnKv7Vlg6BJjmK9a2u3VRVND3s217alBxffEkbXSFgvbZdLqQIM+9J6mHQEgs4MpA48z1mtBxt1EvWUYzibY/sw/Rc6Cc5jogEOt7hnnyXb8CnbaAhq4pNqKhVLSq4IB5A/5zIKXV8d6RBWHiFXqTtrlPPWX1eC/YvyQg8a+aXqMu+9+rHp3dz5vg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=auaeuaG1LK1GXvr5jrCfeopkerVeXOTm7Iysz7mdo5U=;
+ b=Z73HBTQRkLpDeMGykaIXH2QUXD5gnvER7kLt0YfWKAr4M9ZYP+nV39gAJDZ1Z532zMGRmGHSWX2t5dqYPuMqIZ61Ed5XtoOhA1VmqcMP/yWgX4raFNgXJ3aCnL+JVTHZBwglesMUlqudBXiblOuKRKMcA9cWI/N+wxxcSW7CMEBniDyORsgLPdY7MvgMFj0azNs7ZHcHgY0U/iZUMUoWj68QkZ6Gbrxcg21l67sB/jCUtTeTZ3jg8pQxKsM0d6IcG8X75AOqab73DT/oNYwpehKlXctfY9KYMsBdt2jZB8omVChga4l3RlkhXu3/T1ZkrkJi10HzYRD3KyIFcdpWEw==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=whamcloud.com; dmarc=pass action=none
+ header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=auaeuaG1LK1GXvr5jrCfeopkerVeXOTm7Iysz7mdo5U=;
+ b=DMeAHt1z993C+0JxPu/R6W0BchDFWzlqpr+sj/lPckiHEn0yxwyLWudVtdgkiibdWJtEtoykCeRwCpbp8qQuUn6z1KsFegPHNwPHHShEbjgEHYNWxEQ8vLgH13jCxD6xMSaLT23Y+ghhlJr9DdRxtLOAHb2+wKvqbLg/7NzlvbE=
+Received: from BN6PR19MB0146.namprd19.prod.outlook.com (2603:10b6:405:6b::23)
+ by BN8PR19MB2721.namprd19.prod.outlook.com (2603:10b6:408:85::32)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.4823.19; Thu, 23 Dec
+ 2021 07:43:01 +0000
+Received: from BN6PR19MB0146.namprd19.prod.outlook.com
+ ([fe80::6c29:fb73:8830:3480]) by BN6PR19MB0146.namprd19.prod.outlook.com
+ ([fe80::6c29:fb73:8830:3480%7]) with mapi id 15.20.4801.020; Thu, 23 Dec 2021
+ 07:43:00 +0000
+To: Xinliang Liu <xinliang.liu@linaro.org>
+Thread-Topic: Lustre Arm stuff status and work plan
+Thread-Index: AQHX8lZb6p5/653Ee0+vr6HXAC45zaw6ro4AgAUOLoA=
+Date: Thu, 23 Dec 2021 07:43:00 +0000
+Message-ID: <6C592E3F-0437-4776-BB29-C5EE489C5FAE@whamcloud.com>
 References: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
-In-Reply-To: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
-Date: Mon, 20 Dec 2021 10:30:56 +0800
-Message-ID: <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
-To: Peter Jones <pjones@whamcloud.com>
+ <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
+In-Reply-To: <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=whamcloud.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 9acfe984-73c0-41ae-7e71-08d9c5e7d865
+x-ms-traffictypediagnostic: BN8PR19MB2721:EE_
+x-microsoft-antispam-prvs: <BN8PR19MB27218119E279A66FA9176CF8AC7E9@BN8PR19MB2721.namprd19.prod.outlook.com>
+x-ms-oob-tlc-oobclassifiers: OLM:10000;
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: FgJHzGQQJEQoYjxZze/U53dESc0hXUCEc6i713M7EI4k38+hWJ7o6w5A2QS3UtKXO3EsGCwUMrAnN9fjVBO286ThHC0Q6l17dsV81IN0YH02Ezvcb40WJNK4kcGhrzRVUea074EAbLsMiGejAwD/oGzpF0HfD5GVHDaxUz+SNNmMVGbH4g8xXYoUewPmbLUv1h0v1GVGo9/HJLXpdM8AP+XHZXPXqx7X2/Fcq15/OXkE3FKJIYOyp3Hyfp1j3FEbEZtbZyLcuInhgj3PAExFkjBcCmp8qYIc5ywA55SHPDUjvYCia52GgcwWOTYn0+n7egpzP3lkWxZz7oCM/9EKDlICkRqOl0aNYbuigvq4PzxZLQVgCoiLcfzXL7LZa8/rE8rk1D37deALt/BshTwtp5p3QpePG+ykfJbPBc62COWm/AdpOOdY5mSvI7qE5ZbVm0ghGYwHwPYdzu7JqpokI3xzBWIgkyKviZBvm3D4qO/Ds3GEQJKPLFIHEXGK6Or/c/0kjjUX21yTqCJaijadClJBA0RV0xthVjV/7SquBO7qd9nHIi3HDx/0xoc5zCHCWYfGE3r6zdL1BA4gi59ai8mOW2xNuRq3g6Euu8LQFByW+Fg4Luzv70p23824s6w0J39QLrg1cZkW1x3W+dx217AgycEZp5Do1tluxJLEkT4dxKYtYpc5Fz37yKgKabJP8vIbsXjTH+k6DO4DHBgT76dK5C82OHAWsp8sqYSr/oHTGJ/LF2ryYLtqsL2JkMy2nXiBqsVKC8i8P9lI14qKZzVxA9pAsKi4uxhLAQMDdZr/D3CTgVSvN8YAGbCEBt60bQhSmZCfblctMjfpMbGIkeSdBsgGJHGUCbt7op+9871Le1ndUAbPJ7Alk9IE/Hp/FUDfKgf1gw1I7Fkl8fZ2izhhMKpceFOn7uc7SLzCy38=
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:BN6PR19MB0146.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(4636009)(366004)(6916009)(54906003)(16799955002)(122000001)(38100700002)(38070700005)(966005)(316002)(86362001)(2616005)(33656002)(4326008)(508600001)(8676002)(53546011)(66946007)(6506007)(5660300002)(71200400001)(66446008)(83380400001)(6512007)(91956017)(6486002)(66476007)(36756003)(166002)(76116006)(64756008)(66556008)(26005)(2906002)(186003)(8936002)(13693001)(45980500001)(15940465004);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?U2tFMkpDVW5GZm9rVlJmYU84bFpXbUxtQ2l1VVliNHVjd2FBZ1VGMGtJZFEy?=
+ =?utf-8?B?OEU0b1o1aDUxT2xHb3Vxc2tvUm02cndYQVJmdTROcW5mb2h4K1BOTTJNUDUr?=
+ =?utf-8?B?SDlzbG5ZL2xWVUV0ZUdFM2NSZEZWdGZsajhRcHlUUjFYaXdvdHQ2Y2VlUEpD?=
+ =?utf-8?B?V1VRYllzRG5KdVNQT2c3TkMvc3FmajFJVVUvb0haVUNYU3hqTnFPNnJvSk9k?=
+ =?utf-8?B?RVZpZkcvVWp3N00rUFBYYnQ4bmNYbG9qV0wyV3NNUDc1SlNIU3ZhOXRxTUlt?=
+ =?utf-8?B?K0pyN1FzUWY1Q3Rlclk2RlFyS2Rya3p4bUFydVp6NlpBSmF0S1pNd2NhQ1NW?=
+ =?utf-8?B?anluUHY2WGh6LzRRM1FwSTVxTzlxTGp3bC9rVHQxSHN2R3F4M0pqR0tUNkJQ?=
+ =?utf-8?B?ajdJU2szVFB5cm14TWlpZFNibXNrQ1ViODQwVi9jUGk2U2VPWTJwUy9hM2l4?=
+ =?utf-8?B?cmp0Zm5uemtTQ0pUQWR6R1FRQmQveSswS3R0NFBtckdJVVV6QndmRklXRTlS?=
+ =?utf-8?B?dmxKRmc4R0t3NlVaSjdYdzZKeHlVWFdwb2JRZkVlVDJoS2xhR3YzQnRIWkN5?=
+ =?utf-8?B?ZHcvOEtOOWZEalFLVWJMbEdpMUt2bmgyWjhTbFZRMVVOQ1pGa3pZZCt4Q1hu?=
+ =?utf-8?B?ckZHSE5tQUwxYmRlRmlNTndkOEhtOHBIbFM0KzVrVTRYTHRucnNkcFBGY2hF?=
+ =?utf-8?B?QzU2dmxPT0lvdGxPakZhWll0dUpYRm93aTVsWkYzR2NkSFZPU2NHR2NnbUVt?=
+ =?utf-8?B?SnhVNC9WQWdVSHBCQ24yUFRLY3hHZkFoemNDODA1NmN0c2JtNG1DZVV5THlQ?=
+ =?utf-8?B?cVNSS2lGTk9BTVFuUVhQWWtIOUdFanF2KzJaS1FqSHYwQWxHK3hTWXhPbkdT?=
+ =?utf-8?B?L1hubjYzTXlrSDVER3VPK0N4NDJkU3AwNm5wSmFLS2MxOTBXQ1NzMFNFZXNn?=
+ =?utf-8?B?UERaYUJTSVBIVXM0YWpac3poS05rdUNDMERubDFOZVZSaXFrOStXNjBrSTBK?=
+ =?utf-8?B?NjluWklROE9ab1NnMm1NR2dVbkRmc0lZRzQzMmV2WENXcHVIWEVKVjFOdVBP?=
+ =?utf-8?B?akh0QlZQQ1RYWWdPQmFFendJL3V4TFBtbmhsY2FsaytmT1BtalIvQUtoVUhW?=
+ =?utf-8?B?YnlJL2NaWVF4WUFDUFhuaXRUZXZOQ2NyK0d2am02UFN1NjViWTRoZE9IeEMr?=
+ =?utf-8?B?UDJTRGp5SzdvNC82MWRjU1A5aXZMTU80VFFldXVLRThnMjhCb2RaM0QvVkZp?=
+ =?utf-8?B?eC9PNHpHNWZqK3U2UWJlbUdHZHdvSjU3VjRHNWtGb0JlRVBkVWpWaHE2Z2JI?=
+ =?utf-8?B?enZKdWZGS05XYVFBRnJoaWwrZ0kwTmU3RDViRmpyOW9yN1psOTBIRGIzb0kz?=
+ =?utf-8?B?QXNWVUhXYzBtbWVWT1V6Sk10NWl1Mk9QK2hpQnNZaTNSaGw5QVp5bU1CMHhw?=
+ =?utf-8?B?V2tqNlgwYlNaWGRXWG5uZFJIKytXamZSeFc4dk1IVmw0NjhxdXdBUlFwbkZo?=
+ =?utf-8?B?ZmdnMWx5U2V1U0VhUTdaZ0lnNzU5ZjltMDlkRnVGZTB1MHJUUEd0RVNHaWNG?=
+ =?utf-8?B?Mm1vZ1ZnS0RKVnZkQXZKK3dZNWkySG9LZU9MWHJKUFc4eVdLNXFDYTBnYjVZ?=
+ =?utf-8?B?RzFpRnJSUTFtWStyak1ESnZlRkorM0FjeVlaaklHVTMrS1p1TlljZXVDYTk3?=
+ =?utf-8?B?NG1PWlcxWlZWTjV4c3NULzl0WHVJKzlZbFh0dnJPc0hJajFlMGJKYWZLODVh?=
+ =?utf-8?B?dHFIcFcwdkhqMGNuVUVYMUpOdjRDQUtieFpFTmw0ZHdDa3Q5Ujg4ZWN2YW52?=
+ =?utf-8?B?REJ2WWhhRkp5RkZVNkUxWXd0SnpjUndnd1pVM3NrWU1LMlZQY09FQWQwTDRq?=
+ =?utf-8?B?bVhXOGZib2FJOE5wdkZyVWJyTTFUc0FXRlk4UEZGT25sRTNsekxzQi92ZzJs?=
+ =?utf-8?B?YURYcDc1OFVYYUhuUUNDVXhCS1NwdW5zUUdBMVQ3c09YKzF5YzB4OUVhemox?=
+ =?utf-8?B?d0RTV3VpTXA4WFRlNlRaaUY3OFdNamdtRkllMTAwdkVXYzlLK3pQbVBBcjQz?=
+ =?utf-8?B?VkJpdFZJbFNxckw4Y0Q4Mlk0cjc3b0V4cHFxdG9aYk9xN253RDhNU1V5NHRp?=
+ =?utf-8?Q?+MF8=3D?=
+MIME-Version: 1.0
+X-OriginatorOrg: whamcloud.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: BN6PR19MB0146.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9acfe984-73c0-41ae-7e71-08d9c5e7d865
+X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Dec 2021 07:43:00.5783 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: i3jFcjF5K0GpXz4zHp0fbbzLtBaOkCPOD83KBMuqEGgthilIaFr3x/CTpBktoqwH
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN8PR19MB2721
 Subject: Re: [lustre-devel] Lustre Arm stuff status and work plan
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
@@ -59,222 +125,301 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Xinliang Liu <xinliang.liu@linaro.org>
-Cc: Jian Yu <jiyu@whamcloud.com>, lixi@ddn.com,
- cloud-dev-request@op-lists.linaro.org, lustre-devel@lists.lustre.org
-Content-Type: multipart/mixed; boundary="===============7704285089190299862=="
+From: Oleg Drokin via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Oleg Drokin <green@whamcloud.com>
+Cc: Jian Yu <jiyu@whamcloud.com>, Li Xi <lixi@ddn.com>,
+ "cloud-dev-request@op-lists.linaro.org"
+ <cloud-dev-request@op-lists.linaro.org>,
+ Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============8860613570772963827=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7704285089190299862==
-Content-Type: multipart/alternative; boundary="000000000000cb36d705d38aaf37"
+--===============8860613570772963827==
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_6C592E3F04374776BB29C5EE489C5FAEwhamcloudcom_"
 
---000000000000cb36d705d38aaf37
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+--_000_6C592E3F04374776BB29C5EE489C5FAEwhamcloudcom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-(Maybe converting to plain text email will be more readable.)
+SGVsbG8hDQoNCiBUaGFuayB5b3UgZm9yIHlvdXIgd29yayBvbiB0aGlzLg0KDQp0aGUgdGVzdCBp
+bmZyYSBpcyBub3Qgb3BlbiBzb3VyY2UsIGJ1dCBpdCBpcyBvcGVuIC0gaXTigJlzIGp1c3QgZ2Vy
+cml0LCBzbyB5b3UgY2FuIHBsdWcgeW91ciBvd24gQ0kgbm9kZXMNCnRvIHJlcG9ydCB0ZXN0IHJl
+c3VsdHMgZm9yIGNvbmZpZ3VyYXRpb25zIHRoYXQgeW91IHRoaW5rIGFyZSB3ZWxsIHdvcmtpbmcg
+KHRvIGVuc3VyZSB0aGV5IGRvbuKAmXQgYnJlYWspLg0KIFRoaXMgYXBwbGllcyB0byBldmVyeWJv
+ZHkgaGF2aW5nIGlkZWFzIGFib3V0IGdhcHMgaW4gdGVzdCBjb3ZlcmFnZSBmb3IgcGF0Y2hlcyBp
+biByZXZpZXcgKHdoaWNoIGlzDQogIHRoZSBtb3N0IGltcG9ydGFudCBwYXJ0IG9mIHRoZSBwaXBl
+bGluZSBJTU8gLSBzdHVmZiB0aGF0IHdhcyBub3QgY2F1Z2h0IG9uIHRoaXMgc3RlcCBhbmQgZ290
+IGNvbW1pdHRlZCBpcyBtdWNoDQogIGhhcmRlciB0byBmaXggLSBpdCB0aGVuIG5lZWRzIGEgdHJp
+YWdlIGZvciBmYWlsdXJlcywgYSB0aWNrZXQgYW5kIHNvbWVib2R5IGFzc2lnbmVkIHRvIGRvIGl0
+IGFuZCBhbm90aGVyIHBhdGNoKQ0KDQogSXTigJlsbCBuZWVkIHNvbWUgd29yayBvbiB5b3VyIGVu
+ZCB0byBjcmVhdGUgdGhlIHNldHVwIHRoYXQgbWVldHMgdGhlIGxldmVsIG9mIHRlc3RpbmcgeW91
+IGZlZWwgaXMgYWRlcXVhdGUsDQogZS5nLiB5b3UgY291bGQgZG8gc29tZXRoaW5nIHNpbXBsZSB1
+c2luZyB0aGlzIGJ1aWxkZXIgaHR0cHM6Ly93aWtpLmx1c3RyZS5vcmcvaW5kZXgucGhwP3RpdGxl
+PVNpbXBsZV9HZXJyaXRfQnVpbGRlcl9Ib3d0bw0KDQogb3IgeW91IGNvdWxkIGRvIHNvbWV0aGlu
+ZyByZWFsbHkgYWR2YW5jZWQgbGlrZSB3aGF0IEkgaGF2ZSB3aXRoIHRoZSBqYW5pdG9ydGVzdGVy
+IHRoYXQgaXMgYWxzbyBvbiBnaXRodWIgaHR0cHM6Ly9naXRodWIuY29tL3ZlcnlncmVlbi9sdXN0
+cmV0ZXN0ZXINCg0KICBvciBJIGd1ZXNzIHlvdSBjYW4gdXNlIHNvbWUgb2ZmIHRoZSBzaGVsZiBD
+SSBzb2x1dGlvbiB0aGF0IGludGVncnRlcyB3aXRoIGdlcnJpdC4NCg0KICBZb3UgY2FuIGFsc28g
+cmVwb3J0IHJlc3VsdHMgaW50byBNYWxvbyBEQiBpZiB5b3UgZG9u4oCZdCB3YW50IHRvIGhvc3Qg
+eW91ciBvd24gbG9ncyBpbmZyYSwgdGhlcmXigJlzIEFQSSBmb3IgdGhhdCwgdGhvdWdoIEkgc2Vl
+IGl04oCZcyBub3QgZXhhY3RseSBwdWJsaWMNCiAgIGJ1dCB0aGF04oCZcyBwcm9iYWJseSBqdXN0
+IGFuIG9taXNzaW9uIGFuZCBpdCBzaG91bGQgYmUgbWFkZSBwdWJsaWMgaHR0cHM6Ly93aWtpLndo
+YW1jbG91ZC5jb20vZGlzcGxheS9URUkvVGVzdCtyZXN1bHRzK2Zvcm1hdA0KICAgTGV0IG1lIGtu
+b3cgaWYgdGhhdOKAmXMgc29tZXRoaW5nIHlvdSBhcmUgaW50ZXJlc3RlZCBpbiBhbmQgSSB3aWxs
+IHRyeSB0byBwcm92aWRlIHlvdSB3aXRoIHRoaXMgZGF0YS4NCg0KDQpPbiBEZWMgMTksIDIwMjEs
+IGF0IDk6MzAgUE0sIFhpbmxpYW5nIExpdSA8eGlubGlhbmcubGl1QGxpbmFyby5vcmc8bWFpbHRv
+OnhpbmxpYW5nLmxpdUBsaW5hcm8ub3JnPj4gd3JvdGU6DQoNCihNYXliZSBjb252ZXJ0aW5nIHRv
+IHBsYWluIHRleHQgZW1haWwgd2lsbCBiZSBtb3JlIHJlYWRhYmxlLikNCg0KSGkgUGV0ZXIgYW5k
+IGFsbCwNCkFzIEtldmluKG9uIGNjKSBhbmQgSSBoYXZlIGJlZW4gd29ya2luZyBvbiBMdXN0cmUg
+QXJtIHN0dWZmIGZvciBzb21lIHRpbWUuDQpXZSB3YW50IHRvIGdpdmUgYSBzdGF0dXMgYW5kIHBy
+b2dyZXNzIHJlcG9ydCB0byB0aGUgY29tbXVuaXR5IGFuZCBsaXN0IG91ciB3b3JrIHBsYW4gZm9y
+IHRoZSBuZXh0IHllYXIuDQpQbGVhc2UgaGVscCB0byByZXZpZXcgb3VyIHdvcmsgcGxhbiBhbmQg
+Z2l2ZSBzb21lIGNvbW1lbnRzIGFuZCBzdWdnZXN0aW9ucy4gVGhhbmtzLg0KDQoNClN0YXR1cyBh
+bmQgUHJvZ3Jlc3MNCj09PT09PT09PT09PT09PT0NClJlbGVhc2UNCi0tLS0tLS0NCi0gTm8gQXJt
+IHBhY2thZ2VzIGJ1aWx0IG9uIG9mZmljaWFsIGNvbW11bml0eSByZWxlYXNlIHlldC4NCg0KQnVp
+bGQNCi0tLS0tLQ0KLSBWZXJpZmllZCBMdXN0cmUsIG9wZW5aRlMgYnVpbGQgYW5kIG11bHRpLW5v
+ZGVzIHNldHVwIG9uIEFybTY0IENlbnRPUyA4LCBhbGwgYXJlIG9rLg0KLSBMYnVpbGQgc2NyaXB0
+IHN1cHBvcnQgZm9yIEFybSBpcyBvbiByZXZpZXcsIExVLTE1MjkzLg0KDQpDSQ0KLS0tDQotIE5v
+IEFybSBzZXJ2ZXIgZW5kIENJIHN1cHBvcnQgeWV0Lg0KLSBBcm0gY2xpZW50IHdpdGggeDg2XzY0
+IHNlcnZlciB0ZXN0IGlzIGFscmVhZHkgaW4gdGhlIENJIGdhdGUuDQogIC0gT25seSBydW4gYSBm
+ZXcgbGRpc2tmcyB0ZXN0IHN1aXRlcyhzYW5pdHksIHNhbml0eS1zZWMsIHNhbmN0aXR5LWxuZXQs
+IGV0Yy4pLCBub3QgYSBmdWxsIHRlc3QuDQogIC0gQSBmdWxsIHRlc3QgKHdpdGggZW1wdHkgR1JB
+TlRfQ0hFQ0tfTElTVCkgc2hvd3Mgc2V2ZXJhbCBBcm0gY2xpZW50IHJlbGF0ZWQgZmFpbGVkIHRl
+c3QgY2FzZXMsIHNlZSB0ZXN0IHJlc3VsdHMgcGFnZTogaHR0cHM6Ly90ZXN0aW5nLndoYW1jbG91
+ZC5jb20vdGVzdF9zZXNzaW9ucz9qb2JzPWx1c3RyZS1yZXZpZXdzJmJ1aWxkcz04Mjc3NCZzdGFy
+dF9kYXRlPTIwMjEtMDgtMjYjcmVkaXJlY3QNCiAgICAtIHNhbml0eSB0ZXN0IDMxNzogTFUtMTE2
+NjcgKFdvcmthcm91bmQgZml4IGxhbmRlZCkNCiAgICAtIHNhbml0eW4gdGVzdCAxNmE6IExVLTEx
+NTk3LCB0ZXN0IDcxYTogTFUtMTE3ODcNCiAgICAtIGNvbmYtc2FuaXR5IHRlc3QgOTg6IExVLTEx
+Nzg1LCB0ZXN0IDExMjogTFUtMTM4MTMNCiAgICAtIHNhbml0eS1mbHIgdGVzdCA1MGE6IExVLTE0
+OTcwDQogICAgLSBzYW5pdHktcGNjIHRlc3QgN2E6IExVLTE0MzQ2DQoNCkFybSBzZXJ2ZXIgZW5k
+IHRlc3Qgb24gbG9jYWwgc2V0dXANCi0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLQ0KLSBSdW4gYSBmdWxsIGxkaXNrZnMgdGVzdCB3aXRoIGFsbCB0ZXN0IHN1aXRl
+cy4NCiAgLSBEdWUgdG8gdGhlIG11bHRpIE1EVHMgY3Jhc2ggaXNzdWUsIHNvbWUgbXVsdGkgTURU
+cyB0ZXN0cyBhcmUgbm90IHJ1bi4NCiAgLSBNYW55IG5ldyBmYWlsZWQgdGVzdHMgY29tZSwgc2Vl
+IHRoZSB0ZXN0IHJlc3VsdCBnb29nbGUgc2hlZXQgZm9yIGRldGFpbHM6IGh0dHBzOi8vZG9jcy5n
+b29nbGUuY29tL3NwcmVhZHNoZWV0cy9kLzFFRTV6VTk2X2xxbGtTMHVrNk5KZWVOQnJpa1lwZF9a
+RU83aGRWdDVzcHN3L2VkaXQjZ2lkPTk2OTQxMDYxMA0KICAtIFRoZSBvcGVuWkZTIGZ1bGwgdGVz
+dCBpcyBub3QgcnVuLCBidXQgaGVhcmQgdGhhdCBpdCBzaG91bGQgYmUgbW9yZSBzdGFibGUgdGhh
+biBsZGlza2ZzLg0KDQpCdWdmaXgNCi0tLS0tLS0NCi0gT2xkIEFybSBhbHdheXNfZXhjZXB0IGJ1
+Z3MgaHR0cHM6Ly9qaXJhLndoYW1jbG91ZC5jb20vaXNzdWVzLz9maWx0ZXI9MTU1NTUgLCB0aGUg
+QXJtIHJlbGF0ZWQgb25lcyBhcmUgYWxtb3N0IGFkZHJlc3NlZC4NCiAgLSBMVS0xMTU5NiwgTFUt
+MTE1OTcsIExVLTE0MDY3LCBMVS0xMTc4NzogYWRkcmVzc2VkLCBwYXRjaCBzZW50IGFuZCB3YWl0
+aW5nIGZvciBBcm0gY2xpZW50IENJIHJlY292ZXJ5IHRvIGxhbmQuDQogIC0gTFUtMTAwNzMsIExV
+LTExNjcxOiBjYW4ndCBiZSByZXByb2R1Y2VkIG9uIEFybSBvciBoYXBwZW4gb24geDg2XzY0IGFs
+c28uDQoNCi0gT3RoZXIgb2xkIEFybSBidWdzICBMVS0xMTc4NSwgTFUtMTM4MTMsIExVLTE0OTcw
+LCBMVS0xNDM0NiB0byBiZSBmaXhlZC4NCg0KLSBOZXcgY3JlYXRlZCBzZXJ2ZXIgZW5kIGJ1Z3MN
+CiAgLSBMVS0xNTEyMiA6IEFTU0VSVElPTiggaW9idWYtPmRyX3J3ID09IDAgKSBjcmFzaCBpc3N1
+ZSwgZml4ZWQgcGF0Y2ggaXMgbGFuZGVkLg0KICAtIExVLTE1MzY0OiBtdWx0aSBNRFRzIGtlcm5l
+bCBvb3BzIGlzc3VlLCByZWxhdGVkIHRvIGF0b21pYyB1bmFsaWduZWQgbWVtb3J5IGFjY2Vzcywg
+d29yayBpbiBwcm9ncmVzcy4NCiAgLSBMVS0xNTIyMzogNjRLIHBhZ2Ugc2l6ZSByZWFkL3dyaXRl
+IGltcHJvdmVtZW50LCBsb25nLXRlcm0gd29yaywgaW4gcHJvZ3Jlc3MuDQoNCi0gRnVsbCBBcm0g
+cmVsYXRlZCBidWcgbGlzdCB3aXRoIGxhYmVsIGFybTogaHR0cHM6Ly9qaXJhLndoYW1jbG91ZC5j
+b20vaXNzdWVzLz9maWx0ZXI9MTY3MTANCg0KUmVmZXJlbmNlIHRvOg0KSmFtZXMgU2ltbW9uc+KA
+mSBMdXN0cmUgQXJtIHVwZGF0ZTogaHR0cHM6Ly9jb25uZWN0LmxpbmFyby5vcmcvcmVzb3VyY2Vz
+L3NhbjE5L3NhbjE5LTIyNC8NCg0KDQpXb3JrIFBsYW4NCj09PT09PT09DQotIEx1c3RyZSBTZXJ2
+ZXIgRW5kIENyaXRpY2FsIEJ1ZyBGaXggdGFyZ2V0IDIwMjItMDYNCiAgLSBMdXN0cmUgTXVsdGlw
+bGUgTURUcyBrZXJuZWwgT09QUyB3aGVuIHN0cmlwZSBpc3N1ZTogTFUtMTUzNjQNCiAgLSBMdXN0
+cmUgaGFuZ3MgYXQgU2FuaXR5IFRlc3QgODA3DQogIC0gTHVzdHJlIENvbmYtc2FuaXR5IHRlc3Qg
+NDQga2VybmVsIGNyYXNoDQogIC0gTHVzdHJlIENvbmYgc2FuaXR5IGNhc2UgNTgga2VybmVsIGNy
+YXNoDQogIC0gTHVzdHJlIENvbmYgc2FuaXR5IGNhc2UgNzgga2VybmVsIGNyYXNoDQogIC0gTHVz
+dHJlIENvbmYgc2FuaXR5IGNhc2UgNzkgY3Jhc2gNCiAgLSBMdXN0cmUgc2FuaXR5LXBjYyA3YSBj
+YXNlIGhhbmcgdGhlIGNsdXN0ZXINCg0KLSBMdXN0cmUgU2VydmVyIEVuZCBOb24tY3JpdGljYWwg
+QnVnIEZpeCB0YXJnZXQgMjAyMi0xMg0KICAtIEx1c3RyZSBTYW5pdHkgZmFpbHVyZSBjYXNlczog
+MzMgY2FzZXMNCiAgLSBMdXN0cmUgc2VydmVyIHJlcGxheS1zaW5nbGU6IDEgY2FzZQ0KICAtIEx1
+c3RyZSBzYW5pdHktZmxyIDIwMCBjYXNlcyBmaXg6IDEgY2FzZQ0KICAtIEx1c3RyZSBzYW5pdHkt
+aHNtIGZhaWx1cmUgY2FzZXM6IDI1IGNhc2VzDQogIC0gTHVzdHJlIGx1c3RyZS1yc3luYy10ZXN0
+IGZhaWx1cmUgdGVzdDogMyBjYXNlcw0KICAtIEx1c3RyZSByZWNvdmVyeS1zbWFsbC9zYW5pdHkt
+c2NydWI6IDIgY2FzZXMNCiAgLSBMdXN0cmUgc2FuaXR5biB0ZXN0IGNhc2VzIGZpeDogMTIgY2Fz
+ZXMNCiAgLSBMdXN0cmUgc2FuaXR5LWxmc2NrIGZhaWx1cmUgY2FzZXMgZml4OiAzIGNhc2VzDQog
+IC0gTHVzdHJlIHNhbml0eS1zZWMgZmFpbHVyZSBjYXNlcyBmaXgg77yaNyBjYXNlcw0KICAtIEx1
+c3RyZSBzYW5pdHktbG5ldCBmYWlsdXJlIGNhc2VzIHRlc3QgZml4OiAyIGNhc2VzDQoNCi0gQ29u
+dGludW91cyBhZGQgbW9yZSB0ZXN0IHN1aXRlcyBmb3IgQXJtIGNsaWVudCBDSSA/Pw0KICAtIE9u
+Y2UgYSB0ZXN0IHN1aXRlIGlzIGFsbCBwYXNzZWQgZm9yIEFybSB0aGVuIGFkZCBpdCBpbnRvIENJ
+Lg0KDQotIFNlcnZlciBDSSBzdXBwb3J0IGZvciBBcm0gb24gQ2VudG9zOCA/Pw0KICAtIElkZWFs
+bHksIEFybSBzZXJ2ZXIgQ0kgY2FuIGNvbWUgd2l0aCBBcm0gc2VydmVyIGVuZCBmaXhlcyBwYXRj
+aGVzIGFuZCBlbnN1cmUgZnV0dXJlIHBhdGNoZXMgbWVyZ2VkIGRvbuKAmXQgbWFrZSBhbnkgcmVn
+cmVzc2lvbnMgb24gQXJtLg0KICAtIEFzIHRoZSB0ZXN0IGluZnJhIGlzIG5vdCBvcGVuIHNvdXJj
+ZSBhbmQgbWFpbnRhaW5lZCBieSB3aGFtY2xvdWQsIGl0IG1pZ2h0IG5lZWQgd2hhbWNsb3VkIHRv
+IG1ha2UgaXQgPz8NCg0KLSBPdGhlciB3b3JrcyBpbiBmdXR1cmUNCiAgLSBGdWxsIHRlc3Qgd2l0
+aCBvcGVuWkZTIGJhY2tlbmQuDQogIC0gVGVzdCB4ODYgY2xpZW50IHdpdGggQXJtNjQgU2VydmVy
+DQogIC0gVGVzdCBvdGhlciBkaXN0cm9zIGxpa2UgdWJ1bnR1LCBTVVNFIGV0Yy4NCiAgLSBCYXNp
+YyBPcHRpbWlzZWQ6IENSQy9BRVMNCiAgLSBBbGwtZmxhc2ggb3B0aW1pemF0aW9uDQoNCg0KQmVz
+dCBSZWdhcmRzLA0KWGlubGlhbmcNCg0K
 
-Hi Peter and all,
-As Kevin(on cc) and I have been working on Lustre Arm stuff for some time.
-We want to give a status and progress report to the community and list our
-work plan for the next year.
-Please help to review our work plan and give some comments and suggestions.
-Thanks.
+--_000_6C592E3F04374776BB29C5EE489C5FAEwhamcloudcom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <322B3676B26BE3458AB1097FF0A9CC9F@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: base64
 
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IHN0eWxlPSJ3b3JkLXdy
+YXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0
+ZXItd2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4NCkhlbGxvIQ0KPGRpdiBjbGFzcz0iIj48YnIgY2xh
+c3M9IiI+DQo8L2Rpdj4NCjxkaXYgY2xhc3M9IiI+Jm5ic3A7VGhhbmsgeW91IGZvciB5b3VyIHdv
+cmsgb24gdGhpcy48L2Rpdj4NCjxkaXYgY2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8
+ZGl2IGNsYXNzPSIiPnRoZSB0ZXN0IGluZnJhIGlzIG5vdCBvcGVuIHNvdXJjZSwgYnV0IGl0IGlz
+IG9wZW4gLSBpdOKAmXMganVzdCBnZXJyaXQsIHNvIHlvdSBjYW4gcGx1ZyB5b3VyIG93biBDSSBu
+b2RlczwvZGl2Pg0KPGRpdiBjbGFzcz0iIj50byByZXBvcnQgdGVzdCByZXN1bHRzIGZvciBjb25m
+aWd1cmF0aW9ucyB0aGF0IHlvdSB0aGluayBhcmUgd2VsbCB3b3JraW5nICh0byBlbnN1cmUgdGhl
+eSBkb27igJl0IGJyZWFrKS48L2Rpdj4NCjxkaXYgY2xhc3M9IiI+Jm5ic3A7VGhpcyBhcHBsaWVz
+IHRvIGV2ZXJ5Ym9keSBoYXZpbmcgaWRlYXMgYWJvdXQgZ2FwcyBpbiB0ZXN0IGNvdmVyYWdlIGZv
+ciBwYXRjaGVzIGluIHJldmlldyAod2hpY2ggaXM8L2Rpdj4NCjxkaXYgY2xhc3M9IiI+Jm5ic3A7
+IHRoZSBtb3N0IGltcG9ydGFudCBwYXJ0IG9mIHRoZSBwaXBlbGluZSBJTU8gLSBzdHVmZiB0aGF0
+IHdhcyBub3QgY2F1Z2h0IG9uIHRoaXMgc3RlcCBhbmQgZ290IGNvbW1pdHRlZCBpcyBtdWNoPC9k
+aXY+DQo8ZGl2IGNsYXNzPSIiPiZuYnNwOyBoYXJkZXIgdG8gZml4IC0gaXQgdGhlbiBuZWVkcyBh
+IHRyaWFnZSBmb3IgZmFpbHVyZXMsIGEgdGlja2V0IGFuZCBzb21lYm9keSBhc3NpZ25lZCB0byBk
+byBpdCBhbmQgYW5vdGhlciBwYXRjaCkmbmJzcDs8L2Rpdj4NCjxkaXYgY2xhc3M9IiI+PGJyIGNs
+YXNzPSIiPg0KPC9kaXY+DQo8ZGl2IGNsYXNzPSIiPiZuYnNwO0l04oCZbGwgbmVlZCBzb21lIHdv
+cmsgb24geW91ciBlbmQgdG8gY3JlYXRlIHRoZSBzZXR1cCB0aGF0IG1lZXRzIHRoZSBsZXZlbCBv
+ZiB0ZXN0aW5nIHlvdSBmZWVsIGlzIGFkZXF1YXRlLDwvZGl2Pg0KPGRpdiBjbGFzcz0iIj4mbmJz
+cDtlLmcuIHlvdSBjb3VsZCBkbyBzb21ldGhpbmcgc2ltcGxlIHVzaW5nIHRoaXMgYnVpbGRlciZu
+YnNwOzxhIGhyZWY9Imh0dHBzOi8vd2lraS5sdXN0cmUub3JnL2luZGV4LnBocD90aXRsZT1TaW1w
+bGVfR2Vycml0X0J1aWxkZXJfSG93dG8iIGNsYXNzPSIiPmh0dHBzOi8vd2lraS5sdXN0cmUub3Jn
+L2luZGV4LnBocD90aXRsZT1TaW1wbGVfR2Vycml0X0J1aWxkZXJfSG93dG88L2E+PC9kaXY+DQo8
+ZGl2IGNsYXNzPSIiPjxiciBjbGFzcz0iIj4NCjwvZGl2Pg0KPGRpdiBjbGFzcz0iIj4mbmJzcDtv
+ciB5b3UgY291bGQgZG8gc29tZXRoaW5nIHJlYWxseSBhZHZhbmNlZCBsaWtlIHdoYXQgSSBoYXZl
+IHdpdGggdGhlIGphbml0b3J0ZXN0ZXIgdGhhdCBpcyBhbHNvIG9uIGdpdGh1YiZuYnNwOzxhIGhy
+ZWY9Imh0dHBzOi8vZ2l0aHViLmNvbS92ZXJ5Z3JlZW4vbHVzdHJldGVzdGVyIiBjbGFzcz0iIj5o
+dHRwczovL2dpdGh1Yi5jb20vdmVyeWdyZWVuL2x1c3RyZXRlc3RlcjwvYT48L2Rpdj4NCjxkaXYg
+Y2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8ZGl2IGNsYXNzPSIiPiZuYnNwOyBvciBJ
+IGd1ZXNzIHlvdSBjYW4gdXNlIHNvbWUgb2ZmIHRoZSBzaGVsZiBDSSBzb2x1dGlvbiB0aGF0IGlu
+dGVncnRlcyB3aXRoIGdlcnJpdC48L2Rpdj4NCjxkaXYgY2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0K
+PC9kaXY+DQo8ZGl2IGNsYXNzPSIiPiZuYnNwOyBZb3UgY2FuIGFsc28gcmVwb3J0IHJlc3VsdHMg
+aW50byBNYWxvbyBEQiBpZiB5b3UgZG9u4oCZdCB3YW50IHRvIGhvc3QgeW91ciBvd24gbG9ncyBp
+bmZyYSwgdGhlcmXigJlzIEFQSSBmb3IgdGhhdCwgdGhvdWdoIEkgc2VlIGl04oCZcyBub3QgZXhh
+Y3RseSBwdWJsaWM8L2Rpdj4NCjxkaXYgY2xhc3M9IiI+Jm5ic3A7ICZuYnNwO2J1dCB0aGF04oCZ
+cyBwcm9iYWJseSBqdXN0IGFuIG9taXNzaW9uIGFuZCBpdCBzaG91bGQgYmUgbWFkZSBwdWJsaWMm
+bmJzcDs8YSBocmVmPSJodHRwczovL3dpa2kud2hhbWNsb3VkLmNvbS9kaXNwbGF5L1RFSS9UZXN0
+K3Jlc3VsdHMrZm9ybWF0IiBjbGFzcz0iIj5odHRwczovL3dpa2kud2hhbWNsb3VkLmNvbS9kaXNw
+bGF5L1RFSS9UZXN0K3Jlc3VsdHMrZm9ybWF0PC9hPjwvZGl2Pg0KPGRpdiBjbGFzcz0iIj4mbmJz
+cDsgJm5ic3A7TGV0IG1lIGtub3cgaWYgdGhhdOKAmXMgc29tZXRoaW5nIHlvdSBhcmUgaW50ZXJl
+c3RlZCBpbiBhbmQgSSB3aWxsIHRyeSB0byBwcm92aWRlIHlvdSB3aXRoIHRoaXMgZGF0YS48L2Rp
+dj4NCjxkaXYgY2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8ZGl2IGNsYXNzPSIiPg0K
+PGRpdj48YnIgY2xhc3M9IiI+DQo8YmxvY2txdW90ZSB0eXBlPSJjaXRlIiBjbGFzcz0iIj4NCjxk
+aXYgY2xhc3M9IiI+T24gRGVjIDE5LCAyMDIxLCBhdCA5OjMwIFBNLCBYaW5saWFuZyBMaXUgJmx0
+OzxhIGhyZWY9Im1haWx0bzp4aW5saWFuZy5saXVAbGluYXJvLm9yZyIgY2xhc3M9IiI+eGlubGlh
+bmcubGl1QGxpbmFyby5vcmc8L2E+Jmd0OyB3cm90ZTo8L2Rpdj4NCjxiciBjbGFzcz0iQXBwbGUt
+aW50ZXJjaGFuZ2UtbmV3bGluZSI+DQo8ZGl2IGNsYXNzPSIiPg0KPGRpdiBkaXI9Imx0ciIgY2xh
+c3M9IiI+KE1heWJlIGNvbnZlcnRpbmcgdG8gcGxhaW4gdGV4dCBlbWFpbCB3aWxsIGJlIG1vcmUg
+cmVhZGFibGUuKTxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCkhpIFBldGVyIGFuZCBhbGws
+PGJyIGNsYXNzPSIiPg0KQXMgS2V2aW4ob24gY2MpIGFuZCBJIGhhdmUgYmVlbiB3b3JraW5nIG9u
+IEx1c3RyZSBBcm0gc3R1ZmYgZm9yIHNvbWUgdGltZS48YnIgY2xhc3M9IiI+DQpXZSB3YW50IHRv
+IGdpdmUgYSBzdGF0dXMgYW5kIHByb2dyZXNzIHJlcG9ydCB0byB0aGUgY29tbXVuaXR5IGFuZCBs
+aXN0IG91ciB3b3JrIHBsYW4gZm9yIHRoZSBuZXh0IHllYXIuPGJyIGNsYXNzPSIiPg0KUGxlYXNl
+IGhlbHAgdG8gcmV2aWV3IG91ciB3b3JrIHBsYW4gYW5kIGdpdmUgc29tZSBjb21tZW50cyBhbmQg
+c3VnZ2VzdGlvbnMuIFRoYW5rcy48YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8YnIgY2xh
+c3M9IiI+DQpTdGF0dXMgYW5kIFByb2dyZXNzPGJyIGNsYXNzPSIiPg0KPT09PT09PT09PT09PT09
+PTxiciBjbGFzcz0iIj4NClJlbGVhc2U8YnIgY2xhc3M9IiI+DQotLS0tLS0tPGJyIGNsYXNzPSIi
+Pg0KLSBObyBBcm0gcGFja2FnZXMgYnVpbHQgb24gb2ZmaWNpYWwgY29tbXVuaXR5IHJlbGVhc2Ug
+eWV0LjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCkJ1aWxkPGJyIGNsYXNzPSIiPg0KLS0t
+LS0tPGJyIGNsYXNzPSIiPg0KLSBWZXJpZmllZCBMdXN0cmUsIG9wZW5aRlMgYnVpbGQgYW5kIG11
+bHRpLW5vZGVzIHNldHVwIG9uIEFybTY0IENlbnRPUyA4LCBhbGwgYXJlIG9rLjxiciBjbGFzcz0i
+Ij4NCi0gTGJ1aWxkIHNjcmlwdCBzdXBwb3J0IGZvciBBcm0gaXMgb24gcmV2aWV3LCBMVS0xNTI5
+My48YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpDSTxiciBjbGFzcz0iIj4NCi0tLTxiciBj
+bGFzcz0iIj4NCi0gTm8gQXJtIHNlcnZlciBlbmQgQ0kgc3VwcG9ydCB5ZXQuPGJyIGNsYXNzPSIi
+Pg0KLSBBcm0gY2xpZW50IHdpdGggeDg2XzY0IHNlcnZlciB0ZXN0IGlzIGFscmVhZHkgaW4gdGhl
+IENJIGdhdGUuPGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gT25seSBydW4gYSBmZXcgbGRpc2tmcyB0
+ZXN0IHN1aXRlcyhzYW5pdHksIHNhbml0eS1zZWMsIHNhbmN0aXR5LWxuZXQsIGV0Yy4pLCBub3Qg
+YSBmdWxsIHRlc3QuPGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gQSBmdWxsIHRlc3QgKHdpdGggZW1w
+dHkgR1JBTlRfQ0hFQ0tfTElTVCkgc2hvd3Mgc2V2ZXJhbCBBcm0gY2xpZW50IHJlbGF0ZWQgZmFp
+bGVkIHRlc3QgY2FzZXMsIHNlZSB0ZXN0IHJlc3VsdHMgcGFnZToNCjxhIGhyZWY9Imh0dHBzOi8v
+dGVzdGluZy53aGFtY2xvdWQuY29tL3Rlc3Rfc2Vzc2lvbnM/am9icz1sdXN0cmUtcmV2aWV3cyZh
+bXA7YnVpbGRzPTgyNzc0JmFtcDtzdGFydF9kYXRlPTIwMjEtMDgtMjYjcmVkaXJlY3QiIGNsYXNz
+PSIiPg0KaHR0cHM6Ly90ZXN0aW5nLndoYW1jbG91ZC5jb20vdGVzdF9zZXNzaW9ucz9qb2JzPWx1
+c3RyZS1yZXZpZXdzJmFtcDtidWlsZHM9ODI3NzQmYW1wO3N0YXJ0X2RhdGU9MjAyMS0wOC0yNiNy
+ZWRpcmVjdDwvYT48YnIgY2xhc3M9IiI+DQombmJzcDsgJm5ic3A7IC0gc2FuaXR5IHRlc3QgMzE3
+OiBMVS0xMTY2NyAoV29ya2Fyb3VuZCBmaXggbGFuZGVkKTxiciBjbGFzcz0iIj4NCiZuYnNwOyAm
+bmJzcDsgLSBzYW5pdHluIHRlc3QgMTZhOiBMVS0xMTU5NywgdGVzdCA3MWE6IExVLTExNzg3PGJy
+IGNsYXNzPSIiPg0KJm5ic3A7ICZuYnNwOyAtIGNvbmYtc2FuaXR5IHRlc3QgOTg6IExVLTExNzg1
+LCB0ZXN0IDExMjogTFUtMTM4MTM8YnIgY2xhc3M9IiI+DQombmJzcDsgJm5ic3A7IC0gc2FuaXR5
+LWZsciB0ZXN0IDUwYTogTFUtMTQ5NzA8YnIgY2xhc3M9IiI+DQombmJzcDsgJm5ic3A7IC0gc2Fu
+aXR5LXBjYyB0ZXN0IDdhOiBMVS0xNDM0NjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCkFy
+bSBzZXJ2ZXIgZW5kIHRlc3Qgb24gbG9jYWwgc2V0dXA8YnIgY2xhc3M9IiI+DQotLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS08YnIgY2xhc3M9IiI+DQotIFJ1biBh
+IGZ1bGwgbGRpc2tmcyB0ZXN0IHdpdGggYWxsIHRlc3Qgc3VpdGVzLjxiciBjbGFzcz0iIj4NCiZu
+YnNwOyAtIER1ZSB0byB0aGUgbXVsdGkgTURUcyBjcmFzaCBpc3N1ZSwgc29tZSBtdWx0aSBNRFRz
+IHRlc3RzIGFyZSBub3QgcnVuLjxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIE1hbnkgbmV3IGZhaWxl
+ZCB0ZXN0cyBjb21lLCBzZWUgdGhlIHRlc3QgcmVzdWx0IGdvb2dsZSBzaGVldCBmb3IgZGV0YWls
+czogPGEgaHJlZj0iaHR0cHM6Ly9kb2NzLmdvb2dsZS5jb20vc3ByZWFkc2hlZXRzL2QvMUVFNXpV
+OTZfbHFsa1MwdWs2TkplZU5CcmlrWXBkX1pFTzdoZFZ0NXNwc3cvZWRpdCNnaWQ9OTY5NDEwNjEw
+IiBjbGFzcz0iIj4NCmh0dHBzOi8vZG9jcy5nb29nbGUuY29tL3NwcmVhZHNoZWV0cy9kLzFFRTV6
+VTk2X2xxbGtTMHVrNk5KZWVOQnJpa1lwZF9aRU83aGRWdDVzcHN3L2VkaXQjZ2lkPTk2OTQxMDYx
+MDwvYT48YnIgY2xhc3M9IiI+DQombmJzcDsgLSBUaGUgb3BlblpGUyBmdWxsIHRlc3QgaXMgbm90
+IHJ1biwgYnV0IGhlYXJkIHRoYXQgaXQgc2hvdWxkIGJlIG1vcmUgc3RhYmxlIHRoYW4gbGRpc2tm
+cy48YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpCdWdmaXg8YnIgY2xhc3M9IiI+DQotLS0t
+LS0tPGJyIGNsYXNzPSIiPg0KLSBPbGQgQXJtIGFsd2F5c19leGNlcHQgYnVncyA8YSBocmVmPSJo
+dHRwczovL2ppcmEud2hhbWNsb3VkLmNvbS9pc3N1ZXMvP2ZpbHRlcj0xNTU1NSIgY2xhc3M9IiI+
+DQpodHRwczovL2ppcmEud2hhbWNsb3VkLmNvbS9pc3N1ZXMvP2ZpbHRlcj0xNTU1NTwvYT4gLCB0
+aGUgQXJtIHJlbGF0ZWQgb25lcyBhcmUgYWxtb3N0IGFkZHJlc3NlZC48YnIgY2xhc3M9IiI+DQom
+bmJzcDsgLSBMVS0xMTU5NiwgTFUtMTE1OTcsIExVLTE0MDY3LCBMVS0xMTc4NzogYWRkcmVzc2Vk
+LCBwYXRjaCBzZW50IGFuZCB3YWl0aW5nIGZvciBBcm0gY2xpZW50IENJIHJlY292ZXJ5IHRvIGxh
+bmQuPGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gTFUtMTAwNzMsIExVLTExNjcxOiBjYW4ndCBiZSBy
+ZXByb2R1Y2VkIG9uIEFybSBvciBoYXBwZW4gb24geDg2XzY0IGFsc28uPGJyIGNsYXNzPSIiPg0K
+PGJyIGNsYXNzPSIiPg0KLSBPdGhlciBvbGQgQXJtIGJ1Z3MgJm5ic3A7TFUtMTE3ODUsIExVLTEz
+ODEzLCBMVS0xNDk3MCwgTFUtMTQzNDYgdG8gYmUgZml4ZWQuPGJyIGNsYXNzPSIiPg0KPGJyIGNs
+YXNzPSIiPg0KLSBOZXcgY3JlYXRlZCBzZXJ2ZXIgZW5kIGJ1Z3M8YnIgY2xhc3M9IiI+DQombmJz
+cDsgLSBMVS0xNTEyMiA6IEFTU0VSVElPTiggaW9idWYtJmd0O2RyX3J3ID09IDAgKSBjcmFzaCBp
+c3N1ZSwgZml4ZWQgcGF0Y2ggaXMgbGFuZGVkLjxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIExVLTE1
+MzY0OiBtdWx0aSBNRFRzIGtlcm5lbCBvb3BzIGlzc3VlLCByZWxhdGVkIHRvIGF0b21pYyB1bmFs
+aWduZWQgbWVtb3J5IGFjY2Vzcywgd29yayBpbiBwcm9ncmVzcy48YnIgY2xhc3M9IiI+DQombmJz
+cDsgLSBMVS0xNTIyMzogNjRLIHBhZ2Ugc2l6ZSByZWFkL3dyaXRlIGltcHJvdmVtZW50LCBsb25n
+LXRlcm0gd29yaywgaW4gcHJvZ3Jlc3MuPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KLSBG
+dWxsIEFybSByZWxhdGVkIGJ1ZyBsaXN0IHdpdGggbGFiZWwgYXJtOiA8YSBocmVmPSJodHRwczov
+L2ppcmEud2hhbWNsb3VkLmNvbS9pc3N1ZXMvP2ZpbHRlcj0xNjcxMCIgY2xhc3M9IiI+DQpodHRw
+czovL2ppcmEud2hhbWNsb3VkLmNvbS9pc3N1ZXMvP2ZpbHRlcj0xNjcxMDwvYT48YnIgY2xhc3M9
+IiI+DQo8YnIgY2xhc3M9IiI+DQpSZWZlcmVuY2UgdG86PGJyIGNsYXNzPSIiPg0KSmFtZXMgU2lt
+bW9uc+KAmSBMdXN0cmUgQXJtIHVwZGF0ZTogPGEgaHJlZj0iaHR0cHM6Ly9jb25uZWN0LmxpbmFy
+by5vcmcvcmVzb3VyY2VzL3NhbjE5L3NhbjE5LTIyNC8iIGNsYXNzPSIiPg0KaHR0cHM6Ly9jb25u
+ZWN0LmxpbmFyby5vcmcvcmVzb3VyY2VzL3NhbjE5L3NhbjE5LTIyNC88L2E+PGJyIGNsYXNzPSIi
+Pg0KPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KV29yayBQbGFuPGJyIGNsYXNzPSIiPg0K
+PT09PT09PT08YnIgY2xhc3M9IiI+DQotIEx1c3RyZSBTZXJ2ZXIgRW5kIENyaXRpY2FsIEJ1ZyBG
+aXggdGFyZ2V0IDIwMjItMDY8YnIgY2xhc3M9IiI+DQombmJzcDsgLSBMdXN0cmUgTXVsdGlwbGUg
+TURUcyBrZXJuZWwgT09QUyB3aGVuIHN0cmlwZSBpc3N1ZTogTFUtMTUzNjQ8YnIgY2xhc3M9IiI+
+DQombmJzcDsgLSBMdXN0cmUgaGFuZ3MgYXQgU2FuaXR5IFRlc3QgODA3PGJyIGNsYXNzPSIiPg0K
+Jm5ic3A7IC0gTHVzdHJlIENvbmYtc2FuaXR5IHRlc3QgNDQga2VybmVsIGNyYXNoPGJyIGNsYXNz
+PSIiPg0KJm5ic3A7IC0gTHVzdHJlIENvbmYgc2FuaXR5IGNhc2UgNTgga2VybmVsIGNyYXNoPGJy
+IGNsYXNzPSIiPg0KJm5ic3A7IC0gTHVzdHJlIENvbmYgc2FuaXR5IGNhc2UgNzgga2VybmVsIGNy
+YXNoPGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gTHVzdHJlIENvbmYgc2FuaXR5IGNhc2UgNzkgY3Jh
+c2g8YnIgY2xhc3M9IiI+DQombmJzcDsgLSBMdXN0cmUgc2FuaXR5LXBjYyA3YSBjYXNlIGhhbmcg
+dGhlIGNsdXN0ZXI8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQotIEx1c3RyZSBTZXJ2ZXIg
+RW5kIE5vbi1jcml0aWNhbCBCdWcgRml4IHRhcmdldCAyMDIyLTEyPGJyIGNsYXNzPSIiPg0KJm5i
+c3A7IC0gTHVzdHJlIFNhbml0eSBmYWlsdXJlIGNhc2VzOiAzMyBjYXNlczxiciBjbGFzcz0iIj4N
+CiZuYnNwOyAtIEx1c3RyZSBzZXJ2ZXIgcmVwbGF5LXNpbmdsZTogMSBjYXNlPGJyIGNsYXNzPSIi
+Pg0KJm5ic3A7IC0gTHVzdHJlIHNhbml0eS1mbHIgMjAwIGNhc2VzIGZpeDogMSBjYXNlPGJyIGNs
+YXNzPSIiPg0KJm5ic3A7IC0gTHVzdHJlIHNhbml0eS1oc20gZmFpbHVyZSBjYXNlczogMjUgY2Fz
+ZXM8YnIgY2xhc3M9IiI+DQombmJzcDsgLSBMdXN0cmUgbHVzdHJlLXJzeW5jLXRlc3QgZmFpbHVy
+ZSB0ZXN0OiAzIGNhc2VzPGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gTHVzdHJlIHJlY292ZXJ5LXNt
+YWxsL3Nhbml0eS1zY3J1YjogMiBjYXNlczxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEx1c3RyZSBz
+YW5pdHluIHRlc3QgY2FzZXMgZml4OiAxMiBjYXNlczxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEx1
+c3RyZSBzYW5pdHktbGZzY2sgZmFpbHVyZSBjYXNlcyBmaXg6IDMgY2FzZXM8YnIgY2xhc3M9IiI+
+DQombmJzcDsgLSBMdXN0cmUgc2FuaXR5LXNlYyBmYWlsdXJlIGNhc2VzIGZpeCDvvJo3IGNhc2Vz
+PGJyIGNsYXNzPSIiPg0KJm5ic3A7IC0gTHVzdHJlIHNhbml0eS1sbmV0IGZhaWx1cmUgY2FzZXMg
+dGVzdCBmaXg6IDIgY2FzZXM8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQotIENvbnRpbnVv
+dXMgYWRkIG1vcmUgdGVzdCBzdWl0ZXMgZm9yIEFybSBjbGllbnQgQ0kgPz88YnIgY2xhc3M9IiI+
+DQombmJzcDsgLSBPbmNlIGEgdGVzdCBzdWl0ZSBpcyBhbGwgcGFzc2VkIGZvciBBcm0gdGhlbiBh
+ZGQgaXQgaW50byBDSS48YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQotIFNlcnZlciBDSSBz
+dXBwb3J0IGZvciBBcm0gb24gQ2VudG9zOCA/PzxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIElkZWFs
+bHksIEFybSBzZXJ2ZXIgQ0kgY2FuIGNvbWUgd2l0aCBBcm0gc2VydmVyIGVuZCBmaXhlcyBwYXRj
+aGVzIGFuZCBlbnN1cmUgZnV0dXJlIHBhdGNoZXMgbWVyZ2VkIGRvbuKAmXQgbWFrZSBhbnkgcmVn
+cmVzc2lvbnMgb24gQXJtLjxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEFzIHRoZSB0ZXN0IGluZnJh
+IGlzIG5vdCBvcGVuIHNvdXJjZSBhbmQgbWFpbnRhaW5lZCBieSB3aGFtY2xvdWQsIGl0IG1pZ2h0
+IG5lZWQgd2hhbWNsb3VkIHRvIG1ha2UgaXQgPz88YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+
+DQotIE90aGVyIHdvcmtzIGluIGZ1dHVyZTxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEZ1bGwgdGVz
+dCB3aXRoIG9wZW5aRlMgYmFja2VuZC48YnIgY2xhc3M9IiI+DQombmJzcDsgLSBUZXN0IHg4NiBj
+bGllbnQgd2l0aCBBcm02NCBTZXJ2ZXI8YnIgY2xhc3M9IiI+DQombmJzcDsgLSBUZXN0IG90aGVy
+IGRpc3Ryb3MgbGlrZSB1YnVudHUsIFNVU0UgZXRjLjxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEJh
+c2ljIE9wdGltaXNlZDogQ1JDL0FFUzxiciBjbGFzcz0iIj4NCiZuYnNwOyAtIEFsbC1mbGFzaCBv
+cHRpbWl6YXRpb248YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpC
+ZXN0IFJlZ2FyZHMsPGJyIGNsYXNzPSIiPg0KWGlubGlhbmc8YnIgY2xhc3M9IiI+DQo8L2Rpdj4N
+CjwvZGl2Pg0KPC9ibG9ja3F1b3RlPg0KPC9kaXY+DQo8YnIgY2xhc3M9IiI+DQo8L2Rpdj4NCjwv
+Ym9keT4NCjwvaHRtbD4NCg==
 
-Status and Progress
-=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
-Release
--------
-- No Arm packages built on official community release yet.
+--_000_6C592E3F04374776BB29C5EE489C5FAEwhamcloudcom_--
 
-Build
-------
-- Verified Lustre, openZFS build and multi-nodes setup on Arm64 CentOS 8,
-all are ok.
-- Lbuild script support for Arm is on review, LU-15293.
-
-CI
----
-- No Arm server end CI support yet.
-- Arm client with x86_64 server test is already in the CI gate.
-  - Only run a few ldiskfs test suites(sanity, sanity-sec, sanctity-lnet,
-etc.), not a full test.
-  - A full test (with empty GRANT_CHECK_LIST) shows several Arm client
-related failed test cases, see test results page:
-https://testing.whamcloud.com/test_sessions?jobs=3Dlustre-reviews&builds=3D=
-82774&start_date=3D2021-08-26#redirect
-    - sanity test 317: LU-11667 (Workaround fix landed)
-    - sanityn test 16a: LU-11597, test 71a: LU-11787
-    - conf-sanity test 98: LU-11785, test 112: LU-13813
-    - sanity-flr test 50a: LU-14970
-    - sanity-pcc test 7a: LU-14346
-
-Arm server end test on local setup
----------------------------------------------
-- Run a full ldiskfs test with all test suites.
-  - Due to the multi MDTs crash issue, some multi MDTs tests are not run.
-  - Many new failed tests come, see the test result google sheet for
-details:
-https://docs.google.com/spreadsheets/d/1EE5zU96_lqlkS0uk6NJeeNBrikYpd_ZEO7h=
-dVt5spsw/edit#gid=3D969410610
-  - The openZFS full test is not run, but heard that it should be more
-stable than ldiskfs.
-
-Bugfix
--------
-- Old Arm always_except bugs https://jira.whamcloud.com/issues/?filter=3D15=
-555
-, the Arm related ones are almost addressed.
-  - LU-11596, LU-11597, LU-14067, LU-11787: addressed, patch sent and
-waiting for Arm client CI recovery to land.
-  - LU-10073, LU-11671: can't be reproduced on Arm or happen on x86_64 also=
-.
-
-- Other old Arm bugs  LU-11785, LU-13813, LU-14970, LU-14346 to be fixed.
-
-- New created server end bugs
-  - LU-15122 : ASSERTION( iobuf->dr_rw =3D=3D 0 ) crash issue, fixed patch =
-is
-landed.
-  - LU-15364: multi MDTs kernel oops issue, related to atomic unaligned
-memory access, work in progress.
-  - LU-15223: 64K page size read/write improvement, long-term work, in
-progress.
-
-- Full Arm related bug list with label arm:
-https://jira.whamcloud.com/issues/?filter=3D16710
-
-Reference to:
-James Simmons=E2=80=99 Lustre Arm update:
-https://connect.linaro.org/resources/san19/san19-224/
-
-
-Work Plan
-=3D=3D=3D=3D=3D=3D=3D=3D
-- Lustre Server End Critical Bug Fix target 2022-06
-  - Lustre Multiple MDTs kernel OOPS when stripe issue: LU-15364
-  - Lustre hangs at Sanity Test 807
-  - Lustre Conf-sanity test 44 kernel crash
-  - Lustre Conf sanity case 58 kernel crash
-  - Lustre Conf sanity case 78 kernel crash
-  - Lustre Conf sanity case 79 crash
-  - Lustre sanity-pcc 7a case hang the cluster
-
-- Lustre Server End Non-critical Bug Fix target 2022-12
-  - Lustre Sanity failure cases: 33 cases
-  - Lustre server replay-single: 1 case
-  - Lustre sanity-flr 200 cases fix: 1 case
-  - Lustre sanity-hsm failure cases: 25 cases
-  - Lustre lustre-rsync-test failure test: 3 cases
-  - Lustre recovery-small/sanity-scrub: 2 cases
-  - Lustre sanityn test cases fix: 12 cases
-  - Lustre sanity-lfsck failure cases fix: 3 cases
-  - Lustre sanity-sec failure cases fix =EF=BC=9A7 cases
-  - Lustre sanity-lnet failure cases test fix: 2 cases
-
-- Continuous add more test suites for Arm client CI ??
-  - Once a test suite is all passed for Arm then add it into CI.
-
-- Server CI support for Arm on Centos8 ??
-  - Ideally, Arm server CI can come with Arm server end fixes patches and
-ensure future patches merged don=E2=80=99t make any regressions on Arm.
-  - As the test infra is not open source and maintained by whamcloud, it
-might need whamcloud to make it ??
-
-- Other works in future
-  - Full test with openZFS backend.
-  - Test x86 client with Arm64 Server
-  - Test other distros like ubuntu, SUSE etc.
-  - Basic Optimised: CRC/AES
-  - All-flash optimization
-
-
-Best Regards,
-Xinliang
-
---000000000000cb36d705d38aaf37
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">(Maybe converting to plain text email will be more readabl=
-e.)<br><br>Hi Peter and all,<br>As Kevin(on cc) and I have been working on =
-Lustre Arm stuff for some time.<br>We want to give a status and progress re=
-port to the community and list our work plan for the next year.<br>Please h=
-elp to review our work plan and give some comments and suggestions. Thanks.=
-<br><br><br>Status and Progress<br>=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
-=3D=3D=3D<br>Release<br>-------<br>- No Arm packages built on official comm=
-unity release yet.<br><br>Build<br>------<br>- Verified Lustre, openZFS bui=
-ld and multi-nodes setup on Arm64 CentOS 8, all are ok.<br>- Lbuild script =
-support for Arm is on review, LU-15293.<br><br>CI<br>---<br>- No Arm server=
- end CI support yet.<br>- Arm client with x86_64 server test is already in =
-the CI gate.<br>=C2=A0 - Only run a few ldiskfs test suites(sanity, sanity-=
-sec, sanctity-lnet, etc.), not a full test.<br>=C2=A0 - A full test (with e=
-mpty GRANT_CHECK_LIST) shows several Arm client related failed test cases, =
-see test results page: <a href=3D"https://testing.whamcloud.com/test_sessio=
-ns?jobs=3Dlustre-reviews&amp;builds=3D82774&amp;start_date=3D2021-08-26#red=
-irect">https://testing.whamcloud.com/test_sessions?jobs=3Dlustre-reviews&am=
-p;builds=3D82774&amp;start_date=3D2021-08-26#redirect</a><br>=C2=A0 =C2=A0 =
-- sanity test 317: LU-11667 (Workaround fix landed)<br>=C2=A0 =C2=A0 - sani=
-tyn test 16a: LU-11597, test 71a: LU-11787<br>=C2=A0 =C2=A0 - conf-sanity t=
-est 98: LU-11785, test 112: LU-13813<br>=C2=A0 =C2=A0 - sanity-flr test 50a=
-: LU-14970<br>=C2=A0 =C2=A0 - sanity-pcc test 7a: LU-14346<br><br>Arm serve=
-r end test on local setup<br>---------------------------------------------<=
-br>- Run a full ldiskfs test with all test suites.<br>=C2=A0 - Due to the m=
-ulti MDTs crash issue, some multi MDTs tests are not run.<br>=C2=A0 - Many =
-new failed tests come, see the test result google sheet for details: <a hre=
-f=3D"https://docs.google.com/spreadsheets/d/1EE5zU96_lqlkS0uk6NJeeNBrikYpd_=
-ZEO7hdVt5spsw/edit#gid=3D969410610">https://docs.google.com/spreadsheets/d/=
-1EE5zU96_lqlkS0uk6NJeeNBrikYpd_ZEO7hdVt5spsw/edit#gid=3D969410610</a><br>=
-=C2=A0 - The openZFS full test is not run, but heard that it should be more=
- stable than ldiskfs.<br><br>Bugfix<br>-------<br>- Old Arm always_except b=
-ugs <a href=3D"https://jira.whamcloud.com/issues/?filter=3D15555">https://j=
-ira.whamcloud.com/issues/?filter=3D15555</a> , the Arm related ones are alm=
-ost addressed.<br>=C2=A0 - LU-11596, LU-11597, LU-14067, LU-11787: addresse=
-d, patch sent and waiting for Arm client CI recovery to land.<br>=C2=A0 - L=
-U-10073, LU-11671: can&#39;t be reproduced on Arm or happen on x86_64 also.=
-<br><br>- Other old Arm bugs =C2=A0LU-11785, LU-13813, LU-14970, LU-14346 t=
-o be fixed.<br><br>- New created server end bugs<br>=C2=A0 - LU-15122 : ASS=
-ERTION( iobuf-&gt;dr_rw =3D=3D 0 ) crash issue, fixed patch is landed.<br>=
-=C2=A0 - LU-15364: multi MDTs kernel oops issue, related to atomic unaligne=
-d memory access, work in progress.<br>=C2=A0 - LU-15223: 64K page size read=
-/write improvement, long-term work, in progress.<br><br>- Full Arm related =
-bug list with label arm: <a href=3D"https://jira.whamcloud.com/issues/?filt=
-er=3D16710">https://jira.whamcloud.com/issues/?filter=3D16710</a><br><br>Re=
-ference to:<br>James Simmons=E2=80=99 Lustre Arm update: <a href=3D"https:/=
-/connect.linaro.org/resources/san19/san19-224/">https://connect.linaro.org/=
-resources/san19/san19-224/</a><br><br><br>Work Plan<br>=3D=3D=3D=3D=3D=3D=
-=3D=3D<br>- Lustre Server End Critical Bug Fix target 2022-06<br>=C2=A0 - L=
-ustre Multiple MDTs kernel OOPS when stripe issue: LU-15364<br>=C2=A0 - Lus=
-tre hangs at Sanity Test 807<br>=C2=A0 - Lustre Conf-sanity test 44 kernel =
-crash<br>=C2=A0 - Lustre Conf sanity case 58 kernel crash<br>=C2=A0 - Lustr=
-e Conf sanity case 78 kernel crash<br>=C2=A0 - Lustre Conf sanity case 79 c=
-rash<br>=C2=A0 - Lustre sanity-pcc 7a case hang the cluster<br><br>- Lustre=
- Server End Non-critical Bug Fix target 2022-12<br>=C2=A0 - Lustre Sanity f=
-ailure cases: 33 cases<br>=C2=A0 - Lustre server replay-single: 1 case<br>=
-=C2=A0 - Lustre sanity-flr 200 cases fix: 1 case<br>=C2=A0 - Lustre sanity-=
-hsm failure cases: 25 cases<br>=C2=A0 - Lustre lustre-rsync-test failure te=
-st: 3 cases<br>=C2=A0 - Lustre recovery-small/sanity-scrub: 2 cases<br>=C2=
-=A0 - Lustre sanityn test cases fix: 12 cases<br>=C2=A0 - Lustre sanity-lfs=
-ck failure cases fix: 3 cases<br>=C2=A0 - Lustre sanity-sec failure cases f=
-ix =EF=BC=9A7 cases<br>=C2=A0 - Lustre sanity-lnet failure cases test fix: =
-2 cases<br><br>- Continuous add more test suites for Arm client CI ??<br>=
-=C2=A0 - Once a test suite is all passed for Arm then add it into CI.<br><b=
-r>- Server CI support for Arm on Centos8 ??<br>=C2=A0 - Ideally, Arm server=
- CI can come with Arm server end fixes patches and ensure future patches me=
-rged don=E2=80=99t make any regressions on Arm.<br>=C2=A0 - As the test inf=
-ra is not open source and maintained by whamcloud, it might need whamcloud =
-to make it ??<br><br>- Other works in future<br>=C2=A0 - Full test with ope=
-nZFS backend.<br>=C2=A0 - Test x86 client with Arm64 Server<br>=C2=A0 - Tes=
-t other distros like ubuntu, SUSE etc.<br>=C2=A0 - Basic Optimised: CRC/AES=
-<br>=C2=A0 - All-flash optimization<br><br><br>Best Regards,<br>Xinliang<br=
-></div>
-
---000000000000cb36d705d38aaf37--
-
---===============7704285089190299862==
+--===============8860613570772963827==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -285,4 +430,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============7704285089190299862==--
+--===============8860613570772963827==--
