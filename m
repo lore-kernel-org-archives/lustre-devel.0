@@ -4,52 +4,109 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id BD008C433EF
-	for <lustre-devel@archiver.kernel.org>; Tue, 28 Dec 2021 01:54:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id DA1DDC433EF
+	for <lustre-devel@archiver.kernel.org>; Tue, 28 Dec 2021 01:58:57 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A67BF2462B4;
-	Mon, 27 Dec 2021 17:53:41 -0800 (PST)
-Received: from mail-yb1-f170.google.com (mail-yb1-f170.google.com
- [209.85.219.170])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AE07421FFE6
- for <lustre-devel@lists.lustre.org>; Mon, 27 Dec 2021 17:53:39 -0800 (PST)
-Received: by mail-yb1-f170.google.com with SMTP id d201so25597972ybc.7
- for <lustre-devel@lists.lustre.org>; Mon, 27 Dec 2021 17:53:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=oGOKorLE7lsq1Iu/U9wppBMTBfbxK4GEqqdHWI8TgGI=;
- b=ejWnQtnvquSIkVec7XA2/mk6ZoQqiVQFPSfBkp+rAspRMsyx5u+JNH+W9iiD9LIsku
- D4rkgQx1nDE95rSeQvYMrMJb9eABbQb+1t3nX1KVGXbP1o2s9A2MxhqwCvyfuu2oWyGc
- qDPNVN0k+rwFmcpDS89GFMB4vz3Mfige8oXg1UvPcdJTc9VieG7TBaN6bsVakLo5a7kQ
- VkhxnkmrQGPQypA2VZAp38qKegganNfURR1dFfhvyk9FeE1YBkrRVZdCQjQee4tP/CVl
- rL6nvzzm/kcrXv9kze0ezWNQ14Hm8I8uESOCTboGboF62NmRnt5YKE5Do4MToriyIX9C
- hIpg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20210112;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=oGOKorLE7lsq1Iu/U9wppBMTBfbxK4GEqqdHWI8TgGI=;
- b=mZvNE9PRByWIuW7mlstScc3mNVOiyK0HCh4eucjzvIg8nonuDduweWSU2rM+CDEK+F
- VnRw0+lZW0yuQJSbpQB+OtGi4rWntixn0CCwCPqOgDis4w6IclTRUbXASpQNjhNZR5l3
- pakYTRvAAv1+8X49rl11jckSO7U0OFC9Am5HQnLhiohHzTuHV72cJ8igD3TAKaAGm5sF
- e7aIPyptBvH1J051/OX6BZyo/eUdC/TX7AHN4+hpebEeeoEBxgedTw4E9UZWi/RF3MTJ
- mV2Nuiy8MopRuv2KI0M/dxh89mZ0AjxozI/LBWc9obgh78Cj63JFDLidNylChMITc8Wi
- LJUg==
-X-Gm-Message-State: AOAM5303bZCrUatfqHgIBImTargm3/LTm5Dx5gY2CZByBBgV0N91Dsvu
- ewayO00SQj9zU6yD06My5o/9cQ96OXfpaM+x0/IxhQ==
-X-Google-Smtp-Source: ABdhPJxFdPDNy3O2EzrGK4nDJjDO6wmOxFDkJgRlT1ro0arHyG/vap76ZDaVn9Pyd0vMx65t5wrzqgtTYglUIELSa34=
-X-Received: by 2002:a25:8a:: with SMTP id 132mr8965723yba.738.1640656419137;
- Mon, 27 Dec 2021 17:53:39 -0800 (PST)
-MIME-Version: 1.0
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 20F293A696B;
+	Mon, 27 Dec 2021 17:58:55 -0800 (PST)
+Received: from NAM04-MW2-obe.outbound.protection.outlook.com
+ (mail-mw2nam08on2079.outbound.protection.outlook.com [40.107.101.79])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 942EC21F7BB
+ for <lustre-devel@lists.lustre.org>; Mon, 27 Dec 2021 17:58:53 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=eoXvN/SwZTjdvMDp7ED/OgXZxH1MhyKnk4xG4aD26uRO+20vH4NVBioPWbjLJJtjebOjXNmMKT2FzTH5bskhzUlNFAluWKzudcwieLwZnE2lty20IeHkDWcATTqfOc4bXlugebsw5+cs3ezvSmoL+vsHSapuoZtf1+Hka+RSfG7Rkdi6jy4wUvMIlOCnIF3r6YCquKkVlWd1tkLZTQLKkUqQeX73q5ZRWx28mJJbQ1KsYmnc7NBCs6Tnm3dv3Dk1e1Su2G5i9iLYS1BGZ0+w17NDDjUY3+VI/8qjF1Ne7+pP5RSCEd6KQmd5o9BfcfiEoQw2zY4o8nqSFcO6fNGH9A==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=49l3BOWHHNV3OCCx2xnTeu9+4KdhK/AKF7CpzgSJ5+k=;
+ b=WUcAGZD4IVVzIj36XddX8TvK2h7MMkNHB1m6sGauHfepqOZ1BdfXhEKCd2yCaS0AXKj/n9FcDrlYVYINPLWwvWZc2Nry5X0tK1ROH110IM9JlYbRWquoR7xtrAJFwpGM42eBxcVn0M+glsF8PY6BRa56uAddkqUBNJOTcUj1zgcaIuwQQ0eTvFuZC690r1rKy0q0ajzGTcSSTbb/ZDEENhwn402p2waogS+xthOcTpOdEkVuMwUz9so3fHF463LoVUTanrdyzRdrTelCa652N0t/b2rCK44KYWG6yFEXGeEuettV+uaGIWoIGIeJA05m58y/PVaJbDxw4HptK9wZwQ==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=whamcloud.com; dmarc=pass action=none
+ header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=49l3BOWHHNV3OCCx2xnTeu9+4KdhK/AKF7CpzgSJ5+k=;
+ b=OM1gQWUbDovrLDQIMZXy1riGYaXULgbnefGr2Zf7BH7WtBEQ0dKPLJRConF9SjlM/JPPddSHSEX0DW+puhNlEVU0+GWfbmmHINYMKsk2/4vmFMfZgqhAzvtkLW8SM5QrgC+5GZhM/En/poKPZIMI0tudkxQgQaOB5g4H3PYGJas=
+Received: from BN6PR19MB0146.namprd19.prod.outlook.com (2603:10b6:405:6b::23)
+ by BN6PR19MB3169.namprd19.prod.outlook.com (2603:10b6:405:7d::21)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.4823.22; Tue, 28 Dec
+ 2021 01:58:52 +0000
+Received: from BN6PR19MB0146.namprd19.prod.outlook.com
+ ([fe80::6c29:fb73:8830:3480]) by BN6PR19MB0146.namprd19.prod.outlook.com
+ ([fe80::6c29:fb73:8830:3480%7]) with mapi id 15.20.4823.023; Tue, 28 Dec 2021
+ 01:58:51 +0000
+To: Xinliang Liu <xinliang.liu@linaro.org>
+Thread-Topic: Lustre Arm stuff status and work plan
+Thread-Index: AQHX8lZb6p5/653Ee0+vr6HXAC45zaw6ro4AgAUOLoCABkz3AIAAfR0AgACvz4CAAAGfgA==
+Date: Tue, 28 Dec 2021 01:58:51 +0000
+Message-ID: <023CD146-E2BA-4B03-9459-C480E51EBE7E@whamcloud.com>
 References: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
  <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
  <6C592E3F-0437-4776-BB29-C5EE489C5FAE@whamcloud.com>
  <CAKoKPbxmvn7GVc6wsYrLP_HD8SpNMVFfSFdiZMo-5ZXqS-HSdg@mail.gmail.com>
  <7AAC4FDA-AC84-4E73-83AB-130B6BD3AE1B@whamcloud.com>
-In-Reply-To: <7AAC4FDA-AC84-4E73-83AB-130B6BD3AE1B@whamcloud.com>
-Date: Tue, 28 Dec 2021 09:53:03 +0800
-Message-ID: <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
-To: Oleg Drokin <green@whamcloud.com>
+ <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
+In-Reply-To: <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=whamcloud.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 170eb990-ecff-47d6-8832-08d9c9a598b7
+x-ms-traffictypediagnostic: BN6PR19MB3169:EE_
+x-microsoft-antispam-prvs: <BN6PR19MB3169CB5EBFD5A8FE6F436203AC439@BN6PR19MB3169.namprd19.prod.outlook.com>
+x-ms-oob-tlc-oobclassifiers: OLM:9508;
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: 3JnZPLSdLKokc/bYvOQ2IASv2io2dTlRAY+qRhJV12aWUsW42FfqS4g+g3oTwxA7JnZ9NQZVOpdOXSE4HBq45tnY2j+rhPYIfuNpFFdDtELb99PB8sTIdmvVv8vZK/VYA/rd9FZ2f4xsAUKTZH7jZwp+l18+MLPVWmca6VHVwuuogdOr4tHJVyLT5XesyZKqDMPiFEqHlXOIurnQfelLnVtM6+nkgZNmEEhvCQcfOEHrqW0mJRv68zGHErRU0MRsWlR92tuy3da3TPxa5/3tAToWQ24JqkvftlchXoGoo3iuoAml0ws83Zq/kMGxbiiJQj/5HmIbuzx+wzI7ntjNCDXJwivOJkRodiTOlB6Z/I7geeIO1Etqt+F6jXIBveauewtf8xOIVPRaTUSLJgW/yuWQhx1gbg6+MYPSEeVIecllvtISB+yeC/6YmyGvQklY2IKwa+1+beH31dFIC6uRTcnMvnyS6XZVemaxen89rtbvbTNDWech2m926/Ulu5eYm4APMMI+xnP7YF/KoPjItScLPy11ItUsNc2RDpKH2cPYyLN/9lo9LHbyjZJbHhtkNhiVPaA0wv9hfsf+EnEEhcXXggWtOrQYsPYPE5HnhVhfPUlRkFNZHYJ8KBtRkUtCzr6iBmRu7Co/k4RBm01Bkyw3V6wRhLx3TIHQ77ay3tVwrSu1i39ti7KYgr3X5RWUIagmtQeOLy3GXSZaaRtWsfx8BOad+Jc1hHQngoXACKnFVW19pGkOHSXtQ64GDlS+lIu6w5JqPxbK5aw5+QRYpA==
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:BN6PR19MB0146.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(4636009)(366004)(2906002)(38100700002)(2616005)(5660300002)(36756003)(66946007)(122000001)(53546011)(6506007)(6486002)(26005)(6916009)(186003)(4326008)(76116006)(38070700005)(4744005)(71200400001)(316002)(33656002)(8676002)(86362001)(66476007)(83380400001)(8936002)(6512007)(64756008)(508600001)(54906003)(66446008)(66556008)(13693001)(45980500001);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?vwjJEC9KzyLf+pNSoIz3OI9vy5JilDiuNQO/lWfEaEYo8XDswAdrxHAQTDbf?=
+ =?us-ascii?Q?qluQsrAu2wog/t8VStGObh5A/hTKNfRTXuC7OpUyd8mltyvxk1XC7dRt9I3a?=
+ =?us-ascii?Q?s3KfriZWxbrDC80tFP0FhtD3hwMexEskPXfy06FEI1T2JzSBKYnWdNUbonDd?=
+ =?us-ascii?Q?ze4QQ9ZN1SobiQ/WfbHgC6+D1UYGnY66Tgm4F08Isi91Y3ofufTKFbnm6NWM?=
+ =?us-ascii?Q?lyr1+CeyBh36j/SpRKkYYp9Jf6wBTG4xdifNgWw4B+mHlE1rJP1QYqQ6c4Sy?=
+ =?us-ascii?Q?8dRPYe1bryJm2KgM5gHQHeBh691T/meTl/VVatGfhrQ6pAjWG/ex52hsY3N2?=
+ =?us-ascii?Q?b0vWURreE0TW7uMcWjZGCtPg7WbGNbWLEa0JD2poPH1IMUiaN0SCbKclOOFk?=
+ =?us-ascii?Q?Ofsvzg70BdC0GtNuwWC6itJnd6ZqcDDvM8uUfTSGUqdl0YgRlr5ObLaxsVSs?=
+ =?us-ascii?Q?Gv9DOygrxSK/0GL5SYBWiimgxnj3Xkf0q5i96w/Qo7R4NRohEVH3tPJbJWrm?=
+ =?us-ascii?Q?40t7jhnej8ZdI0hPLf6JpzhE29kkSfdOszwkanx4pq4u73lFJzKK+e8e3ATJ?=
+ =?us-ascii?Q?OPoFl8WdfvCmER+yWfjqIIPZMYtGzJfkMWd0QBXt62QGDZKBrgY1PXS8u89C?=
+ =?us-ascii?Q?BQojE15fMGGXxkeoC4RF4n2mdYTgTMcZQ/FVEI3pBTLhlQeV/GTc8AqaMRpc?=
+ =?us-ascii?Q?9robyhQYo0F5hDh3schUC5lLZ3CC20qyM1VtW8R75+Ry+ChcTBWmNWv96Kss?=
+ =?us-ascii?Q?FZ2pWexcz2Ixfnu+BCexh33aKNv7liwY+a/xIXQAaLuplj3YccQTPTJHS6Tz?=
+ =?us-ascii?Q?ROcSQEr4UdOkBarHCPU4J+3AVXT0sNi502fyuPlG9rfkHz9p+Mt0cmJuiSdS?=
+ =?us-ascii?Q?7kWvzkzV9X8MlzgsbE1iu+pe0Y+yDdH9dvQlgUY/6SRJm5rA+W/Sc9ZzjyXy?=
+ =?us-ascii?Q?IHznDF0JqkcCc9Nh9RWqSlFluy/WsG6hxHIsAcM5l385ypoO0uBdY/cQLD7q?=
+ =?us-ascii?Q?t6GD3NeDyX6j58jx0WSEUKoI0by5TMYZMrBSBqrxwDWPjp2jd5npDC+Szwyl?=
+ =?us-ascii?Q?wQz85J7437l/X94Qwe5uXnKQiZC2Le6/MirOzAC17K22eUQh3DlwqiHqdych?=
+ =?us-ascii?Q?GE06OfwBvPF0+jP+u3exdN/N/yhSJWgdYQz6MciZ7up/+R7xsGka1uJPZm7x?=
+ =?us-ascii?Q?P4xSyC7mbWnY+BMmIgdwpz/0pnz5ZE2FdNs2GzU/9KxTiMxmYX5bFQ4JltXs?=
+ =?us-ascii?Q?a/x0RBBqNHWx4IhIlzxkD2jsUqeDwgaaVa91y/aKmh2hOP+OiQbXLrJb8sia?=
+ =?us-ascii?Q?BCVwo3OEOppwE1ZhFc9gLiN569utVY+sd99G9kk2K6+ap7AOxpFSUNtUI7ro?=
+ =?us-ascii?Q?ZUYQdTBEkIAhdHAAbLTMg4X0BvWkkMdp6AphCBZFaZCER0IprWeudEazgAdl?=
+ =?us-ascii?Q?1prCcCsR647gQfNarHOgjsttXBDEl8Eah9YC5/+m5hIla41AJSz4h7NFcfTP?=
+ =?us-ascii?Q?IheIVnzPVgjPY9AvL78QNMihTYCXqhhZgGoVR1Xt1jb9HIOhNstd/O91iGvo?=
+ =?us-ascii?Q?Ikfam5OekA9r8hRYQxM=3D?=
+MIME-Version: 1.0
+X-OriginatorOrg: whamcloud.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: BN6PR19MB0146.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 170eb990-ecff-47d6-8832-08d9c9a598b7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 28 Dec 2021 01:58:51.6243 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: Fz47hcVARaPBdkg77HBpzmOowC1aQxM+kRue2JZsR/28RsdSVmU9O36c5tcWJXG+
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR19MB3169
 Subject: Re: [lustre-devel] Lustre Arm stuff status and work plan
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
@@ -63,116 +120,102 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Xinliang Liu <xinliang.liu@linaro.org>
+From: Oleg Drokin via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Oleg Drokin <green@whamcloud.com>
 Cc: Jian Yu <jiyu@whamcloud.com>, Li Xi <lixi@ddn.com>,
  "cloud-dev-request@op-lists.linaro.org"
  <cloud-dev-request@op-lists.linaro.org>,
  Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============8119224779093855861=="
+Content-Type: multipart/mixed; boundary="===============1665507722653878189=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8119224779093855861==
-Content-Type: multipart/alternative; boundary="0000000000000fc13005d42b17cc"
+--===============1665507722653878189==
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_023CD146E2BA4B039459C480E51EBE7Ewhamcloudcom_"
 
---0000000000000fc13005d42b17cc
-Content-Type: text/plain; charset="UTF-8"
-
-On Mon, 27 Dec 2021 at 23:23, Oleg Drokin <green@whamcloud.com> wrote:
-
->
->
-> > On Dec 27, 2021, at 2:56 AM, Xinliang Liu <xinliang.liu@linaro.org>
-> wrote:
-> >
-> > And if we run some kind of tests externally in our end, we can see the
-> test result (pass or not, running log link) displayed on the gerrit patch
-> page as the community running tests.
-> > We want to make our test results public to the Lustre community, so that
-> developers can see the test results and adjust the patch if necessary. Thus
-> avoiding breaking previous Arm work.
-> > That can be made via reporting results into Maloo DB, right? Am I
-> understanding correctly?
->
-> In general people are more likely to see results when you post a comment
-> to gerrit with said results.
->
-
-Yeah, that's what we want.
-
-
-> Maloo is just one place to link to to actually let people see the results,
-> but you can link to external resources too
-> like e.g. gatekeeper janitor helper does or assuming the information is
-> small enough it could be entirely contained
-> in the comment (like say for a build failure)
->
-
-Ok, understand now. Is there any other reference external CI that posts
-results to Lustre gerrit now?
-
-
->
-> > We will look into the links and evaluate on setting up our own or
-> self-hosted test infra and see if we can make it.
-> > Such as,
-> > 1. How many VMs resources for the test infra and test running;
-> > 2. Other requirements for the self-hosted test infra;
-> > 3. Work items to be done;
-> > ..
->
-
---0000000000000fc13005d42b17cc
-Content-Type: text/html; charset="UTF-8"
+--_000_023CD146E2BA4B039459C480E51EBE7Ewhamcloudcom_
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
-<div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote">=
-<div dir=3D"ltr" class=3D"gmail_attr">On Mon, 27 Dec 2021 at 23:23, Oleg Dr=
-okin &lt;<a href=3D"mailto:green@whamcloud.com">green@whamcloud.com</a>&gt;=
- wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px =
-0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><br>
-<br>
-&gt; On Dec 27, 2021, at 2:56 AM, Xinliang Liu &lt;<a href=3D"mailto:xinlia=
-ng.liu@linaro.org" target=3D"_blank">xinliang.liu@linaro.org</a>&gt; wrote:=
-<br>
-&gt; <br>
-&gt; And if we run some kind of tests externally in our end, we can see the=
- test result (pass or not, running log link) displayed on the gerrit patch =
-page as the community running tests. <br>
-&gt; We want to make our test results public to the Lustre community, so th=
-at developers can see the test results and adjust the patch if necessary. T=
-hus avoiding breaking previous Arm work.<br>
-&gt; That can be made via reporting results into Maloo DB, right? Am I unde=
-rstanding correctly?<br>
-<br>
-In general people are more likely to see results when you post a comment to=
- gerrit with said results.<br></blockquote><div><br></div><div>Yeah, that&#=
-39;s what we want.</div><div>=C2=A0</div><blockquote class=3D"gmail_quote" =
-style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);pa=
-dding-left:1ex">
+
+
+On Dec 27, 2021, at 8:53 PM, Xinliang Liu <xinliang.liu@linaro.org<mailto:x=
+inliang.liu@linaro.org>> wrote:
+
 Maloo is just one place to link to to actually let people see the results, =
-but you can link to external resources too<br>
+but you can link to external resources too
 like e.g. gatekeeper janitor helper does or assuming the information is sma=
-ll enough it could be entirely contained<br>
-in the comment (like say for a build failure)<br></blockquote><div><br></di=
-v><div>Ok, understand now. Is there any other reference external CI that po=
-sts results to Lustre gerrit now?</div><div>=C2=A0</div><blockquote class=
-=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rg=
-b(204,204,204);padding-left:1ex">
-<br>
-&gt; We will look into the links and evaluate on setting up our own or self=
--hosted test infra and see if we can make it.<br>
-&gt; Such as,<br>
-&gt; 1. How many VMs resources for the test infra and test running;<br>
-&gt; 2. Other requirements for the self-hosted test infra; <br>
-&gt; 3. Work items to be done;<br>
-&gt; ..<br>
-</blockquote></div></div>
+ll enough it could be entirely contained
+in the comment (like say for a build failure)
 
---0000000000000fc13005d42b17cc--
+Ok, understand now. Is there any other reference external CI that posts res=
+ults to Lustre gerrit now?
 
---===============8119224779093855861==
+Currently there are:
+- checkpatch and Misc code checks (smach) that post their results as 100% c=
+omment only. they share codebase pretty much
+- the Janitor (also started with above codebase but got changed and extende=
+d a lot)
+
+There was external interest in the past to post results to gerrit but it ne=
+ver materialized in the end
+
+--_000_023CD146E2BA4B039459C480E51EBE7Ewhamcloudcom_
+Content-Type: text/html; charset="us-ascii"
+Content-ID: <0B69BC7EF24F4848A44A4152C87DBBE7@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+</head>
+<body style=3D"word-wrap: break-word; -webkit-nbsp-mode: space; line-break:=
+ after-white-space;" class=3D"">
+<br class=3D"">
+<div><br class=3D"">
+<blockquote type=3D"cite" class=3D"">
+<div class=3D"">On Dec 27, 2021, at 8:53 PM, Xinliang Liu &lt;<a href=3D"ma=
+ilto:xinliang.liu@linaro.org" class=3D"">xinliang.liu@linaro.org</a>&gt; wr=
+ote:</div>
+<div class=3D"">
+<div dir=3D"ltr" class=3D"">
+<div class=3D"gmail_quote"><br class=3D"">
+<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
+left:1px solid rgb(204,204,204);padding-left:1ex">
+Maloo is just one place to link to to actually let people see the results, =
+but you can link to external resources too<br class=3D"">
+like e.g. gatekeeper janitor helper does or assuming the information is sma=
+ll enough it could be entirely contained<br class=3D"">
+in the comment (like say for a build failure)<br class=3D"">
+</blockquote>
+<div class=3D""><br class=3D"">
+</div>
+<div class=3D"">Ok, understand now. Is there any other reference external C=
+I that posts results to Lustre gerrit now?</div>
+</div>
+</div>
+</div>
+</blockquote>
+<div><br class=3D"">
+</div>
+Currently there are:</div>
+<div>- checkpatch and Misc code checks (smach) that post their results as 1=
+00% comment only. they share codebase pretty much</div>
+<div>- the Janitor (also started with above codebase but got changed and ex=
+tended a lot)</div>
+<div><br class=3D"">
+</div>
+<div>There was external interest in the past to post results to gerrit but =
+it never materialized in the end</div>
+</body>
+</html>
+
+--_000_023CD146E2BA4B039459C480E51EBE7Ewhamcloudcom_--
+
+--===============1665507722653878189==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -183,4 +226,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============8119224779093855861==--
+--===============1665507722653878189==--
