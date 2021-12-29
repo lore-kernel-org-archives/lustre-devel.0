@@ -4,28 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id EC833C433EF
-	for <lustre-devel@archiver.kernel.org>; Wed, 29 Dec 2021 14:51:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8AD23C433EF
+	for <lustre-devel@archiver.kernel.org>; Wed, 29 Dec 2021 14:51:56 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id AB4DF3AD5A8;
-	Wed, 29 Dec 2021 06:51:48 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B41313AD53B;
+	Wed, 29 Dec 2021 06:51:51 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 3EDF73AD50F
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D07C53AD51C
  for <lustre-devel@lists.lustre.org>; Wed, 29 Dec 2021 06:51:33 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A200C1006F15;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A92791008260;
  Wed, 29 Dec 2021 09:51:28 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 9EC53D9E6B; Wed, 29 Dec 2021 09:51:28 -0500 (EST)
+ id A7534D9E6F; Wed, 29 Dec 2021 09:51:28 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Wed, 29 Dec 2021 09:51:25 -0500
-Message-Id: <1640789487-22279-12-git-send-email-jsimmons@infradead.org>
+Date: Wed, 29 Dec 2021 09:51:27 -0500
+Message-Id: <1640789487-22279-14-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1640789487-22279-1-git-send-email-jsimmons@infradead.org>
 References: <1640789487-22279-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 11/13] lnet: Race on discovery queue
+Subject: [lustre-devel] [PATCH 13/13] lustre: llite: set ra_pages of
+ backing_dev_info with 0
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -38,161 +39,93 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Chris Horn <chris.horn@hpe.com>
+From: Qian Yingjin <qian@ddn.com>
 
-If the discovery thread clears the LNET_PEER_DISCOVERING bit then a
-race window opens when the discovery thread drops the
-lnet_peer.lp_lock spinlock and closes when the discovery thread
-acquires the lnet_net_lock. If another thread queues the peer for
-discovery during this window then the LNET_PEER_DISCOVERING bit is
-added back to the peer state, but since the peer is already on the
-lnet.ln_dc_working queue, it does not get added to the
-lnet.ln_dc_request queue.
+The latest kernels sets initial @ra_pages of
+backing_dev_info with VM_READAHEAD_PAGES:
 
-When the discovery thread acquires the lnet_net_lock/EX, it sees that
-the LNET_PEER_DISCOVERING bit has not been cleared, so it does not
-call lnet_peer_discovery_complete() which is responsible for sending
-messages on the peer's discovery pending queue.
+struct backing_dev_info *bdi_alloc(int node_id)
+{
+        ...
+        bdi->ra_pages = VM_READAHEAD_PAGES;
+        bdi->io_pages = VM_READAHEAD_PAGES;
+        ...
+}
 
-At this point, the peer is stuck on the lnet.ln_dc_working queue, and
-messages may continue to accumulate on the peer's
-lnet_peer.lp_dc_pendq.
+This will cause that @ra_pages of file readahead state is set
+with @bdi->ra_pages, make the readahead is out of Lustre control
+and trigger the readahead logic in Linux kernel wrongly. And it
+results in the failure sanity 101j.
 
-Fix the issue by re-working the main discovery thread loop so that we
-do not release the lnet_peer.lp_lock until after we've determined
-whether we need to call lnet_peer_discovery_complete().
-This ensures that the lnet_peer is correctly removed from the
-discovery work queue and any messages on the peer's
-lnet_peer.lp_dc_pendq are sent or finalized.
+In this patch, we force to set @ra_pages of backing_dev_info with
+0 after setup the backing device info. By this way, it disables
+kernel readahead in the super block.
 
-It is also possible for the lnet_peer.lp_dc_error to be cleared
-during the aforementioned window, as well as during the time when
-lnet_peer_discovery_complete() is processing the contents of the
-lnet_peer.lp_dc_pendq. This could prevent messages on the
-lnet_peer.lp_dc_pendq from being correctly finalized. To fix this
-issue, the responsibilities of lnet_peer_discovery_error() were
-incorporated into lnet_peer_discovery_complete().
+This patch also cleanups the unnecessary setting of @ra_pages in
+llite "file.c" and "vvp_io.c".
 
-HPE-bug-id: LUS-10615
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15234
-Lustre-commit: 852a4b264a984979d ("LU-15234 lnet: Race on discovery queue")
-Signed-off-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-on: https://review.whamcloud.com/45670
-Reviewed-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15244
+Lustre-commit: 878561880d2aba038 ("LU-15244 llite: set ra_pages of backing_dev_info with 0")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/45712
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/lnet/peer.c | 47 ++++++++++++++++++++---------------------------
- 1 file changed, 20 insertions(+), 27 deletions(-)
+ fs/lustre/llite/file.c      | 2 --
+ fs/lustre/llite/llite_lib.c | 3 +++
+ fs/lustre/llite/vvp_io.c    | 3 ---
+ 3 files changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index cca458f..057a1db 100644
---- a/net/lnet/lnet/peer.c
-+++ b/net/lnet/lnet/peer.c
-@@ -2262,7 +2262,7 @@ static int lnet_peer_queue_for_discovery(struct lnet_peer *lp)
-  * Discovery of a peer is complete. Wake all waiters on the peer.
-  * Call with lnet_net_lock/EX held.
-  */
--static void lnet_peer_discovery_complete(struct lnet_peer *lp)
-+static void lnet_peer_discovery_complete(struct lnet_peer *lp, int dc_error)
- {
- 	struct lnet_msg *msg, *tmp;
- 	int rc = 0;
-@@ -2273,6 +2273,11 @@ static void lnet_peer_discovery_complete(struct lnet_peer *lp)
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index eafb936..30e99c0 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -757,8 +757,6 @@ static int ll_local_open(struct file *file, struct lookup_intent *it,
+ 	file->private_data = fd;
+ 	ll_readahead_init(inode, &fd->fd_ras);
+ 	fd->fd_omode = it->it_flags & (FMODE_READ | FMODE_WRITE | FMODE_EXEC);
+-	/* turn off the kernel's read-ahead */
+-	file->f_ra.ra_pages = 0;
  
- 	list_del_init(&lp->lp_dc_list);
- 	spin_lock(&lp->lp_lock);
-+	if (dc_error) {
-+		lp->lp_dc_error = dc_error;
-+		lp->lp_state &= ~LNET_PEER_DISCOVERING;
-+		lp->lp_state |= LNET_PEER_REDISCOVER;
-+	}
- 	list_splice_init(&lp->lp_dc_pendq, &pending_msgs);
- 	spin_unlock(&lp->lp_lock);
- 	wake_up(&lp->lp_dc_waitq);
-@@ -2285,8 +2290,8 @@ static void lnet_peer_discovery_complete(struct lnet_peer *lp)
- 	/* iterate through all pending messages and send them again */
- 	list_for_each_entry_safe(msg, tmp, &pending_msgs, msg_list) {
- 		list_del_init(&msg->msg_list);
--		if (lp->lp_dc_error) {
--			lnet_finalize(msg, lp->lp_dc_error);
-+		if (dc_error) {
-+			lnet_finalize(msg, dc_error);
- 			continue;
- 		}
- 
-@@ -3619,22 +3624,6 @@ static int lnet_peer_send_push(struct lnet_peer *lp)
+ 	return 0;
  }
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 11a545a3..87cdc36 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -1203,6 +1203,9 @@ int ll_fill_super(struct super_block *sb)
+ 	if (err)
+ 		goto out_free;
  
- /*
-- * An unrecoverable error was encountered during discovery.
-- * Set error status in peer and abort discovery.
-- */
--static void lnet_peer_discovery_error(struct lnet_peer *lp, int error)
--{
--	CDEBUG(D_NET, "Discovery error %s: %d\n",
--	       libcfs_nidstr(&lp->lp_primary_nid), error);
--
--	spin_lock(&lp->lp_lock);
--	lp->lp_dc_error = error;
--	lp->lp_state &= ~LNET_PEER_DISCOVERING;
--	lp->lp_state |= LNET_PEER_REDISCOVER;
--	spin_unlock(&lp->lp_lock);
--}
--
--/*
-  * Wait for work to be queued or some other change that must be
-  * attended to. Returns non-zero if the discovery thread should shut
-  * down.
-@@ -3810,17 +3799,22 @@ static int lnet_peer_discovery(void *arg)
- 			CDEBUG(D_NET, "peer %s(%p) state %#x rc %d\n",
- 			       libcfs_nidstr(&lp->lp_primary_nid), lp,
- 			       lp->lp_state, rc);
--			spin_unlock(&lp->lp_lock);
- 
--			lnet_net_lock(LNET_LOCK_EX);
- 			if (rc == LNET_REDISCOVER_PEER) {
-+				spin_unlock(&lp->lp_lock);
-+				lnet_net_lock(LNET_LOCK_EX);
- 				list_move(&lp->lp_dc_list,
- 					  &the_lnet.ln_dc_request);
--			} else if (rc) {
--				lnet_peer_discovery_error(lp, rc);
-+			} else if (rc ||
-+				   !(lp->lp_state & LNET_PEER_DISCOVERING)) {
-+				spin_unlock(&lp->lp_lock);
-+				lnet_net_lock(LNET_LOCK_EX);
-+				lnet_peer_discovery_complete(lp, rc);
-+			} else {
-+				spin_unlock(&lp->lp_lock);
-+				lnet_net_lock(LNET_LOCK_EX);
- 			}
--			if (!(lp->lp_state & LNET_PEER_DISCOVERING))
--				lnet_peer_discovery_complete(lp);
++	/* disable kernel readahead */
++	sb->s_bdi->ra_pages = 0;
 +
- 			if (the_lnet.ln_dc_state == LNET_DC_STATE_STOPPING)
- 				break;
- 		}
-@@ -3857,8 +3851,7 @@ static int lnet_peer_discovery(void *arg)
- 	while (!list_empty(&the_lnet.ln_dc_request)) {
- 		lp = list_first_entry(&the_lnet.ln_dc_request,
- 				      struct lnet_peer, lp_dc_list);
--		lnet_peer_discovery_error(lp, -ESHUTDOWN);
--		lnet_peer_discovery_complete(lp);
-+		lnet_peer_discovery_complete(lp, -ESHUTDOWN);
- 	}
- 	lnet_net_unlock(LNET_LOCK_EX);
+ 	/* Call ll_debugsfs_register_super() before lustre_process_log()
+ 	 * so that "llite.*.*" params can be processed correctly.
+ 	 */
+diff --git a/fs/lustre/llite/vvp_io.c b/fs/lustre/llite/vvp_io.c
+index d8951ac..40047f8 100644
+--- a/fs/lustre/llite/vvp_io.c
++++ b/fs/lustre/llite/vvp_io.c
+@@ -834,9 +834,6 @@ static int vvp_io_read_start(const struct lu_env *env,
+ 			 "Read ino %lu, %zu bytes, offset %lld, size %llu\n",
+ 			 inode->i_ino, cnt, pos, i_size_read(inode));
  
+-	/* turn off the kernel's read-ahead */
+-	vio->vui_fd->fd_file->f_ra.ra_pages = 0;
+-
+ 	/* initialize read-ahead window once per syscall */
+ 	if (!vio->vui_ra_valid) {
+ 		vio->vui_ra_valid = true;
 -- 
 1.8.3.1
 
