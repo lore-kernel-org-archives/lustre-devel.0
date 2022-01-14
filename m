@@ -4,28 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id AB992C433EF
-	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:39:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 4B83AC433F5
+	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:39:27 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 11DE03AD81B;
-	Thu, 13 Jan 2022 17:38:50 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4D84E3AD9D2;
+	Thu, 13 Jan 2022 17:38:53 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B8AD63AD851
- for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:10 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 476A921FFAD
+ for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:13 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id D5AF5100F333;
- Thu, 13 Jan 2022 20:38:04 -0500 (EST)
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 0C261100F34E;
+ Thu, 13 Jan 2022 20:38:05 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id D47E6DF4C4; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
+ id 0A15BA8103; Thu, 13 Jan 2022 20:38:05 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 13 Jan 2022 20:37:53 -0500
-Message-Id: <1642124283-10148-15-git-send-email-jsimmons@infradead.org>
+Date: Thu, 13 Jan 2022 20:38:03 -0500
+Message-Id: <1642124283-10148-25-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
 References: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 14/24] lustre: llite: Add D_IOTRACE
+Subject: [lustre-devel] [PATCH 24/24] lustre: llite: Implement lower/upper
+ aio
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -47,180 +48,251 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Patrick Farrell <pfarrell@whamcloud.com>
 
-In looking in to performance problems, it's very important
-to be able to trace the I/O patterns from userspace in to
-Lustre, and also understand the key basics of how Lustre
-handles that I/O (readahead, RPC generation).
+This patch creates a lower level aio struct for each set of
+pages submitted, and attaches that to the llite level aio.
 
-This is best done with a dedicated debug flag - No
-userspace tool can provide all this information, and
-existing debug flags collect a huge number of unrelated
-pieces of, well, debug information.
+That means the completion of i/o (in the sense of
+successful RPC/page completion) is associated with the
+lower level aio struct, and the higher level aio waits for
+the completion of these lower level structs.  Previously,
+all pages were associated with the upper level (and only)
+aio struct.
 
-The goal is for customers to be able to quickly gather log
-files of a reasonable size which contain the necessary
-information and which can easily be interpreted by
-engineering.  This is not possible if the information is
-spread out across a number of heavyweight debug flags.
+This patch is a reorganization/cleanup, which is necessary
+for the next patch, which moves release pages to aio_end.
+The justification for this (correctness and performance)
+will be provided in that patch.
 
-This is a first pass at adding the flag and the debug
-required to track basic data I/O.  One significant
-omission in the first patch is RPC generation - I have not
-decided how best to do that yet.  That will be added in a
-future patch.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15137
-Lustre-commit: 40d286e11138fc67f ("LU-15317 llite: Add D_IOTRACE")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13799
+Lustre-commit: 46ff76137160b66f1 ("LU-13799 llite: Implement lower/upper aio")
 Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/45752
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/44209
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Yingjin Qian <qian@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c                 | 10 ++++++++++
- fs/lustre/llite/llite_internal.h       |  1 +
- fs/lustre/llite/llite_mmap.c           | 13 ++++++++++---
- fs/lustre/llite/rw.c                   | 10 ++++++++--
- include/uapi/linux/lnet/libcfs_debug.h |  3 ++-
- 5 files changed, 31 insertions(+), 6 deletions(-)
+ fs/lustre/include/cl_object.h |  7 +++++--
+ fs/lustre/llite/file.c        |  2 +-
+ fs/lustre/llite/rw26.c        | 34 +++++++++++++++++++++++++--------
+ fs/lustre/obdclass/cl_io.c    | 44 +++++++++++++++++++++++++++++++++----------
+ 4 files changed, 66 insertions(+), 21 deletions(-)
 
+diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
+index 1746c4e..9815b19 100644
+--- a/fs/lustre/include/cl_object.h
++++ b/fs/lustre/include/cl_object.h
+@@ -2592,7 +2592,8 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		     int ioret);
+ int cl_sync_io_wait_recycle(const struct lu_env *env, struct cl_sync_io *anchor,
+ 			    long timeout, int ioret);
+-struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb, struct cl_object *obj);
++struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb, struct cl_object *obj,
++				struct cl_dio_aio *ll_aio);
+ void cl_aio_free(const struct lu_env *env, struct cl_dio_aio *aio);
+ 
+ static inline void cl_sync_io_init(struct cl_sync_io *anchor, int nr)
+@@ -2626,7 +2627,9 @@ struct cl_dio_aio {
+ 	struct cl_object	*cda_obj;
+ 	struct kiocb		*cda_iocb;
+ 	ssize_t			cda_bytes;
+-	unsigned int		cda_no_aio_complete:1;
++	struct cl_dio_aio	*cda_ll_aio;
++	unsigned int		cda_no_aio_complete:1,
++				cda_no_aio_free:1;
+ };
+ 
+ /** @} cl_sync_io */
 diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 05f2f1a..dec0109 100644
+index d9b1457..6b95133 100644
 --- a/fs/lustre/llite/file.c
 +++ b/fs/lustre/llite/file.c
-@@ -1954,6 +1954,11 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
- 	ktime_t kstart = ktime_get();
- 	bool cached;
+@@ -1684,7 +1684,7 @@ static void ll_heat_add(struct inode *inode, enum cl_io_type iot,
+ 			is_parallel_dio = false;
  
-+	CDEBUG(D_VFSTRACE|D_IOTRACE, "file %s:"DFID", ppos: %lld, count: %zu\n",
-+	       file_dentry(file)->d_name.name,
-+	       PFID(ll_inode2fid(file_inode(file))), iocb->ki_pos,
-+	       iov_iter_count(to));
+ 		ci_aio = cl_aio_alloc(args->u.normal.via_iocb,
+-				      ll_i2info(inode)->lli_clob);
++				      ll_i2info(inode)->lli_clob, NULL);
+ 		if (!ci_aio) {
+ 			rc = -ENOMEM;
+ 			goto out;
+diff --git a/fs/lustre/llite/rw26.c b/fs/lustre/llite/rw26.c
+index 4c2ab38..16cccfa 100644
+--- a/fs/lustre/llite/rw26.c
++++ b/fs/lustre/llite/rw26.c
+@@ -330,7 +330,8 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	struct cl_io *io;
+ 	struct file *file = iocb->ki_filp;
+ 	struct inode *inode = file->f_mapping->host;
+-	struct cl_dio_aio *aio;
++	struct cl_dio_aio *ll_aio;
++	struct cl_dio_aio *ldp_aio;
+ 	size_t count = iov_iter_count(iter);
+ 	ssize_t tot_bytes = 0, result = 0;
+ 	loff_t file_offset = iocb->ki_pos;
+@@ -365,12 +366,12 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	io = lcc->lcc_io;
+ 	LASSERT(io);
+ 
+-	aio = io->ci_aio;
+-	LASSERT(aio);
+-	LASSERT(aio->cda_iocb == iocb);
++	ll_aio = io->ci_aio;
++	LASSERT(ll_aio);
++	LASSERT(ll_aio->cda_iocb == iocb);
+ 
+ 	while (iov_iter_count(iter)) {
+-		struct ll_dio_pages pvec = { .ldp_aio = aio };
++		struct ll_dio_pages pvec = {};
+ 		struct page **pages;
+ 
+ 		count = min_t(size_t, iov_iter_count(iter), MAX_DIO_SIZE);
+@@ -382,10 +383,23 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 				count = i_size_read(inode) - file_offset;
+ 		}
+ 
++		/* this aio is freed on completion from cl_sync_io_note, so we
++		 * do not need to directly free the memory here
++		 */
++		ldp_aio = cl_aio_alloc(iocb, ll_i2info(inode)->lli_clob,
++				       ll_aio);
++		if (!ldp_aio) {
++			result = -ENOMEM;
++			goto out;
++		}
++		pvec.ldp_aio = ldp_aio;
 +
- 	if (!iov_iter_count(to))
- 		return 0;
+ 		result = ll_get_user_pages(rw, iter, &pages,
+ 					   &pvec.ldp_count, count);
+-		if (unlikely(result <= 0))
++		if (unlikely(result <= 0)) {
++			cl_sync_io_note(env, &ldp_aio->cda_sync, result);
+ 			goto out;
++		}
  
-@@ -2075,6 +2080,11 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
- 	ktime_t kstart = ktime_get();
- 	int result;
+ 		count = result;
+ 		pvec.ldp_file_offset = file_offset;
+@@ -393,6 +407,10 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
  
-+	CDEBUG(D_VFSTRACE|D_IOTRACE, "file %s:"DFID", ppos: %lld, count: %zu\n",
-+	       file_dentry(file)->d_name.name,
-+	       PFID(ll_inode2fid(file_inode(file))), iocb->ki_pos,
-+	       iov_iter_count(from));
+ 		result = ll_direct_rw_pages(env, io, count,
+ 					    rw, inode, &pvec);
++		/* We've submitted pages and can now remove the extra
++		 * reference for that
++		 */
++		cl_sync_io_note(env, &ldp_aio->cda_sync, result);
+ 		ll_free_user_pages(pages, pvec.ldp_count);
+ 
+ 		if (unlikely(result < 0))
+@@ -404,7 +422,7 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	}
+ 
+ out:
+-	aio->cda_bytes += tot_bytes;
++	ll_aio->cda_bytes += tot_bytes;
+ 
+ 	if (rw == WRITE)
+ 		vio->u.readwrite.vui_written += tot_bytes;
+@@ -424,7 +442,7 @@ static ssize_t ll_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 		ssize_t rc2;
+ 
+ 		/* Wait here rather than doing async submission */
+-		rc2 = cl_sync_io_wait_recycle(env, &aio->cda_sync, 0, 0);
++		rc2 = cl_sync_io_wait_recycle(env, &ll_aio->cda_sync, 0, 0);
+ 		if (result == 0 && rc2)
+ 			result = rc2;
+ 
+diff --git a/fs/lustre/obdclass/cl_io.c b/fs/lustre/obdclass/cl_io.c
+index b72f5db..038ab4c 100644
+--- a/fs/lustre/obdclass/cl_io.c
++++ b/fs/lustre/obdclass/cl_io.c
+@@ -1138,9 +1138,13 @@ static void cl_aio_end(const struct lu_env *env, struct cl_sync_io *anchor)
+ 	if (!aio->cda_no_aio_complete)
+ 		aio->cda_iocb->ki_complete(aio->cda_iocb,
+ 					   ret ?: aio->cda_bytes, 0);
 +
- 	if (!iov_iter_count(from)) {
- 		rc_normal = 0;
- 		goto out;
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 54f0218..8c7361a 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -885,6 +885,7 @@ struct ll_readahead_work {
- 	struct file			*lrw_file;
- 	pgoff_t				 lrw_start_idx;
- 	pgoff_t				 lrw_end_idx;
-+	pid_t				 lrw_user_pid;
++	if (aio->cda_ll_aio)
++		cl_sync_io_note(env, &aio->cda_ll_aio->cda_sync, ret);
+ }
  
- 	/* async worker to handler read */
- 	struct work_struct		 lrw_readahead_work;
-diff --git a/fs/lustre/llite/llite_mmap.c b/fs/lustre/llite/llite_mmap.c
-index 0009c5f..d87a68d 100644
---- a/fs/lustre/llite/llite_mmap.c
-+++ b/fs/lustre/llite/llite_mmap.c
-@@ -377,9 +377,10 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
- 	if (cached)
- 		goto out;
+-struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb, struct cl_object *obj)
++struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb, struct cl_object *obj,
++				struct cl_dio_aio *ll_aio)
+ {
+ 	struct cl_dio_aio *aio;
  
--	CDEBUG(D_MMAP, DFID": vma=%p start=%#lx end=%#lx vm_flags=%#lx\n",
-+	CDEBUG(D_MMAP|D_IOTRACE,
-+	       DFID": vma=%p start=%#lx end=%#lx vm_flags=%#lx idx=%lu\n",
- 	       PFID(&ll_i2info(file_inode(vma->vm_file))->lli_fid),
--	       vma, vma->vm_start, vma->vm_end, vma->vm_flags);
-+	       vma, vma->vm_start, vma->vm_end, vma->vm_flags, vmf->pgoff);
- 
- 	/* Only SIGKILL and SIGTERM are allowed for fault/nopage/mkwrite
- 	 * so that it can be killed by admin but not cause segfault by
-@@ -440,8 +441,14 @@ static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
- 	bool retry;
- 	bool cached;
- 	int err;
--	vm_fault_t ret;
- 	ktime_t kstart = ktime_get();
-+	vm_fault_t ret;
+@@ -1153,12 +1157,30 @@ struct cl_dio_aio *cl_aio_alloc(struct kiocb *iocb, struct cl_object *obj)
+ 		cl_sync_io_init_notify(&aio->cda_sync, 1, aio, cl_aio_end);
+ 		cl_page_list_init(&aio->cda_pages);
+ 		aio->cda_iocb = iocb;
+-		if (is_sync_kiocb(iocb))
++		if (is_sync_kiocb(iocb) || ll_aio)
+ 			aio->cda_no_aio_complete = 1;
+ 		else
+ 			aio->cda_no_aio_complete = 0;
++		/* in the case of a lower level aio struct (ll_aio is set), or
++		 * true AIO (!is_sync_kiocb()), the memory is freed by
++		 * the daemons calling cl_sync_io_note, because they are the
++		 * last users of the aio struct
++		 *
++		 * in other cases, the last user is cl_sync_io_wait, and in
++		 * that case, the caller frees the aio struct after that call
++		 * completes
++		 */
++		if (ll_aio || !is_sync_kiocb(iocb))
++			aio->cda_no_aio_free = 0;
++		else
++			aio->cda_no_aio_free = 1;
 +
-+	CDEBUG(D_MMAP|D_IOTRACE,
-+	       DFID": vma=%p start=%#lx end=%#lx vm_flags=%#lx idx=%lu\n",
-+	       PFID(&ll_i2info(file_inode(vma->vm_file))->lli_fid),
-+	       vma, vma->vm_start, vma->vm_end, vma->vm_flags,
-+	       vmf->page->index);
- 
- 	ret = pcc_page_mkwrite(vma, vmf, &cached);
- 	if (cached)
-diff --git a/fs/lustre/llite/rw.c b/fs/lustre/llite/rw.c
-index c9f29ef..9f6e140 100644
---- a/fs/lustre/llite/rw.c
-+++ b/fs/lustre/llite/rw.c
-@@ -595,6 +595,11 @@ static void ll_readahead_handle_work(struct work_struct *wq)
- 	inode = file_inode(file);
- 	sbi = ll_i2sbi(inode);
- 
-+	CDEBUG(D_READA|D_IOTRACE,
-+	       "%s: async ra from %lu to %lu triggered by user pid %d\n",
-+	       file_dentry(file)->d_name.name, work->lrw_start_idx,
-+	       work->lrw_end_idx, work->lrw_user_pid);
+ 		cl_object_get(obj);
+ 		aio->cda_obj = obj;
++		aio->cda_ll_aio = ll_aio;
 +
- 	env = cl_env_alloc(&refcheck, LCT_NOREF);
- 	if (IS_ERR(env)) {
- 		rc = PTR_ERR(env);
-@@ -1301,7 +1306,7 @@ static void ras_update(struct ll_sb_info *sbi, struct inode *inode,
- 	spin_lock(&ras->ras_lock);
++		if (ll_aio)
++			atomic_add(1,  &ll_aio->cda_sync.csi_sync_nr);
+ 	}
+ 	return aio;
+ }
+@@ -1206,14 +1228,7 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
  
- 	if (!hit)
--		CDEBUG(D_READA, DFID " pages at %lu miss.\n",
-+		CDEBUG(D_READA|D_IOTRACE, DFID " pages at %lu miss.\n",
- 		       PFID(ll_inode2fid(inode)), index);
- 	ll_ra_stats_inc_sbi(sbi, hit ? RA_STAT_HIT : RA_STAT_MISS);
+ 		spin_unlock(&anchor->csi_waitq.lock);
  
-@@ -1670,7 +1675,7 @@ int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
- 			skip_index = vvp_index(vpg);
- 		rc2 = ll_readahead(env, io, &queue->c2_qin, ras,
- 				   uptodate, file, skip_index);
--		CDEBUG(D_READA, DFID " %d pages read ahead at %lu\n",
-+		CDEBUG(D_READA|D_IOTRACE, DFID " %d pages read ahead at %lu\n",
- 		       PFID(ll_inode2fid(inode)), rc2, vvp_index(vpg));
- 	} else if (vvp_index(vpg) == io_start_index &&
- 		   io_end_index - io_start_index > 0) {
-@@ -1770,6 +1775,7 @@ static int kickoff_async_readahead(struct file *file, unsigned long pages)
- 		lrw->lrw_file = get_file(file);
- 		lrw->lrw_start_idx = start_idx;
- 		lrw->lrw_end_idx = end_idx;
-+		lrw->lrw_user_pid = current->pid;
- 		spin_lock(&ras->ras_lock);
- 		ras->ras_next_readahead_idx = end_idx + 1;
- 		ras->ras_async_last_readpage_idx = start_idx;
-diff --git a/include/uapi/linux/lnet/libcfs_debug.h b/include/uapi/linux/lnet/libcfs_debug.h
-index 4cb6594..bbd9f25 100644
---- a/include/uapi/linux/lnet/libcfs_debug.h
-+++ b/include/uapi/linux/lnet/libcfs_debug.h
-@@ -106,6 +106,7 @@ struct ptldebug_header {
- #define D_TRACE		0x00000001 /* ENTRY/EXIT markers */
- #define D_INODE		0x00000002
- #define D_SUPER		0x00000004
-+#define D_IOTRACE	0x00000008 /* simple, low overhead io tracing */
- #define D_MALLOC	0x00000010 /* print malloc, free information */
- #define D_CACHE		0x00000020 /* cache-related items */
- #define D_INFO		0x00000040 /* general information */
-@@ -136,7 +137,7 @@ struct ptldebug_header {
- #define D_LAYOUT	0x80000000
+-		/**
+-		 * For AIO (!is_sync_kiocb), we are responsible for freeing
+-		 * memory here.  This is because we are the last user of this
+-		 * aio struct, whereas in other cases, we will call
+-		 * cl_sync_io_wait to wait after this, and so the memory is
+-		 * freed after that call.
+-		 */
+-		if (aio && !is_sync_kiocb(aio->cda_iocb))
++		if (aio && !aio->cda_no_aio_free)
+ 			cl_aio_free(env, aio);
+ 	}
+ }
+@@ -1223,8 +1238,15 @@ void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
+ int cl_sync_io_wait_recycle(const struct lu_env *env, struct cl_sync_io *anchor,
+ 			    long timeout, int ioret)
+ {
++	bool no_aio_free = anchor->csi_aio->cda_no_aio_free;
+ 	int rc = 0;
  
- #define LIBCFS_DEBUG_MASKS_NAMES {					\
--	"trace", "inode", "super", "tty", "malloc", "cache", "info",	\
-+	"trace", "inode", "super", "iotrace", "malloc", "cache", "info",\
- 	"ioctl", "neterror", "net", "warning", "buffs", "other",	\
- 	"dentry", "nettrace", "page", "dlmtrace", "error", "emerg",	\
- 	"ha", "rpctrace", "vfstrace", "reada", "mmap", "config",	\
++	/* for true AIO, the daemons running cl_sync_io_note would normally
++	 * free the aio struct, but if we're waiting on it, we need them to not
++	 * do that.  This ensures the aio is not freed when we drop the
++	 * reference count to zero in cl_sync_io_note below
++	 */
++	anchor->csi_aio->cda_no_aio_free = 1;
+ 	/*
+ 	 * @anchor was inited as 1 to prevent end_io to be
+ 	 * called before we add all pages for IO, so drop
+@@ -1244,6 +1266,8 @@ int cl_sync_io_wait_recycle(const struct lu_env *env, struct cl_sync_io *anchor,
+ 	 */
+ 	atomic_add(1, &anchor->csi_sync_nr);
+ 
++	anchor->csi_aio->cda_no_aio_free = no_aio_free;
++
+ 	return rc;
+ }
+ EXPORT_SYMBOL(cl_sync_io_wait_recycle);
 -- 
 1.8.3.1
 
