@@ -4,29 +4,28 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id C2BB1C433F5
-	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:38:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 37474C433F5
+	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:38:53 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E09833AD9AA;
-	Thu, 13 Jan 2022 17:38:37 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id EEE493AD923;
+	Thu, 13 Jan 2022 17:38:40 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7FC043AD812
- for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:09 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 89D9321FF8F
+ for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:07 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id C5E13100F32D;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id ACA43100F320;
  Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id C2B7FE07E3; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
+ id A34EEE07E3; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 13 Jan 2022 20:37:49 -0500
-Message-Id: <1642124283-10148-11-git-send-email-jsimmons@infradead.org>
+Date: Thu, 13 Jan 2022 20:37:42 -0500
+Message-Id: <1642124283-10148-4-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
 References: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 10/24] lnet: socklnd: decrement connection
- counters on close
+Subject: [lustre-devel] [PATCH 03/24] lnet: o2iblnd: cleanup
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,7 +38,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Serguei Smirnov <ssmirnov@whamcloud.com>,
+Cc: Alexey Lyashkov <alexey.lyashkov@hpe.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -47,133 +46,139 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Serguei Smirnov <ssmirnov@whamcloud.com>
+From: Alexey Lyashkov <alexey.lyashkov@hpe.com>
 
-To gracefully handle potential race with delayed connection create,
-decrement connection counters per type as connections are being
-closed.
+simplify kiblnd_send by avoid code duplication.
+lets pickup idle tx first.
 
-Fixes: 511ace4a ("lnet: socklnd: add conns_per_peer parameter")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15137
-Lustre-commit: 7e26413aa85fdc931 ("LU-15137 socklnd: decrement connection counters on close")
-Signed-off-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/45422
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+HPE-bug-id: LUS-1796
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14008
+Lustre-commit: 3916b9d7226ebb21c ("LU-14008 o2iblnd: cleanup")
+Signed-off-by: Alexey Lyashkov <alexey.lyashkov@hpe.com>
+Reviewed-on: https://review.whamcloud.com/40260
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Alexander Boyko <alexander.boyko@hpe.com>
 Reviewed-by: Cyril Bordage <cbordage@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/socklnd/socklnd.c | 69 ++++++++++++++++++++++++++++++++++------
- 1 file changed, 60 insertions(+), 9 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c | 43 ++++++++++++++-----------------------
+ net/lnet/lnet/lib-move.c            |  1 +
+ 2 files changed, 17 insertions(+), 27 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index b014aa8..6d1f85c 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -422,7 +422,9 @@ struct ksock_peer_ni *
- 	switch (type) {
- 	case SOCKLND_CONN_CONTROL:
- 		conn_cb->ksnr_ctrl_conn_count++;
--		/* there's a single control connection per peer */
-+		/* there's a single control connection per peer,
-+		 * two in case of loopback
-+		 */
- 		conn_cb->ksnr_connected |= BIT(type);
- 		break;
- 	case SOCKLND_CONN_BULK_IN:
-@@ -449,6 +451,45 @@ struct ksock_peer_ni *
- }
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index db13f41..7560fe1 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1543,6 +1543,15 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
  
- static void
-+ksocknal_decr_conn_count(struct ksock_conn_cb *conn_cb,
-+			 int type)
-+{
-+	conn_cb->ksnr_conn_count--;
-+
-+	/* check if all connections of the given type got created */
-+	switch (type) {
-+	case SOCKLND_CONN_CONTROL:
-+		conn_cb->ksnr_ctrl_conn_count--;
-+		/* there's a single control connection per peer,
-+		 * two in case of loopback
-+		 */
-+		if (conn_cb->ksnr_ctrl_conn_count == 0)
-+			conn_cb->ksnr_connected &= ~BIT(type);
-+		break;
-+	case SOCKLND_CONN_BULK_IN:
-+		conn_cb->ksnr_blki_conn_count--;
-+		if (conn_cb->ksnr_blki_conn_count < conn_cb->ksnr_max_conns)
-+			conn_cb->ksnr_connected &= ~BIT(type);
-+		break;
-+	case SOCKLND_CONN_BULK_OUT:
-+		conn_cb->ksnr_blko_conn_count--;
-+		if (conn_cb->ksnr_blko_conn_count < conn_cb->ksnr_max_conns)
-+			conn_cb->ksnr_connected &= ~BIT(type);
-+		break;
-+	case SOCKLND_CONN_ANY:
-+		if (conn_cb->ksnr_conn_count < conn_cb->ksnr_max_conns)
-+			conn_cb->ksnr_connected &= ~BIT(type);
-+		break;
-+	default:
-+		LBUG();
-+		break;
+ 	iov_iter_advance(&from, payload_offset);
+ 
++	tx = kiblnd_get_idle_tx(ni, target.nid);
++	if (!tx) {
++		CERROR("Can't allocate %s txd for %s\n",
++		       lnet_msgtyp2str(type),
++		       libcfs_nid2str(target.nid));
++		return -ENOMEM;
 +	}
++	ibmsg = tx->tx_msg;
 +
-+	CDEBUG(D_NET, "Del conn type %d, ksnr_connected %x ksnr_max_conns %d\n",
-+	       type, conn_cb->ksnr_connected, conn_cb->ksnr_max_conns);
-+}
-+
-+static void
- ksocknal_associate_cb_conn_locked(struct ksock_conn_cb *conn_cb,
- 				  struct ksock_conn *conn)
- {
-@@ -1249,6 +1290,8 @@ struct ksock_peer_ni *
- 	struct ksock_peer_ni *peer_ni = conn->ksnc_peer;
- 	struct ksock_conn_cb *conn_cb;
- 	struct ksock_conn *conn2;
-+	int conn_count;
-+	int duplicate_count = 0;
+ 	switch (type) {
+ 	default:
+ 		LBUG();
+@@ -1561,14 +1570,6 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 		if (nob <= IBLND_MSG_SIZE && !lntmsg->msg_rdma_force)
+ 			break;		/* send IMMEDIATE */
  
- 	LASSERT(!peer_ni->ksnp_error);
- 	LASSERT(!conn->ksnc_closing);
-@@ -1262,21 +1305,29 @@ struct ksock_peer_ni *
- 		/* dissociate conn from cb... */
- 		LASSERT(!conn_cb->ksnr_deleted);
- 
-+		conn_count = ksocknal_get_conn_count_by_type(conn_cb,
-+							     conn->ksnc_type);
- 		/* connected bit is set only if all connections
- 		 * of the given type got created
- 		 */
--		if (ksocknal_get_conn_count_by_type(conn_cb, conn->ksnc_type) ==
--		    conn_cb->ksnr_max_conns)
-+		if (conn_count == conn_cb->ksnr_max_conns)
- 			LASSERT((conn_cb->ksnr_connected &
- 				BIT(conn->ksnc_type)) != 0);
- 
--		list_for_each_entry(conn2, &peer_ni->ksnp_conns, ksnc_list) {
--			if (conn2->ksnc_conn_cb == conn_cb &&
--			    conn2->ksnc_type == conn->ksnc_type)
--				goto conn2_found;
-+		if (conn_count == 1) {
-+			list_for_each_entry(conn2, &peer_ni->ksnp_conns,
-+					    ksnc_list) {
-+				if (conn2->ksnc_conn_cb == conn_cb &&
-+				    conn2->ksnc_type == conn->ksnc_type)
-+					duplicate_count += 1;
-+			}
-+			if (duplicate_count > 0)
-+				CERROR("Found %d duplicate conns type %d\n",
-+				       duplicate_count,
-+				       conn->ksnc_type);
+-		tx = kiblnd_get_idle_tx(ni, target.nid);
+-		if (!tx) {
+-			CERROR("Can't allocate txd for GET to %s\n",
+-			       libcfs_nid2str(target.nid));
+-			return -ENOMEM;
+-		}
+-
+-		ibmsg = tx->tx_msg;
+ 		rd = &ibmsg->ibm_u.get.ibgm_rd;
+ 		rc = kiblnd_setup_rd_kiov(ni, tx, rd,
+ 					  payload_niov, payload_kiov,
+@@ -1595,7 +1596,8 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			return -EIO;
  		}
--		conn_cb->ksnr_connected &= ~BIT(conn->ksnc_type);
--conn2_found:
-+		ksocknal_decr_conn_count(conn_cb, conn->ksnc_type);
-+
- 		conn->ksnc_conn_cb = NULL;
  
- 		/* drop conn's ref on route */
+-		tx->tx_lntmsg[0] = lntmsg;	/* finalise lntmsg[0,1] on completion */
++		/* finalise lntmsg[0,1] on completion */
++		tx->tx_lntmsg[0] = lntmsg;
+ 		tx->tx_waiting = 1;		/* waiting for GET_DONE */
+ 		kiblnd_launch_tx(ni, tx, target.nid);
+ 		return 0;
+@@ -1607,14 +1609,6 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 		if (nob <= IBLND_MSG_SIZE && !lntmsg->msg_rdma_force)
+ 			break;			/* send IMMEDIATE */
+ 
+-		tx = kiblnd_get_idle_tx(ni, target.nid);
+-		if (!tx) {
+-			CERROR("Can't allocate %s txd for %s\n",
+-			       type == LNET_MSG_PUT ? "PUT" : "REPLY",
+-			       libcfs_nid2str(target.nid));
+-			return -ENOMEM;
+-		}
+-
+ 		rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
+ 					  payload_niov, payload_kiov,
+ 					  payload_offset, payload_nob);
+@@ -1625,12 +1619,12 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 			return -EIO;
+ 		}
+ 
+-		ibmsg = tx->tx_msg;
+ 		ibmsg->ibm_u.putreq.ibprm_hdr = *hdr;
+ 		ibmsg->ibm_u.putreq.ibprm_cookie = tx->tx_cookie;
+ 		kiblnd_init_tx_msg(ni, tx, IBLND_MSG_PUT_REQ, sizeof(struct kib_putreq_msg));
+ 
+-		tx->tx_lntmsg[0] = lntmsg;	/* finalise lntmsg on completion */
++		/* finalise lntmsg on completion */
++		tx->tx_lntmsg[0] = lntmsg;
+ 		tx->tx_waiting = 1;		/* waiting for PUT_{ACK,NAK} */
+ 		kiblnd_launch_tx(ni, tx, target.nid);
+ 		return 0;
+@@ -1641,13 +1635,6 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	LASSERT(offsetof(struct kib_msg, ibm_u.immediate.ibim_payload[payload_nob])
+ 		 <= IBLND_MSG_SIZE);
+ 
+-	tx = kiblnd_get_idle_tx(ni, target.nid);
+-	if (!tx) {
+-		CERROR("Can't send %d to %s: tx descs exhausted\n",
+-		       type, libcfs_nid2str(target.nid));
+-		return -ENOMEM;
+-	}
+-
+ 	ibmsg = tx->tx_msg;
+ 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
+ 
+@@ -1661,7 +1648,9 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	nob = offsetof(struct kib_immediate_msg, ibim_payload[payload_nob]);
+ 	kiblnd_init_tx_msg(ni, tx, IBLND_MSG_IMMEDIATE, nob);
+ 
+-	tx->tx_lntmsg[0] = lntmsg;		/* finalise lntmsg on completion */
++	/* finalise lntmsg on completion */
++	tx->tx_lntmsg[0] = lntmsg;
++
+ 	kiblnd_launch_tx(ni, tx, target.nid);
+ 	return 0;
+ }
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index caffa30..133397e 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -4215,6 +4215,7 @@ void lnet_monitor_thr_stop(void)
+ 		return "<UNKNOWN>";
+ 	}
+ }
++EXPORT_SYMBOL(lnet_msgtyp2str);
+ 
+ int
+ lnet_parse(struct lnet_ni *ni, struct lnet_hdr *hdr, lnet_nid_t from_nid4,
 -- 
 1.8.3.1
 
