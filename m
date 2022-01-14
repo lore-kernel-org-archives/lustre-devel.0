@@ -4,29 +4,26 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 829BCC433F5
-	for <lustre-devel@archiver.kernel.org>; Wed, 29 Dec 2021 14:52:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 0F3D0C433FE
+	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:38:08 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7E47D3AD39B;
-	Wed, 29 Dec 2021 06:52:05 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 586C43B4792;
+	Thu, 13 Jan 2022 17:38:08 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 87D7F3AD51C
- for <lustre-devel@lists.lustre.org>; Wed, 29 Dec 2021 06:51:33 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 85E6921FF8F
+ for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:06 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A40B21006F16;
- Wed, 29 Dec 2021 09:51:28 -0500 (EST)
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A555B10087C4;
+ Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id A31F1D9E6D; Wed, 29 Dec 2021 09:51:28 -0500 (EST)
+ id 96281A8102; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Wed, 29 Dec 2021 09:51:26 -0500
-Message-Id: <1640789487-22279-13-git-send-email-jsimmons@infradead.org>
+Date: Thu, 13 Jan 2022 20:37:39 -0500
+Message-Id: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <1640789487-22279-1-git-send-email-jsimmons@infradead.org>
-References: <1640789487-22279-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/13] lnet: o2iblnd: convert ibp_refcount to
- a kref
+Subject: [lustre-devel] [PATCH 00/24] lustre: update to OpenSFS Jan 13, 2022
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,131 +43,94 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-This refcount is used exactly like a kref.  So change it to one.
-kref uses refcount_t which will warn on increment-from-zero and
-similar problems (which enabled with CONFIG option), so we don't
-need the LASSERT calls.
+Update native Linux lustre client with backport of the OpenSFS
+work as of Jan 13, 2022
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12678
-Lustre-commit: 2968a40a163aa1b0f ("LU-12678 o2iblnd: convert ibp_refcount to a kref")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/45685
-Reviewed-by: Neil Brown <neilb@suse.de>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
----
- net/lnet/klnds/o2iblnd/o2iblnd.c | 11 ++++++-----
- net/lnet/klnds/o2iblnd/o2iblnd.h | 35 +++++++++++++++++------------------
- 2 files changed, 23 insertions(+), 23 deletions(-)
+Alexander Zarochentsev (2):
+  lustre: ptlrpc: make rq_replied flag always correct
+  lustre: mgc: do not ignore target registration failure
 
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
-index 9cdc12a..7d28acd 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -337,7 +337,7 @@ int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer_ni **peerp,
- 	peer_ni->ibp_max_frags = IBLND_MAX_RDMA_FRAGS;
- 	peer_ni->ibp_queue_depth = ni->ni_net->net_tunables.lct_peer_tx_credits;
- 	peer_ni->ibp_queue_depth_mod = 0;	/* try to use the default */
--	atomic_set(&peer_ni->ibp_refcount, 1);  /* 1 ref for caller */
-+	kref_init(&peer_ni->ibp_kref);
- 
- 	INIT_HLIST_NODE(&peer_ni->ibp_list);
- 	INIT_LIST_HEAD(&peer_ni->ibp_conns);
-@@ -357,12 +357,13 @@ int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer_ni **peerp,
- 	return 0;
- }
- 
--void kiblnd_destroy_peer(struct kib_peer_ni *peer_ni)
-+void kiblnd_destroy_peer(struct kref *kref)
- {
-+	struct kib_peer_ni *peer_ni = container_of(kref, struct kib_peer_ni,
-+						   ibp_kref);
- 	struct kib_net *net = peer_ni->ibp_ni->ni_data;
- 
- 	LASSERT(net);
--	LASSERT(!atomic_read(&peer_ni->ibp_refcount));
- 	LASSERT(!kiblnd_peer_active(peer_ni));
- 	LASSERT(kiblnd_peer_idle(peer_ni));
- 	LASSERT(list_empty(&peer_ni->ibp_tx_queue));
-@@ -403,7 +404,7 @@ struct kib_peer_ni *kiblnd_find_peer_locked(struct lnet_ni *ni, lnet_nid_t nid)
- 
- 		CDEBUG(D_NET, "got peer_ni [%p] -> %s (%d) version: %x\n",
- 		       peer_ni, libcfs_nid2str(nid),
--		       atomic_read(&peer_ni->ibp_refcount),
-+		       kref_read(&peer_ni->ibp_kref),
- 		       peer_ni->ibp_version);
- 		return peer_ni;
- 	}
-@@ -439,7 +440,7 @@ static int kiblnd_get_peer_info(struct lnet_ni *ni, int index,
- 			continue;
- 
- 		*nidp = peer_ni->ibp_nid;
--		*count = atomic_read(&peer_ni->ibp_refcount);
-+		*count = kref_read(&peer_ni->ibp_kref);
- 
- 		read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 		return 0;
-diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
-index 21f8981..4fb651e 100644
---- a/net/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -499,7 +499,7 @@ struct kib_peer_ni {
- 	/* when (in seconds) I was last alive */
- 	time64_t		ibp_last_alive;
- 	/* # users */
--	atomic_t		ibp_refcount;
-+	struct kref		ibp_kref;
- 	/* version of peer_ni */
- 	u16			ibp_version;
- 	/* current passive connection attempts */
-@@ -607,23 +607,23 @@ static inline int kiblnd_timeout(void)
- 	}								\
- } while (0)
- 
--#define kiblnd_peer_addref(peer_ni)					\
--do {									\
--	CDEBUG(D_NET, "peer_ni[%p] -> %s (%d)++\n",			\
--	       (peer_ni), libcfs_nid2str((peer_ni)->ibp_nid),		\
--	       atomic_read(&(peer_ni)->ibp_refcount));			\
--	atomic_inc(&(peer_ni)->ibp_refcount);				\
--} while (0)
-+void kiblnd_destroy_peer(struct kref *kref);
- 
--#define kiblnd_peer_decref(peer_ni)					\
--do {									\
--	CDEBUG(D_NET, "peer_ni[%p] -> %s (%d)--\n",			\
--	       (peer_ni), libcfs_nid2str((peer_ni)->ibp_nid),		\
--	       atomic_read(&(peer_ni)->ibp_refcount));			\
--	LASSERT_ATOMIC_POS(&(peer_ni)->ibp_refcount);			\
--	if (atomic_dec_and_test(&(peer_ni)->ibp_refcount))		\
--		kiblnd_destroy_peer(peer_ni);				\
--} while (0)
-+static inline void kiblnd_peer_addref(struct kib_peer_ni *peer_ni)
-+{
-+	CDEBUG(D_NET, "peer_ni[%p] -> %s (%d)++\n",
-+	       peer_ni, libcfs_nid2str(peer_ni->ibp_nid),
-+	       kref_read(&peer_ni->ibp_kref));
-+	kref_get(&(peer_ni)->ibp_kref);
-+}
-+
-+static inline void kiblnd_peer_decref(struct kib_peer_ni *peer_ni)
-+{
-+	CDEBUG(D_NET, "peer_ni[%p] -> %s (%d)--\n",
-+	       peer_ni, libcfs_nid2str(peer_ni->ibp_nid),
-+	       kref_read(&peer_ni->ibp_kref));
-+	kref_put(&peer_ni->ibp_kref, kiblnd_destroy_peer);
-+}
- 
- static inline bool
- kiblnd_peer_connecting(struct kib_peer_ni *peer_ni)
-@@ -929,7 +929,6 @@ int kiblnd_cm_callback(struct rdma_cm_id *cmid,
- int kiblnd_dev_failover(struct kib_dev *dev, struct net *ns);
- int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer_ni **peerp,
- 		       lnet_nid_t nid);
--void kiblnd_destroy_peer(struct kib_peer_ni *peer_ni);
- bool kiblnd_reconnect_peer(struct kib_peer_ni *peer_ni);
- void kiblnd_destroy_dev(struct kib_dev *dev);
- void kiblnd_unlink_peer_locked(struct kib_peer_ni *peer_ni);
+Alexey Lyashkov (2):
+  lustre: osc: don't have extra gpu call
+  lnet: o2iblnd: cleanup
+
+Andreas Dilger (1):
+  lustre: mdc: GET(X)ATTR to READPAGE portal
+
+Chris Horn (1):
+  lnet: Skip router discovery on send path
+
+Etienne AUJAMES (1):
+  lnet: libcfs: set x->ls_len to 0 when x->ls_str is NULL
+
+James Simmons (1):
+  lustre: llite: make foreign symlinks aware of mount namespaces
+
+Lai Siyao (4):
+  lustre: lmv: set default LMV for "lfs mkdir -c 1"
+  lustre: lmv: improve MDT QOS space balance
+  lustre: llite: access striped directory with missing stripe
+  lustre: llite: revalidate dentry if LOOKUP lock fetched
+
+Lei Feng (1):
+  lustre: uapi: set default max-inherit to 3
+
+Li Dongyang (1):
+  lustre: llite: add trusted.projid virtual xattr
+
+Patrick Farrell (8):
+  lustre: lov: Cache stripe offset calculation
+  lnet: libcfs: Remove D_TTY
+  lustre: llite: Add D_IOTRACE
+  lustre: llite: Add start_idx debug
+  lustre: llite: Switch pcc to lookup_one_len
+  lustre: llite: Simplify cda_no_aio_complete use
+  lustre: osc: Always set aio in anchor
+  lustre: llite: Implement lower/upper aio
+
+Serguei Smirnov (2):
+  lnet: o2iblnd: treat cmid->device == NULL as an error
+  lnet: socklnd: decrement connection counters on close
+
+ fs/lustre/include/cl_object.h           |   7 +-
+ fs/lustre/include/obd.h                 |   9 ++-
+ fs/lustre/include/obd_class.h           |   7 +-
+ fs/lustre/llite/dcache.c                |  19 ++++-
+ fs/lustre/llite/dir.c                   |  45 ++++++++---
+ fs/lustre/llite/file.c                  |  16 +++-
+ fs/lustre/llite/llite_foreign_symlink.c |   8 +-
+ fs/lustre/llite/llite_internal.h        |  14 +++-
+ fs/lustre/llite/llite_lib.c             |   7 +-
+ fs/lustre/llite/llite_mmap.c            |  13 +++-
+ fs/lustre/llite/llite_nfs.c             |   2 +-
+ fs/lustre/llite/namei.c                 |   6 +-
+ fs/lustre/llite/pcc.c                   | 119 +++++++++++++++++++---------
+ fs/lustre/llite/rw.c                    |  31 +++++---
+ fs/lustre/llite/rw26.c                  |  34 ++++++--
+ fs/lustre/llite/statahead.c             |   6 +-
+ fs/lustre/llite/xattr.c                 |  15 ++++
+ fs/lustre/llite/xattr_cache.c           |  15 ++++
+ fs/lustre/lmv/lmv_intent.c              |   4 +-
+ fs/lustre/lmv/lmv_obd.c                 | 133 ++++++++++++++++++--------------
+ fs/lustre/lov/lov_cl_internal.h         |   9 ++-
+ fs/lustre/lov/lov_io.c                  |   6 ++
+ fs/lustre/lov/lov_page.c                |  57 ++++++++++----
+ fs/lustre/mdc/mdc_request.c             |  14 +++-
+ fs/lustre/mgc/mgc_request.c             |   5 +-
+ fs/lustre/obdclass/cl_io.c              |  56 ++++++++++----
+ fs/lustre/osc/osc_request.c             |   2 +-
+ fs/lustre/ptlrpc/ptlrpc_internal.h      |   1 +
+ include/uapi/linux/lnet/libcfs_debug.h  |   4 +-
+ include/uapi/linux/lustre/lustre_idl.h  |   1 +
+ include/uapi/linux/lustre/lustre_user.h |  16 ++--
+ net/lnet/klnds/o2iblnd/o2iblnd.c        |  15 ++--
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c     |  43 ++++-------
+ net/lnet/klnds/socklnd/socklnd.c        |  69 ++++++++++++++---
+ net/lnet/libcfs/libcfs_string.c         |   1 +
+ net/lnet/libcfs/tracefile.c             |  51 +-----------
+ net/lnet/lnet/lib-move.c                |  23 ++++--
+ 37 files changed, 582 insertions(+), 301 deletions(-)
+
 -- 
 1.8.3.1
 
