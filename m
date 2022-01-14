@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id B3063C433F5
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 4C75FC433EF
 	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:38:31 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E230E3AD960;
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 4A8A521FF91;
 	Thu, 13 Jan 2022 17:38:23 -0800 (PST)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 371E121FF8F
- for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:07 -0800 (PST)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id A77BA21FFA9
+ for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:08 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id A8F34100BAF3;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id BC88D100F326;
  Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 9EDFADF4C4; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
+ id B53E1A8102; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 13 Jan 2022 20:37:41 -0500
-Message-Id: <1642124283-10148-3-git-send-email-jsimmons@infradead.org>
+Date: Thu, 13 Jan 2022 20:37:46 -0500
+Message-Id: <1642124283-10148-8-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
 References: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 02/24] lustre: llite: add trusted.projid
- virtual xattr
+Subject: [lustre-devel] [PATCH 07/24] lustre: lov: Cache stripe offset
+ calculation
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,7 +39,7 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Li Dongyang <dongyangli@ddn.com>,
+Cc: Patrick Farrell <farr0186@gmail.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -47,121 +47,203 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Li Dongyang <dongyangli@ddn.com>
+From: Patrick Farrell <farr0186@gmail.com>
 
-Add trusted.projid virtual xattr in ldiskfs to export the
-current project id, intended for ldiskfs level MDT backup.
+Calculating the page offset relative to the stripe (etc)
+in a file is surprisingly expensive.  Because i/o has
+already been split up to stripes by the cl_io code,
+calculating the stripe each time is unnecessary.
 
-When the project id is EXT4_DEF_PROJID/0,
-the virtual xattr is hidden from listxattr(2).
+We cache most of the values requiring calculation.
 
-It's also hidden on lustre client when parent has the
-project inherit flag and the same project ID,
-to stop mv from setting the virtual xattr on the dest with
-the project id from src, which could be different from dest.
+This improves AIO/DIO page submission significantly,
+improving performance by a bit over 10%.
 
-getxattr(2) on trusted.projid will report current project id,
-setxattr(2) will change curent project id and
-removexattr(2) will set project id back to EXT4_DEF_PROJID/0
+Also remove lpg_generation, which isn't doing anything
+useful.  This suggests the possibility of removing
+lov_page, but that's for another patch.
 
-Both get|setxattr(2) will work even when the virtual xattr is
-hidden.
+This patch reduces i/o time in ms/GiB by:
+Write: 17 ms/GiB
+Read: 22 ms/GiB
 
-Invalidate client xattr cache for the inode when changing its
-project id, so the virtual xattr can get the new value
-for next getxattr(2)
+Totals:
+Write: 119 ms/GiB
+Read: 121 ms/GiB
 
-Add test cases to verify the virtual projid xattr and backup
-restore MDT using tar can now preserve the project id.
+mpirun -np 1  $IOR -w -r -t 64M -b 64G -o ./iorfile --posix.odirect
 
-Change mds_backup_restore in test framework, to use
-tar with --xattrs --xattrs-include='trusted.*'" options.
+With previous patches in series:
+write        7531 MiB/s
+read         7179 MiB/s
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12056
-Lustre-commit: 665383d3a1f4d1dc7 ("LU-12056 ldiskfs: add trusted.projid virtual xattr")
-Signed-off-by: Li Dongyang <dongyangli@ddn.com>
-Reviewed-on: https://review.whamcloud.com/45679
+Plus this patch:
+write        8637 MiB/s
+read         8488 MiB/s
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13799
+Lustre-commit: 14db1faa0fbe813fe ("LU-13799 lov: Cache stripe offset calculation")
+Signed-off-by: Patrick Farrell <farr0186@gmail.com>
+Reviewed-on: https://review.whamcloud.com/39445
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Yang Sheng <ys@whamcloud.com>
+Reviewed-by: Yingjin Qian <qian@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/xattr.c                | 15 +++++++++++++++
- fs/lustre/llite/xattr_cache.c          | 15 +++++++++++++++
- include/uapi/linux/lustre/lustre_idl.h |  1 +
- 3 files changed, 31 insertions(+)
+ fs/lustre/lov/lov_cl_internal.h |  9 +++++--
+ fs/lustre/lov/lov_io.c          |  6 +++++
+ fs/lustre/lov/lov_page.c        | 57 +++++++++++++++++++++++++++++++----------
+ 3 files changed, 57 insertions(+), 15 deletions(-)
 
-diff --git a/fs/lustre/llite/xattr.c b/fs/lustre/llite/xattr.c
-index 6aea651..ce9585a 100644
---- a/fs/lustre/llite/xattr.c
-+++ b/fs/lustre/llite/xattr.c
-@@ -613,6 +613,7 @@ static int ll_xattr_get(const struct xattr_handler *handler,
+diff --git a/fs/lustre/lov/lov_cl_internal.h b/fs/lustre/lov/lov_cl_internal.h
+index d48e2df3..42fd10a 100644
+--- a/fs/lustre/lov/lov_cl_internal.h
++++ b/fs/lustre/lov/lov_cl_internal.h
+@@ -453,8 +453,6 @@ struct lov_lock {
  
- ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
+ struct lov_page {
+ 	struct cl_page_slice	lps_cl;
+-	/* the layout gen when this page was created */
+-	u32			lps_layout_gen;
+ };
+ 
+ /*
+@@ -524,6 +522,7 @@ struct lov_io_sub {
+ /**
+  * IO state private for LOV.
+  */
++#define LIS_CACHE_ENTRY_NONE	-ENOENT
+ struct lov_io {
+ 	/** super-class */
+ 	struct cl_io_slice	lis_cl;
+@@ -590,6 +589,12 @@ struct lov_io {
+ 	 * All sub-io's created in this lov_io.
+ 	 */
+ 	struct list_head	lis_subios;
++	/* Cached results from stripe & offset calculations for page init */
++	int			lis_cached_entry;
++	int			lis_cached_stripe;
++	loff_t			lis_cached_off;
++	loff_t			lis_cached_suboff;
++	struct lov_io_sub	*lis_cached_sub;
+ };
+ 
+ struct lov_session {
+diff --git a/fs/lustre/lov/lov_io.c b/fs/lustre/lov/lov_io.c
+index 8df13ee..904bafd 100644
+--- a/fs/lustre/lov/lov_io.c
++++ b/fs/lustre/lov/lov_io.c
+@@ -467,6 +467,7 @@ static int lov_io_slice_init(struct lov_io *lio, struct lov_object *obj,
+ 
+ 	io->ci_result = 0;
+ 	lio->lis_object = obj;
++	lio->lis_cached_entry = LIS_CACHE_ENTRY_NONE;
+ 
+ 	switch (io->ci_type) {
+ 	case CIT_READ:
+@@ -1053,6 +1054,11 @@ static void lov_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
  {
-+	struct inode *dir = d_inode(dentry->d_parent);
- 	struct inode *inode = d_inode(dentry);
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	ktime_t kstart = ktime_get();
-@@ -656,6 +657,20 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
- 				hide_xattr = true;
- 		}
+ 	int rc;
  
-+		/* Hide virtual project id xattr from the list when
-+		 * parent has the inherit flag and the same project id,
-+		 * so project id won't be messed up by copying the xattrs
-+		 * when mv to a tree with different project id.
-+		 */
-+		if (get_xattr_type(xattr_name)->flags == XATTR_TRUSTED_T &&
-+		    strcmp(xattr_name, XATTR_NAME_PROJID) == 0) {
-+			if (ll_i2info(inode)->lli_projid ==
-+					ll_i2info(dir)->lli_projid &&
-+			    test_bit(LLIF_PROJECT_INHERIT,
-+				     &ll_i2info(dir)->lli_flags))
-+				hide_xattr = true;
-+		}
++	/* Before ending each i/o, we must set lis_cached_entry to tell the
++	 * next i/o not to use stale cached lis information.
++	 */
++	cl2lov_io(env, ios)->lis_cached_entry = LIS_CACHE_ENTRY_NONE;
 +
- 		len = strnlen(xattr_name, rem - 1) + 1;
- 		rem -= len;
- 		if (!xattr_type_filter(sbi, hide_xattr ? NULL :
-diff --git a/fs/lustre/llite/xattr_cache.c b/fs/lustre/llite/xattr_cache.c
-index 7c1f5b7..723cc39 100644
---- a/fs/lustre/llite/xattr_cache.c
-+++ b/fs/lustre/llite/xattr_cache.c
-@@ -563,6 +563,21 @@ int ll_xattr_cache_get(struct inode *inode, const char *name, char *buffer,
- 				else
- 					rc = -ERANGE;
- 			}
-+		/* Return the project id when the virtual project id xattr
-+		 * is explicitly asked.
-+		 */
-+		} else if (strcmp(name, XATTR_NAME_PROJID) == 0) {
-+			/* 10 chars to hold u32 in decimal, plus ending \0 */
-+			char projid[11];
+ 	rc = lov_io_call(env, cl2lov_io(env, ios), lov_io_end_wrapper);
+ 	LASSERT(rc == 0);
+ }
+diff --git a/fs/lustre/lov/lov_page.c b/fs/lustre/lov/lov_page.c
+index fdc415b..16bd7cd 100644
+--- a/fs/lustre/lov/lov_page.c
++++ b/fs/lustre/lov/lov_page.c
+@@ -56,8 +56,7 @@ static int lov_comp_page_print(const struct lu_env *env,
+ 	struct lov_page *lp = cl2lov_page(slice);
+ 
+ 	return (*printer)(env, cookie,
+-			  LUSTRE_LOV_NAME "-page@%p, gen: %u\n",
+-			  lp, lp->lps_layout_gen);
++			  LUSTRE_LOV_NAME"-page@%p\n", lp);
+ }
+ 
+ static const struct cl_page_operations lov_comp_page_ops = {
+@@ -74,33 +73,65 @@ int lov_page_init_composite(const struct lu_env *env, struct cl_object *obj,
+ 	struct cl_object *o;
+ 	struct lov_io_sub *sub;
+ 	struct lov_page *lpg = cl_object_page_slice(obj, page);
++	bool stripe_cached = false;
+ 	u64 offset;
+ 	u64 suboff;
+-	int stripe;
+ 	int entry;
++	int stripe;
+ 	int rc;
+ 
++	/* Direct i/o (CPT_TRANSIENT) is split strictly to stripes, so we can
++	 * cache the stripe information.  Buffered i/o is differently
++	 * organized, and stripe calculation isn't a significant cost for
++	 * buffered i/o, so we only cache this for direct i/o.
++	 */
++	stripe_cached = lio->lis_cached_entry != LIS_CACHE_ENTRY_NONE &&
++			page->cp_type == CPT_TRANSIENT;
 +
-+			rc = snprintf(projid, sizeof(projid),
-+				      "%u", lli->lli_projid);
-+			if (size != 0) {
-+				if (rc <= size)
-+					memcpy(buffer, projid, rc);
-+				else
-+					rc = -ERANGE;
-+			}
- 		}
- 	} else if (valid & OBD_MD_FLXATTRLS) {
- 		rc = ll_xattr_cache_list(&lli->lli_xattrs,
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 35d3ed2..78e20a7 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -1078,6 +1078,7 @@ struct lov_mds_md_v1 {		/* LOV EA mds/wire data (little-endian) */
- #define XATTR_NAME_SOM		"trusted.som"
- #define XATTR_NAME_HSM		"trusted.hsm"
- #define XATTR_NAME_LFSCK_NAMESPACE "trusted.lfsck_namespace"
-+#define XATTR_NAME_PROJID	"trusted.projid"
+ 	offset = cl_offset(obj, index);
+-	entry = lov_io_layout_at(lio, offset);
++
++	if (stripe_cached) {
++		entry = lio->lis_cached_entry;
++		stripe = lio->lis_cached_stripe;
++		/* Offset can never go backwards in an i/o, so this is valid */
++		suboff = lio->lis_cached_suboff + offset - lio->lis_cached_off;
++	} else {
++		entry = lov_io_layout_at(lio, offset);
++
++		stripe = lov_stripe_number(loo->lo_lsm, entry, offset);
++		rc = lov_stripe_offset(loo->lo_lsm, entry, offset, stripe,
++				       &suboff);
++		LASSERT(rc == 0);
++		lio->lis_cached_entry = entry;
++		lio->lis_cached_stripe = stripe;
++		lio->lis_cached_off = offset;
++		lio->lis_cached_suboff = suboff;
++	}
++
+ 	if (entry < 0 || !lsm_entry_inited(loo->lo_lsm, entry)) {
+ 		/* non-existing layout component */
+ 		lov_page_init_empty(env, obj, page, index);
+ 		return 0;
+ 	}
  
- #define LL_XATTR_NAME_ENCRYPTION_CONTEXT XATTR_SECURITY_PREFIX"c"
+-	r0 = lov_r0(loo, entry);
+-	stripe = lov_stripe_number(loo->lo_lsm, entry, offset);
+-	LASSERT(stripe < r0->lo_nr);
+-	rc = lov_stripe_offset(loo->lo_lsm, entry, offset, stripe, &suboff);
+-	LASSERT(rc == 0);
++	CDEBUG(D_PAGE, "offset %llu, entry %d, stripe %d, suboff %llu\n",
++	       offset, entry, stripe, suboff);
  
+ 	page->cp_lov_index = lov_comp_index(entry, stripe);
+-	lpg->lps_layout_gen = loo->lo_lsm->lsm_layout_gen;
+ 	cl_page_slice_add(page, &lpg->lps_cl, obj, &lov_comp_page_ops);
+ 
+-	sub = lov_sub_get(env, lio, page->cp_lov_index);
+-	if (IS_ERR(sub))
+-		return PTR_ERR(sub);
++	if (!stripe_cached) {
++		sub = lov_sub_get(env, lio, page->cp_lov_index);
++		if (IS_ERR(sub))
++			return PTR_ERR(sub);
++	} else {
++		sub = lio->lis_cached_sub;
++	}
++
++	lio->lis_cached_sub = sub;
++
++	r0 = lov_r0(loo, entry);
++	LASSERT(stripe < r0->lo_nr);
+ 
+ 	subobj = lovsub2cl(r0->lo_sub[stripe]);
+ 	cl_object_for_each(o, subobj) {
 -- 
 1.8.3.1
 
