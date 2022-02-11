@@ -4,29 +4,113 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 4A563C433EF
-	for <lustre-devel@archiver.kernel.org>; Fri, 14 Jan 2022 01:39:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id EE072C433EF
+	for <lustre-devel@archiver.kernel.org>; Fri, 11 Feb 2022 20:46:41 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1355C3AD841;
-	Thu, 13 Jan 2022 17:38:58 -0800 (PST)
-Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 497883AD7BC
- for <lustre-devel@lists.lustre.org>; Thu, 13 Jan 2022 17:38:12 -0800 (PST)
-Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id F22BA100F34A;
- Thu, 13 Jan 2022 20:38:04 -0500 (EST)
-Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id EE92DA8103; Thu, 13 Jan 2022 20:38:04 -0500 (EST)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>
-Date: Thu, 13 Jan 2022 20:37:59 -0500
-Message-Id: <1642124283-10148-21-git-send-email-jsimmons@infradead.org>
-X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
-References: <1642124283-10148-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 20/24] lustre: llite: Switch pcc to
- lookup_one_len
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 7D39C3B8F7B;
+	Fri, 11 Feb 2022 12:37:06 -0800 (PST)
+Received: from na01-obe.outbound.protection.outlook.com
+ (mail-centralusazon11021025.outbound.protection.outlook.com [52.101.62.25])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B41C03B8F6D
+ for <lustre-devel@lists.lustre.org>; Fri, 11 Feb 2022 12:37:03 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=Toc7ogQemWJ9ZW5HbYyGBfUY7V87qA28TVd8ROCuk8hr4aV6ku6lhJ6K1ttQmFcp6NZBSAc9s+4NG5UkqsF5odI+tcqdYfJ0bB1+yOWvvqvDGjbup03KqcDJVz92+QijqFA07zEsoRojwGBuiVKU5azkWf2nKd1KTk0MFg7oAoMAJUkWPRMcBEsnLjbnd1VF4ofHFvZ1hT2aVgKrtclQ7kUCGp41zZ0QpuIM9zbk9oAj3IwxAtxerKokYCqvYMrRyYSU7PWPnTuRfAsmvbpFk721+nTHzQIJ6kjLh3BnCeKFilQEylAknPeGCQWJP/9p7L3JhuRGls1W6Q5TfU7nCA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=KkPoSbPlKQiSe4l27n/x1IMCVVoZ51quETYuwOFwG3w=;
+ b=HbPSeeYpBrbJ/24el0oWoDyHHuY1DEOHwEc07GMi5ivn3GYr0ODA36oidB3CofAQawsiHWapu+gNDDPxMxGK7+SQN4uQ+4N8KN3hxYJzr+7ZVddvOeLbkB5zTOwPwjJkKf8SvZc7/OaTG5Kq5GkBFxiK05cE/ZHCK3Nz82ECuPYQSF1bi12q4I0RDrl9WnCnnw5z6p09mHtJM5BHQfvMDeefnitVnokgLlzv6gjHUJWlbF94zUuieMd9OIGk5s60Hi4QGME6Eces7xfY/SQkjXHVGBmafrLO1SE48zE5KaD11b3QPbRqslBE715n8OHaS01/fCWvrwK/5SrlaGt4LQ==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=microsoft.com; dmarc=pass action=none
+ header.from=microsoft.com; dkim=pass header.d=microsoft.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=KkPoSbPlKQiSe4l27n/x1IMCVVoZ51quETYuwOFwG3w=;
+ b=aWUWrXxPYnexIDPh0LFiKf7mEiSV66c0RoTBfKYR0PNhfGyOcOXYcxZqmR9envD1cNkIRKPahkVx6jcxXLzwTtwlDpDfx0ENhzwRTgUuqbVVTjK/on4ZwY0uRGUiqEmDgYQrcTnSK3zmMjMakXeXIvdoB1jZ18w5aylxN0oMdho=
+Received: from MN2PR21MB1439.namprd21.prod.outlook.com (2603:10b6:208:20a::15)
+ by BN6PR21MB0467.namprd21.prod.outlook.com (2603:10b6:404:b2::17)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.4995.6; Fri, 11 Feb
+ 2022 20:37:00 +0000
+Received: from MN2PR21MB1439.namprd21.prod.outlook.com
+ ([fe80::9536:319b:96cb:6f6d]) by MN2PR21MB1439.namprd21.prod.outlook.com
+ ([fe80::9536:319b:96cb:6f6d%4]) with mapi id 15.20.4995.004; Fri, 11 Feb 2022
+ 20:37:00 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: Memory issues with bulk rpcs and buffered I/O; ptlrpc bug?
+Thread-Index: AdgfhQ6qxxGIcBGwTzyTZr43wadh+w==
+Date: Fri, 11 Feb 2022 20:37:00 +0000
+Message-ID: <MN2PR21MB1439AD0458A0144B3825D83EBE309@MN2PR21MB1439.namprd21.prod.outlook.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+msip_labels: MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ActionId=f5001d4e-6071-43fd-84a9-1b5447b2ac3e;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ContentBits=0;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Enabled=true;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Method=Standard;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Name=Internal;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SetDate=2022-02-11T20:21:06Z;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SiteId=72f988bf-86f1-41af-91ab-2d7cd011db47;
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=microsoft.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: e72eebf9-00f2-489e-7952-08d9ed9e4153
+x-ms-traffictypediagnostic: BN6PR21MB0467:EE_
+x-ms-exchange-atpmessageproperties: SA|SL
+x-microsoft-antispam-prvs: <BN6PR21MB04675F3A795724BB71470F90BE309@BN6PR21MB0467.namprd21.prod.outlook.com>
+x-ms-oob-tlc-oobclassifiers: OLM:10000;
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: z+ZPtyyZhMs/9+TjxLhhZFxJre0Ea1fwM47aFgNfltJUdmroJPCSlcK0IYG0VxqMcwW594Cg9IR7w8bLMpbgDXDZJNKIDA5SIMG2V3BaC2r4P6fIxfuRX4BAOxJwGcZlwgyA4DuujUygbh8alYVmtVBS8HsJZMh5DlAqAF8hKFO/0FPMpCOlx8pnwHM+ZfrwHUDHWgGrBG3RPuaGlQ1SIOhR+vDr2Q2trHQr56yzw2MLcKKvfePL4+a1MuvmrLoEB92iP5Of40ai4w+GIkPQY/0cUPgja8xoMH5JialBTcYnS7dc8iBlHxCwbEaZJtTBL4nVrm8tx+6oOfzH+83ka8iFtsgVFd6AnBQYgYnHByhN3C3Hdcgft8e31K0i9qx6jGK9rd/u720rmAMMkTQ0+A7RrwFvZhb9NX8v+UM6tcWvXhChuM3nONQK0VZQw5obP/laE57GbKeRAk79rpkvfH9Ii7BpU5ahPPshQJnqJ19LgwsiBxbRb8BpuRVN+6EUoiYJznjiDylIZXTALNX8HA9SXuzWrhE/7+dLPYu6G4c/96L6dVaEYkCzcw6HSq1el9ch4SF58XYlfICRNTabwRktChS3ATBkhu9jUiTdhcZlWhCI6vwqKJ0Q8KJl652oieOYC7VIiHNnJNoLcHFwKCJZlpbHhuop4eESCrb4ebZWgO7VvZRR3fjT6SObMHO82eNTYJyLM5iTLzx8kjCu8LdeQdyJOxc55+RmtFHKH2QmTSTQIN/fQV+wTUB+vC5sNi958o+YXmQVtG//QTlpJq3QM2ng4OEzk8wv15Vrgv5U+MJBnQm0X+C0JOKoAjWKrBD5Zn95QIde/rbruGLAqVTBB6FuSXICLOVrgCh1VyU=
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:MN2PR21MB1439.namprd21.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230001)(4636009)(366004)(82960400001)(122000001)(71200400001)(64756008)(82950400001)(66556008)(66476007)(66946007)(8990500004)(6506007)(55016003)(38100700002)(7696005)(52536014)(33656002)(8936002)(316002)(76116006)(66446008)(9686003)(186003)(6916009)(38070700005)(83380400001)(2906002)(5660300002)(508600001)(86362001)(8676002)(26005)(10290500003)(966005)(40753002);
+ DIR:OUT; SFP:1102; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?NSe+C4ALGDwYgB3vppRshGTSooHOTHKtAM0NBCo7puZHHQ0QjJ6U+PJ13T/+?=
+ =?us-ascii?Q?FoN71Bd5vEV78lip+Ce3ZZtLmxvv2y3EOrdxLCp2KjGKIcVUnlnxS+dcj0Z6?=
+ =?us-ascii?Q?vVlVbuWfsEnbsQ9vqcCVOvFQQEuwAW+4ubjsAvILVbdMIhQKM9qqVft8Ujlo?=
+ =?us-ascii?Q?SVARdLC7ne0iVLob74nR/g78dAToOi+f9n1qwwObjtcvlmynkCmkbkOyu6gx?=
+ =?us-ascii?Q?IOy3jthdfCZeHU5MyimyRBQRxw1tPEpkSrOKFzgxffT1HhmEIo5weVFF/Sbw?=
+ =?us-ascii?Q?l/YnTkxL5I9U4fYpBbMWWkSmNqkizv/mDSvP6TpfatYIpvgYEKJWxELwzVQM?=
+ =?us-ascii?Q?9HjnJaV6WAehWGCZkP5Pmaqua3PCHfSVmiHwNpj72zbw2o5/KdiYbyoTE523?=
+ =?us-ascii?Q?GLYt1mPPDZw6OMwqiu3QHl9LHUX8mEDbb1oQsd8upELTvONgTMauS4GcaXgA?=
+ =?us-ascii?Q?WqnAU3qOk9nVpTANli66xk3N0jXxv/zhK4h/IG7BStZ/z2C4eD1wmCGiqB9d?=
+ =?us-ascii?Q?GXqpCXC/hQORCqe6dHETWHuogftJnYTw2e0bkx5bwqccqrcDq+yPwNIB9MaR?=
+ =?us-ascii?Q?N9fSWFiF1xCD3dYc204fGmgTJB2ICbcH9dh4JvDaBQW/ZNlglXWsaiOqu2a6?=
+ =?us-ascii?Q?eDJUfZGcR+rjHM4umz6e8BQROKpAY5uwm+gTHOvJZIyjzDr+yFYGM+uJdmOy?=
+ =?us-ascii?Q?Qkx8HsjbSZQyCdLNFP945NpYUHBw066NbpAwz/EWh24PS8EQoV3dPWG4oerK?=
+ =?us-ascii?Q?mnEajN4IwXbi8dfZrUWJWANw9PhxlHcOFOJqUIm7VhQ3TR863lLkHhbXKaL1?=
+ =?us-ascii?Q?4QKNE8vZlCZaxkYdmgRgQbr5fKLfEj0Iy/NFMBcLCLhyo2z9Y91zZeTx1bDm?=
+ =?us-ascii?Q?6amiQ1UWPiV/7tG/VlvKOtZ5Jz61W615lOE22XQM8169Jxu1KeCPiapCJ4Jw?=
+ =?us-ascii?Q?beAVkBZfJGBpp37or9xELKa4XT2qn8Cwz1FEM2LEnoqbrzO29R0fJsgUV2Q/?=
+ =?us-ascii?Q?9wLBHV98RgWm/AeRnwpE3NNOUxs78SH52vbhFoxStz164gVnJFQM2ZxBGP3N?=
+ =?us-ascii?Q?T4oS27IRRvszAUw7N2dxhx93+vhGOZZeKqHggRxnhQRfi4gjv1KpkPAoX9NP?=
+ =?us-ascii?Q?08wjJDdiU6EpIbKEKF6dGI6yqIvhwtqXF/d1Xwd+YCFy7w9hxz3mpZCykqDy?=
+ =?us-ascii?Q?xCH8fXfs+ClL18NZH1+P+/U+t3kJzvH5AB9OXGT7PztKDGisAxoJy4ucH74C?=
+ =?us-ascii?Q?AA+T0F6KAVJ/+d9NsB/i8GU3w0miqEjqTwkmSyFmKJHl3LCppEJWKisA84YH?=
+ =?us-ascii?Q?pbJpDY5uO2pWf1bFYtvRV0MAM4/LgWue0VZ2dAHtmSLrU+krcwyzWXjKJPQe?=
+ =?us-ascii?Q?PphLbZQ1eNgfrUVu2UDN6uF7ZFMaSVcaTwhEVFn669e9YNIQrYmmZ/Fe7XiU?=
+ =?us-ascii?Q?Ii39CitrGyCVmggDCoEh+bweHnRP6fTJ+E2ZNhbpucrAtlCd7eAROhnYeP8v?=
+ =?us-ascii?Q?z60gO2NgS4EPex59VAwFXbYLeW7dtzUjZfNnW9QM7EZw8+h2+EBvYSpfld5i?=
+ =?us-ascii?Q?MBaA0xBy+F2AmJ3DJc2ELrYeFLCMQQXL9ulNnuTOMS1MMKuCk/ySdF+xU2Qa?=
+ =?us-ascii?Q?LQ=3D=3D?=
+MIME-Version: 1.0
+X-OriginatorOrg: microsoft.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: MN2PR21MB1439.namprd21.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: e72eebf9-00f2-489e-7952-08d9ed9e4153
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2022 20:37:00.4991 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 72f988bf-86f1-41af-91ab-2d7cd011db47
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: JrWY1AyPNVFm2qVlMSX0L3o+NLNexuTslyHpc6uJNEDNdf3umwotA+KiqTxa4oavEeYMV9nHfYOp4uvO5kO/GJ+Z7Q3H9BMcziKEcqO+YKs=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR21MB0467
+Subject: [lustre-devel] Memory issues with bulk rpcs and buffered I/O;
+ ptlrpc bug?
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -39,247 +123,86 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-MIME-Version: 1.0
+From: Ellis Wilson via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Ellis Wilson <elliswilson@microsoft.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+Hi,
 
-Using kern_path to lookup files in the PCC cache means we
-are subject to user namespaces, so the PCC volume must be
-mapped in to a container or the cached files cannot be
-found.
+I'm still trying to get to the bottom of recurring OOM issues relating to: https://jira.whamcloud.com/browse/LU-15468  Any help is greatly appreciated, even if it's just "here are docs on bulk rpcs / ptlrpc / etc".
 
-One solution is to switch to using lookup_one_len - this is
-what the code which *creates* PCC files does.  This
-manually walks the path from the root, which avoids
-namespace issues.
+The TL;DR issue is iozone or dd can trivially drive used memory up against system limits, I/O drags to a halt due to inability to allocate new pages, and eventually all of the outstanding pages are marked cleaned and the process repeats.  Oom-killer pops in and out for longer runs.
 
-This is appropriate because PCC is kernel functionality -
-the user should not be able to directly access the volume,
-but it should be accessible as a cache.
+I've been able to reproduce it on the following combinations of (kernel) + (lustre) on Ubuntu 18.04 (client-side):
+5.14.11 + 2.14.0
+4.15.17 + 2.14.0
+4.15.17 + 2.12.8
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15170
-Lustre-commit: f3be560031cc7022a ("LU-15170 llite: Switch pcc to lookup_one_len")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/45436
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Yingjin Qian <qian@ddn.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- fs/lustre/llite/pcc.c | 119 +++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 84 insertions(+), 35 deletions(-)
+One of the things I noticed was that when I hit the high-memory pressure condition, kswapd0 kicks in aggressively, and on-cpu graphs show that shrink_inactive_pages is cycling wildly (up to 1M calls per second).  Digging further into this, shrink_page_list is being called from that and every time it scans 32 pages, finding none available for reclaim.  This is due to the page not having a mapping (it was synced out to the OST long ago), and therefore the vmscan code is treating it almost like an anonymous page (though it's not) -- it's waiting for the last reference to drop it.  This behavior is NOT reproduced if you specify ODIRECT.
 
-diff --git a/fs/lustre/llite/pcc.c b/fs/lustre/llite/pcc.c
-index 85114b8..8bdf681e 100644
---- a/fs/lustre/llite/pcc.c
-+++ b/fs/lustre/llite/pcc.c
-@@ -1085,7 +1085,7 @@ void pcc_inode_free(struct inode *inode)
-  * reduce overhead:
-  * (fid->f_oid >> 16 & oxFFFF)/FID
-  */
--#define MAX_PCC_DATABASE_PATH (6 * 5 + FID_NOBRACE_LEN + 1)
-+#define PCC_DATASET_MAX_PATH (6 * 5 + FID_NOBRACE_LEN + 1)
- static int pcc_fid2dataset_path(char *buf, int sz, struct lu_fid *fid)
- {
- 	return scnprintf(buf, sz, "%04x/%04x/%04x/%04x/%04x/%04x/"
-@@ -1160,21 +1160,6 @@ static int pcc_get_layout_info(struct inode *inode, struct cl_layout *clt)
- 	return rc < 0 ? rc : 0;
- }
- 
--static int pcc_fid2dataset_fullpath(char *buf, int sz, struct lu_fid *fid,
--				    struct pcc_dataset *dataset)
--{
--	return scnprintf(buf, sz, "%s/%04x/%04x/%04x/%04x/%04x/%04x/"
--			 DFID_NOBRACE,
--			 dataset->pccd_pathname,
--			 (fid)->f_oid       & 0xFFFF,
--			 (fid)->f_oid >> 16 & 0xFFFF,
--			 (unsigned int)((fid)->f_seq       & 0xFFFF),
--			 (unsigned int)((fid)->f_seq >> 16 & 0xFFFF),
--			 (unsigned int)((fid)->f_seq >> 32 & 0xFFFF),
--			 (unsigned int)((fid)->f_seq >> 48 & 0xFFFF),
--			 PFID(fid));
--}
--
- /* Must be called with pcci->pcci_lock held */
- static void pcc_inode_attach_init(struct pcc_dataset *dataset,
- 				  struct pcc_inode *pcci,
-@@ -1221,6 +1206,72 @@ static inline bool pcc_inode_has_layout(struct pcc_inode *pcci)
- 	return pcci->pcci_layout_gen != CL_LAYOUT_GEN_NONE;
- }
- 
-+static struct dentry *pcc_lookup(struct dentry *base, char *pathname)
-+{
-+	char *ptr = NULL, *component;
-+	struct dentry *parent;
-+	struct dentry *child = ERR_PTR(-ENOENT);
-+
-+	ptr = pathname;
-+
-+	/* move past any initial '/' to the start of the first path component*/
-+	while (*ptr == '/')
-+		ptr++;
-+
-+	/* store the start of the first path component */
-+	component = ptr;
-+
-+	parent = dget(base);
-+	while (ptr) {
-+		/* find the start of the next component - if we don't find it,
-+		 * the current component is the last component
-+		 */
-+		ptr = strchr(ptr, '/');
-+		/* put a NUL char in place of the '/' before the next compnent
-+		 * so we can treat this component as a string; note the full
-+		 * path string is NUL terminated to this is not needed for the
-+		 * last component
-+		 */
-+		if (ptr)
-+			*ptr = '\0';
-+
-+		/* look up the current component */
-+		inode_lock(parent->d_inode);
-+		child = lookup_one_len(component, parent, strlen(component));
-+		inode_unlock(parent->d_inode);
-+
-+		/* repair the path string: put '/' back in place of the NUL */
-+		if (ptr)
-+			*ptr = '/';
-+
-+		dput(parent);
-+
-+		if (IS_ERR_OR_NULL(child))
-+			break;
-+
-+		/* we may find a cached negative dentry */
-+		if (!d_is_positive(child)) {
-+			dput(child);
-+			child = NULL;
-+			break;
-+		}
-+
-+		/* descend in to the next level of the path */
-+		parent = child;
-+
-+		/* move the pointer past the '/' to the next component */
-+		if (ptr)
-+			ptr++;
-+		component = ptr;
-+	}
-+
-+	/* NULL child means we didn't find anything */
-+	if (!child)
-+		child = ERR_PTR(-ENOENT);
-+
-+	return child;
-+}
-+
- static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
- 				  enum lu_pcc_type type,
- 				  struct pcc_dataset *dataset,
-@@ -1229,9 +1280,8 @@ static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
- 	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct pcc_inode *pcci = lli->lli_pcc_inode;
- 	const struct cred *old_cred;
--	struct dentry *pcc_dentry;
--	struct path path;
--	char *pathname;
-+	struct dentry *pcc_dentry = NULL;
-+	char pathname[PCC_DATASET_MAX_PATH];
- 	u32 pcc_gen;
- 	int rc;
- 
-@@ -1239,27 +1289,27 @@ static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
- 	    !(dataset->pccd_flags & PCC_DATASET_RWPCC))
- 		return 0;
- 
--	pathname = kzalloc(PATH_MAX, GFP_KERNEL);
--	if (!pathname)
--		return -ENOMEM;
--
--	pcc_fid2dataset_fullpath(pathname, PATH_MAX, &lli->lli_fid, dataset);
-+	rc = pcc_fid2dataset_path(pathname, PCC_DATASET_MAX_PATH,
-+				  &lli->lli_fid);
- 
- 	old_cred = override_creds(pcc_super_cred(inode->i_sb));
--	rc = kern_path(pathname, LOOKUP_FOLLOW, &path);
--	if (rc) {
-+	pcc_dentry = pcc_lookup(dataset->pccd_path.dentry, pathname);
-+	if (IS_ERR(pcc_dentry)) {
-+		rc = PTR_ERR(pcc_dentry);
-+		CDEBUG(D_CACHE, "%s: path lookup error on "DFID":%s: rc = %d\n",
-+		       ll_i2sbi(inode)->ll_fsname, PFID(&lli->lli_fid),
-+		       pathname, rc);
- 		/* ignore this error */
- 		rc = 0;
- 		goto out;
- 	}
- 
--	pcc_dentry = path.dentry;
- 	rc = __vfs_getxattr(pcc_dentry, pcc_dentry->d_inode, pcc_xattr_layout,
- 			    &pcc_gen, sizeof(pcc_gen));
- 	if (rc < 0) {
- 		/* ignore this error */
- 		rc = 0;
--		goto out_put_path;
-+		goto out_put_pcc_dentry;
- 	}
- 
- 	rc = 0;
-@@ -1271,7 +1321,7 @@ static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
- 			pcci = kmem_cache_zalloc(pcc_inode_slab, GFP_NOFS);
- 			if (!pcci) {
- 				rc = -ENOMEM;
--				goto out_put_path;
-+				goto out_put_pcc_dentry;
- 			}
- 
- 			pcc_inode_init(pcci, lli);
-@@ -1294,11 +1344,10 @@ static int pcc_try_dataset_attach(struct inode *inode, u32 gen,
- 		pcc_layout_gen_set(pcci, gen);
- 		*cached = true;
- 	}
--out_put_path:
--	path_put(&path);
-+out_put_pcc_dentry:
-+	dput(pcc_dentry);
- out:
- 	revert_creds(old_cred);
--	kfree(pathname);
- 	return rc;
- }
- 
-@@ -2072,11 +2121,11 @@ static int __pcc_inode_create(struct pcc_dataset *dataset,
- 	struct dentry *child;
- 	int rc = 0;
- 
--	path = kzalloc(MAX_PCC_DATABASE_PATH, GFP_NOFS);
-+	path = kzalloc(PCC_DATASET_MAX_PATH, GFP_NOFS);
- 	if (!path)
- 		return -ENOMEM;
- 
--	pcc_fid2dataset_path(path, MAX_PCC_DATABASE_PATH, fid);
-+	pcc_fid2dataset_path(path, PCC_DATASET_MAX_PATH, fid);
- 
- 	base = pcc_mkdir_p(dataset->pccd_path.dentry, path, 0);
- 	if (IS_ERR(base)) {
-@@ -2084,7 +2133,7 @@ static int __pcc_inode_create(struct pcc_dataset *dataset,
- 		goto out;
- 	}
- 
--	snprintf(path, MAX_PCC_DATABASE_PATH, DFID_NOBRACE, PFID(fid));
-+	snprintf(path, PCC_DATASET_MAX_PATH, DFID_NOBRACE, PFID(fid));
- 	child = pcc_create(base, path, 0);
- 	if (IS_ERR(child)) {
- 		rc = PTR_ERR(child);
--- 
-1.8.3.1
+Tracing this with ftrace, I find:
 
+If using direct I/O, kernel functions and counts per second matching 'get_page' or 'put_page' show up as (two seconds provided for each example): 
+
+FUNC                              COUNT
+pagecache_get_page                  238 
+sptlrpc_enc_pool_put_pages          356 
+__put_page                        45772
+get_page_from_freelist            56242
+
+FUNC                              COUNT
+pagecache_get_page                  119 
+sptlrpc_enc_pool_put_pages          356 
+__put_page                        45693
+get_page_from_freelist            55934
+
+
+But if you use buffered I/O, the result is: 
+
+FUNC                              COUNT
+__put_page                        45703
+pagecache_get_page               364219
+get_page_from_freelist           426720
+
+FUNC                              COUNT
+__put_page                        45934
+pagecache_get_page               364304
+get_page_from_freelist           427555
+
+Not only are the volumes significantly higher, but the gets to puts are way off.  Note: there are the ~55K gets per second as there were for DIO in get_page_from_freelist, PLUS one get per pagecache_get_page in get_page_from_freelist.
+So, this isn't 700K newly gotten pages per second, but more like 400K newly gotten pages per second (which matches the line-rate of around 1.6GB/s), 350K of which are referenced twice and end up gunking up the inactive page lru list for vmscan.  Some time later you will see a mass put of these pages for non-DIO workloads:
+
+FUNC                              COUNT
+__put_page                      2898827
+
+I've tracked these puts to be caused by:
+   ptlrpcd_00_03-3531    [002] .... 82284.061407: __put_page: (__put_page+0x0/0x80)
+   ptlrpcd_00_00-3527    [000] .... 82284.061423: __put_page: (__put_page+0x0/0x80)
+   ptlrpcd_00_00-3527    [000] .... 82284.061434: <stack trace>
+ => __put_page
+ => ptlrpc_free_bulk
+ => __ptlrpc_req_finished
+ => ptlrpc_free_request
+ => ptlrpc_free_committed
+ => after_reply
+ => ptlrpc_check_set
+ => ptlrpcd_check
+ => ptlrpcd
+ => kthread
+ => ret_from_fork
+
+The ptlrpcd_check loop basically processes around 2M+ of these in a second and suddenly we go from 15/16GB in Used to 1/16GB in Used, the rest having returned to Free.
+
+Anybody who can shed light on possible causes of the above behavior, provide suggested experiments or tunables to revise, or point me at useful docs on PTLRPC behavior would be greatly appreciated.
+
+I'm baffled that PTLRPC can seemingly hold onto references to an indefinite number of pages -- despite plenty of tunables existing at higher levels to control sizes of various caches, no tunable seems to govern how many refs ptlrpc can hold onto.
+
+Best,
+
+ellis
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
