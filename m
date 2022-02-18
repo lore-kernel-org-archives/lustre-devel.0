@@ -4,115 +4,57 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id E1105C433EF
-	for <lustre-devel@archiver.kernel.org>; Mon, 14 Feb 2022 22:09:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 83229C433F5
+	for <lustre-devel@archiver.kernel.org>; Fri, 18 Feb 2022 08:05:44 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D144721F6F2;
-	Mon, 14 Feb 2022 14:09:13 -0800 (PST)
-Received: from na01-obe.outbound.protection.outlook.com
- (mail-centralusazon11021015.outbound.protection.outlook.com [52.101.62.15])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 200FD21F224
- for <lustre-devel@lists.lustre.org>; Mon, 14 Feb 2022 14:09:11 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=ep5CJ6BCSuneTuhCWXmwU1SGA8SS8z8rbC9Y8ImQ0C4U+jKpVG2q0X3pLAkXIFdOtO/HIAo7xbxYNNB6IZoxE9QQ2StTLw4EMEdB2qtIUYtCh1lwEcbbbppWIrP9bm2IEJuwcO4pL3LIDUANH8a+drDmXRwpHZ6z+ZK8ThtN5al0I3K2WWT5B59jliaey5YNj9aC4FJrA90j5a4dNia01sA4pUEwKHUkjDsb2D8ZmCPH/hdOeEKLrhySzf0cYYpCOl/PseIRKezJ/Ys/sXzMtpDGixz89vst/rzA6PIZZ9Z/jsQb4Y1NbozczbQuvtNRh79Lw4b4x5bSOw1R6JzVMw==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=b6HsbSyn7pbaQmQAbkarp4hFqvDyqziDVkteH4dUpEg=;
- b=EHiaKtOkNzdQm7A3RlSw5bN0itPyeE9PFynAz3Lj5Jiq2HYetPHhwsU8/wv/+eJJfUv3PHAA+LGH0gV78dcCK+TnpVAROlod/RsTmHpj07v/OL+Co+rUbVR5bSEC94cV0zulQxMzJjvyVv0k4ekvVLyu3H2eUyOc1hbMMl3phlCjXd+edZOHyNbOpqsslHRDYwL4O1/4tcNsQeLuMj5akZaAlX2D4V9oepLqw9AoZoA9iUInFNG8AlBpSsgPo6FaMxLbgOkpV3q3Nw2Ov4dIwm4Dw5n6qlh25qI7pKCtJtbmZioZQuegpftyp7KaexChXYVm+YWP0KSXvoFOhAling==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=microsoft.com; dmarc=pass action=none
- header.from=microsoft.com; dkim=pass header.d=microsoft.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=b6HsbSyn7pbaQmQAbkarp4hFqvDyqziDVkteH4dUpEg=;
- b=O89r8agvPtDVA3tJ6r0qViTpVkH0Ddz0Vm/ZmckIVh6kCSb75nRByUPYzJaapb9AaU61fU+XIKCb4Sj4Z23uEuObG7wVhamnWCva27C4qLV8Z6JCvLrUlo3acAQk1Rpt3JyS9Wd3KI8ZGwQHgsJoIaApeve2fwZEjMMZ+i6qZTE=
-Received: from MN2PR21MB1439.namprd21.prod.outlook.com (2603:10b6:208:20a::15)
- by CH2PR21MB1510.namprd21.prod.outlook.com (2603:10b6:610:8e::7) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.4995.8; Mon, 14 Feb
- 2022 22:09:08 +0000
-Received: from MN2PR21MB1439.namprd21.prod.outlook.com
- ([fe80::b041:49:3c25:f2bd]) by MN2PR21MB1439.namprd21.prod.outlook.com
- ([fe80::b041:49:3c25:f2bd%7]) with mapi id 15.20.5017.006; Mon, 14 Feb 2022
- 22:09:08 +0000
-To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: Memory issues with bulk rpcs and buffered I/O; ptlrpc bug?
-Thread-Index: AdgfhQ6qxxGIcBGwTzyTZr43wadh+wCakHNA
-Date: Mon, 14 Feb 2022 22:09:07 +0000
-Message-ID: <MN2PR21MB143903E11873AF9F11A01DD5BE339@MN2PR21MB1439.namprd21.prod.outlook.com>
-References: <MN2PR21MB1439AD0458A0144B3825D83EBE309@MN2PR21MB1439.namprd21.prod.outlook.com>
-In-Reply-To: <MN2PR21MB1439AD0458A0144B3825D83EBE309@MN2PR21MB1439.namprd21.prod.outlook.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-msip_labels: MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ActionId=f5001d4e-6071-43fd-84a9-1b5447b2ac3e;
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ContentBits=0;
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Enabled=true;
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Method=Standard;
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Name=Internal;
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SetDate=2022-02-11T20:21:06Z; 
- MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SiteId=72f988bf-86f1-41af-91ab-2d7cd011db47;
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=microsoft.com;
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 60946481-4bb6-4190-b6ba-08d9f0069f2c
-x-ms-traffictypediagnostic: CH2PR21MB1510:EE_
-x-ms-exchange-atpmessageproperties: SA|SL
-x-microsoft-antispam-prvs: <CH2PR21MB15104DC5A729F0E1D8CD05ECBE339@CH2PR21MB1510.namprd21.prod.outlook.com>
-x-ms-oob-tlc-oobclassifiers: OLM:10000;
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: KZFJ9/cZGRU60pFf2PMg3w0wZw+6G2UfJ/zqpJH8Yi9nlcvwDs8UDRciwOQK9ddh9wi2IcqQin7Jb5GZ3+60SYvM5ZNuZ0F3f2odnYK4h3BXBhIqOWaeoKOE+WyeSQGEGtaI7eGbZDt7vejdf/AsWxP8RsI4H0chbb9r3e5ot9bosvaGgbeLyZe8NVBzT1bv6hED+iRShkPZcoV/3/7kvCO5ei4FvYpz3J8XyJfSsZJmjEgqAEHDEIOv7XUkrCfrYHfjvEuqrRS0GRKYuU/kJZuIvKMAb8IQ/fNiVwRXXk1DU5Y6NUd4d5DpOzYmqM8FOl9Khwy5iL9Mc62x/MjQcTWQwEBy/yelzIhKPSKk9JfRmDikN2OUFIfpBzRmB8KEJdG3otasRWIkOA8/OGTtbZlLJpXyeuJIwDOHvDUPUXi8+FBallkvXtX5aZ7gpJDtUUlEJNb3/2qWX/6wioTdtehIV3t0GU11J5ZxQSFYfObofHSPUtG+M9qe6MdjZYRDQkgQKpA6QUQSSceHFhugRjZBr9RrWmhogJz28ntFug5il4zNJbekORIwRq8Mb7osGZNYInEGBgmLqxLX+WZg1ako57ba3ku/rTrJGl0JWGZAN4SZTh0nheybQrgB8QXqsWjMiV27WQNF89SaO+hzyGE4gAUZw6z0x741CFWn+qkizFEgSpH0TQ9RIkRj7DRsFcwUxztarVAQJiWs8g6P9mvcSb8h4TcVs8tisig1bLHOcoRBzhc5pTvPRbuQZ0DEGMjtfNwVnNsoAQmFLLoQUAG7Bp+cUL93zj8Kr832hW6PpAe9tpS4CIKE9SO5eD7TPX6ByfvAKn8y6uxmTOSujbPO1F7SxhGeJBjKaYEQE9I=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MN2PR21MB1439.namprd21.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230001)(4636009)(366004)(66556008)(8990500004)(66476007)(66446008)(66946007)(26005)(122000001)(76116006)(55016003)(8676002)(508600001)(10290500003)(8936002)(6916009)(186003)(64756008)(9686003)(38100700002)(52536014)(82950400001)(82960400001)(53546011)(966005)(7696005)(6506007)(83380400001)(2906002)(316002)(38070700005)(71200400001)(86362001)(5660300002)(33656002)(40753002);
- DIR:OUT; SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?hroKW5+ve3MKiA8OZvPXsheASW0F0WfZJkEpSwYTGFp12DfztTfz0saSVK7Z?=
- =?us-ascii?Q?b2L2TEN66JAbKe6dXWDaoQkVaNHIKYz6rXKUqbFlMJoLJhsnjjKPWI9J6x5M?=
- =?us-ascii?Q?qrv4Q7qxTkY5lgm9/IJ9VgA0c1Y0xnPp8C1Zoi9l2rm1XvW2QkTwDemtFmLb?=
- =?us-ascii?Q?nL4Ub/GDZN8Ir0Tj64y+1QbsLMYa2d/gkkBT5fyDOteCaZM9a0W2UeZzoFZ9?=
- =?us-ascii?Q?Bay6rwKszicFFnWHDnEZbd9T5KkrSfA6Nqo5fT6VyeEltlAFJtY0qUUHVank?=
- =?us-ascii?Q?M3EfuJP/Ij/OwH+vhtXW+zhftyY5ISZVCfnN1fgUq4MO0tpv5OsS1Kiwa6Ua?=
- =?us-ascii?Q?M+7oTCscTeHX5tgLTosxd5AP3w+2SKv/Bl2GWBMDxEVJNNB50O6a49iNM27I?=
- =?us-ascii?Q?7TEb6cH69dubJ+efTe7RTP+mcgIcmPhN7tSYVSv6Vd7g+ghTY2XbdjnFAQki?=
- =?us-ascii?Q?mE3Ltv618dBVwNHVGXKp6F2ZFrmik81DBvmprTxGlsqIi+F0CVjfTn/AoG9U?=
- =?us-ascii?Q?7DX3AmUyntdUl0d5oIKocS94u71pK4Aqm/iN/HeZr0R12BiG1suChHkEtTJp?=
- =?us-ascii?Q?g5IQ4QvpIEc1BUXPNxaD9aBkkQlob5DNBkX+u98bV/M2N1V+U7ACB4Rtcgm0?=
- =?us-ascii?Q?Nzsx1AqaKKq1DQqXTDE67G71+ojjHTUxORh4QS0I6/qWmIKECdkVcsVf1Zk7?=
- =?us-ascii?Q?PVTUSTvDIC92BhjFqfXEPybYyGL/BqXcHkvOm185APJpdDIDe+nyI85zOSzQ?=
- =?us-ascii?Q?9pRRfjIBAVY60Wdhr2hNqu0G1/HxBwqW81dZUM25+qf0dpBJnWOjAOMs44ma?=
- =?us-ascii?Q?G3t5C01UiIAPj/CBh6ffWu+R3zBZK2NDvlkRJ3qKzlaF2XEacUskxKZrYmqP?=
- =?us-ascii?Q?pcbMjMmkHv8uttvXrBKXiWhjUYh7ACqjrJO15/jbdtsPyFzxx2oz6+aEZUZ7?=
- =?us-ascii?Q?kU25qk6gN/Dv+CFbdCYFjwB/Pn+G9tzR0Q9a5g8Gxzk17RDkw5iEanPIeZtY?=
- =?us-ascii?Q?g9fmT+zHDSmy/Ho4/el22Ej3RQ9CwNUa+Scf2YkuJUw8/y3Df3SNWeufgqzg?=
- =?us-ascii?Q?5kyLCGXEaMfANZQhZWm8IugFBzqZRJ0GJhwLfiJPLhDWq7c+RObijQzyiCgF?=
- =?us-ascii?Q?LD3iHMuKOPGOWVM188SlLOdUzTj5lUmAxHA6V9er7Wz1OQjHOlUPS73ZHIK6?=
- =?us-ascii?Q?QvIzJi1pPoFleEVYm+EiwtnU0cEkPNaPhthwWjjqH7bwgfkNygO1ht/n2aag?=
- =?us-ascii?Q?jkbtB/HTWaGId8MfHXgnxyYwVC5IY63T2j/qO7/3oLCKbFCjzhY3xknpK1G5?=
- =?us-ascii?Q?BOXQ6lQSyOrC8vQhwVuFuAloZK56PmGnilFs1dluhtDaurrjEy4o6JUfIr58?=
- =?us-ascii?Q?3Eo5+SmHuRYFr3k1NqavAp1qnBq4imU0VaTMUoQTUO75+63vm7ty1AHbuZlm?=
- =?us-ascii?Q?c2mf1UiPm7uYasXvAMmCmpSBJ4HEbuFUjqYkoag0Xm0Shn9/yR7WXUJLjK9j?=
- =?us-ascii?Q?4vhx2DjfOwz0zfmSgKEnuLoPk+2naqF7BENCo4zt4g+JVlV7VbHAX6eC3B0L?=
- =?us-ascii?Q?zNrGkoQJIlO3SkC0URYGSf6aGCI+J2g0lEasuYJtA9wWsIxQ078TgCbjyPwW?=
- =?us-ascii?Q?WA=3D=3D?=
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id EE12421CAF7;
+	Fri, 18 Feb 2022 00:05:43 -0800 (PST)
+Received: from mail-oo1-f54.google.com (mail-oo1-f54.google.com
+ [209.85.161.54])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 9772121CA3F
+ for <lustre-devel@lists.lustre.org>; Fri, 18 Feb 2022 00:05:42 -0800 (PST)
+Received: by mail-oo1-f54.google.com with SMTP id
+ i10-20020a4aab0a000000b002fccf890d5fso2642524oon.5
+ for <lustre-devel@lists.lustre.org>; Fri, 18 Feb 2022 00:05:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=IrzNotffqN0hBecqn/WKMqvepcJ9Nc9xSQ8wRdox22s=;
+ b=BUmfaLXJmH/QY/AsGkQqOHHoLOXn0Nuis7JAOo0RwvyvmpDhg284gLSvrI9prsEJlZ
+ 4GuCi/LW4INQaUdDAr+Z6nFEpSAXTH1vhZjj9efR58V9c0VcJu79Y4VJpJELE/gx9mdA
+ YRa2qnPI3QAubElCJRlBY12nV5biVwMK9GXw3yHyENw4G5XARAag9wBdMATfd0Fqc1Fp
+ 9T+D97RR4JKAEjFS8L9wNYreMiuOgWqsS6sfRUd9fZO5/rqBsAmN/C0oI3J4et+R/CWf
+ NMh5PxQzUS91oTESLTCNl3RptDzms/vKwRlW2YmgJ0fzBtOPS0XjMHqddD4ArxY4Ckyh
+ mIlg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20210112;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=IrzNotffqN0hBecqn/WKMqvepcJ9Nc9xSQ8wRdox22s=;
+ b=LZIcMR8RlvjDDQDjvau02H31R9mh184CXRYEmxHTSir6qXGofxK+iMftyIeu2ZQ408
+ jOzygM9vqjLxjChAJPJlpYgXSUNd2N8oBUCiKwqRvLaUNfXWg8Oc8N0fOLMLM71/YxmW
+ Ntqg44Zw2vdsCjykMLAk0O3T2eQcrtlbeMz2HYjQIW0ouX66hZ8D3Sk/mFQ1vBAnrxFx
+ ob1bcdBoB2xmTwc7Bg4StFKj6WYVRZoGyiDf8NJd3tSsm5Rou3fYByI/h+Il2eSs2CRE
+ FTeVResjoB7c5gXYFEhAzmqwnl5FSQ5upEfNelx2Z85dlFmY7Q2aozgP8NaiwqUMq5oo
+ 8mhA==
+X-Gm-Message-State: AOAM530U+pbtcGT3Y6Zk78zv/wvYEVJEoR2d+SANPCmV1dwaqcZR/HKl
+ R8v2dBhiCvgOgHnjagXKXMyECbSuUUIPZFEA7ir1
+X-Google-Smtp-Source: ABdhPJx7g+D+P8FuomLs0IcarAW1EznvQwmFjhWV/TRoFtNebedKCxfQtUfUDMpTv9vCFeEqEphxtHB7u1JIdPhHKV8=
+X-Received: by 2002:a05:6870:14cc:b0:ce:c0c9:649 with SMTP id
+ l12-20020a05687014cc00b000cec0c90649mr4041327oab.155.1645171541552; Fri, 18
+ Feb 2022 00:05:41 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: microsoft.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MN2PR21MB1439.namprd21.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 60946481-4bb6-4190-b6ba-08d9f0069f2c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2022 22:09:07.9113 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 72f988bf-86f1-41af-91ab-2d7cd011db47
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: HaXVCjAuuvaglBGPGLXmNcoL/llHB0Dz7seRftp373fObWtTfIvkxKp82++dJssh2WTpoelhIoUTDfE6vnqt7bTYVoNz8Ib30QyL/DheQAM=
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CH2PR21MB1510
-Subject: Re: [lustre-devel] Memory issues with bulk rpcs and buffered I/O;
- ptlrpc bug?
+References: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
+ <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
+ <6C592E3F-0437-4776-BB29-C5EE489C5FAE@whamcloud.com>
+ <CAKoKPbxmvn7GVc6wsYrLP_HD8SpNMVFfSFdiZMo-5ZXqS-HSdg@mail.gmail.com>
+ <7AAC4FDA-AC84-4E73-83AB-130B6BD3AE1B@whamcloud.com>
+ <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
+ <023CD146-E2BA-4B03-9459-C480E51EBE7E@whamcloud.com>
+In-Reply-To: <023CD146-E2BA-4B03-9459-C480E51EBE7E@whamcloud.com>
+Date: Fri, 18 Feb 2022 16:05:30 +0800
+Message-ID: <CACzn6-XOJuca15j8sObDwoG3Wb6WgUGc0ptTCUHuQFkEM7S1XQ@mail.gmail.com>
+To: Oleg Drokin <green@whamcloud.com>, mdiep@whamcloud.com
+Subject: Re: [lustre-devel] Lustre Arm stuff status and work plan
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -125,104 +67,299 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Ellis Wilson via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Ellis Wilson <elliswilson@microsoft.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+From: Kevin Zhao via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Kevin Zhao <kevin.zhao@linaro.org>
+Cc: Li Xi <lixi@ddn.com>, Jian Yu <jiyu@whamcloud.com>,
+ "cloud-dev-request@op-lists.linaro.org"
+ <cloud-dev-request@op-lists.linaro.org>,
+ Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============4003944723233794852=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-I posted what I think is root cause and a workaround in:
-https://jira.whamcloud.com/browse/LU-15468
+--===============4003944723233794852==
+Content-Type: multipart/alternative; boundary="00000000000054465005d84659d1"
 
-I have some resulting questions for the community, which I'll cross-post back on my original thread on lustre-discuss, since that seems to be the more active of the two channels.
+--00000000000054465005d84659d1
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-If anybody thinks my RC is not accurate or has any other thoughts don't hesitate to post on that JIRA issue or ping me directly.
-
------Original Message-----
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> On Behalf Of Ellis Wilson via lustre-devel
-Sent: Friday, February 11, 2022 3:37 PM
-To: lustre-devel@lists.lustre.org
-Subject: [EXTERNAL] [lustre-devel] Memory issues with bulk rpcs and buffered I/O; ptlrpc bug?
-
-Hi,
-
-I'm still trying to get to the bottom of recurring OOM issues relating to: https://nam06.safelinks.protection.outlook.com/?url=https%3A%2F%2Fjira.whamcloud.com%2Fbrowse%2FLU-15468&amp;data=04%7C01%7Celliswilson%40microsoft.com%7C4a0f0c5a088847d779a908d9ed9f9c51%7C72f988bf86f141af91ab2d7cd011db47%7C1%7C0%7C637802092058004059%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000&amp;sdata=coTYCDC8%2FQSjk5Jc3H8KHktWIqwbWw9JLKtSEUov6Vw%3D&amp;reserved=0  Any help is greatly appreciated, even if it's just "here are docs on bulk rpcs / ptlrpc / etc".
-
-The TL;DR issue is iozone or dd can trivially drive used memory up against system limits, I/O drags to a halt due to inability to allocate new pages, and eventually all of the outstanding pages are marked cleaned and the process repeats.  Oom-killer pops in and out for longer runs.
-
-I've been able to reproduce it on the following combinations of (kernel) + (lustre) on Ubuntu 18.04 (client-side):
-5.14.11 + 2.14.0
-4.15.17 + 2.14.0
-4.15.17 + 2.12.8
-
-One of the things I noticed was that when I hit the high-memory pressure condition, kswapd0 kicks in aggressively, and on-cpu graphs show that shrink_inactive_pages is cycling wildly (up to 1M calls per second).  Digging further into this, shrink_page_list is being called from that and every time it scans 32 pages, finding none available for reclaim.  This is due to the page not having a mapping (it was synced out to the OST long ago), and therefore the vmscan code is treating it almost like an anonymous page (though it's not) -- it's waiting for the last reference to drop it.  This behavior is NOT reproduced if you specify ODIRECT.
-
-Tracing this with ftrace, I find:
-
-If using direct I/O, kernel functions and counts per second matching 'get_page' or 'put_page' show up as (two seconds provided for each example): 
-
-FUNC                              COUNT
-pagecache_get_page                  238 
-sptlrpc_enc_pool_put_pages          356 
-__put_page                        45772
-get_page_from_freelist            56242
-
-FUNC                              COUNT
-pagecache_get_page                  119 
-sptlrpc_enc_pool_put_pages          356 
-__put_page                        45693
-get_page_from_freelist            55934
+Hi All,
 
 
-But if you use buffered I/O, the result is: 
+Greetings and thanks a lot for your comments! Xinliang and I are from Linar=
+o
+<https://www.linaro.org/>, an organization focusing on Arm open-source
+ecosystem development. We have been working on Lustre on the Arm64 server
+and client end for a while now, already fixing a few bugs on arm64.
 
-FUNC                              COUNT
-__put_page                        45703
-pagecache_get_page               364219
-get_page_from_freelist           426720
+As Xinliang said before, we want to enable the Arm64 CI, Oleg advises that
+we can plug our own CI nodes into the Jenkins. Now we want to understand
+and estimate how many machines resources can meet our requests, and doing
+the next stage plan of our hardware to meet the Lustre test requirements.
 
-FUNC                              COUNT
-__put_page                        45934
-pagecache_get_page               364304
-get_page_from_freelist           427555
 
-Not only are the volumes significantly higher, but the gets to puts are way off.  Note: there are the ~55K gets per second as there were for DIO in get_page_from_freelist, PLUS one get per pagecache_get_page in get_page_from_freelist.
-So, this isn't 700K newly gotten pages per second, but more like 400K newly gotten pages per second (which matches the line-rate of around 1.6GB/s), 350K of which are referenced twice and end up gunking up the inactive page lru list for vmscan.  Some time later you will see a mass put of these pages for non-DIO workloads:
+As I understand, the test jobs will cover the ZFS and Ldiskfs backend with
+2 scenarios:
 
-FUNC                              COUNT
-__put_page                      2898827
+   -
 
-I've tracked these puts to be caused by:
-   ptlrpcd_00_03-3531    [002] .... 82284.061407: __put_page: (__put_page+0x0/0x80)
-   ptlrpcd_00_00-3527    [000] .... 82284.061423: __put_page: (__put_page+0x0/0x80)
-   ptlrpcd_00_00-3527    [000] .... 82284.061434: <stack trace>
- => __put_page
- => ptlrpc_free_bulk
- => __ptlrpc_req_finished
- => ptlrpc_free_request
- => ptlrpc_free_committed
- => after_reply
- => ptlrpc_check_set
- => ptlrpcd_check
- => ptlrpcd
- => kthread
- => ret_from_fork
+   Lustre Arm64 Server + Arm64 Client( High Priority )
+   -
 
-The ptlrpcd_check loop basically processes around 2M+ of these in a second and suddenly we go from 15/16GB in Used to 1/16GB in Used, the rest having returned to Free.
+   Lustre Arm64 Server + x86_64 Client
 
-Anybody who can shed light on possible causes of the above behavior, provide suggested experiments or tunables to revise, or point me at useful docs on PTLRPC behavior would be greatly appreciated.
+After going through the Lustre test website:
+https://testing.whamcloud.com/test_sessions, it is quite clear to show the
+test info, and still remain some questions, that will be great if the
+community can give me a clear answer.
 
-I'm baffled that PTLRPC can seemingly hold onto references to an indefinite number of pages -- despite plenty of tunables existing at higher levels to control sizes of various caches, no tunable seems to govern how many refs ptlrpc can hold onto.
+1. Is there a link to show all the machine resources=EF=BC=9F Including the=
+ machine
+info, CPU, memory and peripheral info.
 
-Best,
+2. Do we have a CI infra arch overview diagram to show the machine usage
+and communication?
 
-ellis
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-https://nam06.safelinks.protection.outlook.com/?url=http%3A%2F%2Flists.lustre.org%2Flistinfo.cgi%2Flustre-devel-lustre.org&amp;data=04%7C01%7Celliswilson%40microsoft.com%7C4a0f0c5a088847d779a908d9ed9f9c51%7C72f988bf86f141af91ab2d7cd011db47%7C1%7C0%7C637802092058004059%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000&amp;sdata=EpbmuiGBdhWQmJpIOSWfauDO98ciO497ptde8g6IIgI%3D&amp;reserved=0
+3. How many machines are needed to meet the request of the Lustre Arm64
+Server + Arm64 Client test?
+
+
+Thanks a lot for your time, and look forward to your response.
+
+
+On Tue, 28 Dec 2021 at 09:58, Oleg Drokin <green@whamcloud.com> wrote:
+
+>
+>
+> On Dec 27, 2021, at 8:53 PM, Xinliang Liu <xinliang.liu@linaro.org> wrote=
+:
+>
+> Maloo is just one place to link to to actually let people see the results=
+,
+>> but you can link to external resources too
+>> like e.g. gatekeeper janitor helper does or assuming the information is
+>> small enough it could be entirely contained
+>> in the comment (like say for a build failure)
+>>
+>
+> Ok, understand now. Is there any other reference external CI that posts
+> results to Lustre gerrit now?
+>
+>
+> Currently there are:
+> - checkpatch and Misc code checks (smach) that post their results as 100%
+> comment only. they share codebase pretty much
+> - the Janitor (also started with above codebase but got changed and
+> extended a lot)
+>
+> There was external interest in the past to post results to gerrit but it
+> never materialized in the end
+>
+
+
+--=20
+*Best Regards*
+
+*Kevin Zhao*
+
+Tech Lead, LDCG Cloud Infrastructure
+
+Linaro Vertical Technologies
+
+IRC(freenode): kevinz
+
+Slack(kubernetes.slack.com): kevinz
+
+kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
+
+--00000000000054465005d84659d1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><span id=3D"gmail-docs-internal-guid-546d83e7-7fff-79c4-f7=
+64-aa4cccb7706c"><p style=3D"line-height:1.38;margin-top:0pt;margin-bottom:=
+0pt"><span style=3D"font-size:11pt;font-family:Arial;background-color:trans=
+parent;font-variant-numeric:normal;font-variant-east-asian:normal;vertical-=
+align:baseline;white-space:pre-wrap">Hi All,</span></p><p style=3D"line-hei=
+ght:1.38;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-size:11pt;fo=
+nt-family:Arial;background-color:transparent;font-variant-numeric:normal;fo=
+nt-variant-east-asian:normal;vertical-align:baseline;white-space:pre-wrap">=
+<br></span></p><p style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0p=
+t"><span style=3D"font-size:11pt;font-family:Arial;background-color:transpa=
+rent;font-variant-numeric:normal;font-variant-east-asian:normal;vertical-al=
+ign:baseline;white-space:pre-wrap">Greetings and thanks a lot for your comm=
+ents! Xinliang and I are from <a href=3D"https://www.linaro.org/">Linaro</a=
+>, an organization focusing on </span><span style=3D"font-family:Arial;font=
+-size:14.6667px;white-space:pre-wrap">Arm open-source ecosystem development=
+</span><span style=3D"background-color:transparent;font-family:Arial;font-s=
+ize:11pt;white-space:pre-wrap">. We have been working on Lustre on the Arm6=
+4 server and client end for a while now, already fixing a few bugs on arm64=
+. </span></p><p style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"=
+><span style=3D"background-color:transparent;font-family:Arial;font-size:11=
+pt;white-space:pre-wrap">As Xinliang said before, </span><span style=3D"bac=
+kground-color:transparent;font-family:Arial;font-size:11pt;white-space:pre-=
+wrap">we want to enable the Arm64 CI, Oleg advises that we can plug our own=
+ CI nodes into</span>=C2=A0the Jenkins<span style=3D"background-color:trans=
+parent;font-family:Arial;font-size:11pt;white-space:pre-wrap">. </span><spa=
+n style=3D"font-family:Arial;font-size:14.6667px;white-space:pre-wrap">Now =
+we want to understand and estimate how many machines resources can meet our=
+ requests, and doing the next stage plan of our hardware to meet the Lustre=
+ test requirements.</span></p><p style=3D"line-height:1.38;margin-top:0pt;m=
+argin-bottom:0pt"><span style=3D"background-color:transparent;font-family:A=
+rial;font-size:11pt;white-space:pre-wrap"><br></span></p><p dir=3D"ltr" sty=
+le=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span style=3D"fon=
+t-size:11pt;font-family:Arial;background-color:transparent;font-variant-num=
+eric:normal;font-variant-east-asian:normal;vertical-align:baseline;white-sp=
+ace:pre-wrap">As I understand, the test jobs will cover the ZFS and Ldiskfs=
+ backend with 2 scenarios:</span></p><ul style=3D"margin-top:0px;margin-bot=
+tom:0px"><li dir=3D"ltr" style=3D"list-style-type:disc;font-size:11pt;font-=
+family:Arial;background-color:transparent;font-variant-numeric:normal;font-=
+variant-east-asian:normal;vertical-align:baseline;white-space:pre"><p dir=
+=3D"ltr" style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt" role=
+=3D"presentation"><span style=3D"font-size:11pt;background-color:transparen=
+t;font-variant-numeric:normal;font-variant-east-asian:normal;vertical-align=
+:baseline;white-space:pre-wrap">Lustre Arm64 Server + Arm64 Client( High Pr=
+iority )</span></p></li><li dir=3D"ltr" style=3D"list-style-type:disc;font-=
+size:11pt;font-family:Arial;background-color:transparent;font-variant-numer=
+ic:normal;font-variant-east-asian:normal;vertical-align:baseline;white-spac=
+e:pre"><p dir=3D"ltr" style=3D"line-height:1.38;margin-top:0pt;margin-botto=
+m:0pt" role=3D"presentation"><span style=3D"font-size:11pt;background-color=
+:transparent;font-variant-numeric:normal;font-variant-east-asian:normal;ver=
+tical-align:baseline;white-space:pre-wrap">Lustre Arm64 Server + x86_64 Cli=
+ent</span></p></li></ul><p dir=3D"ltr" style=3D"line-height:1.656;margin-to=
+p:0pt;margin-bottom:0pt"><span style=3D"font-size:11pt;font-family:Arial;ba=
+ckground-color:transparent;font-variant-numeric:normal;font-variant-east-as=
+ian:normal;vertical-align:baseline;white-space:pre-wrap">After going throug=
+h the Lustre test website: </span><a href=3D"https://testing.whamcloud.com/=
+test_sessions" style=3D"text-decoration-line:none"><span style=3D"font-size=
+:11pt;font-family:Arial;background-color:transparent;font-variant-numeric:n=
+ormal;font-variant-east-asian:normal;text-decoration-line:underline;vertica=
+l-align:baseline;white-space:pre-wrap">https://testing.whamcloud.com/test_s=
+essions</span></a><span style=3D"font-size:11pt;font-family:Arial;backgroun=
+d-color:transparent;font-variant-numeric:normal;font-variant-east-asian:nor=
+mal;vertical-align:baseline;white-space:pre-wrap">, it is quite clear to sh=
+ow the test info, and still remain some questions, that will be great if th=
+e community can give me a clear answer.</span></p><p dir=3D"ltr" style=3D"l=
+ine-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"font-size=
+:11pt;font-family:Arial;background-color:transparent;font-variant-numeric:n=
+ormal;font-variant-east-asian:normal;vertical-align:baseline;white-space:pr=
+e-wrap">1. Is there a link to show all the machine resources=EF=BC=9F Inclu=
+ding the machine info, CPU, memory and peripheral info.=C2=A0</span></p><p =
+dir=3D"ltr" style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><s=
+pan style=3D"font-size:11pt;font-family:Arial;background-color:transparent;=
+font-variant-numeric:normal;font-variant-east-asian:normal;vertical-align:b=
+aseline;white-space:pre-wrap">2. Do we have a CI infra arch overview diagra=
+m to show the machine usage and communication?=C2=A0</span></p><p dir=3D"lt=
+r" style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=
+=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-vari=
+ant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;w=
+hite-space:pre-wrap">3. How many machines are needed to meet the request of=
+ the Lustre Arm64 Server + Arm64 Client test?</span></p><p dir=3D"ltr" styl=
+e=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span style=3D"fon=
+t-size:11pt;font-family:Arial;background-color:transparent;font-variant-num=
+eric:normal;font-variant-east-asian:normal;vertical-align:baseline;white-sp=
+ace:pre-wrap"><br></span></p><p style=3D"line-height:1.656;margin-top:0pt;m=
+argin-bottom:0pt"><span style=3D"font-size:11pt;font-family:Arial;backgroun=
+d-color:transparent;font-variant-numeric:normal;font-variant-east-asian:nor=
+mal;vertical-align:baseline;white-space:pre-wrap">Thanks a lot for your tim=
+e, and look forward to your response.</span></p></span><br class=3D"gmail-A=
+pple-interchange-newline"></div><br><div class=3D"gmail_quote"><div dir=3D"=
+ltr" class=3D"gmail_attr">On Tue, 28 Dec 2021 at 09:58, Oleg Drokin &lt;<a =
+href=3D"mailto:green@whamcloud.com">green@whamcloud.com</a>&gt; wrote:<br><=
+/div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bo=
+rder-left:1px solid rgb(204,204,204);padding-left:1ex">
+
+
+
+<div style=3D"overflow-wrap: break-word;">
+<br>
+<div><br>
+<blockquote type=3D"cite">
+<div>On Dec 27, 2021, at 8:53 PM, Xinliang Liu &lt;<a href=3D"mailto:xinlia=
+ng.liu@linaro.org" target=3D"_blank">xinliang.liu@linaro.org</a>&gt; wrote:=
+</div>
+<div>
+<div dir=3D"ltr">
+<div class=3D"gmail_quote"><br>
+<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
+left:1px solid rgb(204,204,204);padding-left:1ex">
+Maloo is just one place to link to to actually let people see the results, =
+but you can link to external resources too<br>
+like e.g. gatekeeper janitor helper does or assuming the information is sma=
+ll enough it could be entirely contained<br>
+in the comment (like say for a build failure)<br>
+</blockquote>
+<div><br>
+</div>
+<div>Ok, understand now. Is there any other reference external CI that post=
+s results to Lustre gerrit now?</div>
+</div>
+</div>
+</div>
+</blockquote>
+<div><br>
+</div>
+Currently there are:</div>
+<div>- checkpatch and Misc code checks (smach) that post their results as 1=
+00% comment only. they share codebase pretty much</div>
+<div>- the Janitor (also started with above codebase but got changed and ex=
+tended a lot)</div>
+<div><br>
+</div>
+<div>There was external interest in the past to post results to gerrit but =
+it never materialized in the end</div>
+</div>
+
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+ class=3D"gmail_signature"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div=
+ dir=3D"ltr"><div dir=3D"ltr"><b>Best Regards</b><div><div style=3D"margin:=
+0px;padding:0px 0px 20px;width:1262px"><div><div style=3D"margin:8px 0px 0p=
+x;padding:0px"><div><div dir=3D"ltr"><font><div dir=3D"ltr"><div dir=3D"ltr=
+"><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto=
+,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><b><span style=3D=
+"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font></span></b></p><p=
+ class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,Rob=
+otoDraft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"#757b8=
+0"><span style=3D"font-size:14.6667px">Tech Lead, LDCG Cloud Infrastructure=
+</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);fo=
+nt-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><=
+font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical =
+Technologies</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136=
+,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-si=
+ze:medium"><font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(=
+freenode): kevinz</span></font></p><p class=3D"MsoNormal"><font color=3D"#7=
+57b80"><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Aria=
+l, sans-serif"><span style=3D"font-size:14.6667px">Slack(</span></font><fon=
+t face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D=
+"font-size:14.6667px"><a href=3D"http://kubernetes.slack.com" target=3D"_bl=
+ank">kubernetes.slack.com</a>)</span></font><font color=3D"#888888" face=3D=
+"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D"font-siz=
+e:14.6667px">: kevinz</span></font></font></p><p class=3D"MsoNormal" style=
+=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,s=
+ans-serif;font-size:medium"><font color=3D"#757b80"><span style=3D"font-siz=
+e:14.6667px"><a href=3D"mailto:kevin.zhao@linaro.org" target=3D"_blank"><sp=
+an>kevin.zhao@linaro.org</span></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 =
+18818270915</span></font><span style=3D"color:rgb(117,123,128);font-size:11=
+pt">=C2=A0</span><br></p><div style=3D"color:rgb(136,136,136);font-family:R=
+oboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><span style=
+=3D"color:rgb(117,123,128);font-size:11pt"><br></span></div></div></div></f=
+ont></div><div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans=
+-serif;font-size:medium"></div></div></div><div style=3D"font-family:Roboto=
+,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"></div></div></div=
+></div></div></div></div></div></div></div></div>
+
+--00000000000054465005d84659d1--
+
+--===============4003944723233794852==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============4003944723233794852==--
