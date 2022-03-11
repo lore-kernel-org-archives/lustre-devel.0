@@ -4,48 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 6A095C433EF
-	for <lustre-devel@archiver.kernel.org>; Fri, 11 Mar 2022 08:18:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 33940C433EF
+	for <lustre-devel@archiver.kernel.org>; Fri, 11 Mar 2022 08:29:01 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B540821C906;
-	Fri, 11 Mar 2022 00:18:56 -0800 (PST)
-Received: from mail-oi1-f179.google.com (mail-oi1-f179.google.com
- [209.85.167.179])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D0E3021C8EE
- for <lustre-devel@lists.lustre.org>; Fri, 11 Mar 2022 00:18:54 -0800 (PST)
-Received: by mail-oi1-f179.google.com with SMTP id j83so8589861oih.6
- for <lustre-devel@lists.lustre.org>; Fri, 11 Mar 2022 00:18:54 -0800 (PST)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 12E7E21C90B;
+	Fri, 11 Mar 2022 00:29:01 -0800 (PST)
+Received: from mail-oo1-f46.google.com (mail-oo1-f46.google.com
+ [209.85.161.46])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CC76D20110B
+ for <lustre-devel@lists.lustre.org>; Fri, 11 Mar 2022 00:28:58 -0800 (PST)
+Received: by mail-oo1-f46.google.com with SMTP id
+ y27-20020a4a9c1b000000b0032129651bb0so9806694ooj.2
+ for <lustre-devel@lists.lustre.org>; Fri, 11 Mar 2022 00:28:58 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:from:date:message-id:subject:to:cc;
- bh=Jh6TD3HOJt6eAs1GuzJx9rq4K7ChpMIGA88NJ5qJr70=;
- b=S2hZD0S+rY8arpF8ms4PtbazMoasAEKchQDlyAAxlw7vK3N2oLgDpcil90xgtiAUlK
- LR9eLmp6aKMHW7QKuOB+87RKAu2g+eb7iUu5+SOYJyasmjwBt9QVfY6bwZiHKZ02uZqR
- Lc0jVdao2zaXo2AcIEKyBqyRwItwxtD7UASMO1FJNuLEVHUrRSIMA4aS8UcSXdzB/CXb
- kzcmGdRxK2OwGtUMAAaRlLxfZvfHYiGOP6jE0D6uRL5eIiW39dLVsM00IKD/TfaGmuG3
- 2ohT0FFI4HYlUdVrmQnKWo1o/WbtWsUI12Fo2F1Kj+swgLz2Q2hSBujKt+DSUcdf5aed
- g+8w==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=OTsGd6jOFsI6fD1+cWH+E2bf4C/k4zYMCdn1PI0cK2w=;
+ b=tMyODAmNhb/kNxZY3ME+WA9Iz7bBGUt8JprCkxSCKEC2HjUgDjWl/kPVNPS3szH3xE
+ PL9BX3ItVPOl00TmP73tk3nFjXfGwnQsSPXDJi89NarwlwUmgi2ba1J7pM2ltiAZJumS
+ ByIqiQhCELP8r4widROi7VNwqcirfNddOWZdJYsz3CAsDCH84kBznoU3ZpJLJmYCm+41
+ hHJVGFOUUp1Rc+mdGc3gJcAxeaskYzLpmcPy6xb85L0uEIvMOawluZkO0pKn5B9ska2Y
+ onOPP5flH+fhHnn8JwMxX4GxTP2EAGKDz8wE4OgUSWUj/Uk+YraEpMoWdBr4LZEcEDZ1
+ B64A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20210112;
- h=x-gm-message-state:mime-version:from:date:message-id:subject:to:cc;
- bh=Jh6TD3HOJt6eAs1GuzJx9rq4K7ChpMIGA88NJ5qJr70=;
- b=g6ObKvb6BMIJWFjNjPf96vz9xDQ0ZS/IW5TPjv5CQwQZC4gJ9KCrG5R23fbpJHaOVm
- iJjlR1ymWEsq5Lu04vtY5hkLJE5s9CCwSJbEEwNYLdm4xCwgn9If3YM1SV3cYPKLTVag
- G8gglUoW8YlecWLYvIaTj+ri9qY/LTJfaCL0nf5kjI2kDrAQ907NXhrWQneDOVfC3C4m
- 8e9oMSHy1ApGXT1SewmceIlQ0gThqMyzheXRT2LDRVYbOA2xyLSIMkRTyxbhco1Aktxb
- Qs+4lFZr1hsj22eM3UdB3oM7ABU9g7QAKqMuBBC4QkVs2aS4pbReqmJR8bTPzg4ziIoS
- WyVw==
-X-Gm-Message-State: AOAM532dmCZzZKIL9bxHT5eleXgKYK2+60rxAO7/q8z5vdS3Tw260Y0B
- 3b/TxdsfvLPEgCeyf7/XPWqwSs7hi3rY4LMJpaGCkeY27DDQ
-X-Google-Smtp-Source: ABdhPJxzp3L11ka2c2WpRN7wS9s0UDqjwLJ9gcUbcfzdMN9x41C7wUVgGC02N+H3LisKfzQgQOOvoeZiuhs28KqgS3I=
-X-Received: by 2002:a05:6808:1281:b0:2d9:a01a:4bd6 with SMTP id
- a1-20020a056808128100b002d9a01a4bd6mr5862526oiw.253.1646986734032; Fri, 11
- Mar 2022 00:18:54 -0800 (PST)
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=OTsGd6jOFsI6fD1+cWH+E2bf4C/k4zYMCdn1PI0cK2w=;
+ b=wb+QOymlCLuy4yCJYG9cUNhe6EFkl30GelXNhG94j+83M4AwUjhsxf/aL58s055ul/
+ fO2uQn5UmYj6lm7F3DJ4uCqAgsDcfI+rFcKpWj45R9LcKb/XaZCyg/6lcage4fKy8Y3Z
+ SJhCwj2+P8WitfL2HZbpRrbmh7DazJac5TYg37TlOZDWIZ3Skn4MFvG1ksgJ+KhJ1E9u
+ CIJbLiQz0uV53QwT4OLrB7L6kY2G/phFzhj0JP6ouiNh0e0RfSOGNWQzPqxMYdk3bFxZ
+ P3G6b0kb8nyfnS7hM/HS+QH4m/qtFQStrdKnoGDLqOxQIWimgAeGbcVcS6CUeZzNC3VW
+ XBYQ==
+X-Gm-Message-State: AOAM533Dl1c450BzhwnF7GPS3CBT7PM4upHKt2nzS+KI18ZZk5Dtv1hD
+ 9CFVj6AKVN0/O4sC79+R4+AQAHiQ0bdanmSNlTs4
+X-Google-Smtp-Source: ABdhPJxXkqXLTnKg6YV2ERwpUJ7wPkIeosDQklYGSpZ7JnSJ0qWZADzZLu4nOWsDPWzCIhS3glpFNg0QFREU9JGi7n8=
+X-Received: by 2002:a05:6870:630c:b0:da:b3f:324d with SMTP id
+ s12-20020a056870630c00b000da0b3f324dmr4971070oao.253.1646987337951; Fri, 11
+ Mar 2022 00:28:57 -0800 (PST)
 MIME-Version: 1.0
-Date: Fri, 11 Mar 2022 16:18:43 +0800
-Message-ID: <CACzn6-UFqbF+rb1wvDJQ=6+jrHDsEZUufa8AG6vY5izH+KNNVg@mail.gmail.com>
-To: Lustre-devel <lustre-devel@lists.lustre.org>
-Subject: [lustre-devel] lustre:pcc: Sanity-pcc 7a test hang(Both on Aarch64
- and X86_64) discussion
+References: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
+ <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
+ <6C592E3F-0437-4776-BB29-C5EE489C5FAE@whamcloud.com>
+ <CAKoKPbxmvn7GVc6wsYrLP_HD8SpNMVFfSFdiZMo-5ZXqS-HSdg@mail.gmail.com>
+ <7AAC4FDA-AC84-4E73-83AB-130B6BD3AE1B@whamcloud.com>
+ <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
+ <023CD146-E2BA-4B03-9459-C480E51EBE7E@whamcloud.com>
+ <CACzn6-XOJuca15j8sObDwoG3Wb6WgUGc0ptTCUHuQFkEM7S1XQ@mail.gmail.com>
+ <F5AF3C10-6ED7-4EEC-BA63-EF8256DA94D7@whamcloud.com>
+In-Reply-To: <F5AF3C10-6ED7-4EEC-BA63-EF8256DA94D7@whamcloud.com>
+Date: Fri, 11 Mar 2022 16:28:46 +0800
+Message-ID: <CACzn6-V0Cvg+O1-DEWotBoZah2nZq=a65DVjtssF2RFj+aGqUQ@mail.gmail.com>
+To: Oleg Drokin <green@whamcloud.com>
+Subject: Re: [lustre-devel] Lustre Arm stuff status and work plan
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -60,102 +71,138 @@ List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>,
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 From: Kevin Zhao via lustre-devel <lustre-devel@lists.lustre.org>
 Reply-To: Kevin Zhao <kevin.zhao@linaro.org>
-Cc: Li Xi <lixi@ddn.com>
-Content-Type: multipart/mixed; boundary="===============3730844255725045327=="
+Cc: Li Xi <lixi@ddn.com>, Jian Yu <jiyu@whamcloud.com>,
+ "cloud-dev-request@op-lists.linaro.org"
+ <cloud-dev-request@op-lists.linaro.org>,
+ Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============1862672673448885845=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============3730844255725045327==
-Content-Type: multipart/alternative; boundary="0000000000003b6be005d9ecfb85"
+--===============1862672673448885845==
+Content-Type: multipart/alternative; boundary="0000000000003a81f505d9ed1f09"
 
---0000000000003b6be005d9ecfb85
+--0000000000003a81f505d9ed1f09
 Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Hi,
+Thanks Oleg,
 
-Recently we've worked on the bug https://jira.whamcloud.com/browse/LU-14346.
-This bug will make the *mmap write* hang forever. This one is first
-occurring on Aarch64, but if we do a small change
-<https://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7a-analysis.md#reproduced-on-x86_64-with-a-small-change>,
-we *can easily reproduce it on X86_64*. For more details analysis of this
-bug, you can also check the link
-<https://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7a-analysis.md>
-.
+I will update the progress for the test clusters setup on Arm64 platform.
 
-The hang location is here
-<https://github.com/lustre/lustre-release/blob/master/lustre/tests/multiop.c#L725>
-as
-below:
-==============
-    case 'W':
-        for (i = 0; i < mmap_len && mmap_ptr; i += 4096)
-            mmap_ptr[i] += junk++;
-        break;
-===============
+On Mon, 28 Feb 2022 at 13:36, Oleg Drokin <green@whamcloud.com> wrote:
 
-*Bug Analysis - different behavior when run **mmap_ptr[i] += junk++ on
-different platform.*
-Traditionally, this process is:
-1. read from mmap_ptr[i]first(Execute the read page fault)
-2. Write a value to the same page(execute the page_mkwrite to change the
-page to writable).
+> Hello!
+>
+>   the sizing really depends on your test scaling requirements.
+>   For example my own test infrastructure is a couple builders + 4 nodes
+> for VMs (each has 256G RAM), 160 VM pairs in total,
+>   and on a particularly busy day another 80 VM pairs can be added. This i=
+s
+> to ensure speedy feedback to developers.
+>   You can operate a much smaller scale testing system if you want, just
+> keep in mind what is the longest running test would take
+>   to understand how many patches could be tested in parallel (sometimes
+> patch bombs result in 20+ patches submission at the same time).
+>    Here=E2=80=99s stats for last 30 days. https://imgur.com/lk2ogJv 1 ite=
+m means
+> single patch n processing. time in testing for a patch is typically about
+> 3.5 hours.
+>
+> maloo shows the resources when you go into the test session, for example
+> https://testing.whamcloud.com/test_sessions/4de25b47-43fc-4bfc-87aa-15e49=
+68519a7
+> - scroll down to see list of nodes
+>
+>
+>
+> On Feb 18, 2022, at 3:05 AM, Kevin Zhao <kevin.zhao@linaro.org> wrote:
+>
+> Hi All,
+>
+> Greetings and thanks a lot for your comments! Xinliang and I are from
+> Linaro <https://www.linaro.org/>, an organization focusing on Arm
+> open-source ecosystem development. We have been working on Lustre on the
+> Arm64 server and client end for a while now, already fixing a few bugs on
+> arm64.
+> As Xinliang said before, we want to enable the Arm64 CI, Oleg advises
+> that we can plug our own CI nodes into the Jenkins. Now we want to
+> understand and estimate how many machines resources can meet our requests=
+,
+> and doing the next stage plan of our hardware to meet the Lustre test
+> requirements.
+>
+> As I understand, the test jobs will cover the ZFS and Ldiskfs backend wit=
+h
+> 2 scenarios:
+>
+>    - Lustre Arm64 Server + Arm64 Client( High Priority )
+>    - Lustre Arm64 Server + x86_64 Client
+>
+> After going through the Lustre test website:
+> https://testing.whamcloud.com/test_sessions, it is quite clear to show
+> the test info, and still remain some questions, that will be great if the
+> community can give me a clear answer.
+> 1. Is there a link to show all the machine resources=EF=BC=9F Including t=
+he
+> machine info, CPU, memory and peripheral info.
+> 2. Do we have a CI infra arch overview diagram to show the machine usage
+> and communication?
+> 3. How many machines are needed to meet the request of the Lustre Arm64
+> Server + Arm64 Client test?
+>
+> Thanks a lot for your time, and look forward to your response.
+>
+>
+> On Tue, 28 Dec 2021 at 09:58, Oleg Drokin <green@whamcloud.com> wrote:
+>
+>>
+>>
+>> On Dec 27, 2021, at 8:53 PM, Xinliang Liu <xinliang.liu@linaro.org>
+>> wrote:
+>>
+>> Maloo is just one place to link to to actually let people see the
+>>> results, but you can link to external resources too
+>>> like e.g. gatekeeper janitor helper does or assuming the information is
+>>> small enough it could be entirely contained
+>>> in the comment (like say for a build failure)
+>>>
+>>
+>> Ok, understand now. Is there any other reference external CI that posts
+>> results to Lustre gerrit now?
+>>
+>>
+>> Currently there are:
+>> - checkpatch and Misc code checks (smach) that post their results as 100=
+%
+>> comment only. they share codebase pretty much
+>> - the Janitor (also started with above codebase but got changed and
+>> extended a lot)
+>>
+>> There was external interest in the past to post results to gerrit but it
+>> never materialized in the end
+>>
+>
+>
+> --
+> *Best Regards*
+>
+> *Kevin Zhao*
+>
+> Tech Lead, LDCG Cloud Infrastructure
+>
+> Linaro Vertical Technologies
+>
+> IRC(freenode): kevinz
+>
+> Slack(kubernetes.slack.com): kevinz
+>
+> kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
+>
+>
+>
 
-But on different platforms, it executes quite differently.
-On aarch64 platform: do_page_fault, no FAULT_FLAG_WRITE set, so
-handle_pte_fault will call do_read_fault
-
-   - do_read_fault:
-               __do_fault -> call ll_fault, get a page from pcc_fault
-               finish_fault(map the returned page to page tables)
-               unlock_page
-               vmf->flags is VM_FAULT_LOCKED
-   - call do_wp_page --> do_page_mkwrite --> ll_page_mkwrite
-
-On X86_64 platform, the mechanism is different. On X86_64, do_page_fault,
-with *FAULT_FLAG_WRITE set*, so handle_pte_fault will call *do_shared_fault*
-.
-
-   - do_shared_fault
-      -  __do_fault -> call ll_fault, get a page from pcc_fault
-      - do_page_mkwrite-> call ll_page_mkwrite
-      - finish_fault(map the returned page to page tables)
-      - fault_dirty_shared_page
-
-*Bug Analysis: why hang forever:*
-Also can check:
-https://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7a-analysis.md#kernel-do_page_fault-process-analysis
-for more details.
-
-do_page_mkwrite--->ll_page_mkwrite.
-    Insert the issue 0x1412 OBD_FAIL_LLITE_PCC_DETACH_MKWRITE.
-    Return with VM_FAULT_RETRY | VM_FAULT_NOPAGE
-    RETRY again, due to PTE is not NULL, vmf->flags FAULT_FLAG_WRITE, will
-call do_wp_page again.
-So that next time we will enter into do_page_mkwrite again. hanging forever.
-
-*Seek a good solution*
-As the above code snippet shows, *we want to let the kernel retry the mmap
-write (->fault() and ->page_mkwrite).*
-In handle_pte_fault, if there is no page or the page is not mapped(no PTE
-found), then
- __do_page_fault will try the memory fault handling.
-
-The easy fix here is to* remove the page and page table entry when we do
-fail injection in pcc_page_mkwrite.* But I don't find a good method to
-execute this, so list the info here and ask for community help.
-
-Some tried fix is:
-add function: *generic_error_remove_page*, but the mapped page still can
-not be unmapped successfully. The error log is here
-<https://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7a-analysis.md#solution>
-.
-
-Since I'm a newbie to Lustre and not quite familiar with the memory
-management process, so please give some advice on this bug fix. Thanks in
-advance.
-
-
-
+--=20
 *Best Regards*
 
 *Kevin Zhao*
@@ -170,110 +217,341 @@ Slack(kubernetes.slack.com): kevinz
 
 kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
 
---0000000000003b6be005d9ecfb85
+--0000000000003a81f505d9ed1f09
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-<div dir=3D"ltr">Hi,<div><br></div><div>Recently we&#39;ve worked on the bu=
-g=C2=A0<a href=3D"https://jira.whamcloud.com/browse/LU-14346">https://jira.=
-whamcloud.com/browse/LU-14346</a>. This bug will make the <b>mmap write</b>=
- hang forever. This one is first occurring on Aarch64, but if we do a <a hr=
-ef=3D"https://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sa=
-nity-pcc-7a-analysis.md#reproduced-on-x86_64-with-a-small-change">small cha=
-nge</a>, we <b>can easily reproduce it on X86_64</b>. For more details=C2=
-=A0analysis of this bug, you can also<a href=3D"https://github.com/kevinzs2=
-048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7a-analysis.md"> check t=
-he link</a>.</div><div><br></div><div>The <a href=3D"https://github.com/lus=
-tre/lustre-release/blob/master/lustre/tests/multiop.c#L725">hang location i=
-s here</a>=C2=A0as below:<br>=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D<br>=
-=C2=A0 =C2=A0 case &#39;W&#39;:<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0 for (i =3D 0=
-; i &lt; mmap_len &amp;&amp; mmap_ptr; i +=3D 4096)<br>=C2=A0 =C2=A0 =C2=A0=
- =C2=A0 =C2=A0 =C2=A0 mmap_ptr[i] +=3D junk++;<br>=C2=A0 =C2=A0 =C2=A0 =C2=
-=A0 break;<br>=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D</div><div><br><=
-/div><div><b>Bug Analysis - different behavior when run=C2=A0</b><b>mmap_pt=
-r[i] +=3D junk++ on different platform.</b></div><div>Traditionally, this p=
-rocess is:<br>1. read from mmap_ptr[i]first(Execute the read page fault)<br=
->2. Write a value to the same page(execute the page_mkwrite to change the p=
-age to writable).<br><br>But on different platforms, it executes quite diff=
-erently.<br>On aarch64 platform: do_page_fault, no FAULT_FLAG_WRITE set, so=
- handle_pte_fault will call do_read_fault<ul><li>do_read_fault:<br>=C2=A0 =
-=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 __do_fault=C2=A0-&gt; call ll_fault, get=
- a page from pcc_fault<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 finish_=
-fault(map the returned page to page tables)<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0 =
-=C2=A0 =C2=A0 unlock_page<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 vmf-=
-&gt;flags is VM_FAULT_LOCKED</li><li>call do_wp_page --&gt; do_page_mkwrite=
- --&gt; ll_page_mkwrite</li></ul>On X86_64 platform, the mechanism is diffe=
-rent. On X86_64, do_page_fault, with <b>FAULT_FLAG_WRITE set</b>, so handle=
-_pte_fault will call <b>do_shared_fault</b>.<ul><li>do_shared_fault</li><ul=
-><li>=C2=A0__do_fault -&gt; call ll_fault, get a page from pcc_fault</li><l=
-i>do_page_mkwrite-&gt; call ll_page_mkwrite</li><li>finish_fault(map the re=
-turned page to page tables)</li><li>fault_dirty_shared_page</li></ul></ul><=
-/div><div><b>Bug Analysis: why hang forever:</b></div><div>Also can check:=
-=C2=A0<a href=3D"https://github.com/kevinzs2048/devbox/blob/master/notes/lu=
-stre/pcc_sanity-pcc-7a-analysis.md#kernel-do_page_fault-process-analysis">h=
-ttps://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pc=
-c-7a-analysis.md#kernel-do_page_fault-process-analysis</a> for more details=
-.</div><div><br></div><div>do_page_mkwrite---&gt;ll_page_mkwrite.<br>=C2=A0=
- =C2=A0 Insert the issue 0x1412 OBD_FAIL_LLITE_PCC_DETACH_MKWRITE.<br>=C2=
-=A0 =C2=A0 Return with VM_FAULT_RETRY | VM_FAULT_NOPAGE<br>=C2=A0 =C2=A0 RE=
-TRY again, due to PTE is not NULL, vmf-&gt;flags FAULT_FLAG_WRITE, will cal=
-l do_wp_page again.<br>So that next time we will enter into do_page_mkwrite=
- again. hanging forever.<br></div><div><br></div><div><b>Seek a good soluti=
-on</b></div>As the above code snippet shows, <b>we want to let the kernel r=
-etry=C2=A0the mmap write (-&gt;fault() and -&gt;page_mkwrite).</b><br>In ha=
-ndle_pte_fault, if there is no page or the page is not mapped(no PTE found)=
-, then<br>=C2=A0__do_page_fault will try the memory fault handling. <br><br=
->The easy fix here is to<b> remove the page and page table entry when we do=
- fail injection in pcc_page_mkwrite.</b> But I don&#39;t find a good method=
- to execute this, so list the info here and ask for community help.<br><br>=
-Some tried fix is:<br><div>add function: <b>generic_error_remove_page</b>, =
-but the mapped page still can not be unmapped successfully. <a href=3D"http=
-s://github.com/kevinzs2048/devbox/blob/master/notes/lustre/pcc_sanity-pcc-7=
-a-analysis.md#solution">The error log is here</a>.<br></div><div><br></div>=
-<div>Since I&#39;m a newbie to Lustre and not quite familiar with the memor=
-y management process, so please=C2=A0give some advice on this bug fix. Than=
-ks in advance.</div><div><br></div><div><br></div><div><br></div><div><div =
-dir=3D"ltr" class=3D"gmail_signature" data-smartmail=3D"gmail_signature"><d=
-iv dir=3D"ltr"><div><div dir=3D"ltr"><div><div dir=3D"ltr"><div dir=3D"ltr"=
-><b>Best Regards</b><div><div style=3D"margin:0px;padding:0px 0px 20px;widt=
-h:1262px"><div><div style=3D"margin:8px 0px 0px;padding:0px"><div><div dir=
-=3D"ltr"><font><div dir=3D"ltr"><div dir=3D"ltr"><p class=3D"MsoNormal" sty=
-le=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial=
-,sans-serif;font-size:medium"><b><span style=3D"font-size:11pt"><font color=
-=3D"#38761d">Kevin Zhao</font></span></b></p><p class=3D"MsoNormal" style=
+<div dir=3D"ltr">Thanks Oleg,<div><br></div><div>I will update the progress=
+ for the test clusters setup on Arm64 platform.</div></div><br><div class=
+=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Mon, 28 Feb 2022 =
+at 13:36, Oleg Drokin &lt;<a href=3D"mailto:green@whamcloud.com">green@wham=
+cloud.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=
+=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding=
+-left:1ex">
+
+
+
+<div style=3D"overflow-wrap: break-word;">
+Hello!
+<div><br>
+</div>
+<div>=C2=A0 the sizing really depends on your test scaling requirements.</d=
+iv>
+<div>=C2=A0 For example my own test infrastructure is a couple builders + 4=
+ nodes for VMs (each has 256G RAM), 160 VM pairs in total,</div>
+<div>=C2=A0 and on a particularly busy day another 80 VM pairs can be added=
+. This is to ensure speedy feedback to developers.</div>
+<div>=C2=A0 You can operate a much smaller scale testing system if you want=
+, just keep in mind what is the longest running test would take</div>
+<div>=C2=A0 to understand how many patches could be tested in parallel (som=
+etimes patch bombs result in 20+ patches submission at the same time).</div=
+>
+<div>=C2=A0 =C2=A0Here=E2=80=99s stats for last 30 days.=C2=A0<span style=
+=3D"color:unset;font-family:unset;font-size:unset;font-variant-caps:unset;l=
+etter-spacing:unset;text-align:unset;text-indent:unset;text-transform:unset=
+;white-space:pre-wrap;word-spacing:unset;text-decoration:unset"><a href=3D"=
+https://imgur.com/lk2ogJv" target=3D"_blank">https://imgur.com/lk2ogJv</a>
+ 1 item means single patch n processing. time in testing for a patch is typ=
+ically about 3.5 hours.</span></div>
+<div><span style=3D"white-space:pre-wrap"><br>
+</span></div>
+<div><span style=3D"white-space:pre-wrap">maloo shows the resources when yo=
+u go into the test session, for example
+<a href=3D"https://testing.whamcloud.com/test_sessions/4de25b47-43fc-4bfc-8=
+7aa-15e4968519a7" target=3D"_blank">
+https://testing.whamcloud.com/test_sessions/4de25b47-43fc-4bfc-87aa-15e4968=
+519a7</a> - scroll down to see list of nodes</span></div>
+<div><span style=3D"white-space:pre-wrap"><br>
+</span></div>
+<div><span style=3D"white-space:pre-wrap"><br>
+</span>
+<div><br>
+<blockquote type=3D"cite">
+<div>On Feb 18, 2022, at 3:05 AM, Kevin Zhao &lt;<a href=3D"mailto:kevin.zh=
+ao@linaro.org" target=3D"_blank">kevin.zhao@linaro.org</a>&gt; wrote:</div>
+<br>
+<div>
+<div dir=3D"ltr"><span id=3D"gmail-m_-917106669318353807gmail-docs-internal=
+-guid-546d83e7-7fff-79c4-f764-aa4cccb7706c">
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
+iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
+white-space:pre-wrap">Hi
+ All,</span></div>
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
+iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
+white-space:pre-wrap"><br>
+</span></div>
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
+iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
+white-space:pre-wrap">Greetings
+ and thanks a lot for your comments! Xinliang and I are from <a href=3D"htt=
+ps://www.linaro.org/" target=3D"_blank">
+Linaro</a>, an organization focusing on </span><span style=3D"font-family:A=
+rial;font-size:14.6667px;white-space:pre-wrap">Arm open-source ecosystem de=
+velopment</span><span style=3D"background-color:transparent;font-family:Ari=
+al;font-size:11pt;white-space:pre-wrap">.
+ We have been working on Lustre on the Arm64 server and client end for a wh=
+ile now, already fixing a few bugs on arm64.
+</span></div>
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-sp=
+ace:pre-wrap">As Xinliang said before,
+</span><span style=3D"background-color:transparent;font-family:Arial;font-s=
+ize:11pt;white-space:pre-wrap">we want to enable the Arm64 CI, Oleg advises=
+ that we can plug our own CI nodes into</span>=C2=A0the Jenkins<span style=
+=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-spa=
+ce:pre-wrap">.
+</span><span style=3D"font-family:Arial;font-size:14.6667px;white-space:pre=
+-wrap">Now we want to understand and estimate how many machines resources c=
+an meet our requests, and doing the next stage plan of our hardware to meet=
+ the Lustre test requirements.</span></div>
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-sp=
+ace:pre-wrap"><br>
+</span></div>
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
+iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
+white-space:pre-wrap">As
+ I understand, the test jobs will cover the ZFS and Ldiskfs backend with 2 =
+scenarios:</span></div>
+<ul style=3D"margin-top:0px;margin-bottom:0px">
+<li dir=3D"ltr" style=3D"list-style-type:disc;font-size:11pt;font-family:Ar=
+ial;background-color:transparent;font-variant-numeric:normal;font-variant-e=
+ast-asian:normal;vertical-align:baseline;white-space:pre-wrap">
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;background-color:transparent;font-variant-numeric:norma=
+l;font-variant-east-asian:normal;vertical-align:baseline;white-space:pre-wr=
+ap">Lustre Arm64
+ Server + Arm64 Client( High Priority )</span></div>
+</li><li dir=3D"ltr" style=3D"list-style-type:disc;font-size:11pt;font-fami=
+ly:Arial;background-color:transparent;font-variant-numeric:normal;font-vari=
+ant-east-asian:normal;vertical-align:baseline;white-space:pre-wrap">
+<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
+e=3D"font-size:11pt;background-color:transparent;font-variant-numeric:norma=
+l;font-variant-east-asian:normal;vertical-align:baseline;white-space:pre-wr=
+ap">Lustre Arm64
+ Server + x86_64 Client</span></div>
+</li></ul>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap">After
+ going through the Lustre test website: </span><a href=3D"https://testing.w=
+hamcloud.com/test_sessions" style=3D"text-decoration-line:none" target=3D"_=
+blank"><span style=3D"font-size:11pt;font-family:Arial;background-color:tra=
+nsparent;font-variant-numeric:normal;font-variant-east-asian:normal;text-de=
+coration-line:underline;vertical-align:baseline;white-space:pre-wrap">https=
+://testing.whamcloud.com/test_sessions</span></a><span style=3D"font-size:1=
+1pt;font-family:Arial;background-color:transparent;font-variant-numeric:nor=
+mal;font-variant-east-asian:normal;vertical-align:baseline;white-space:pre-=
+wrap">,
+ it is quite clear to show the test info, and still remain some questions, =
+that will be great if the community can give me a clear answer.</span></div=
+>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap">1.
+ Is there a link to show all the machine resources=EF=BC=9F Including the m=
+achine info, CPU, memory and peripheral info.=C2=A0</span></div>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap">2.
+ Do we have a CI infra arch overview diagram to show the machine usage and =
+communication?=C2=A0</span></div>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap">3.
+ How many machines are needed to meet the request of the Lustre Arm64 Serve=
+r + Arm64 Client test?</span></div>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap"><br>
+</span></div>
+<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
+le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
+riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
+;white-space:pre-wrap">Thanks
+ a lot for your time, and look forward to your response.</span></div>
+</span><br>
+</div>
+<br>
+<div class=3D"gmail_quote">
+<div dir=3D"ltr" class=3D"gmail_attr">On Tue, 28 Dec 2021 at 09:58, Oleg Dr=
+okin &lt;<a href=3D"mailto:green@whamcloud.com" target=3D"_blank">green@wha=
+mcloud.com</a>&gt; wrote:<br>
+</div>
+<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
+left:1px solid rgb(204,204,204);padding-left:1ex">
+<div><br>
+<div><br>
+<blockquote type=3D"cite">
+<div>On Dec 27, 2021, at 8:53 PM, Xinliang Liu &lt;<a href=3D"mailto:xinlia=
+ng.liu@linaro.org" target=3D"_blank">xinliang.liu@linaro.org</a>&gt; wrote:=
+</div>
+<div>
+<div dir=3D"ltr">
+<div class=3D"gmail_quote"><br>
+<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
+left:1px solid rgb(204,204,204);padding-left:1ex">
+Maloo is just one place to link to to actually let people see the results, =
+but you can link to external resources too<br>
+like e.g. gatekeeper janitor helper does or assuming the information is sma=
+ll enough it could be entirely contained<br>
+in the comment (like say for a build failure)<br>
+</blockquote>
+<div><br>
+</div>
+<div>Ok, understand now. Is there any other reference external CI that post=
+s results to Lustre gerrit now?</div>
+</div>
+</div>
+</div>
+</blockquote>
+<div><br>
+</div>
+Currently there are:</div>
+<div>- checkpatch and Misc code checks (smach) that post their results as 1=
+00% comment only. they share codebase pretty much</div>
+<div>- the Janitor (also started with above codebase but got changed and ex=
+tended a lot)</div>
+<div><br>
+</div>
+<div>There was external interest in the past to post results to gerrit but =
+it never materialized in the end</div>
+</div>
+</blockquote>
+</div>
+<br clear=3D"all">
+<div><br>
+</div>
+-- <br>
+<div dir=3D"ltr">
+<div dir=3D"ltr">
+<div>
+<div dir=3D"ltr">
+<div>
+<div dir=3D"ltr">
+<div dir=3D"ltr"><b>Best Regards</b>
+<div>
+<div style=3D"margin:0px;padding:0px 0px 20px;width:1262px">
+<div>
+<div style=3D"margin:8px 0px 0px;padding:0px">
+<div>
+<div dir=3D"ltr"><font>
+<div dir=3D"ltr">
+<div dir=3D"ltr">
+<p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,R=
+obotoDraft,Helvetica,Arial,sans-serif;font-size:inherit">
+<b><span style=3D"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font>=
+</span></b></p>
+<p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,R=
+obotoDraft,Helvetica,Arial,sans-serif;font-size:inherit">
+<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Tech Lead, LDCG=
+ Cloud Infrastructure</span></font></p>
+<p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,R=
+obotoDraft,Helvetica,Arial,sans-serif;font-size:inherit">
+<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical=
+ Technologies</span></font></p>
+<p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,R=
+obotoDraft,Helvetica,Arial,sans-serif;font-size:inherit">
+<font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(freenode): =
+kevinz</span></font></p>
+<p class=3D"MsoNormal"><font color=3D"#757b80"><font color=3D"#888888" face=
+=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D"font-=
+size:14.6667px">Slack(</span></font><font face=3D"Roboto, RobotoDraft, Helv=
+etica, Arial, sans-serif"><span style=3D"font-size:14.6667px"><a href=3D"ht=
+tp://kubernetes.slack.com/" target=3D"_blank">kubernetes.slack.com</a>)</sp=
+an></font><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, A=
+rial, sans-serif"><span style=3D"font-size:14.6667px">:
+ kevinz</span></font></font></p>
+<p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,R=
+obotoDraft,Helvetica,Arial,sans-serif;font-size:inherit">
+<font color=3D"#757b80"><span style=3D"font-size:14.6667px"><a href=3D"mail=
+to:kevin.zhao@linaro.org" target=3D"_blank"><span>kevin.zhao@linaro.org</sp=
+an></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915</span></font><sp=
+an style=3D"color:rgb(117,123,128);font-size:11pt">=C2=A0</span><br>
+</p>
+<div style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helveti=
+ca,Arial,sans-serif;font-size:inherit">
+<span style=3D"color:rgb(117,123,128);font-size:11pt"><br>
+</span></div>
+</div>
+</div>
+</font></div>
+<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
+t-size:inherit">
+</div>
+</div>
+</div>
+<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
+t-size:inherit">
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</blockquote>
+</div>
+<br>
+</div>
+</div>
+
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+ class=3D"gmail_signature"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div=
+ dir=3D"ltr"><div dir=3D"ltr"><b>Best Regards</b><div><div style=3D"margin:=
+0px;padding:0px 0px 20px;width:1262px"><div><div style=3D"margin:8px 0px 0p=
+x;padding:0px"><div><div dir=3D"ltr"><font><div dir=3D"ltr"><div dir=3D"ltr=
+"><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto=
+,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><b><span style=3D=
+"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font></span></b></p><p=
+ class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,Rob=
+otoDraft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"#757b8=
+0"><span style=3D"font-size:14.6667px">Tech Lead, LDCG Cloud Infrastructure=
+</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);fo=
+nt-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><=
+font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical =
+Technologies</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136=
+,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-si=
+ze:medium"><font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(=
+freenode): kevinz</span></font></p><p class=3D"MsoNormal"><font color=3D"#7=
+57b80"><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Aria=
+l, sans-serif"><span style=3D"font-size:14.6667px">Slack(</span></font><fon=
+t face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D=
+"font-size:14.6667px"><a href=3D"http://kubernetes.slack.com" target=3D"_bl=
+ank">kubernetes.slack.com</a>)</span></font><font color=3D"#888888" face=3D=
+"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D"font-siz=
+e:14.6667px">: kevinz</span></font></font></p><p class=3D"MsoNormal" style=
 =3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,s=
 ans-serif;font-size:medium"><font color=3D"#757b80"><span style=3D"font-siz=
-e:14.6667px">Tech Lead, LDCG Cloud Infrastructure</span></font></p><p class=
-=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDra=
-ft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"#757b80"><sp=
-an style=3D"font-size:14.6667px">Linaro Vertical Technologies</span></font>=
-</p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Robo=
-to,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"=
-#757b80"><span style=3D"font-size:14.6667px">IRC(freenode): kevinz</span></=
-font></p><p class=3D"MsoNormal"><font color=3D"#757b80"><font color=3D"#888=
-888" face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=
-=3D"font-size:14.6667px">Slack(</span></font><font face=3D"Roboto, RobotoDr=
-aft, Helvetica, Arial, sans-serif"><span style=3D"font-size:14.6667px"><a h=
-ref=3D"http://kubernetes.slack.com" target=3D"_blank">kubernetes.slack.com<=
-/a>)</span></font><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helv=
-etica, Arial, sans-serif"><span style=3D"font-size:14.6667px">: kevinz</spa=
-n></font></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);=
-font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"=
-><font color=3D"#757b80"><span style=3D"font-size:14.6667px"><a href=3D"mai=
-lto:kevin.zhao@linaro.org" target=3D"_blank"><span>kevin.zhao@linaro.org</s=
-pan></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915</span></font><s=
-pan style=3D"color:rgb(117,123,128);font-size:11pt">=C2=A0</span><br></p><d=
-iv style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium"><span style=3D"color:rgb(117,123,128);f=
-ont-size:11pt"><br></span></div></div></div></font></div><div style=3D"font=
--family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"></d=
-iv></div></div><div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial=
-,sans-serif;font-size:medium"></div></div></div></div></div></div></div></d=
-iv></div></div></div></div></div>
+e:14.6667px"><a href=3D"mailto:kevin.zhao@linaro.org" target=3D"_blank"><sp=
+an>kevin.zhao@linaro.org</span></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 =
+18818270915</span></font><span style=3D"color:rgb(117,123,128);font-size:11=
+pt">=C2=A0</span><br></p><div style=3D"color:rgb(136,136,136);font-family:R=
+oboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><span style=
+=3D"color:rgb(117,123,128);font-size:11pt"><br></span></div></div></div></f=
+ont></div><div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans=
+-serif;font-size:medium"></div></div></div><div style=3D"font-family:Roboto=
+,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"></div></div></div=
+></div></div></div></div></div></div></div></div>
 
---0000000000003b6be005d9ecfb85--
+--0000000000003a81f505d9ed1f09--
 
---===============3730844255725045327==
+--===============1862672673448885845==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -284,4 +562,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============3730844255725045327==--
+--===============1862672673448885845==--
