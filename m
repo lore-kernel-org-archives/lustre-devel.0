@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id B0444C433F5
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:33:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 83745C433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:33:08 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CE0C221FC02;
-	Sun, 20 Mar 2022 06:32:10 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 185BE21CB7D;
+	Sun, 20 Mar 2022 06:32:13 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8DF3221F3E8
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:18 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D7CB321F999
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:19 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 601A9EF8;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 784F9EFD;
  Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 5D34AAB; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
+ id 73B28D5A47; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 20 Mar 2022 09:30:47 -0400
-Message-Id: <1647783064-20688-34-git-send-email-jsimmons@infradead.org>
+Date: Sun, 20 Mar 2022 09:30:52 -0400
+Message-Id: <1647783064-20688-39-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
 References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 33/50] lustre: hsm: update size upon
- completion of data version
+Subject: [lustre-devel] [PATCH 38/50] lustre: sec: present .fscrypt in
+ subdir mount
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,122 +46,106 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Qian Yingjin <qian@ddn.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-We found a HSM retore followed by a HSM release will set the
-file size with 0 wrongly during the tests.
-The reason is that the file size and blocks information is
-incorrect obtained via @ll_merger_attr().
-The data version operation will flush dirty pages from all
-clients, the size and blocks information returns from the Lustre
-OST is correct.
-In this patch, we update the size and block attributes for a file
-upon the completion of the data version operation accordingly.
-By this way, HSM release will set the size and blocks information
-correctly after data version ioctl operation.
+fscrypt userspace tool works with a .fscrypt directory at the root of
+the file system. In case of subdirectory mount, we virtually present
+this .fscrypt directory at the root of the mount point so that fscrypt
+can be used. This makes it possible to even do a subdirectory mount of
+an encrypted directory, making clients access encrypted content only.
+Internally, the .fscrypt directory is always stored at the root of
+Lustre.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15381
-Lustre-commit: dd3b5601ec6905b00 ("LU-15381 hsm: update size upon completion of data version")
-Signed-off-by: Qian Yingjin <qian@ddn.com>
-Reviewed-on: https://review.whamcloud.com/45935
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Artem Blagodarenko <artem.blagodarenko@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15176
+Lustre-commit: c12378fba7f0aa2f2 ("LU-15176 sec: present .fscrypt in subdir mount")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/46167
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c                  |  5 +++--
- fs/lustre/osc/osc_io.c                  | 30 +++++++++++++++++++++++++-----
+ fs/lustre/llite/crypto.c                |  9 +++++++--
+ fs/lustre/llite/llite_lib.c             | 11 ++++++++++-
+ fs/lustre/llite/namei.c                 |  9 +++++++++
  include/uapi/linux/lustre/lustre_user.h |  1 +
- 3 files changed, 29 insertions(+), 7 deletions(-)
+ 4 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 6b95133..373efdd 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -2771,8 +2771,8 @@ int ll_hsm_release(struct inode *inode)
- 	struct lu_env *env;
- 	struct obd_client_handle *och = NULL;
- 	u64 data_version = 0;
--	int rc;
- 	u16 refcheck;
-+	int rc;
- 
- 	CDEBUG(D_INODE, "%s: Releasing file " DFID ".\n",
- 	       ll_i2sbi(inode)->ll_fsname,
-@@ -2785,7 +2785,8 @@ int ll_hsm_release(struct inode *inode)
+diff --git a/fs/lustre/llite/crypto.c b/fs/lustre/llite/crypto.c
+index f310d4c..b0e4f76 100644
+--- a/fs/lustre/llite/crypto.c
++++ b/fs/lustre/llite/crypto.c
+@@ -233,8 +233,13 @@ int ll_setup_filename(struct inode *dir, const struct qstr *iname,
  	}
+ 	rc = fscrypt_setup_filename(dir, &dname, lookup, fname);
+ 	if (rc == -ENOENT && lookup &&
+-	    !fscrypt_has_encryption_key(dir) &&
+-	    unlikely(filename_is_volatile(iname->name, iname->len, NULL))) {
++	    ((is_root_inode(dir) && iname->len == strlen(dot_fscrypt_name) &&
++	      strncmp(iname->name, dot_fscrypt_name, iname->len) == 0) ||
++	     (!fscrypt_has_encryption_key(dir) &&
++	      unlikely(filename_is_volatile(iname->name, iname->len, NULL))))) {
++		/* In case of subdir mount of an encrypted directory, we allow
++		 * lookup of /.fscrypt directory.
++		 */
+ 		/* For purpose of migration or mirroring without enc key, we
+ 		 * allow lookup of volatile file without enc context.
+ 		 */
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 423c531..8c0a3e0 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -3157,7 +3157,16 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
+ 		return ERR_PTR(-ENOMEM);
  
- 	/* Grab latest data_version and [am]time values */
--	rc = ll_data_version(inode, &data_version, LL_DV_WR_FLUSH);
-+	rc = ll_data_version(inode, &data_version,
-+			     LL_DV_WR_FLUSH | LL_DV_SZ_UPDATE);
- 	if (rc != 0)
- 		goto out;
+ 	ll_i2gids(op_data->op_suppgids, i1, i2);
+-	op_data->op_fid1 = *ll_inode2fid(i1);
++	/* If the client is using a subdir mount and looks at what it sees as
++	 * /.fscrypt, interpret it as the .fscrypt dir at the root of the fs.
++	 */
++	if (unlikely(i1->i_sb && i1->i_sb->s_root && is_root_inode(i1) &&
++		     !fid_is_root(ll_inode2fid(i1)) &&
++		     name && namelen == strlen(dot_fscrypt_name) &&
++		     strncmp(name, dot_fscrypt_name, namelen) == 0))
++		lu_root_fid(&op_data->op_fid1);
++	else
++		op_data->op_fid1 = *ll_inode2fid(i1);
  
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index b84022b..db91bf2 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -833,7 +833,11 @@ static void osc_io_data_version_end(const struct lu_env *env,
- {
- 	struct cl_data_version_io *dv = &slice->cis_io->u.ci_data_version;
- 	struct osc_io *oio = cl2osc_io(env, slice);
-+	struct cl_object *obj = slice->cis_obj;
- 	struct osc_async_cbargs *cbargs = &oio->oi_cbarg;
-+	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
-+	struct obdo *oa = &oio->oi_oa;
-+	unsigned int cl_valid = 0;
+ 	if (S_ISDIR(i1->i_mode)) {
+ 		down_read_non_owner(&ll_i2info(i1)->lli_lsm_sem);
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 1e3a4fd..c05e3bf 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -2068,6 +2068,15 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
  
- 	wait_for_completion(&cbargs->opc_sync);
- 
-@@ -841,14 +845,30 @@ static void osc_io_data_version_end(const struct lu_env *env,
- 		slice->cis_io->ci_result = cbargs->opc_rc;
- 	} else {
- 		slice->cis_io->ci_result = 0;
--		if (!(oio->oi_oa.o_valid &
-+		if (!(oa->o_valid &
- 		      (OBD_MD_LAYOUT_VERSION | OBD_MD_FLDATAVERSION)))
- 			slice->cis_io->ci_result = -ENOTSUPP;
- 
--		if (oio->oi_oa.o_valid & OBD_MD_LAYOUT_VERSION)
--			dv->dv_layout_version = oio->oi_oa.o_layout_version;
--		if (oio->oi_oa.o_valid & OBD_MD_FLDATAVERSION)
--			dv->dv_data_version = oio->oi_oa.o_data_version;
-+		if (oa->o_valid & OBD_MD_LAYOUT_VERSION)
-+			dv->dv_layout_version = oa->o_layout_version;
-+		if (oa->o_valid & OBD_MD_FLDATAVERSION)
-+			dv->dv_data_version = oa->o_data_version;
++	/* If the client is using a subdir mount and does a rename to what it
++	 * sees as /.fscrypt, interpret it as the .fscrypt dir at fs root.
++	 */
++	if (unlikely(is_root_inode(tgt) && !fid_is_root(ll_inode2fid(tgt)) &&
++		     tgt_dchild->d_name.len == strlen(dot_fscrypt_name) &&
++		     strncmp(tgt_dchild->d_name.name, dot_fscrypt_name,
++			     tgt_dchild->d_name.len) == 0))
++		lu_root_fid(&op_data->op_fid2);
 +
-+		if (dv->dv_flags & LL_DV_SZ_UPDATE) {
-+			if (oa->o_valid & OBD_MD_FLSIZE) {
-+				attr->cat_size = oa->o_size;
-+				cl_valid |= CAT_SIZE;
-+			}
-+
-+			if (oa->o_valid & OBD_MD_FLBLOCKS) {
-+				attr->cat_blocks = oa->o_blocks;
-+				cl_valid |= CAT_BLOCKS;
-+			}
-+
-+			cl_object_attr_lock(obj);
-+			cl_object_attr_update(env, obj, attr, cl_valid);
-+			cl_object_attr_unlock(obj);
-+		}
- 	}
- }
- 
+ 	if (src_dchild->d_inode)
+ 		op_data->op_fid3 = *ll_inode2fid(src_dchild->d_inode);
+ 	if (tgt_dchild->d_inode)
 diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index 3b53a5b..2fdd7df 100644
+index 2fdd7df..96efdf0 100644
 --- a/include/uapi/linux/lustre/lustre_user.h
 +++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -1848,6 +1848,7 @@ struct ioc_data_version {
- enum ioc_data_version_flags {
- 	LL_DV_RD_FLUSH	= (1 << 0), /* Flush dirty pages from clients */
- 	LL_DV_WR_FLUSH	= (1 << 1), /* Flush all caching pages from clients */
-+	LL_DV_SZ_UPDATE	= (1 << 2), /* Update the file size on the client */
- };
+@@ -1856,6 +1856,7 @@ enum ioc_data_version_flags {
+ #endif
  
- #ifndef offsetof
+ #define dot_lustre_name ".lustre"
++#define dot_fscrypt_name ".fscrypt"
+ 
+ /********* HSM **********/
+ 
 -- 
 1.8.3.1
 
