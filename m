@@ -4,64 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id B944EC433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 12:26:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 489A8C433EF
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:31:13 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id BF22A21E074;
-	Sun, 20 Mar 2022 05:26:34 -0700 (PDT)
-Received: from mail-oo1-f48.google.com (mail-oo1-f48.google.com
- [209.85.161.48])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E124D21D4A8
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 05:26:31 -0700 (PDT)
-Received: by mail-oo1-f48.google.com with SMTP id
- w3-20020a4ac183000000b0031d806bbd7eso16044368oop.13
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 05:26:31 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=nCp3TcUeuZ6X9vWMvHh+AOwIRBpOvvkbIEBgNem6BPk=;
- b=WU1+BfZ1dJ43MZlvO/8xzssEWrvP65x6VXejN2/TSzdH1amcNkHQRQNCy14vzxxpmc
- z0kmMbyflrSmis0LfTom02XHkcD7MeGssRXlQ9zUTGUn5LYc8cxLxwxanGe2lezRwXPY
- GxloNJekIMAXlMnydbogI13AJhbjb4cEqqbIqU/td1auiYEvktEM9GYXSjzgvMLdKzoX
- 8dWlKseH+shOXjkA8mfxi8Av/Ug1pou3jS7zIXc/9Inhjb+BKpfSZ83MzjSb4G06kGRW
- g1TTc5Oipp/kGMVxu/YLnwfamKvRX50k99WO16cFJpDktnBY0UHSOTe7Bp72PghDqlMc
- sWHw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20210112;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=nCp3TcUeuZ6X9vWMvHh+AOwIRBpOvvkbIEBgNem6BPk=;
- b=OIqYdRDWzUvJ0TQM6/7x9356DbxuavC0TXXwniSZo6D2r5M2K0wNZt3x+J7v2DTyWX
- bMkr+9napRTSz6V/BP9asYO+1y0Z8UXWMMcyQ5fuUeHraNbgGFuO4i6eu2FYCgTCTv/N
- y3f35cgwlQ/TDGHbP98BE6OcfLG1nSVgk8XfrjrukUPP5qeyyAwY9nuKMlBD7PmWT4JB
- B5G6d8RVug09O9SkYGD3MDU1UPVgdDkvfiAytuUbXJEM6F8rxxrWqFdqhhEDYA39hYY5
- gsYlMEHm25hHwGnNOB5r01jedA+X3tJYXc3nfXjFMGyPQZ7ZQYaVkvRIl+RK697572+4
- XxHg==
-X-Gm-Message-State: AOAM5313JwYsRa1VI7D5NyghgUQXO2WWZ1RQ/JwfnlX2oIOHAOF7Nx2k
- z/kRHrIn97eoNICAwly8FpPNXgZs21tER9Zk/RLW
-X-Google-Smtp-Source: ABdhPJxT+TCguHvn/aQW/RWI6J18ZXISvm8iIwO3HGmXHZiiJHJfAGZUVGOTwP3Zfiu0vrrCdjHPe2FlcZ6YDrM1DeA=
-X-Received: by 2002:a05:6870:630c:b0:da:b3f:324d with SMTP id
- s12-20020a056870630c00b000da0b3f324dmr6623854oao.253.1647779191067; Sun, 20
- Mar 2022 05:26:31 -0700 (PDT)
-MIME-Version: 1.0
-References: <CAKoKPby+hn5+py-f11c31Po241871un0v=SQM+Cc6_hzvxW8uA@mail.gmail.com>
- <CAKoKPbxTcSxGzASKyVhiv_7W3OY6x3DRtkcTu8hzvLM+4-PzZw@mail.gmail.com>
- <6C592E3F-0437-4776-BB29-C5EE489C5FAE@whamcloud.com>
- <CAKoKPbxmvn7GVc6wsYrLP_HD8SpNMVFfSFdiZMo-5ZXqS-HSdg@mail.gmail.com>
- <7AAC4FDA-AC84-4E73-83AB-130B6BD3AE1B@whamcloud.com>
- <CAKoKPbxQymhN93F5oM_TxK6y0kk5_bv3p62FncUz6Ri_0jmABw@mail.gmail.com>
- <023CD146-E2BA-4B03-9459-C480E51EBE7E@whamcloud.com>
- <CACzn6-XOJuca15j8sObDwoG3Wb6WgUGc0ptTCUHuQFkEM7S1XQ@mail.gmail.com>
- <F5AF3C10-6ED7-4EEC-BA63-EF8256DA94D7@whamcloud.com>
- <CACzn6-V0Cvg+O1-DEWotBoZah2nZq=a65DVjtssF2RFj+aGqUQ@mail.gmail.com>
- <SA9PR09MB58089F742CA86BB6A89FF610D6109@SA9PR09MB5808.namprd09.prod.outlook.com>
- <CACzn6-XWcAa_QouJP6PAh6S-m9ztyb1dDTmfNnuMOEADBS3GRQ@mail.gmail.com>
- <SA9PR09MB58081016628528EFD16CB9E2D6139@SA9PR09MB5808.namprd09.prod.outlook.com>
-In-Reply-To: <SA9PR09MB58081016628528EFD16CB9E2D6139@SA9PR09MB5808.namprd09.prod.outlook.com>
-Date: Sun, 20 Mar 2022 20:26:19 +0800
-Message-ID: <CACzn6-XFmC8sD5wyn5ycbv7mkFExhF__demj=XSu0yGONxU0iA@mail.gmail.com>
-To: "Simmons, James" <simmonsja@ornl.gov>
-Subject: Re: [lustre-devel] [EXTERNAL] Re: Lustre Arm stuff status and work
- plan
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1A40921CA80;
+	Sun, 20 Mar 2022 06:31:12 -0700 (PDT)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 89D3221CA7D
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:09 -0700 (PDT)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id E5319B94;
+ Sun, 20 Mar 2022 09:31:07 -0400 (EDT)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id D7877E41FE; Sun, 20 Mar 2022 09:31:07 -0400 (EDT)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Sun, 20 Mar 2022 09:30:15 -0400
+Message-Id: <1647783064-20688-2-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
+References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
+Subject: [lustre-devel] [PATCH 01/50] lustre: type cleanups and remove debug
+ statements
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -74,862 +39,132 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Kevin Zhao via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Kevin Zhao <kevin.zhao@linaro.org>
-Cc: Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============8926508185858767379=="
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8926508185858767379==
-Content-Type: multipart/alternative; boundary="0000000000005a2b7005daa57df3"
+Remove pr_info() left over from earlier debugging.
+Remove __u[32|64] from core kernel code that slipped in.
 
---0000000000005a2b7005daa57df3
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ fs/lustre/include/lustre_dlm.h  | 2 +-
+ fs/lustre/lov/lov_pack.c        | 5 +----
+ fs/lustre/obdclass/lu_object.c  | 8 ++++----
+ fs/lustre/ptlrpc/layout.c       | 2 +-
+ fs/lustre/ptlrpc/pack_generic.c | 2 +-
+ 5 files changed, 8 insertions(+), 11 deletions(-)
 
-Hi James,
-
-Thanks! I think the abstract is quite nice.
-
-On Sat, 19 Mar 2022 at 06:47, Simmons, James <simmonsja@ornl.gov> wrote:
-
-> By joint talk I'm referring to a presentation at LUG about how to do this
-> type of setup. He is the abstract I'm thinking of sending to easychair.
-> Feedback welcomed.
->
-> The scope of Lustre support matrix has grown due to the community
-> involvement but the testing has been very limited and the results often g=
-o
-> unpublished. Whamcloud is resourced restrained to support every platform
-> requested. Discusses have opened up about how to create testing sites
-> outside of Whamcloud that are tied into the general testing frame work.
-> This is with the goal of enabling external sites to running the equivalen=
-t
-> tests Whamcloud's does when work is presented to OpenSFS Lustre source tr=
-ee
-> and have the results published the the general Maloo testing framework.
-> This talk will go over what needs to be done to create such a setup.
-> ------------------------------
-> *From:* Kevin Zhao <kevin.zhao@linaro.org>
-> *Sent:* Tuesday, March 15, 2022 7:25 PM
-> *To:* Simmons, James <simmonsja@ornl.gov>
-> *Cc:* Xinliang Liu via lustre-devel <lustre-devel@lists.lustre.org>;
-> Peter Jones <pjones@whamcloud.com>
-> *Subject:* Re: [EXTERNAL] Re: [lustre-devel] Lustre Arm stuff status and
-> work plan
->
-> Hi James,
->
-> It would be great! Look forward to having a joint talk on LUG2022 :-).
->
-> Xinliang and I are now working on the test cluster setup and hopefully, w=
-e
-> will have some progress quite soon.
->
-> On Wed, 16 Mar 2022 at 06:09, Simmons, James <simmonsja@ornl.gov> wrote:
->
-> Hello.
->
->     I have been watching your efforts to doing your own testing and this
-> is something ORNL has been interested in as well.
-> I was thinking would you be willing to do a joint talk at LUG on this
-> effort. We can pool our knowledge on how to doing
-> local testing and feeding it back to WC. Would you be interested?
-> ------------------------------
-> *From:* lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of
-> Kevin Zhao via lustre-devel <lustre-devel@lists.lustre.org>
-> *Sent:* Friday, March 11, 2022 1:28 AM
-> *To:* Oleg Drokin <green@whamcloud.com>
-> *Cc:* Li Xi <lixi@ddn.com>; Jian Yu <jiyu@whamcloud.com>;
-> cloud-dev-request@op-lists.linaro.org <
-> cloud-dev-request@op-lists.linaro.org>; Xinliang Liu via lustre-devel <
-> lustre-devel@lists.lustre.org>
-> *Subject:* [EXTERNAL] Re: [lustre-devel] Lustre Arm stuff status and work
-> plan
->
-> Thanks Oleg,
->
-> I will update the progress for the test clusters setup on Arm64 platform.
->
-> On Mon, 28 Feb 2022 at 13:36, Oleg Drokin <green@whamcloud.com> wrote:
->
-> Hello!
->
->   the sizing really depends on your test scaling requirements.
->   For example my own test infrastructure is a couple builders + 4 nodes
-> for VMs (each has 256G RAM), 160 VM pairs in total,
->   and on a particularly busy day another 80 VM pairs can be added. This i=
-s
-> to ensure speedy feedback to developers.
->   You can operate a much smaller scale testing system if you want, just
-> keep in mind what is the longest running test would take
->   to understand how many patches could be tested in parallel (sometimes
-> patch bombs result in 20+ patches submission at the same time).
->    Here=E2=80=99s stats for last 30 days. hxxps://imgur.com/lk2ogJv 1 ite=
-m means
-> single patch n processing. time in testing for a patch is typically about
-> 3.5 hours.
->
-> maloo shows the resources when you go into the test session, for example
-> hxxps://testing.whamcloud.com/test_sessions/4de25b47-43fc-4bfc-87aa-15e49=
-68519a7
-> - scroll down to see list of nodes
->
->
->
-> On Feb 18, 2022, at 3:05 AM, Kevin Zhao <kevin.zhao@linaro.org> wrote:
->
-> Hi All,
->
-> Greetings and thanks a lot for your comments! Xinliang and I are from
-> Linaro, an organization focusing on Arm open-source ecosystem development=
-.
-> We have been working on Lustre on the Arm64 server and client end for a
-> while now, already fixing a few bugs on arm64.
-> As Xinliang said before, we want to enable the Arm64 CI, Oleg advises
-> that we can plug our own CI nodes into the Jenkins. Now we want to
-> understand and estimate how many machines resources can meet our requests=
-,
-> and doing the next stage plan of our hardware to meet the Lustre test
-> requirements.
->
-> As I understand, the test jobs will cover the ZFS and Ldiskfs backend wit=
-h
-> 2 scenarios:
->
->    - Lustre Arm64 Server + Arm64 Client( High Priority )
->    - Lustre Arm64 Server + x86_64 Client
->
-> After going through the Lustre test website:
-> hxxps://testing.whamcloud.com/test_sessions, it is quite clear to show
-> the test info, and still remain some questions, that will be great if the
-> community can give me a clear answer.
-> 1. Is there a link to show all the machine resources=EF=BC=9F Including t=
-he
-> machine info, CPU, memory and peripheral info.
-> 2. Do we have a CI infra arch overview diagram to show the machine usage
-> and communication?
-> 3. How many machines are needed to meet the request of the Lustre Arm64
-> Server + Arm64 Client test?
->
-> Thanks a lot for your time, and look forward to your response.
->
->
-> On Tue, 28 Dec 2021 at 09:58, Oleg Drokin <green@whamcloud.com> wrote:
->
->
->
-> On Dec 27, 2021, at 8:53 PM, Xinliang Liu <xinliang.liu@linaro.org> wrote=
-:
->
-> Maloo is just one place to link to to actually let people see the results=
-,
-> but you can link to external resources too
-> like e.g. gatekeeper janitor helper does or assuming the information is
-> small enough it could be entirely contained
-> in the comment (like say for a build failure)
->
->
-> Ok, understand now. Is there any other reference external CI that posts
-> results to Lustre gerrit now?
->
->
-> Currently there are:
-> - checkpatch and Misc code checks (smach) that post their results as 100%
-> comment only. they share codebase pretty much
-> - the Janitor (also started with above codebase but got changed and
-> extended a lot)
->
-> There was external interest in the past to post results to gerrit but it
-> never materialized in the end
->
->
->
-> --
-> *Best Regards*
->
-> *Kevin Zhao*
->
-> Tech Lead, LDCG Cloud Infrastructure
->
-> Linaro Vertical Technologies
->
-> IRC(freenode): kevinz
->
-> Slack(kubernetes.slack.com): kevinz
->
-> kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
->
->
->
->
-> --
-> *Best Regards*
->
-> *Kevin Zhao*
->
-> Tech Lead, LDCG Cloud Infrastructure
->
-> Linaro Vertical Technologies
->
-> IRC(freenode): kevinz
->
-> Slack(kubernetes.slack.com): kevinz
->
-> kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
->
->
->
-> --
-> *Best Regards*
->
-> *Kevin Zhao*
->
-> Tech Lead, LDCG Cloud Infrastructure
->
-> Linaro Vertical Technologies
->
-> IRC(freenode): kevinz
->
-> Slack(kubernetes.slack.com): kevinz
->
-> kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
->
->
-
---=20
-*Best Regards*
-
-*Kevin Zhao*
-
-Tech Lead, LDCG Cloud Infrastructure
-
-Linaro Vertical Technologies
-
-IRC(freenode): kevinz
-
-Slack(kubernetes.slack.com): kevinz
-
-kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
-
---0000000000005a2b7005daa57df3
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">Hi James,<div><br></div><div>Thanks! I think the abstract =
-is quite nice.</div></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" c=
-lass=3D"gmail_attr">On Sat, 19 Mar 2022 at 06:47, Simmons, James &lt;<a hre=
-f=3D"mailto:simmonsja@ornl.gov">simmonsja@ornl.gov</a>&gt; wrote:<br></div>=
-<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
-left:1px solid rgb(204,204,204);padding-left:1ex">
-
-
-
-
-<div dir=3D"ltr">
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-By joint talk I&#39;m referring to a presentation at LUG about how to do th=
-is type of setup. He is the abstract I&#39;m thinking of sending to easycha=
-ir.</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-Feedback welcomed.</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-The scope of Lustre support matrix has grown due to the community involveme=
-nt but the testing has been very limited and the results often go unpublish=
-ed. Whamcloud is resourced restrained to support every platform requested. =
-Discusses have opened up about how
- to create testing sites outside of Whamcloud that are tied into the genera=
-l testing frame work. This is with the goal of enabling external sites to r=
-unning the equivalent tests Whamcloud&#39;s does when work is presented to =
-OpenSFS Lustre source tree and have
- the results published the the general Maloo testing framework. This talk w=
-ill go over what needs to be done to create such a setup.<br>
-</div>
-<div id=3D"gmail-m_-4664697339880128160appendonsend"></div>
-<hr style=3D"display:inline-block;width:98%">
-<div id=3D"gmail-m_-4664697339880128160divRplyFwdMsg" dir=3D"ltr"><font fac=
-e=3D"Calibri, sans-serif" style=3D"font-size:11pt" color=3D"#000000"><b>Fro=
-m:</b> Kevin Zhao &lt;<a href=3D"mailto:kevin.zhao@linaro.org" target=3D"_b=
-lank">kevin.zhao@linaro.org</a>&gt;<br>
-<b>Sent:</b> Tuesday, March 15, 2022 7:25 PM<br>
-<b>To:</b> Simmons, James &lt;<a href=3D"mailto:simmonsja@ornl.gov" target=
-=3D"_blank">simmonsja@ornl.gov</a>&gt;<br>
-<b>Cc:</b> Xinliang Liu via lustre-devel &lt;<a href=3D"mailto:lustre-devel=
-@lists.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org</a>&gt;;=
- Peter Jones &lt;<a href=3D"mailto:pjones@whamcloud.com" target=3D"_blank">=
-pjones@whamcloud.com</a>&gt;<br>
-<b>Subject:</b> Re: [EXTERNAL] Re: [lustre-devel] Lustre Arm stuff status a=
-nd work plan</font>
-<div>=C2=A0</div>
-</div>
-<div>
-<div dir=3D"ltr">Hi=C2=A0James,
-<div><br>
-</div>
-<div>It would be great! Look forward to having a joint talk on LUG2022 :-).=
-=C2=A0</div>
-<div><br>
-</div>
-<div>Xinliang and I are now working on the test cluster setup and hopefully=
-, we will have some progress quite soon.</div>
-</div>
-<br>
-<div>
-<div dir=3D"ltr">On Wed, 16 Mar 2022 at 06:09, Simmons, James &lt;<a href=
-=3D"mailto:simmonsja@ornl.gov" target=3D"_blank">simmonsja@ornl.gov</a>&gt;=
- wrote:<br>
-</div>
-<blockquote style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204=
-,204,204);padding-left:1ex">
-<div dir=3D"ltr">
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-Hello.</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-=C2=A0 =C2=A0 I have been watching your efforts to doing your own testing a=
-nd this is something ORNL has been interested in as well.</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-I was thinking would you be willing to do a joint talk at LUG on this effor=
-t. We can pool our knowledge on how to doing</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif;font-size:12pt=
-;color:rgb(0,0,0)">
-local testing and feeding it back to WC. Would you be interested?</div>
-<div id=3D"gmail-m_-4664697339880128160x_gmail-m_-7396076243517827728append=
-onsend"></div>
-<hr style=3D"display:inline-block;width:98%">
-<div id=3D"gmail-m_-4664697339880128160x_gmail-m_-7396076243517827728divRpl=
-yFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" color=3D"#000000" s=
-tyle=3D"font-size:11pt"><b>From:</b> lustre-devel &lt;<a href=3D"mailto:lus=
-tre-devel-bounces@lists.lustre.org" target=3D"_blank">lustre-devel-bounces@=
-lists.lustre.org</a>&gt;
- on behalf of Kevin Zhao via lustre-devel &lt;<a href=3D"mailto:lustre-deve=
-l@lists.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org</a>&gt;=
-<br>
-<b>Sent:</b> Friday, March 11, 2022 1:28 AM<br>
-<b>To:</b> Oleg Drokin &lt;<a href=3D"mailto:green@whamcloud.com" target=3D=
-"_blank">green@whamcloud.com</a>&gt;<br>
-<b>Cc:</b> Li Xi &lt;<a href=3D"mailto:lixi@ddn.com" target=3D"_blank">lixi=
-@ddn.com</a>&gt;; Jian Yu &lt;<a href=3D"mailto:jiyu@whamcloud.com" target=
-=3D"_blank">jiyu@whamcloud.com</a>&gt;;
-<a href=3D"mailto:cloud-dev-request@op-lists.linaro.org" target=3D"_blank">=
-cloud-dev-request@op-lists.linaro.org</a> &lt;<a href=3D"mailto:cloud-dev-r=
-equest@op-lists.linaro.org" target=3D"_blank">cloud-dev-request@op-lists.li=
-naro.org</a>&gt;; Xinliang Liu via lustre-devel
- &lt;<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lus=
-tre-devel@lists.lustre.org</a>&gt;<br>
-<b>Subject:</b> [EXTERNAL] Re: [lustre-devel] Lustre Arm stuff status and w=
-ork plan</font>
-<div>=C2=A0</div>
-</div>
-<div>
-<div dir=3D"ltr">Thanks Oleg,
-<div><br>
-</div>
-<div>I will update the progress for the test clusters setup on Arm64 platfo=
-rm.</div>
-</div>
-<br>
-<div>
-<div dir=3D"ltr">On Mon, 28 Feb 2022 at 13:36, Oleg Drokin &lt;<a href=3D"m=
-ailto:green@whamcloud.com" target=3D"_blank">green@whamcloud.com</a>&gt; wr=
-ote:<br>
-</div>
-<blockquote style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204=
-,204,204);padding-left:1ex">
-<div>Hello!
-<div><br>
-</div>
-<div>=C2=A0 the sizing really depends on your test scaling requirements.</d=
-iv>
-<div>=C2=A0 For example my own test infrastructure is a couple builders + 4=
- nodes for VMs (each has 256G RAM), 160 VM pairs in total,</div>
-<div>=C2=A0 and on a particularly busy day another 80 VM pairs can be added=
-. This is to ensure speedy feedback to developers.</div>
-<div>=C2=A0 You can operate a much smaller scale testing system if you want=
-, just keep in mind what is the longest running test would take</div>
-<div>=C2=A0 to understand how many patches could be tested in parallel (som=
-etimes patch bombs result in 20+ patches submission at the same time).</div=
->
-<div>=C2=A0 =C2=A0Here=E2=80=99s stats for last 30 days.=C2=A0<span style=
-=3D"color:unset;font-family:unset;font-size:unset;font-variant-caps:unset;l=
-etter-spacing:unset;text-align:unset;text-indent:unset;text-transform:unset=
-;white-space:pre-wrap;word-spacing:unset;text-decoration:unset"><a>hxxps://=
-imgur.com/lk2ogJv</a>
- 1 item means single patch n processing. time in testing for a patch is typ=
-ically about 3.5 hours.</span></div>
-<div><span style=3D"white-space:pre-wrap"><br>
-</span></div>
-<div><span style=3D"white-space:pre-wrap">maloo shows the resources when yo=
-u go into the test session, for example
-<a>hxxps://testing.whamcloud.com/test_sessions/4de25b47-43fc-4bfc-87aa-15e4=
-968519a7</a> - scroll down to see list of nodes</span></div>
-<div><span style=3D"white-space:pre-wrap"><br>
-</span></div>
-<div><span style=3D"white-space:pre-wrap"><br>
-</span>
-<div><br>
-<blockquote type=3D"cite">
-<div>On Feb 18, 2022, at 3:05 AM, Kevin Zhao &lt;<a href=3D"mailto:kevin.zh=
-ao@linaro.org" target=3D"_blank">kevin.zhao@linaro.org</a>&gt; wrote:</div>
-<br>
-<div>
-<div dir=3D"ltr"><span id=3D"gmail-m_-4664697339880128160x_gmail-m_-7396076=
-243517827728x_gmail-m_-917106669318353807gmail-docs-internal-guid-546d83e7-=
-7fff-79c4-f764-aa4cccb7706c">
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
-iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
-white-space:pre-wrap">Hi All,</span></div>
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
-iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
-white-space:pre-wrap"><br>
-</span></div>
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
-iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
-white-space:pre-wrap">Greetings
- and thanks a lot for your comments! Xinliang and I are from <a>Linaro</a>,=
- an organization focusing on
-</span><span style=3D"font-family:Arial;font-size:14.6667px;white-space:pre=
--wrap">Arm open-source ecosystem development</span><span style=3D"backgroun=
-d-color:transparent;font-family:Arial;font-size:11pt;white-space:pre-wrap">=
-. We have been working on Lustre
- on the Arm64 server and client end for a while now, already fixing a few b=
-ugs on arm64.
-</span></div>
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-sp=
-ace:pre-wrap">As Xinliang said before,
-</span><span style=3D"background-color:transparent;font-family:Arial;font-s=
-ize:11pt;white-space:pre-wrap">we want to enable the Arm64 CI, Oleg advises=
- that we can plug our own CI nodes into</span>=C2=A0the Jenkins<span style=
-=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-spa=
-ce:pre-wrap">.
-</span><span style=3D"font-family:Arial;font-size:14.6667px;white-space:pre=
--wrap">Now we want to understand and estimate how many machines resources c=
-an meet our requests, and doing the next stage plan of our hardware to meet=
- the Lustre test requirements.</span></div>
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"background-color:transparent;font-family:Arial;font-size:11pt;white-sp=
-ace:pre-wrap"><br>
-</span></div>
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-var=
-iant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline;=
-white-space:pre-wrap">As I understand,
- the test jobs will cover the ZFS and Ldiskfs backend with 2 scenarios:</sp=
-an></div>
-<ul style=3D"margin-top:0px;margin-bottom:0px">
-<li dir=3D"ltr" style=3D"list-style-type:disc;font-size:11pt;font-family:Ar=
-ial;background-color:transparent;font-variant-numeric:normal;font-variant-e=
-ast-asian:normal;vertical-align:baseline;white-space:pre-wrap">
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;background-color:transparent;font-variant-numeric:norma=
-l;font-variant-east-asian:normal;vertical-align:baseline;white-space:pre-wr=
-ap">Lustre Arm64 Server + Arm64
- Client( High Priority )</span></div>
-</li><li dir=3D"ltr" style=3D"list-style-type:disc;font-size:11pt;font-fami=
-ly:Arial;background-color:transparent;font-variant-numeric:normal;font-vari=
-ant-east-asian:normal;vertical-align:baseline;white-space:pre-wrap">
-<div style=3D"line-height:1.38;margin-top:0pt;margin-bottom:0pt"><span styl=
-e=3D"font-size:11pt;background-color:transparent;font-variant-numeric:norma=
-l;font-variant-east-asian:normal;vertical-align:baseline;white-space:pre-wr=
-ap">Lustre Arm64 Server + x86_64
- Client</span></div>
-</li></ul>
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap">After
- going through the Lustre test website: </span><a style=3D"text-decoration-=
-line:none"><span style=3D"font-size:11pt;font-family:Arial;background-color=
-:transparent;font-variant-numeric:normal;font-variant-east-asian:normal;tex=
-t-decoration-line:underline;vertical-align:baseline;white-space:pre-wrap">h=
-xxps://testing.whamcloud.com/test_sessions</span></a><span style=3D"font-si=
-ze:11pt;font-family:Arial;background-color:transparent;font-variant-numeric=
-:normal;font-variant-east-asian:normal;vertical-align:baseline;white-space:=
-pre-wrap">,
- it is quite clear to show the test info, and still remain some questions, =
-that will be great if the community can give me a clear answer.</span></div=
->
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap">1. Is
- there a link to show all the machine resources=EF=BC=9F Including the mach=
-ine info, CPU, memory and peripheral info.=C2=A0</span></div>
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap">2. Do
- we have a CI infra arch overview diagram to show the machine usage and com=
-munication?=C2=A0</span></div>
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap">3. How
- many machines are needed to meet the request of the Lustre Arm64 Server + =
-Arm64 Client test?</span></div>
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap"><br>
-</span></div>
-<div style=3D"line-height:1.656;margin-top:0pt;margin-bottom:0pt"><span sty=
-le=3D"font-size:11pt;font-family:Arial;background-color:transparent;font-va=
-riant-numeric:normal;font-variant-east-asian:normal;vertical-align:baseline=
-;white-space:pre-wrap">Thanks
- a lot for your time, and look forward to your response.</span></div>
-</span><br>
-</div>
-<br>
-<div>
-<div dir=3D"ltr">On Tue, 28 Dec 2021 at 09:58, Oleg Drokin &lt;<a href=3D"m=
-ailto:green@whamcloud.com" target=3D"_blank">green@whamcloud.com</a>&gt; wr=
-ote:<br>
-</div>
-<blockquote style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204=
-,204,204);padding-left:1ex">
-<div><br>
-<div><br>
-<blockquote type=3D"cite">
-<div>On Dec 27, 2021, at 8:53 PM, Xinliang Liu &lt;<a href=3D"mailto:xinlia=
-ng.liu@linaro.org" target=3D"_blank">xinliang.liu@linaro.org</a>&gt; wrote:=
-</div>
-<div>
-<div dir=3D"ltr">
-<div><br>
-<blockquote style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204=
-,204,204);padding-left:1ex">
-Maloo is just one place to link to to actually let people see the results, =
-but you can link to external resources too<br>
-like e.g. gatekeeper janitor helper does or assuming the information is sma=
-ll enough it could be entirely contained<br>
-in the comment (like say for a build failure)<br>
-</blockquote>
-<div><br>
-</div>
-<div>Ok, understand now. Is there any other reference external CI that post=
-s results to Lustre gerrit now?</div>
-</div>
-</div>
-</div>
-</blockquote>
-<div><br>
-</div>
-Currently there are:</div>
-<div>- checkpatch and Misc code checks (smach) that post their results as 1=
-00% comment only. they share codebase pretty much</div>
-<div>- the Janitor (also started with above codebase but got changed and ex=
-tended a lot)</div>
-<div><br>
-</div>
-<div>There was external interest in the past to post results to gerrit but =
-it never materialized in the end</div>
-</div>
-</blockquote>
-</div>
-<br clear=3D"all">
-<div><br>
-</div>
--- <br>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div dir=3D"ltr"><b>Best Regards</b>
-<div>
-<div style=3D"margin:0px;padding:0px 0px 20px;width:1262px">
-<div>
-<div style=3D"margin:8px 0px 0px;padding:0px">
-<div>
-<div dir=3D"ltr"><font>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:inherit">
-<b><span style=3D"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font>=
-</span></b></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:inherit">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Tech Lead, LDCG=
- Cloud Infrastructure</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:inherit">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical=
- Technologies</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:inherit">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(freenode): =
-kevinz</span></font></p>
-<p><font color=3D"#757b80"><font color=3D"#888888" face=3D"Roboto, RobotoDr=
-aft, Helvetica, Arial, sans-serif"><span style=3D"font-size:14.6667px">Slac=
-k(</span></font><font face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-s=
-erif"><span style=3D"font-size:14.6667px"><a>kubernetes.slack.com</a>)</spa=
-n></font><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Ar=
-ial, sans-serif"><span style=3D"font-size:14.6667px">:
- kevinz</span></font></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:inherit">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px"><a href=3D"mail=
-to:kevin.zhao@linaro.org" target=3D"_blank"><span>kevin.zhao@linaro.org</sp=
-an></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915</span></font><sp=
-an style=3D"color:rgb(117,123,128);font-size:11pt">=C2=A0</span><br>
-</p>
-<div style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helveti=
-ca,Arial,sans-serif;font-size:inherit">
-<span style=3D"color:rgb(117,123,128);font-size:11pt"><br>
-</span></div>
-</div>
-</div>
-</font></div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:inherit">
-</div>
-</div>
-</div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:inherit">
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</blockquote>
-</div>
-<br>
-</div>
-</div>
-</blockquote>
-</div>
-<br clear=3D"all">
-<div><br>
-</div>
--- <br>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div dir=3D"ltr"><b>Best Regards</b>
-<div>
-<div style=3D"margin:0px;padding:0px 0px 20px;width:1262px">
-<div>
-<div style=3D"margin:8px 0px 0px;padding:0px">
-<div>
-<div dir=3D"ltr"><font>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<b><span style=3D"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font>=
-</span></b></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Tech Lead, LDCG=
- Cloud Infrastructure</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical=
- Technologies</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(freenode): =
-kevinz</span></font></p>
-<p><font color=3D"#757b80"><font color=3D"#888888" face=3D"Roboto, RobotoDr=
-aft, Helvetica, Arial, sans-serif"><span style=3D"font-size:14.6667px">Slac=
-k(</span></font><font face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-s=
-erif"><span style=3D"font-size:14.6667px"><a>kubernetes.slack.com</a>)</spa=
-n></font><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Ar=
-ial, sans-serif"><span style=3D"font-size:14.6667px">:
- kevinz</span></font></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px"><a href=3D"mail=
-to:kevin.zhao@linaro.org" target=3D"_blank"><span>kevin.zhao@linaro.org</sp=
-an></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915</span></font><sp=
-an style=3D"color:rgb(117,123,128);font-size:11pt">=C2=A0</span><br>
-</p>
-<div style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helveti=
-ca,Arial,sans-serif;font-size:medium">
-<span style=3D"color:rgb(117,123,128);font-size:11pt"><br>
-</span></div>
-</div>
-</div>
-</font></div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:medium">
-</div>
-</div>
-</div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:medium">
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</blockquote>
-</div>
-<br clear=3D"all">
-<div><br>
-</div>
--- <br>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div>
-<div dir=3D"ltr">
-<div dir=3D"ltr"><b>Best Regards</b>
-<div>
-<div style=3D"margin:0px;padding:0px 0px 20px;width:1262px">
-<div>
-<div style=3D"margin:8px 0px 0px;padding:0px">
-<div>
-<div dir=3D"ltr"><font>
-<div dir=3D"ltr">
-<div dir=3D"ltr">
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<b><span style=3D"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font>=
-</span></b></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Tech Lead, LDCG=
- Cloud Infrastructure</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical=
- Technologies</span></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(freenode): =
-kevinz</span></font></p>
-<p><font color=3D"#757b80"><font color=3D"#888888" face=3D"Roboto, RobotoDr=
-aft, Helvetica, Arial, sans-serif"><span style=3D"font-size:14.6667px">Slac=
-k(</span></font><font face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-s=
-erif"><span style=3D"font-size:14.6667px"><a>kubernetes.slack.com</a>)</spa=
-n></font><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Ar=
-ial, sans-serif"><span style=3D"font-size:14.6667px">:
- kevinz</span></font></font></p>
-<p style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica=
-,Arial,sans-serif;font-size:medium">
-<font color=3D"#757b80"><span style=3D"font-size:14.6667px"><a href=3D"mail=
-to:kevin.zhao@linaro.org" target=3D"_blank"><span>kevin.zhao@linaro.org</sp=
-an></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 18818270915</span></font><sp=
-an style=3D"color:rgb(117,123,128);font-size:11pt">=C2=A0</span><br>
-</p>
-<div style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helveti=
-ca,Arial,sans-serif;font-size:medium">
-<span style=3D"color:rgb(117,123,128);font-size:11pt"><br>
-</span></div>
-</div>
-</div>
-</font></div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:medium">
-</div>
-</div>
-</div>
-<div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;fon=
-t-size:medium">
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-
-</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
- class=3D"gmail_signature"><div dir=3D"ltr"><div><div dir=3D"ltr"><div><div=
- dir=3D"ltr"><div dir=3D"ltr"><b>Best Regards</b><div><div style=3D"margin:=
-0px;padding:0px 0px 20px;width:1262px"><div><div style=3D"margin:8px 0px 0p=
-x;padding:0px"><div><div dir=3D"ltr"><font><div dir=3D"ltr"><div dir=3D"ltr=
-"><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto=
-,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><b><span style=3D=
-"font-size:11pt"><font color=3D"#38761d">Kevin Zhao</font></span></b></p><p=
- class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,Rob=
-otoDraft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"#757b8=
-0"><span style=3D"font-size:14.6667px">Tech Lead, LDCG Cloud Infrastructure=
-</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);fo=
-nt-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><=
-font color=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Vertical =
-Technologies</span></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136=
-,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-si=
-ze:medium"><font color=3D"#757b80"><span style=3D"font-size:14.6667px">IRC(=
-freenode): kevinz</span></font></p><p class=3D"MsoNormal"><font color=3D"#7=
-57b80"><font color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Aria=
-l, sans-serif"><span style=3D"font-size:14.6667px">Slack(</span></font><fon=
-t face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D=
-"font-size:14.6667px"><a href=3D"http://kubernetes.slack.com" target=3D"_bl=
-ank">kubernetes.slack.com</a>)</span></font><font color=3D"#888888" face=3D=
-"Roboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D"font-siz=
-e:14.6667px">: kevinz</span></font></font></p><p class=3D"MsoNormal" style=
-=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,s=
-ans-serif;font-size:medium"><font color=3D"#757b80"><span style=3D"font-siz=
-e:14.6667px"><a href=3D"mailto:kevin.zhao@linaro.org" target=3D"_blank"><sp=
-an>kevin.zhao@linaro.org</span></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86 =
-18818270915</span></font><span style=3D"color:rgb(117,123,128);font-size:11=
-pt">=C2=A0</span><br></p><div style=3D"color:rgb(136,136,136);font-family:R=
-oboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><span style=
-=3D"color:rgb(117,123,128);font-size:11pt"><br></span></div></div></div></f=
-ont></div><div style=3D"font-family:Roboto,RobotoDraft,Helvetica,Arial,sans=
--serif;font-size:medium"></div></div></div><div style=3D"font-family:Roboto=
-,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"></div></div></div=
-></div></div></div></div></div></div></div></div>
-
---0000000000005a2b7005daa57df3--
-
---===============8926508185858767379==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
+index a2fe9676..9286bec 100644
+--- a/fs/lustre/include/lustre_dlm.h
++++ b/fs/lustre/include/lustre_dlm.h
+@@ -1451,7 +1451,7 @@ static inline int ldlm_extent_contain(const struct ldlm_extent *ex1,
+ 	return ex1->start <= ex2->start && ex1->end >= ex2->end;
+ }
+ 
+-int ldlm_inodebits_drop(struct ldlm_lock *lock,  __u64 to_drop);
++int ldlm_inodebits_drop(struct ldlm_lock *lock, u64 to_drop);
+ 
+ #endif
+ /** @} LDLM */
+diff --git a/fs/lustre/lov/lov_pack.c b/fs/lustre/lov/lov_pack.c
+index 438bf36..2a080ff 100644
+--- a/fs/lustre/lov/lov_pack.c
++++ b/fs/lustre/lov/lov_pack.c
+@@ -195,10 +195,8 @@ ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
+ 	if (lsm->lsm_magic == LOV_MAGIC_V1 || lsm->lsm_magic == LOV_MAGIC_V3)
+ 		return lov_lsm_pack_v1v3(lsm, buf, buf_size);
+ 
+-	if (lsm->lsm_magic == LOV_MAGIC_FOREIGN) {
+-		pr_info("calling lov_lsm_pack_foreign\n");
++	if (lsm->lsm_magic == LOV_MAGIC_FOREIGN)
+ 		return lov_lsm_pack_foreign(lsm, buf, buf_size);
+-	}
+ 
+ 	lmm_size = lov_comp_md_size(lsm);
+ 	if (buf_size == 0)
+@@ -378,7 +376,6 @@ int lov_getstripe(const struct lu_env *env, struct lov_object *obj,
+ 
+ 	lmm_size = lov_lsm_pack(lsm, lmmk, lmmk_size);
+ 	if (lmm_size < 0) {
+-		pr_info("lov_lsm_pack return rc = %zd\n", lmm_size);
+ 		rc = lmm_size;
+ 		goto out_free;
+ 	}
+diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
+index b49e0cd..25b47d8 100644
+--- a/fs/lustre/obdclass/lu_object.c
++++ b/fs/lustre/obdclass/lu_object.c
+@@ -1810,7 +1810,7 @@ int lu_context_refill(struct lu_context *ctx)
+ u32 lu_context_tags_default = LCT_CL_THREAD;
+ u32 lu_session_tags_default = LCT_SESSION;
+ 
+-void lu_context_tags_update(__u32 tags)
++void lu_context_tags_update(u32 tags)
+ {
+ 	spin_lock(&lu_context_remembered_guard);
+ 	lu_context_tags_default |= tags;
+@@ -1819,7 +1819,7 @@ void lu_context_tags_update(__u32 tags)
+ }
+ EXPORT_SYMBOL(lu_context_tags_update);
+ 
+-void lu_context_tags_clear(__u32 tags)
++void lu_context_tags_clear(u32 tags)
+ {
+ 	spin_lock(&lu_context_remembered_guard);
+ 	lu_context_tags_default &= ~tags;
+@@ -1828,7 +1828,7 @@ void lu_context_tags_clear(__u32 tags)
+ }
+ EXPORT_SYMBOL(lu_context_tags_clear);
+ 
+-void lu_session_tags_update(__u32 tags)
++void lu_session_tags_update(u32 tags)
+ {
+ 	spin_lock(&lu_context_remembered_guard);
+ 	lu_session_tags_default |= tags;
+@@ -1837,7 +1837,7 @@ void lu_session_tags_update(__u32 tags)
+ }
+ EXPORT_SYMBOL(lu_session_tags_update);
+ 
+-void lu_session_tags_clear(__u32 tags)
++void lu_session_tags_clear(u32 tags)
+ {
+ 	spin_lock(&lu_context_remembered_guard);
+ 	lu_session_tags_default &= ~tags;
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index f31ab6e..8e3c97d 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -854,7 +854,7 @@ enum rmf_flags {
+ 	.rmf_name	= (name),				\
+ 	.rmf_flags	= (flags),				\
+ 	.rmf_size	= (size),				\
+-	.rmf_swab_len	= (int (*)(void *, __u32))(swab_len),	\
++	.rmf_swab_len	= (int (*)(void *, u32))(swab_len),	\
+ 	.rmf_dumper	= (void (*)(void *))(dumper)		\
+ }
+ 
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index b41f51d..e06c421 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -1246,7 +1246,7 @@ u32 lustre_msg_calc_cksum(struct lustre_msg *msg, u32 buf)
+ 
+ #if IS_ENABLED(CONFIG_CRC32)
+ 		/* about 10x faster than crypto_hash for small buffers */
+-		crc = crc32_le(~(__u32)0, (unsigned char *)pb, len);
++		crc = crc32_le(~(u32)0, (unsigned char *)pb, len);
+ #elif IS_ENABLED(CONFIG_CRYPTO_CRC32)
+ 		unsigned int hsize = 4;
+ 
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============8926508185858767379==--
