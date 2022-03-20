@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 4F588C433F5
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:31:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id CB38FC433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:31:54 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 6A88E21FA70;
-	Sun, 20 Mar 2022 06:31:34 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 2757621FA85;
+	Sun, 20 Mar 2022 06:31:36 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id D8D0C21F3E8
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:18 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B559A21EB66
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:15 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 68254EF9;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 38929EEE;
  Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 61C57D5A47; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
+ id 355C1D6A26; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 20 Mar 2022 09:30:48 -0400
-Message-Id: <1647783064-20688-35-git-send-email-jsimmons@infradead.org>
+Date: Sun, 20 Mar 2022 09:30:37 -0400
+Message-Id: <1647783064-20688-24-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
 References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 34/50] lustre: llite: Delay dput in
- ll_dirty_page_discard_warn
+Subject: [lustre-devel] [PATCH 23/50] lnet: socklnd: add hello message
+ version 4
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,131 +46,347 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Oleg Drokin <green@whamcloud.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-Otherwise we can be final dput and need to wait for pages
-to clear which is bad because this is called from ptlrpcd
-that is not supposed to block esp. for network traffic as
-it can cause livelocks if it happens to be needed to kill
-the very same RPC we are waiting on.
+KSOCK_PROTO_V4 uses a 'hello' message that contains
+lnet_hdr_nid16 with 16 byte addresses
 
-Additionally pass in the inode from IO since the page
-we are using might come from directio and that is
-probably not even a valid inode.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15340
-Lustre-commit: a1d75780ba19cfca5 ("LU-15340 llite: Delay dput in ll_dirty_page_discard_warn")
-Signed-off-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/45784
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Shaun Tancheff <shaun.tancheff@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
+Lustre-commit: 7b31ef0bbac99bfd0 ("LU-10391 socklnd: add hello message version 4")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/43611
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/llite_internal.h |  2 +-
- fs/lustre/llite/llite_lib.c      | 49 +++++++++++++++++++++++++++++++---------
- fs/lustre/llite/vvp_page.c       |  2 +-
- 3 files changed, 40 insertions(+), 13 deletions(-)
+ include/linux/lnet/lib-lnet.h          |  26 ++++++
+ include/linux/lnet/socklnd.h           |   5 ++
+ include/uapi/linux/lnet/lnet-types.h   |   4 +
+ net/lnet/klnds/socklnd/socklnd.h       |   1 +
+ net/lnet/klnds/socklnd/socklnd_cb.c    |   9 +-
+ net/lnet/klnds/socklnd/socklnd_proto.c | 154 ++++++++++++++++++++++++++++++++-
+ 6 files changed, 194 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index a8d43bd..f51ab19 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -1208,7 +1208,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
- void ll_umount_begin(struct super_block *sb);
- int ll_remount_fs(struct super_block *sb, int *flags, char *data);
- int ll_show_options(struct seq_file *seq, struct dentry *dentry);
--void ll_dirty_page_discard_warn(struct page *page, int ioret);
-+void ll_dirty_page_discard_warn(struct inode *inode, int ioret);
- int ll_prep_inode(struct inode **inode, struct req_capsule *pill,
- 		  struct super_block *sb, struct lookup_intent *it);
- int ll_obd_statfs(struct inode *inode, void __user *arg);
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 4c91a78..423c531 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -3334,18 +3334,36 @@ int ll_get_obd_name(struct inode *inode, unsigned int cmd, unsigned long arg)
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index ce18897..0155111 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -507,6 +507,32 @@ static inline void lnet_hdr_to_nid4(const struct lnet_hdr *hdr,
+ 	hdr_nid4->msg = hdr->msg;
+ }
+ 
++static inline void lnet_hdr_from_nid16(struct lnet_hdr *hdr,
++				       const struct lnet_hdr_nid16 *vhdr)
++{
++	const struct lnet_hdr *hdr16 = (void *)vhdr;
++
++	hdr->dest_nid = hdr16->dest_nid;
++	hdr->src_nid = hdr16->src_nid;
++	hdr->dest_pid = le32_to_cpu(hdr16->dest_pid);
++	hdr->src_pid = le32_to_cpu(hdr16->src_pid);
++	hdr->type = le32_to_cpu(hdr16->type);
++	hdr->payload_length = le32_to_cpu(hdr16->payload_length);
++}
++
++static inline void lnet_hdr_to_nid16(const struct lnet_hdr *hdr,
++				     struct lnet_hdr_nid16 *vhdr)
++{
++	struct lnet_hdr *hdr16 = (void *)vhdr;
++
++	hdr16->dest_nid = hdr->dest_nid;
++	hdr16->src_nid = hdr->src_nid;
++	hdr16->dest_pid = cpu_to_le32(hdr->dest_pid);
++	hdr16->src_pid = cpu_to_le32(hdr->src_pid);
++	hdr16->type = cpu_to_le32(hdr->type);
++	hdr16->payload_length = cpu_to_le32(hdr->payload_length);
++}
++
+ extern struct lnet_lnd the_lolnd;
+ extern int avoid_asym_router_failure;
+ 
+diff --git a/include/linux/lnet/socklnd.h b/include/linux/lnet/socklnd.h
+index ddfcf76..092ba6e 100644
+--- a/include/linux/lnet/socklnd.h
++++ b/include/linux/lnet/socklnd.h
+@@ -84,6 +84,10 @@ struct ksock_msg {
+ 		/* - nothing */
+ 		/* case ksm_kh.ksh_type == KSOCK_MSG_LNET */
+ 		struct lnet_hdr_nid4 lnetmsg_nid4;
++		/* case ksm_kh.ksh_type == KSOCK_MSG_LNET &&
++		 *      kshm_version >= KSOCK_PROTO_V4
++		 */
++		struct lnet_hdr_nid16 lnetmsg_nid16;
+ 	} __packed ksm_u;
+ } __packed;
+ #define ksm_type ksm_kh.ksh_type
+@@ -95,5 +99,6 @@ struct ksock_msg {
+  */
+ #define KSOCK_PROTO_V2	2
+ #define KSOCK_PROTO_V3	3
++#define KSOCK_PROTO_V4	4
+ 
+ #endif
+diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
+index 4818271..eacc401 100644
+--- a/include/uapi/linux/lnet/lnet-types.h
++++ b/include/uapi/linux/lnet/lnet-types.h
+@@ -308,6 +308,10 @@ enum lnet_ins_pos {
+  * @{
+  */
+ 
++struct lnet_hdr_nid16 {
++	char	_bytes[sizeof(struct lnet_hdr)];
++} __attribute__((packed));
++
+ /**
+  * Event queue handler function type.
+  *
+diff --git a/net/lnet/klnds/socklnd/socklnd.h b/net/lnet/klnds/socklnd/socklnd.h
+index 094f635..13abe20 100644
+--- a/net/lnet/klnds/socklnd/socklnd.h
++++ b/net/lnet/klnds/socklnd/socklnd.h
+@@ -500,6 +500,7 @@ struct ksock_proto {
+ extern const struct ksock_proto ksocknal_protocol_v1x;
+ extern const struct ksock_proto ksocknal_protocol_v2x;
+ extern const struct ksock_proto ksocknal_protocol_v3x;
++extern const struct ksock_proto ksocknal_protocol_v4x;
+ 
+ #define KSOCK_PROTO_V1_MAJOR	LNET_PROTO_TCP_VERSION_MAJOR
+ #define KSOCK_PROTO_V1_MINOR	LNET_PROTO_TCP_VERSION_MINOR
+diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
+index c93f43f..af35c49 100644
+--- a/net/lnet/klnds/socklnd/socklnd_cb.c
++++ b/net/lnet/klnds/socklnd/socklnd_cb.c
+@@ -1925,11 +1925,11 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 		if (!list_empty(&peer_ni->ksnp_conns)) {
+ 			conn = list_first_entry(&peer_ni->ksnp_conns,
+ 						struct ksock_conn, ksnc_list);
+-			LASSERT(conn->ksnc_proto == &ksocknal_protocol_v3x);
++			LASSERT(conn->ksnc_proto == &ksocknal_protocol_v3x ||
++				conn->ksnc_proto == &ksocknal_protocol_v4x);
+ 		}
+ 
+-		/*
+-		 * take all the blocked packets while I've got the lock and
++		/* take all the blocked packets while I've got the lock and
+ 		 * complete below...
+ 		 */
+ 		list_splice_init(&peer_ni->ksnp_tx_queue, &zombies);
+@@ -2297,7 +2297,8 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 	if (list_empty(&peer_ni->ksnp_conns))
+ 		return 0;
+ 
+-	if (peer_ni->ksnp_proto != &ksocknal_protocol_v3x)
++	if (peer_ni->ksnp_proto != &ksocknal_protocol_v3x &&
++	    peer_ni->ksnp_proto != &ksocknal_protocol_v4x)
+ 		return 0;
+ 
+ 	if (*ksocknal_tunables.ksnd_keepalive <= 0 ||
+diff --git a/net/lnet/klnds/socklnd/socklnd_proto.c b/net/lnet/klnds/socklnd/socklnd_proto.c
+index 783c62f..0a93d57 100644
+--- a/net/lnet/klnds/socklnd/socklnd_proto.c
++++ b/net/lnet/klnds/socklnd/socklnd_proto.c
+@@ -365,6 +365,51 @@
+ 	}
+ }
+ 
++static int
++ksocknal_match_tx_v4(struct ksock_conn *conn, struct ksock_tx *tx, int nonblk)
++{
++	int nob;
++
++	if (!tx || !tx->tx_lnetmsg)
++		nob = sizeof(struct ksock_msg_hdr);
++	else
++		nob = sizeof(struct ksock_msg_hdr) +
++			sizeof(struct lnet_hdr_nid16) +
++			tx->tx_lnetmsg->msg_len;
++
++	switch (conn->ksnc_type) {
++	default:
++		CERROR("ksnc_type bad: %u\n", conn->ksnc_type);
++		LBUG();
++	case SOCKLND_CONN_ANY:
++		return SOCKNAL_MATCH_NO;
++
++	case SOCKLND_CONN_ACK:
++		if (nonblk)
++			return SOCKNAL_MATCH_YES;
++		else if (!tx || !tx->tx_lnetmsg)
++			return SOCKNAL_MATCH_MAY;
++		else
++			return SOCKNAL_MATCH_NO;
++
++	case SOCKLND_CONN_BULK_OUT:
++		if (nonblk)
++			return SOCKNAL_MATCH_NO;
++		else if (nob < *ksocknal_tunables.ksnd_min_bulk)
++			return SOCKNAL_MATCH_MAY;
++		else
++			return SOCKNAL_MATCH_YES;
++
++	case SOCKLND_CONN_CONTROL:
++		if (nonblk)
++			return SOCKNAL_MATCH_NO;
++		else if (nob >= *ksocknal_tunables.ksnd_min_bulk)
++			return SOCKNAL_MATCH_MAY;
++		else
++			return SOCKNAL_MATCH_YES;
++	}
++}
++
+ /* (Sink) handle incoming ZC request from sender */
+ static int
+ ksocknal_handle_zcreq(struct ksock_conn *c, u64 cookie, int remote)
+@@ -425,7 +470,8 @@
+ 	count = (cookie1 > cookie2) ? 2 : (cookie2 - cookie1 + 1);
+ 
+ 	if (cookie2 == SOCKNAL_KEEPALIVE_PING &&
+-	    conn->ksnc_proto == &ksocknal_protocol_v3x) {
++	    (conn->ksnc_proto == &ksocknal_protocol_v3x ||
++	     conn->ksnc_proto == &ksocknal_protocol_v4x)) {
+ 		/* keepalive PING for V3.x, just ignore it */
+ 		return count == 1 ? 0 : -EPROTO;
+ 	}
+@@ -596,6 +642,24 @@
+ }
+ 
+ static int
++ksocknal_send_hello_v4(struct ksock_conn *conn, struct ksock_hello_msg *hello)
++{
++	struct socket *sock = conn->ksnc_sock;
++	int rc;
++
++	hello->kshm_magic   = LNET_PROTO_MAGIC;
++	hello->kshm_version = conn->ksnc_proto->pro_version;
++
++	rc = lnet_sock_write(sock, hello, sizeof(*hello),
++			     lnet_acceptor_timeout());
++
++	if (rc != 0)
++		CNETERR("Error %d sending HELLO hdr to %pISp\n",
++			rc, &conn->ksnc_peeraddr);
++	return rc;
++}
++
++static int
+ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
+ 		       int timeout)
+ {
+@@ -750,6 +814,40 @@
  	return 0;
  }
  
--void ll_dirty_page_discard_warn(struct page *page, int ioret)
-+struct dname_buf {
-+	struct work_struct db_work;
-+	struct dentry *db_dentry;
-+	/* Let's hope the path is not too long, 32 bytes for the work struct
-+	 * on my kernel
-+	 */
-+	char buf[PAGE_SIZE - sizeof(struct work_struct) - sizeof(void *)];
-+};
++static int
++ksocknal_recv_hello_v4(struct ksock_conn *conn, struct ksock_hello_msg *hello,
++		       int timeout)
++{
++	struct socket *sock = conn->ksnc_sock;
++	int rc;
 +
-+static void ll_dput_later(struct work_struct *work)
- {
--	char *buf, *path = NULL;
-+	struct dname_buf *db = container_of(work, struct dname_buf, db_work);
++	if (hello->kshm_magic == LNET_PROTO_MAGIC)
++		conn->ksnc_flip = 0;
++	else
++		conn->ksnc_flip = 1;
 +
-+	dput(db->db_dentry);
-+	free_page((unsigned long)db);
++	rc = lnet_sock_read(sock, &hello->kshm_src_nid,
++			    sizeof(*hello) -
++			    offsetof(struct ksock_hello_msg, kshm_src_nid),
++			    timeout);
++	if (rc) {
++		CERROR("Error %d reading HELLO from %pIS\n",
++		       rc, &conn->ksnc_peeraddr);
++		LASSERT(rc < 0 && rc != -EALREADY);
++		return rc;
++	}
++
++	if (conn->ksnc_flip) {
++		__swab32s(&hello->kshm_src_pid);
++		__swab32s(&hello->kshm_dst_pid);
++		__swab64s(&hello->kshm_src_incarnation);
++		__swab64s(&hello->kshm_dst_incarnation);
++		__swab32s(&hello->kshm_ctype);
++	}
++
++	return 0;
 +}
 +
-+void ll_dirty_page_discard_warn(struct inode *inode, int ioret)
+ static void
+ ksocknal_pack_msg_v1(struct ksock_tx *tx)
+ {
+@@ -802,6 +900,41 @@
+ }
+ 
+ static void
++ksocknal_pack_msg_v4(struct ksock_tx *tx)
 +{
-+	struct dname_buf *db;
-+	char *path = NULL;
- 	struct dentry *dentry = NULL;
--	struct inode *inode = page->mapping->host;
- 
- 	/* this can be called inside spin lock so use GFP_ATOMIC. */
--	buf = (char *)__get_free_page(GFP_ATOMIC);
--	if (buf) {
-+	db = (struct dname_buf *)__get_free_page(GFP_ATOMIC);
-+	if (db) {
- 		dentry = d_find_alias(inode);
- 		if (dentry)
--			path = dentry_path_raw(dentry, buf, PAGE_SIZE);
-+			path = dentry_path_raw(dentry, db->buf,
-+					       sizeof(db->buf));
- 	}
- 
- 	/* The below message is checked in recovery-small.sh test_24b */
-@@ -3356,11 +3374,20 @@ void ll_dirty_page_discard_warn(struct page *page, int ioret)
- 	       PFID(ll_inode2fid(inode)),
- 	       (path && !IS_ERR(path)) ? path : "", ioret);
- 
--	if (dentry)
--		dput(dentry);
--
--	if (buf)
--		free_page((unsigned long)buf);
-+	if (dentry) {
-+		/* We cannot dput here since if we happen to be the last holder
-+		 * then we can end up waiting for page evictions that
-+		 * in turn wait for RPCs that need this instance of ptlrpcd
-+		 * (callng brw_interpret->*page_completion*->vmpage_error->here)
-+		 * LU-15340
-+		 */
-+		INIT_WORK(&db->db_work, ll_dput_later);
-+		db->db_dentry = dentry;
-+		schedule_work(&db->db_work);
-+	} else {
-+		if (db)
-+			free_page((unsigned long)db);
++	int hdr_size;
++
++	tx->tx_hdr.iov_base = (void *)&tx->tx_msg;
++
++	switch (tx->tx_msg.ksm_type) {
++	case KSOCK_MSG_LNET:
++		LASSERT(tx->tx_lnetmsg);
++		hdr_size = (sizeof(struct ksock_msg_hdr) +
++				sizeof(struct lnet_hdr_nid16));
++
++		lnet_hdr_to_nid16(&tx->tx_lnetmsg->msg_hdr,
++				  &tx->tx_msg.ksm_u.lnetmsg_nid16);
++		tx->tx_hdr.iov_len = hdr_size;
++		tx->tx_resid = hdr_size + tx->tx_lnetmsg->msg_len;
++		tx->tx_nob = hdr_size + tx->tx_lnetmsg->msg_len;
++		break;
++	case KSOCK_MSG_NOOP:
++		LASSERT(!tx->tx_lnetmsg);
++		hdr_size = sizeof(struct ksock_msg_hdr);
++
++		tx->tx_hdr.iov_len = hdr_size;
++		tx->tx_resid = hdr_size;
++		tx->tx_nob = hdr_size;
++		break;
++	default:
++		LASSERT(0);
 +	}
++	/* Don't checksum before start sending, because packet can be
++	 * piggybacked with ACK
++	 */
++}
++
++static void
+ ksocknal_unpack_msg_v1(struct ksock_msg *msg, struct lnet_hdr *hdr)
+ {
+ 	msg->ksm_csum = 0;
+@@ -817,6 +950,12 @@
+ 	lnet_hdr_from_nid4(hdr, &msg->ksm_u.lnetmsg_nid4);
  }
  
- ssize_t ll_copy_user_md(const struct lov_user_md __user *md,
-diff --git a/fs/lustre/llite/vvp_page.c b/fs/lustre/llite/vvp_page.c
-index ae51ba0..1e95ede 100644
---- a/fs/lustre/llite/vvp_page.c
-+++ b/fs/lustre/llite/vvp_page.c
-@@ -244,7 +244,7 @@ static void vvp_vmpage_error(struct inode *inode, struct page *vmpage,
- 		if ((ioret == -ESHUTDOWN || ioret == -EINTR ||
- 		     ioret == -EIO) && obj->vob_discard_page_warned == 0) {
- 			obj->vob_discard_page_warned = 1;
--			ll_dirty_page_discard_warn(vmpage, ioret);
-+			ll_dirty_page_discard_warn(inode, ioret);
- 		}
- 	}
- }
++static void
++ksocknal_unpack_msg_v4(struct ksock_msg *msg, struct lnet_hdr *hdr)
++{
++	lnet_hdr_from_nid16(hdr, &msg->ksm_u.lnetmsg_nid16);
++}
++
+ const struct ksock_proto ksocknal_protocol_v1x = {
+ 	.pro_version		= KSOCK_PROTO_V1,
+ 	.pro_send_hello		= ksocknal_send_hello_v1,
+@@ -855,3 +994,16 @@
+ 	.pro_handle_zcack	= ksocknal_handle_zcack,
+ 	.pro_match_tx		= ksocknal_match_tx_v3
+ };
++
++const struct ksock_proto ksocknal_protocol_v4x = {
++	.pro_version		= KSOCK_PROTO_V4,
++	.pro_send_hello		= ksocknal_send_hello_v4,
++	.pro_recv_hello		= ksocknal_recv_hello_v4,
++	.pro_pack		= ksocknal_pack_msg_v4,
++	.pro_unpack		= ksocknal_unpack_msg_v4,
++	.pro_queue_tx_msg	= ksocknal_queue_tx_msg_v2,
++	.pro_queue_tx_zcack	= ksocknal_queue_tx_zcack_v3,
++	.pro_handle_zcreq	= ksocknal_handle_zcreq,
++	.pro_handle_zcack	= ksocknal_handle_zcack,
++	.pro_match_tx		= ksocknal_match_tx_v4,
++};
 -- 
 1.8.3.1
 
