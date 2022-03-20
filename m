@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id ACC91C433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:32:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 7BF7DC433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:32:56 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id C04B121FBD9;
-	Sun, 20 Mar 2022 06:32:06 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 609A821FBDE;
+	Sun, 20 Mar 2022 06:32:07 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5455221EBCD
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:16 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5088F21CA7D
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:11 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 407EEEF0;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 0692DED8;
  Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 3D54CAB; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
+ id E7140FCF2B; Sun, 20 Mar 2022 09:31:07 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 20 Mar 2022 09:30:39 -0400
-Message-Id: <1647783064-20688-26-git-send-email-jsimmons@infradead.org>
+Date: Sun, 20 Mar 2022 09:30:19 -0400
+Message-Id: <1647783064-20688-6-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
 References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 25/50] lnet: convert nids in lnet_parse to
- lnet_nid
+Subject: [lustre-devel] [PATCH 05/50] lnet: use large nids in struct
+ lnet_event
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -48,337 +48,811 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Mr NeilBrown <neilb@suse.de>
 
-src_nid and dest_nid in lnet_parse() are changed to
-struct lnet_nid, and this change propagates out to
-affect a few support function.
+All nids, including those in process_id, are changed to
+to struct lnet_nid / struct lnet_processid.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: ac439ce87b0acbff3 ("LU-10391 lnet: convert nids in lnet_parse to lnet_nid")
+Lustre-commit: e1d0224fb4045571a ("LU-10391 lnet: use large nids in struct lnet_event")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/43613
+Reviewed-on: https://review.whamcloud.com/43600
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h |  4 +--
- net/lnet/lnet/api-ni.c        | 13 -------
- net/lnet/lnet/lib-move.c      | 80 ++++++++++++++++++++-----------------------
- net/lnet/lnet/peer.c          |  7 ++--
- 4 files changed, 43 insertions(+), 61 deletions(-)
+ fs/lustre/include/lustre_net.h       |  6 +++---
+ fs/lustre/include/obd_class.h        |  4 ++--
+ fs/lustre/ldlm/ldlm_lib.c            |  6 +++---
+ fs/lustre/ldlm/ldlm_request.c        |  2 +-
+ fs/lustre/obdclass/lprocfs_status.c  |  8 ++++----
+ fs/lustre/osc/osc_request.c          | 14 ++++++-------
+ fs/lustre/ptlrpc/client.c            |  6 +++---
+ fs/lustre/ptlrpc/connection.c        | 20 +++++++++---------
+ fs/lustre/ptlrpc/events.c            | 10 ++++-----
+ fs/lustre/ptlrpc/import.c            |  6 +++---
+ fs/lustre/ptlrpc/niobuf.c            | 10 ++++-----
+ fs/lustre/ptlrpc/pack_generic.c      |  8 ++++----
+ fs/lustre/ptlrpc/ptlrpc_internal.h   |  2 +-
+ fs/lustre/ptlrpc/sec.c               |  4 ++--
+ fs/lustre/ptlrpc/sec_config.c        |  9 +++++----
+ fs/lustre/ptlrpc/service.c           |  2 +-
+ include/linux/lnet/api.h             |  2 +-
+ include/linux/lnet/lib-lnet.h        |  3 ++-
+ include/uapi/linux/lnet/lnet-types.h |  8 ++++----
+ net/lnet/lnet/api-ni.c               |  8 ++++----
+ net/lnet/lnet/lib-msg.c              | 24 +++++++++++-----------
+ net/lnet/lnet/peer.c                 | 39 +++++++++++++++++++++++++++---------
+ net/lnet/selftest/rpc.c              |  6 +++---
+ 23 files changed, 114 insertions(+), 93 deletions(-)
 
+diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
+index cf1bb7f..7d29542 100644
+--- a/fs/lustre/include/lustre_net.h
++++ b/fs/lustre/include/lustre_net.h
+@@ -364,9 +364,9 @@ struct ptlrpc_connection {
+ 	/** linkage for connections hash table */
+ 	struct rhash_head	c_hash;
+ 	/** Our own lnet nid for this connection */
+-	lnet_nid_t		c_self;
++	struct lnet_nid		c_self;
+ 	/** Remote side nid for this connection */
+-	struct lnet_process_id	c_peer;
++	struct lnet_processid	c_peer;
+ 	/** UUID of the other side */
+ 	struct obd_uuid		c_remote_uuid;
+ 	/** reference counter for this connection */
+@@ -1749,7 +1749,7 @@ static inline void  ptlrpc_connection_put(struct ptlrpc_connection *conn)
+ 
+ 	CDEBUG(D_INFO, "PUT conn=%p refcount %d to %s\n",
+ 	       conn, atomic_read(&conn->c_refcount),
+-	       libcfs_nid2str(conn->c_peer.nid));
++	       libcfs_nidstr(&conn->c_peer.nid));
+ }
+ 
+ struct ptlrpc_connection *ptlrpc_connection_addref(struct ptlrpc_connection *);
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index b69331d..3f444b0 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -98,13 +98,13 @@ int obd_connect_flags2str(char *page, int count, u64 flags, u64 flags2,
+ static inline char *obd_export_nid2str(struct obd_export *exp)
+ {
+ 	return exp->exp_connection ?
+-		libcfs_nid2str(exp->exp_connection->c_peer.nid) : "<unknown>";
++		libcfs_nidstr(&exp->exp_connection->c_peer.nid) : "<unknown>";
+ }
+ 
+ static inline char *obd_import_nid2str(struct obd_import *imp)
+ {
+ 	return imp->imp_connection ?
+-		libcfs_nid2str(imp->imp_connection->c_peer.nid) : "<unknown>";
++		libcfs_nidstr(&imp->imp_connection->c_peer.nid) : "<unknown>";
+ }
+ 
+ int obd_zombie_impexp_init(void);
+diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+index 9aa87d1..02d1eea 100644
+--- a/fs/lustre/ldlm/ldlm_lib.c
++++ b/fs/lustre/ldlm/ldlm_lib.c
+@@ -67,7 +67,7 @@ static int import_set_conn(struct obd_import *imp, struct obd_uuid *uuid,
+ 	if (imp->imp_connection &&
+ 	    imp->imp_connection->c_remote_uuid.uuid[0] == 0)
+ 		/* nid4refnet is used to restrict network connections */
+-		nid4refnet = imp->imp_connection->c_self;
++		nid4refnet = lnet_nid_to_nid4(&imp->imp_connection->c_self);
+ 
+ 	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, nid4refnet);
+ 	if (!ptlrpc_conn) {
+@@ -297,7 +297,7 @@ int client_obd_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	const char *name = obd->obd_type->typ_name;
+ 	enum ldlm_ns_type ns_type = LDLM_NS_TYPE_UNKNOWN;
+ 	struct ptlrpc_connection fake_conn = {
+-		.c_self = 0,
++		.c_self = {},
+ 		.c_remote_uuid.uuid[0] = 0
+ 	};
+ 	int rc;
+@@ -494,7 +494,7 @@ int client_obd_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 			       rc);
+ 			goto err_import;
+ 		}
+-		fake_conn.c_self = LNET_MKNID(refnet, 0);
++		lnet_nid4_to_nid(LNET_MKNID(refnet, 0), &fake_conn.c_self);
+ 		imp->imp_connection = &fake_conn;
+ 	}
+ 
+diff --git a/fs/lustre/ldlm/ldlm_request.c b/fs/lustre/ldlm/ldlm_request.c
+index 44e1ec2..4ba64b1 100644
+--- a/fs/lustre/ldlm/ldlm_request.c
++++ b/fs/lustre/ldlm/ldlm_request.c
+@@ -1099,7 +1099,7 @@ static int ldlm_cli_cancel_req(struct obd_export *exp,
+ 		if (rc == LUSTRE_ESTALE) {
+ 			CDEBUG(D_DLMTRACE,
+ 			       "client/server (nid %s) out of sync -- not fatal\n",
+-			       libcfs_nid2str(req->rq_import->imp_connection->c_peer.nid));
++			       libcfs_nidstr(&req->rq_import->imp_connection->c_peer.nid));
+ 			rc = 0;
+ 		} else if (rc == -ETIMEDOUT && /* check there was no reconnect*/
+ 			   req->rq_import_generation == imp->imp_generation) {
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 335fc34..335e748 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -854,14 +854,14 @@ static void ldebugfs_import_locked(struct seq_file *m,
+ 	spin_lock(&imp->imp_lock);
+ 	j = 0;
+ 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+-		libcfs_nid2str_r(conn->oic_conn->c_peer.nid,
+-				 nidstr, sizeof(nidstr));
++		libcfs_nidstr_r(&conn->oic_conn->c_peer.nid,
++				  nidstr, sizeof(nidstr));
+ 		seq_printf(m, "%s%s", j ? ", " : "", nidstr);
+ 		j++;
+ 	}
+ 	if (imp->imp_connection)
+-		libcfs_nid2str_r(imp->imp_connection->c_peer.nid,
+-				 nidstr, sizeof(nidstr));
++		libcfs_nidstr_r(&imp->imp_connection->c_peer.nid,
++				  nidstr, sizeof(nidstr));
+ 	else
+ 		strncpy(nidstr, "<none>", sizeof(nidstr));
+ 	seq_printf(m,
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 14863dc..c442819 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -1899,7 +1899,7 @@ static void dump_all_bulk_pages(struct obdo *oa, u32 page_count,
+ }
+ 
+ static int check_write_checksum(struct obdo *oa,
+-				const struct lnet_process_id *peer,
++				const struct lnet_processid *peer,
+ 				u32 client_cksum, u32 server_cksum,
+ 				struct osc_brw_async_args *aa)
+ {
+@@ -1967,7 +1967,7 @@ static int check_write_checksum(struct obdo *oa,
+ 
+ 	LCONSOLE_ERROR_MSG(0x132,
+ 			   "%s: BAD WRITE CHECKSUM: %s: from %s inode " DFID " object " DOSTID " extent [%llu-%llu], original client csum %x (type %x), server csum %x (type %x), client csum now %x\n",
+-			   obd_name, msg, libcfs_nid2str(peer->nid),
++			   obd_name, msg, libcfs_nidstr(&peer->nid),
+ 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : (u64)0,
+ 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_oid : 0,
+ 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_ver : 0,
+@@ -1985,8 +1985,8 @@ static int check_write_checksum(struct obdo *oa,
+ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
+ {
+ 	struct osc_brw_async_args *aa = (void *)&req->rq_async_args;
+-	const struct lnet_process_id *peer =
+-			&req->rq_import->imp_connection->c_peer;
++	const struct lnet_processid *peer =
++		&req->rq_import->imp_connection->c_peer;
+ 	struct client_obd *cli = aa->aa_cli;
+ 	const char *obd_name = cli->cl_import->imp_obd->obd_name;
+ 	struct ost_body *body;
+@@ -2129,7 +2129,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
+ 			goto out;
+ 
+ 		if (req->rq_bulk &&
+-		    peer->nid != req->rq_bulk->bd_sender) {
++		    lnet_nid_to_nid4(&peer->nid) != req->rq_bulk->bd_sender) {
+ 			via = " via ";
+ 			router = libcfs_nid2str(req->rq_bulk->bd_sender);
+ 		}
+@@ -2152,7 +2152,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
+ 			LCONSOLE_ERROR_MSG(0x133,
+ 					   "%s: BAD READ CHECKSUM: from %s%s%s inode "DFID" object "DOSTID" extent [%llu-%llu], client %x/%x, server %x, cksum_type %x\n",
+ 					   obd_name,
+-					   libcfs_nid2str(peer->nid),
++					   libcfs_nidstr(&peer->nid),
+ 					   via, router,
+ 					   clbody->oa.o_valid & OBD_MD_FLFID ?
+ 					   clbody->oa.o_parent_seq : (u64)0,
+@@ -2181,7 +2181,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
+ 		if ((cksum_missed & (-cksum_missed)) == cksum_missed)
+ 			CERROR("%s: checksum %u requested from %s but not sent\n",
+ 			       obd_name, cksum_missed,
+-			       libcfs_nid2str(peer->nid));
++			       libcfs_nidstr(&peer->nid));
+ 	} else {
+ 		rc = 0;
+ 	}
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index dedb5db..ec0cd5f 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -1303,7 +1303,7 @@ static int ptlrpc_check_status(struct ptlrpc_request *req)
+ 	rc = lustre_msg_get_status(req->rq_repmsg);
+ 	if (lustre_msg_get_type(req->rq_repmsg) == PTL_RPC_MSG_ERR) {
+ 		struct obd_import *imp = req->rq_import;
+-		lnet_nid_t nid = imp->imp_connection->c_peer.nid;
++		struct lnet_nid *nid = &imp->imp_connection->c_peer.nid;
+ 		u32 opc = lustre_msg_get_opc(req->rq_reqmsg);
+ 
+ 		/* -EAGAIN is normal when using POSIX flocks */
+@@ -1313,7 +1313,7 @@ static int ptlrpc_check_status(struct ptlrpc_request *req)
+ 					   "%s: operation %s to node %s failed: rc = %d\n",
+ 					   imp->imp_obd->obd_name,
+ 					   ll_opcode2str(opc),
+-					   libcfs_nid2str(nid), rc);
++					   libcfs_nidstr(nid), rc);
+ 		return rc < 0 ? rc : -EINVAL;
+ 	}
+ 
+@@ -2199,7 +2199,7 @@ int ptlrpc_expire_one_request(struct ptlrpc_request *req, int async_unlink)
+ 		  req->rq_sent, req->rq_real_sent);
+ 
+ 	if (imp && obd_debug_peer_on_timeout)
+-		LNetDebugPeer(imp->imp_connection->c_peer);
++		LNetDebugPeer(&imp->imp_connection->c_peer);
+ 
+ 	ptlrpc_unregister_reply(req, async_unlink);
+ 	ptlrpc_unregister_bulk(req, async_unlink);
+diff --git a/fs/lustre/ptlrpc/connection.c b/fs/lustre/ptlrpc/connection.c
+index 0415357..8dbaea40 100644
+--- a/fs/lustre/ptlrpc/connection.c
++++ b/fs/lustre/ptlrpc/connection.c
+@@ -48,20 +48,20 @@
+ 
+ static u32 lnet_process_id_hash(const void *data, u32 len, u32 seed)
+ {
+-	const struct lnet_process_id *lpi = data;
++	const struct lnet_processid *lpi = data;
+ 
+ 	seed = hash_32(seed ^ lpi->pid, 32);
+-	seed ^= hash_64(lpi->nid, 32);
++	seed = hash_32(nidhash(&lpi->nid) ^ seed, 32);
+ 	return seed;
+ }
+ 
+ static int lnet_process_id_cmp(struct rhashtable_compare_arg *arg,
+ 			       const void *obj)
+ {
+-	const struct lnet_process_id *lpi = arg->key;
++	const struct lnet_processid *lpi = arg->key;
+ 	const struct ptlrpc_connection *con = obj;
+ 
+-	if (lpi->nid == con->c_peer.nid &&
++	if (nid_same(&lpi->nid, &con->c_peer.nid) &&
+ 	    lpi->pid == con->c_peer.pid)
+ 		return 0;
+ 	return -ESRCH;
+@@ -76,12 +76,14 @@ static int lnet_process_id_cmp(struct rhashtable_compare_arg *arg,
+ };
+ 
+ struct ptlrpc_connection *
+-ptlrpc_connection_get(struct lnet_process_id peer, lnet_nid_t self,
++ptlrpc_connection_get(struct lnet_process_id peer4, lnet_nid_t self,
+ 		      struct obd_uuid *uuid)
+ {
+ 	struct ptlrpc_connection *conn, *conn2;
++	struct lnet_processid peer;
+ 
+-	peer.nid = LNetPrimaryNID(peer.nid);
++	peer4.nid = LNetPrimaryNID(peer4.nid);
++	lnet_pid4_to_pid(peer4, &peer);
+ 	conn = rhashtable_lookup_fast(&conn_hash, &peer, conn_hash_params);
+ 	if (conn) {
+ 		ptlrpc_connection_addref(conn);
+@@ -93,7 +95,7 @@ struct ptlrpc_connection *
+ 		return NULL;
+ 
+ 	conn->c_peer = peer;
+-	conn->c_self = self;
++	lnet_nid4_to_nid(self, &conn->c_self);
+ 	atomic_set(&conn->c_refcount, 1);
+ 	if (uuid)
+ 		obd_str2uuid(&conn->c_remote_uuid, uuid->uuid);
+@@ -125,7 +127,7 @@ struct ptlrpc_connection *
+ out:
+ 	CDEBUG(D_INFO, "conn=%p refcount %d to %s\n",
+ 	       conn, atomic_read(&conn->c_refcount),
+-	       libcfs_nid2str(conn->c_peer.nid));
++	       libcfs_nidstr(&conn->c_peer.nid));
+ 	return conn;
+ }
+ 
+@@ -135,7 +137,7 @@ struct ptlrpc_connection *
+ 	atomic_inc(&conn->c_refcount);
+ 	CDEBUG(D_INFO, "conn=%p refcount %d to %s\n",
+ 	       conn, atomic_read(&conn->c_refcount),
+-	       libcfs_nid2str(conn->c_peer.nid));
++	       libcfs_nidstr(&conn->c_peer.nid));
+ 
+ 	return conn;
+ }
+diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
+index dbf9f9d..385a6f2 100644
+--- a/fs/lustre/ptlrpc/events.c
++++ b/fs/lustre/ptlrpc/events.c
+@@ -213,7 +213,7 @@ void client_bulk_callback(struct lnet_event *ev)
+ 
+ 	if (ev->type != LNET_EVENT_UNLINK && ev->status == 0) {
+ 		desc->bd_nob_transferred += ev->mlength;
+-		desc->bd_sender = ev->sender;
++		desc->bd_sender = lnet_nid_to_nid4(&ev->sender);
+ 	} else {
+ 		/* start reconnect and resend if network error hit */
+ 		spin_lock(&req->rq_lock);
+@@ -330,7 +330,7 @@ void request_in_callback(struct lnet_event *ev)
+ 		if (!req) {
+ 			CERROR("Can't allocate incoming request descriptor: Dropping %s RPC from %s\n",
+ 			       service->srv_name,
+-			       libcfs_id2str(ev->initiator));
++			       libcfs_idstr(&ev->initiator));
+ 			return;
+ 		}
+ 	}
+@@ -346,9 +346,9 @@ void request_in_callback(struct lnet_event *ev)
+ 		req->rq_reqdata_len = ev->mlength;
+ 	ktime_get_real_ts64(&req->rq_arrival_time);
+ 	/* Multi-Rail: keep track of both initiator and source NID. */
+-	req->rq_peer = ev->initiator;
+-	req->rq_source = ev->source;
+-	req->rq_self = ev->target.nid;
++	req->rq_peer = lnet_pid_to_pid4(&ev->initiator);
++	req->rq_source = lnet_pid_to_pid4(&ev->source);
++	req->rq_self = lnet_nid_to_nid4(&ev->target.nid);
+ 	req->rq_rqbd = rqbd;
+ 	req->rq_phase = RQ_PHASE_NEW;
+ 	if (ev->type == LNET_EVENT_PUT)
+diff --git a/fs/lustre/ptlrpc/import.c b/fs/lustre/ptlrpc/import.c
+index f28fb68..3dc987cf 100644
+--- a/fs/lustre/ptlrpc/import.c
++++ b/fs/lustre/ptlrpc/import.c
+@@ -516,7 +516,7 @@ static int import_select_connection(struct obd_import *imp)
+ 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+ 		CDEBUG(D_HA, "%s: connect to NID %s last attempt %lld\n",
+ 		       imp->imp_obd->obd_name,
+-		       libcfs_nid2str(conn->oic_conn->c_peer.nid),
++		       libcfs_nidstr(&conn->oic_conn->c_peer.nid),
+ 		       conn->oic_last_attempt);
+ 
+ 		/* If we have not tried this connection since
+@@ -591,7 +591,7 @@ static int import_select_connection(struct obd_import *imp)
+ 			       "%s: Connection changing to %.*s (at %s)\n",
+ 			       imp->imp_obd->obd_name,
+ 			       target_len, target_start,
+-			       libcfs_nid2str(imp_conn->oic_conn->c_peer.nid));
++			       libcfs_nidstr(&imp_conn->oic_conn->c_peer.nid));
+ 		}
+ 
+ 		imp->imp_conn_current = imp_conn;
+@@ -600,7 +600,7 @@ static int import_select_connection(struct obd_import *imp)
+ 	/* The below message is checked in conf-sanity.sh test_35[ab] */
+ 	CDEBUG(D_HA, "%s: import %p using connection %s/%s\n",
+ 	       imp->imp_obd->obd_name, imp, imp_conn->oic_uuid.uuid,
+-	       libcfs_nid2str(imp_conn->oic_conn->c_peer.nid));
++	       libcfs_nidstr(&imp_conn->oic_conn->c_peer.nid));
+ 
+ out_unlock:
+ 	spin_unlock(&imp->imp_lock);
+diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
+index da04d4e..afe83ad 100644
+--- a/fs/lustre/ptlrpc/niobuf.c
++++ b/fs/lustre/ptlrpc/niobuf.c
+@@ -150,9 +150,7 @@ static int ptlrpc_register_bulk(struct ptlrpc_request *req)
+ 
+ 	desc->bd_failure = 0;
+ 
+-	peer.pid = desc->bd_import->imp_connection->c_peer.pid;
+-	lnet_nid4_to_nid(desc->bd_import->imp_connection->c_peer.nid,
+-		      &peer.nid);
++	peer = desc->bd_import->imp_connection->c_peer;
+ 
+ 	LASSERT(desc->bd_cbid.cbid_fn == client_bulk_callback);
+ 	LASSERT(desc->bd_cbid.cbid_arg == desc);
+@@ -630,8 +628,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 			request->rq_repmsg = NULL;
+ 		}
+ 
+-		peer.pid = connection->c_peer.pid;
+-		lnet_nid4_to_nid(connection->c_peer.nid, &peer.nid);
++		peer = connection->c_peer;
+ 		if (request->rq_bulk &&
+ 		    OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_BULK_REPLY_ATTACH)) {
+ 			reply_me = ERR_PTR(-ENOMEM);
+@@ -723,7 +720,8 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	rc = ptl_send_buf(&request->rq_req_md_h,
+ 			  request->rq_reqbuf, request->rq_reqdata_len,
+ 			  LNET_NOACK_REQ, &request->rq_req_cbid,
+-			  LNET_NID_ANY, connection->c_peer,
++			  LNET_NID_ANY,
++			  lnet_pid_to_pid4(&connection->c_peer),
+ 			  request->rq_request_portal,
+ 			  request->rq_xid, 0, &bulk_cookie);
+ 	if (likely(rc == 0))
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index e06c421..f075188e 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -2460,7 +2460,7 @@ void _debug_req(struct ptlrpc_request *req,
+ {
+ 	bool req_ok = req->rq_reqmsg != NULL;
+ 	bool rep_ok = false;
+-	lnet_nid_t nid = LNET_NID_ANY;
++	struct lnet_nid *nid = NULL;
+ 	int rep_flags = -1;
+ 	int rep_status = -1;
+ 	va_list args;
+@@ -2482,9 +2482,9 @@ void _debug_req(struct ptlrpc_request *req,
+ 	spin_unlock(&req->rq_early_free_lock);
+ 
+ 	if (req->rq_import && req->rq_import->imp_connection)
+-		nid = req->rq_import->imp_connection->c_peer.nid;
++		nid = &req->rq_import->imp_connection->c_peer.nid;
+ 	else if (req->rq_export && req->rq_export->exp_connection)
+-		nid = req->rq_export->exp_connection->c_peer.nid;
++		nid = &req->rq_export->exp_connection->c_peer.nid;
+ 
+ 	va_start(args, fmt);
+ 	vaf.fmt = fmt;
+@@ -2500,7 +2500,7 @@ void _debug_req(struct ptlrpc_request *req,
+ 			 req->rq_export ?
+ 			 req->rq_export->exp_client_uuid.uuid :
+ 			 "<?>",
+-			 libcfs_nid2str(nid),
++			 nid ? libcfs_nidstr(nid) : "<unknown>",
+ 			 req->rq_request_portal, req->rq_reply_portal,
+ 			 req->rq_reqlen, req->rq_replen,
+ 			 req->rq_early_count, (s64)req->rq_timedout,
+diff --git a/fs/lustre/ptlrpc/ptlrpc_internal.h b/fs/lustre/ptlrpc/ptlrpc_internal.h
+index d902cfe..9eddb3b 100644
+--- a/fs/lustre/ptlrpc/ptlrpc_internal.h
++++ b/fs/lustre/ptlrpc/ptlrpc_internal.h
+@@ -278,7 +278,7 @@ struct ptlrpc_reply_state *
+ void sptlrpc_conf_choose_flavor(enum lustre_sec_part from,
+ 				enum lustre_sec_part to,
+ 				struct obd_uuid *target,
+-				lnet_nid_t nid,
++				struct lnet_nid *nid,
+ 				struct sptlrpc_flavor *sf);
+ int sptlrpc_conf_init(void);
+ void sptlrpc_conf_fini(void);
+diff --git a/fs/lustre/ptlrpc/sec.c b/fs/lustre/ptlrpc/sec.c
+index 7e6b681..f2d0340 100644
+--- a/fs/lustre/ptlrpc/sec.c
++++ b/fs/lustre/ptlrpc/sec.c
+@@ -1396,7 +1396,7 @@ int sptlrpc_import_sec_adapt(struct obd_import *imp,
+ 			sptlrpc_conf_choose_flavor(cliobd->cl_sp_me,
+ 						   cliobd->cl_sp_to,
+ 						   &cliobd->cl_target_uuid,
+-						   conn->c_self, &sf);
++						   &conn->c_self, &sf);
+ 
+ 		sp = imp->imp_obd->u.cli.cl_sp_me;
+ 	} else {
+@@ -1435,7 +1435,7 @@ int sptlrpc_import_sec_adapt(struct obd_import *imp,
+ 		CDEBUG(D_SEC, "import %s->%s netid %x: select flavor %s\n",
+ 		       imp->imp_obd->obd_name,
+ 		       obd_uuid2str(&conn->c_remote_uuid),
+-		       LNET_NIDNET(conn->c_self),
++		       LNET_NID_NET(&conn->c_self),
+ 		       sptlrpc_flavor2name(&sf, str, sizeof(str)));
+ 	}
+ 
+diff --git a/fs/lustre/ptlrpc/sec_config.c b/fs/lustre/ptlrpc/sec_config.c
+index d44af0f..e0ddebd 100644
+--- a/fs/lustre/ptlrpc/sec_config.c
++++ b/fs/lustre/ptlrpc/sec_config.c
+@@ -786,7 +786,7 @@ static inline void flavor_set_flags(struct sptlrpc_flavor *sf,
+ void sptlrpc_conf_choose_flavor(enum lustre_sec_part from,
+ 				enum lustre_sec_part to,
+ 				struct obd_uuid *target,
+-				lnet_nid_t nid,
++				struct lnet_nid *nid,
+ 				struct sptlrpc_flavor *sf)
+ {
+ 	struct sptlrpc_conf *conf;
+@@ -810,13 +810,14 @@ void sptlrpc_conf_choose_flavor(enum lustre_sec_part from,
+ 
+ 	conf_tgt = sptlrpc_conf_get_tgt(conf, name, 0);
+ 	if (conf_tgt) {
+-		rc = sptlrpc_rule_set_choose(&conf_tgt->sct_rset,
+-					     from, to, nid, sf);
++		rc = sptlrpc_rule_set_choose(&conf_tgt->sct_rset, from, to,
++					     lnet_nid_to_nid4(nid), sf);
+ 		if (rc)
+ 			goto out;
+ 	}
+ 
+-	rc = sptlrpc_rule_set_choose(&conf->sc_rset, from, to, nid, sf);
++	rc = sptlrpc_rule_set_choose(&conf->sc_rset, from, to,
++				     lnet_nid_to_nid4(nid), sf);
+ out:
+ 	mutex_unlock(&sptlrpc_conf_lock);
+ 
+diff --git a/fs/lustre/ptlrpc/service.c b/fs/lustre/ptlrpc/service.c
+index dbe2347..7db6f52 100644
+--- a/fs/lustre/ptlrpc/service.c
++++ b/fs/lustre/ptlrpc/service.c
+@@ -1937,7 +1937,7 @@ static int ptlrpc_handle_rs(struct ptlrpc_reply_state *rs)
+ 		CDEBUG(D_HA,
+ 		       "All locks stolen from rs %p x%lld.t%lld o%d NID %s\n",
+ 		       rs, rs->rs_xid, rs->rs_transno, rs->rs_opc,
+-		       libcfs_nid2str(exp->exp_connection->c_peer.nid));
++		       libcfs_nidstr(&exp->exp_connection->c_peer.nid));
+ 	}
+ 
+ 	if ((rs->rs_sent && !rs->rs_unlinked) || nlocks > 0) {
+diff --git a/include/linux/lnet/api.h b/include/linux/lnet/api.h
+index 040bf18..ee0a9a6 100644
+--- a/include/linux/lnet/api.h
++++ b/include/linux/lnet/api.h
+@@ -162,7 +162,7 @@ int LNetGet(lnet_nid_t self,
+ int LNetSetLazyPortal(int portal);
+ int LNetClearLazyPortal(int portal);
+ int LNetCtl(unsigned int cmd, void *arg);
+-void LNetDebugPeer(struct lnet_process_id id);
++void LNetDebugPeer(struct lnet_processid *id);
+ int LNetGetPeerDiscoveryStatus(void);
+ int LNetAddPeer(lnet_nid_t *nids, u32 num_nids);
+ 
 diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 297e5ef..fe2fd83 100644
+index 8b4a29b..9441265 100644
 --- a/include/linux/lnet/lib-lnet.h
 +++ b/include/linux/lnet/lib-lnet.h
-@@ -626,7 +626,6 @@ void lnet_rtr_transfer_to_peer(struct lnet_peer *src,
- void lnet_net_clr_pref_rtrs(struct lnet_net *net);
- int lnet_net_add_pref_rtr(struct lnet_net *net, struct lnet_nid *gw_nid);
- 
--int lnet_islocalnid4(lnet_nid_t nid);
- int lnet_islocalnid(struct lnet_nid *nid);
- int lnet_islocalnet(u32 net);
- int lnet_islocalnet_locked(u32 net);
-@@ -912,7 +911,8 @@ struct lnet_peer_ni *lnet_peer_ni_get_locked(struct lnet_peer *lp,
- struct lnet_peer *lnet_find_peer4(lnet_nid_t nid);
- struct lnet_peer *lnet_find_peer(struct lnet_nid *nid);
+@@ -852,7 +852,8 @@ struct lnet_peer_ni *lnet_peer_ni_get_locked(struct lnet_peer *lp,
+ 					     struct lnet_nid *nid);
+ struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
+ struct lnet_peer_ni *lnet_peer_ni_find_locked(struct lnet_nid *nid);
+-struct lnet_peer *lnet_find_peer(lnet_nid_t nid);
++struct lnet_peer *lnet_find_peer4(lnet_nid_t nid);
++struct lnet_peer *lnet_find_peer(struct lnet_nid *nid);
  void lnet_peer_net_added(struct lnet_net *net);
--void lnet_peer_primary_nid_locked(lnet_nid_t nid, struct lnet_nid *result);
-+void lnet_peer_primary_nid_locked(struct lnet_nid *nid,
-+				  struct lnet_nid *result);
+ void lnet_peer_primary_nid_locked(lnet_nid_t nid, struct lnet_nid *result);
  int lnet_discover_peer_locked(struct lnet_peer_ni *lpni, int cpt, bool block);
- void lnet_peer_queue_message(struct lnet_peer *lp, struct lnet_msg *msg);
- int lnet_peer_discovery_start(void);
+diff --git a/include/uapi/linux/lnet/lnet-types.h b/include/uapi/linux/lnet/lnet-types.h
+index ec0c4ef..4818271 100644
+--- a/include/uapi/linux/lnet/lnet-types.h
++++ b/include/uapi/linux/lnet/lnet-types.h
+@@ -518,17 +518,17 @@ enum lnet_event_kind {
+  */
+ struct lnet_event {
+ 	/** The identifier (nid, pid) of the target. */
+-	struct lnet_process_id	target;
++	struct lnet_processid	target;
+ 	/** The identifier (nid, pid) of the initiator. */
+-	struct lnet_process_id	initiator;
++	struct lnet_processid	initiator;
+ 	/** The source NID on the initiator. */
+-	struct lnet_process_id	source;
++	struct lnet_processid	source;
+ 	/**
+ 	 * The NID of the immediate sender. If the request has been forwarded
+ 	 * by routers, this is the NID of the last hop; otherwise it's the
+ 	 * same as the source.
+ 	 */
+-	lnet_nid_t		sender;
++	struct lnet_nid		sender;
+ 	/** Indicates the type of the event. */
+ 	enum lnet_event_kind	type;
+ 	/** The portal table index specified in the request */
 diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
-index d7ada85..0389a89 100644
+index 550f035..d61c03a 100644
 --- a/net/lnet/lnet/api-ni.c
 +++ b/net/lnet/lnet/api-ni.c
-@@ -1636,19 +1636,6 @@ struct lnet_ni *
- EXPORT_SYMBOL(lnet_nid_to_ni_addref);
+@@ -4310,7 +4310,7 @@ u32 lnet_get_dlc_seq_locked(void)
+ 			return rc;
  
- int
--lnet_islocalnid4(lnet_nid_t nid)
--{
--	struct lnet_ni *ni;
--	int cpt;
--
--	cpt = lnet_net_lock_current();
--	ni = lnet_nid2ni_locked(nid, cpt);
--	lnet_net_unlock(cpt);
--
--	return !!ni;
--}
--
--int
- lnet_islocalnid(struct lnet_nid *nid)
- {
- 	struct lnet_ni	*ni;
-diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index 496c895..051bea1 100644
---- a/net/lnet/lnet/lib-move.c
-+++ b/net/lnet/lnet/lib-move.c
-@@ -239,16 +239,14 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		mutex_lock(&the_lnet.ln_api_mutex);
+-		lp = lnet_find_peer(ping->ping_id.nid);
++		lp = lnet_find_peer4(ping->ping_id.nid);
+ 		if (lp) {
+ 			ping->ping_id.nid =
+ 				lnet_nid_to_nid4(&lp->lp_primary_nid);
+@@ -4334,7 +4334,7 @@ u32 lnet_get_dlc_seq_locked(void)
+ 			return rc;
+ 
+ 		mutex_lock(&the_lnet.ln_api_mutex);
+-		lp = lnet_find_peer(discover->ping_id.nid);
++		lp = lnet_find_peer4(discover->ping_id.nid);
+ 		if (lp) {
+ 			discover->ping_id.nid =
+ 				lnet_nid_to_nid4(&lp->lp_primary_nid);
+@@ -4464,9 +4464,9 @@ u32 lnet_get_dlc_seq_locked(void)
  }
+ EXPORT_SYMBOL(LNetCtl);
  
- static int
--fail_peer(lnet_nid_t nid4, int outgoing)
-+fail_peer(struct lnet_nid *nid, int outgoing)
+-void LNetDebugPeer(struct lnet_process_id id)
++void LNetDebugPeer(struct lnet_processid *id)
  {
- 	struct lnet_test_peer *tp;
- 	struct list_head *el;
- 	struct list_head *next;
--	struct lnet_nid nid;
- 	LIST_HEAD(cull);
- 	int fail = 0;
+-	lnet_debug_peer(id.nid);
++	lnet_debug_peer(lnet_nid_to_nid4(&id->nid));
+ }
+ EXPORT_SYMBOL(LNetDebugPeer);
  
--	lnet_nid4_to_nid(nid4, &nid);
- 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
- 	lnet_net_lock(0);
+diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
+index f432488..4102c7b 100644
+--- a/net/lnet/lnet/lib-msg.c
++++ b/net/lnet/lnet/lib-msg.c
+@@ -66,25 +66,25 @@
  
-@@ -269,7 +267,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 		}
- 
- 		if (LNET_NID_IS_ANY(&tp->tp_nid) ||	/* fail every peer */
--		    nid_same(&nid, &tp->tp_nid)) {	/* fail this peer */
-+		    nid_same(nid, &tp->tp_nid)) {	/* fail this peer */
- 			fail = 1;
- 
- 			if (tp->tp_threshold != LNET_MD_THRESH_INF) {
-@@ -4238,8 +4236,8 @@ void lnet_monitor_thr_stop(void)
- 	struct lnet_msg *msg;
- 	u32 payload_length;
- 	lnet_pid_t dest_pid;
--	lnet_nid_t dest_nid;
--	lnet_nid_t src_nid;
-+	struct lnet_nid dest_nid;
-+	struct lnet_nid src_nid;
- 	struct lnet_nid from_nid;
- 	bool push = false;
- 	int for_me;
-@@ -4252,19 +4250,18 @@ void lnet_monitor_thr_stop(void)
- 	lnet_nid4_to_nid(from_nid4, &from_nid);
- 
- 	type = hdr->type;
--	src_nid = lnet_nid_to_nid4(&hdr->src_nid);
--	dest_nid = lnet_nid_to_nid4(&hdr->dest_nid);
-+	src_nid = hdr->src_nid;
-+	dest_nid = hdr->dest_nid;
- 	dest_pid = hdr->dest_pid;
- 	payload_length = hdr->payload_length;
- 
--	/* FIXME handle large-addr nids */
--	for_me = (lnet_nid_to_nid4(&ni->ni_nid) == dest_nid);
--	cpt = lnet_cpt_of_nid(from_nid4, ni);
-+	for_me = nid_same(&ni->ni_nid, &dest_nid);
-+	cpt = lnet_nid2cpt(&from_nid, ni);
- 
- 	CDEBUG(D_NET, "TRACE: %s(%s) <- %s : %s\n",
--	       libcfs_nid2str(dest_nid),
-+	       libcfs_nidstr(&dest_nid),
- 	       libcfs_nidstr(&ni->ni_nid),
--	       libcfs_nid2str(src_nid),
-+	       libcfs_nidstr(&src_nid),
- 	       lnet_msgtyp2str(type));
- 
- 	switch (type) {
-@@ -4273,7 +4270,7 @@ void lnet_monitor_thr_stop(void)
- 		if (payload_length > 0) {
- 			CERROR("%s, src %s: bad %s payload %d (0 expected)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
-+			       libcfs_nidstr(&src_nid),
- 			       lnet_msgtyp2str(type), payload_length);
- 			return -EPROTO;
- 		}
-@@ -4285,7 +4282,7 @@ void lnet_monitor_thr_stop(void)
- 		   (u32)(for_me ? LNET_MAX_PAYLOAD : LNET_MTU)) {
- 			CERROR("%s, src %s: bad %s payload %d (%d max expected)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
-+			       libcfs_nidstr(&src_nid),
- 			       lnet_msgtyp2str(type),
- 			       payload_length,
- 			       for_me ? LNET_MAX_PAYLOAD : LNET_MTU);
-@@ -4296,7 +4293,7 @@ void lnet_monitor_thr_stop(void)
- 	default:
- 		CERROR("%s, src %s: Bad message type 0x%x\n",
- 		       libcfs_nid2str(from_nid4),
--		       libcfs_nid2str(src_nid), type);
-+		       libcfs_nidstr(&src_nid), type);
- 		return -EPROTO;
+ 	if (ev_type == LNET_EVENT_SEND) {
+ 		/* event for active message */
+-		ev->target.nid = le64_to_cpu(hdr->dest_nid);
++		lnet_nid4_to_nid(le64_to_cpu(hdr->dest_nid), &ev->target.nid);
+ 		ev->target.pid = le32_to_cpu(hdr->dest_pid);
+-		ev->initiator.nid = LNET_NID_ANY;
++		ev->initiator.nid = LNET_ANY_NID;
+ 		ev->initiator.pid = the_lnet.ln_pid;
+-		ev->source.nid = LNET_NID_ANY;
++		ev->source.nid = LNET_ANY_NID;
+ 		ev->source.pid = the_lnet.ln_pid;
+-		ev->sender = LNET_NID_ANY;
++		ev->sender = LNET_ANY_NID;
+ 	} else {
+ 		/* event for passive message */
+ 		ev->target.pid = hdr->dest_pid;
+-		ev->target.nid = hdr->dest_nid;
++		lnet_nid4_to_nid(hdr->dest_nid, &ev->target.nid);
+ 		ev->initiator.pid = hdr->src_pid;
+ 		/* Multi-Rail: resolve src_nid to "primary" peer NID */
+-		ev->initiator.nid = lnet_nid_to_nid4(&msg->msg_initiator);
++		ev->initiator.nid = msg->msg_initiator;
+ 		/* Multi-Rail: track source NID. */
+ 		ev->source.pid = hdr->src_pid;
+-		ev->source.nid = hdr->src_nid;
++		lnet_nid4_to_nid(hdr->src_nid, &ev->source.nid);
+ 		ev->rlength = hdr->payload_length;
+-		ev->sender = lnet_nid_to_nid4(&msg->msg_from);
++		ev->sender = msg->msg_from;
+ 		ev->mlength = msg->msg_wanted;
+ 		ev->offset = msg->msg_offset;
  	}
+@@ -379,7 +379,6 @@
  
-@@ -4319,40 +4316,39 @@ void lnet_monitor_thr_stop(void)
- 	 * or malicious so we chop them off at the knees :)
- 	 */
- 	if (!for_me) {
--		if (LNET_NIDNET(dest_nid) == LNET_NID_NET(&ni->ni_nid)) {
-+		if (LNET_NID_NET(&dest_nid) == LNET_NID_NET(&ni->ni_nid)) {
- 			/* should have gone direct */
- 			CERROR("%s, src %s: Bad dest nid %s (should have been sent direct)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
--			       libcfs_nid2str(dest_nid));
-+			       libcfs_nidstr(&src_nid),
-+			       libcfs_nidstr(&dest_nid));
- 			return -EPROTO;
- 		}
+ 	if (!status && msg->msg_ack) {
+ 		/* Only send an ACK if the PUT completed successfully */
+-		struct lnet_nid src;
  
--		if (lnet_islocalnid4(dest_nid)) {
--			/*
--			 * dest is another local NI; sender should have used
-+		if (lnet_islocalnid(&dest_nid)) {
-+			/* dest is another local NI; sender should have used
- 			 * this node's NID on its own network
- 			 */
- 			CERROR("%s, src %s: Bad dest nid %s (it's my nid but on a different network)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
--			       libcfs_nid2str(dest_nid));
-+			       libcfs_nidstr(&src_nid),
-+			       libcfs_nidstr(&dest_nid));
- 			return -EPROTO;
- 		}
+ 		lnet_msg_decommit(msg, cpt, 0);
  
- 		if (rdma_req && type == LNET_MSG_GET) {
- 			CERROR("%s, src %s: Bad optimized GET for %s (final destination must be me)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
--			       libcfs_nid2str(dest_nid));
-+			       libcfs_nidstr(&src_nid),
-+			       libcfs_nidstr(&dest_nid));
- 			return -EPROTO;
- 		}
+@@ -391,14 +390,15 @@
  
- 		if (!the_lnet.ln_routing) {
- 			CERROR("%s, src %s: Dropping message for %s (routing not enabled)\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid),
--			       libcfs_nid2str(dest_nid));
-+			       libcfs_nidstr(&src_nid),
-+			       libcfs_nidstr(&dest_nid));
- 			goto drop;
- 		}
- 	}
-@@ -4361,10 +4357,10 @@ void lnet_monitor_thr_stop(void)
- 	 * Message looks OK; we're not going to return an error, so we MUST
- 	 * call back lnd_recv() come what may...
- 	 */
--	if (!list_empty(&the_lnet.ln_test_peers) && /* normally we don't */
--	    fail_peer(src_nid, 0)) {		/* shall we now? */
-+	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
-+	    fail_peer(&src_nid, 0)) {			/* shall we now? */
- 		CERROR("%s, src %s: Dropping %s to simulate failure\n",
--		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
-+		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
- 		       lnet_msgtyp2str(type));
- 		goto drop;
- 	}
-@@ -4373,15 +4369,15 @@ void lnet_monitor_thr_stop(void)
- 	if (!list_empty(&the_lnet.ln_drop_rules) &&
- 	    lnet_drop_rule_match(hdr, lnet_nid_to_nid4(&ni->ni_nid), NULL)) {
- 		CDEBUG(D_NET, "%s, src %s, dst %s: Dropping %s to simulate silent message loss\n",
--		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
--		       libcfs_nid2str(dest_nid), lnet_msgtyp2str(type));
-+		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
-+		       libcfs_nidstr(&dest_nid), lnet_msgtyp2str(type));
- 		goto drop;
- 	}
+ 		ack_wmd = msg->msg_hdr.msg.put.ack_wmd;
  
- 	msg = kmem_cache_zalloc(lnet_msg_cachep, GFP_NOFS);
- 	if (!msg) {
- 		CERROR("%s, src %s: Dropping %s (out of memory)\n",
--		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
-+		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
- 		       lnet_msgtyp2str(type));
- 		goto drop;
- 	}
-@@ -4401,7 +4397,7 @@ void lnet_monitor_thr_stop(void)
- 	msg->msg_from = from_nid;
- 	if (!for_me) {
- 		msg->msg_target.pid = dest_pid;
--		lnet_nid4_to_nid(dest_nid, &msg->msg_target.nid);
-+		msg->msg_target.nid = dest_nid;
- 		msg->msg_routing = 1;
- 	}
+-		lnet_prep_send(msg, LNET_MSG_ACK, msg->msg_ev.source, 0, 0);
++		lnet_prep_send(msg, LNET_MSG_ACK,
++			       lnet_pid_to_pid4(&msg->msg_ev.source), 0, 0);
  
-@@ -4411,7 +4407,7 @@ void lnet_monitor_thr_stop(void)
- 		lnet_net_unlock(cpt);
- 		rc = PTR_ERR(lpni);
- 		CERROR("%s, src %s: Dropping %s (error %d looking up sender)\n",
--		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
-+		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
- 		       lnet_msgtyp2str(type), rc);
- 		kfree(msg);
- 		if (rc == -ESHUTDOWN)
-@@ -4426,8 +4422,8 @@ void lnet_monitor_thr_stop(void)
- 	 */
- 	if (((lnet_drop_asym_route && for_me) ||
- 	     !lpni->lpni_peer_net->lpn_peer->lp_alive) &&
--	    LNET_NIDNET(src_nid) != LNET_NIDNET(from_nid4)) {
--		u32 src_net_id = LNET_NIDNET(src_nid);
-+	    LNET_NID_NET(&src_nid) != LNET_NIDNET(from_nid4)) {
-+		u32 src_net_id = LNET_NID_NET(&src_nid);
- 		struct lnet_peer *gw = lpni->lpni_peer_net->lpn_peer;
- 		struct lnet_route *route;
- 		bool found = false;
-@@ -4462,7 +4458,7 @@ void lnet_monitor_thr_stop(void)
- 			 */
- 			CERROR("%s, src %s: Dropping asymmetrical route %s\n",
- 			       libcfs_nid2str(from_nid4),
--			       libcfs_nid2str(src_nid), lnet_msgtyp2str(type));
-+			       libcfs_nidstr(&src_nid), lnet_msgtyp2str(type));
- 			kfree(msg);
- 			goto drop;
- 		}
-@@ -4486,7 +4482,7 @@ void lnet_monitor_thr_stop(void)
- 	msg->msg_rxni = ni;
- 	lnet_ni_addref_locked(ni, cpt);
- 	/* Multi-Rail: Primary NID of source. */
--	lnet_peer_primary_nid_locked(src_nid, &msg->msg_initiator);
-+	lnet_peer_primary_nid_locked(&src_nid, &msg->msg_initiator);
+ 		msg->msg_hdr.msg.ack.dst_wmd = ack_wmd;
+ 		msg->msg_hdr.msg.ack.match_bits = msg->msg_ev.match_bits;
+ 		msg->msg_hdr.msg.ack.mlength = cpu_to_le32(msg->msg_ev.mlength);
  
- 	/* mark the status of this lpni as UP since we received a message
- 	 * from it. The ping response reports back the ns_status which is
-@@ -4718,7 +4714,7 @@ void lnet_monitor_thr_stop(void)
- 	target.pid = target4.pid;
+-		lnet_nid4_to_nid(msg->msg_ev.target.nid, &src);
+-		rc = lnet_send(&src, msg, &msg->msg_from);
++		rc = lnet_send(&msg->msg_ev.target.nid, msg,
++			       &msg->msg_from);
  
- 	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
--	    fail_peer(target4.nid, 1)) {		/* shall we now? */
-+	    fail_peer(&target.nid, 1)) {		/* shall we now? */
- 		CERROR("Dropping PUT to %s: simulated failure\n",
- 		       libcfs_id2str(target4));
- 		return -EIO;
-@@ -4964,7 +4960,7 @@ struct lnet_msg *
- 	target.pid = target4.pid;
- 
- 	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
--	    fail_peer(target4.nid, 1)) {		/* shall we now? */
-+	    fail_peer(&target.nid, 1)) {		/* shall we now? */
- 		CERROR("Dropping GET to %s: simulated failure\n",
- 		       libcfs_id2str(target4));
- 		return -EIO;
+ 		lnet_net_lock(cpt);
+ 		/*
 diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
-index 494b7ef..8e7f44c 100644
+index 505065f..d0b7bc8 100644
 --- a/net/lnet/lnet/peer.c
 +++ b/net/lnet/lnet/peer.c
-@@ -1345,13 +1345,12 @@ struct lnet_peer_ni *
+@@ -768,7 +768,7 @@ struct lnet_peer_ni *
  }
  
- void
--lnet_peer_primary_nid_locked(lnet_nid_t nid, struct lnet_nid *result)
-+lnet_peer_primary_nid_locked(struct lnet_nid *nid, struct lnet_nid *result)
+ struct lnet_peer *
+-lnet_find_peer(lnet_nid_t nid)
++lnet_find_peer4(lnet_nid_t nid)
  {
--	/* FIXME handle large-addr nid */
  	struct lnet_peer_ni *lpni;
+ 	struct lnet_peer *lp = NULL;
+@@ -786,6 +786,25 @@ struct lnet_peer *
+ 	return lp;
+ }
  
--	lnet_nid4_to_nid(nid, result);
--	lpni = lnet_find_peer_ni_locked(nid);
-+	*result = *nid;
++struct lnet_peer *
++lnet_find_peer(struct lnet_nid *nid)
++{
++	struct lnet_peer_ni *lpni;
++	struct lnet_peer *lp = NULL;
++	int cpt;
++
++	cpt = lnet_net_lock_current();
 +	lpni = lnet_peer_ni_find_locked(nid);
- 	if (lpni) {
- 		*result = lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
- 		lnet_peer_ni_decref_locked(lpni);
++	if (lpni) {
++		lp = lpni->lpni_peer_net->lpn_peer;
++		lnet_peer_addref_locked(lp);
++		lnet_peer_ni_decref_locked(lpni);
++	}
++	lnet_net_unlock(cpt);
++
++	return lp;
++}
++
+ struct lnet_peer_net *
+ lnet_get_next_peer_net_locked(struct lnet_peer *lp, u32 prev_lpn_id)
+ {
+@@ -2321,12 +2340,12 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 	pbuf = LNET_PING_INFO_TO_BUFFER(ev->md_start + ev->offset);
+ 
+ 	/* lnet_find_peer() adds a refcount */
+-	lp = lnet_find_peer(ev->source.nid);
++	lp = lnet_find_peer(&ev->source.nid);
+ 	if (!lp) {
+ 		CDEBUG(D_NET,
+ 		       "Push Put from unknown %s (source %s). Ignoring...\n",
+-		       libcfs_nid2str(ev->initiator.nid),
+-		       libcfs_nid2str(ev->source.nid));
++		       libcfs_nidstr(&ev->initiator.nid),
++		       libcfs_nidstr(&ev->source.nid));
+ 		pbuf->pb_needs_post = true;
+ 		return;
+ 	}
+@@ -2345,7 +2364,7 @@ void lnet_peer_push_event(struct lnet_event *ev)
+ 		CDEBUG(D_NET, "Push Put error %d from %s (source %s)\n",
+ 		       ev->status,
+ 		       libcfs_nidstr(&lp->lp_primary_nid),
+-		       libcfs_nid2str(ev->source.nid));
++		       libcfs_nidstr(&ev->source.nid));
+ 		goto out;
+ 	}
+ 
+@@ -2643,8 +2662,8 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 
+ 	spin_lock(&lp->lp_lock);
+ 
+-	lnet_nid4_to_nid(ev->target.nid, &lp->lp_disc_src_nid);
+-	lnet_nid4_to_nid(ev->source.nid, &lp->lp_disc_dst_nid);
++	lp->lp_disc_src_nid = ev->target.nid;
++	lp->lp_disc_dst_nid = ev->source.nid;
+ 
+ 	/*
+ 	 * If some kind of error happened the contents of message
+@@ -2656,7 +2675,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ 		CDEBUG(D_NET, "Ping Reply error %d from %s (source %s)\n",
+ 		       ev->status,
+ 		       libcfs_nidstr(&lp->lp_primary_nid),
+-		       libcfs_nid2str(ev->source.nid));
++		       libcfs_nidstr(&ev->source.nid));
+ 		goto out;
+ 	}
+ 
+@@ -2843,7 +2862,7 @@ static void lnet_peer_clear_discovery_error(struct lnet_peer *lp)
+ out:
+ 	CDEBUG(D_NET, "%s Send to %s: %d\n",
+ 	       (ev->msg_type == LNET_MSG_GET ? "Ping" : "Push"),
+-	       libcfs_nid2str(ev->target.nid), rc);
++	       libcfs_nidstr(&ev->target.nid), rc);
+ 	return rc;
+ }
+ 
+@@ -4031,7 +4050,7 @@ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk)
+ 	u32 size;
+ 	int rc;
+ 
+-	lp = lnet_find_peer(cfg->prcfg_prim_nid);
++	lp = lnet_find_peer4(cfg->prcfg_prim_nid);
+ 
+ 	if (!lp) {
+ 		rc = -ENOENT;
+diff --git a/net/lnet/selftest/rpc.c b/net/lnet/selftest/rpc.c
+index bd95e88..d1538be 100644
+--- a/net/lnet/selftest/rpc.c
++++ b/net/lnet/selftest/rpc.c
+@@ -1492,8 +1492,8 @@ struct srpc_client_rpc *
+ 			sv->sv_shuttingdown);
+ 
+ 		buffer = container_of(ev->md_start, struct srpc_buffer, buf_msg);
+-		buffer->buf_peer = ev->source;
+-		buffer->buf_self = ev->target.nid;
++		buffer->buf_peer = lnet_pid_to_pid4(&ev->source);
++		buffer->buf_self = lnet_nid_to_nid4(&ev->target.nid);
+ 
+ 		LASSERT(scd->scd_buf_nposted > 0);
+ 		scd->scd_buf_nposted--;
+@@ -1532,7 +1532,7 @@ struct srpc_client_rpc *
+ 		    (msg->msg_magic != SRPC_MSG_MAGIC &&
+ 		     msg->msg_magic != __swab32(SRPC_MSG_MAGIC))) {
+ 			CERROR("Dropping RPC (%s) from %s: status %d mlength %d type %u magic %u.\n",
+-			       sv->sv_name, libcfs_id2str(ev->initiator),
++			       sv->sv_name, libcfs_idstr(&ev->initiator),
+ 			       ev->status, ev->mlength,
+ 			       msg->msg_type, msg->msg_magic);
+ 
 -- 
 1.8.3.1
 
