@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 93B27C433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:32:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id ACC91C433EF
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:32:55 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 1FD7C21FBAB;
-	Sun, 20 Mar 2022 06:32:04 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id C04B121FBD9;
+	Sun, 20 Mar 2022 06:32:06 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id ADC7D21F9D5
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:22 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 5455221EBCD
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:16 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 9F6391030;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 407EEEF0;
  Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 9DAE4AB; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
+ id 3D54CAB; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 20 Mar 2022 09:31:03 -0400
-Message-Id: <1647783064-20688-50-git-send-email-jsimmons@infradead.org>
+Date: Sun, 20 Mar 2022 09:30:39 -0400
+Message-Id: <1647783064-20688-26-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
 References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 49/50] lustre: sec: fix DIO for encrypted
- files
+Subject: [lustre-devel] [PATCH 25/50] lnet: convert nids in lnet_parse to
+ lnet_nid
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -46,340 +46,339 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Mr NeilBrown <neilb@suse.de>
 
-With Direct IO, we do not have proper page cache pages. So we need to
-retrieve by ourselves the page mapping and the page index of the page
-to be encrypted/decrypted.
+src_nid and dest_nid in lnet_parse() are changed to
+struct lnet_nid, and this change propagates out to
+affect a few support function.
 
-For the index, we need to use the offset of the page within the file,
-and not the object.
-So we rename cl_page's cp_osc_index to cp_page_index for that purpose.
-cp_osc_index is redundant with osc_async_page's oap_obj_off and only
-used by osc_index(), so we also adapt this function.
-cp_page_index is initialized in cl_page_alloc(), and accessed in
-the OSC layer where the llcrypt primitives are called.
-
-For the mapping, problem is page->mapping is not set to NULL on page
-allocation, so it cannot safely be used to see if a page is a direct
-I/O page.
-Use cl_page for direct I/O and page->mapping for buffered
-I/O.  (clpage->cp_inode is only set for direct I/O and
-cannot easily be always set.)
-Without this, we sometimes get panics when page2inode is
-used in the OSC layer.  (Note the remaining use in dom is
-safe because ll_dom_readpage is a page cache helper and
-will never see DIO pages.)
-
-Fixes: 2de53869ee ("lustre: sec: get rid of bad rss-counter state messages")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15608
-Lustre-commit: 966ca46e4aa2eb39c ("LU-15608 sec: fix DIO for encrypted files")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/46664
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
+Lustre-commit: ac439ce87b0acbff3 ("LU-10391 lnet: convert nids in lnet_parse to lnet_nid")
+Signed-off-by: Mr NeilBrown <neilb@suse.de>
+Reviewed-on: https://review.whamcloud.com/43613
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/cl_object.h  |  3 +-
- fs/lustre/include/lustre_osc.h |  2 +-
- fs/lustre/include/obd.h        |  3 ++
- fs/lustre/llite/file.c         |  3 ++
- fs/lustre/obdclass/cl_page.c   |  9 +++-
- fs/lustre/osc/osc_page.c       |  1 -
- fs/lustre/osc/osc_request.c    | 97 +++++++++++++++++++-----------------------
- 7 files changed, 60 insertions(+), 58 deletions(-)
+ include/linux/lnet/lib-lnet.h |  4 +--
+ net/lnet/lnet/api-ni.c        | 13 -------
+ net/lnet/lnet/lib-move.c      | 80 ++++++++++++++++++++-----------------------
+ net/lnet/lnet/peer.c          |  7 ++--
+ 4 files changed, 43 insertions(+), 61 deletions(-)
 
-diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
-index af708cc..ab7f0f2 100644
---- a/fs/lustre/include/cl_object.h
-+++ b/fs/lustre/include/cl_object.h
-@@ -735,7 +735,8 @@ struct cl_page {
- 	refcount_t			 cp_ref;
- 	/** layout_entry + stripe index, composed using lov_comp_index() */
- 	unsigned int			 cp_lov_index;
--	pgoff_t				 cp_osc_index;
-+	/** page->index of the page within the whole file */
-+	pgoff_t				 cp_page_index;
- 	/** An object this page is a part of. Immutable after creation. */
- 	struct cl_object		*cp_obj;
- 	/** vmpage */
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index 4c5eb1f..7551390 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -855,7 +855,7 @@ static inline struct osc_page *oap2osc(struct osc_async_page *oap)
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index 297e5ef..fe2fd83 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -626,7 +626,6 @@ void lnet_rtr_transfer_to_peer(struct lnet_peer *src,
+ void lnet_net_clr_pref_rtrs(struct lnet_net *net);
+ int lnet_net_add_pref_rtr(struct lnet_net *net, struct lnet_nid *gw_nid);
  
- static inline pgoff_t osc_index(struct osc_page *opg)
+-int lnet_islocalnid4(lnet_nid_t nid);
+ int lnet_islocalnid(struct lnet_nid *nid);
+ int lnet_islocalnet(u32 net);
+ int lnet_islocalnet_locked(u32 net);
+@@ -912,7 +911,8 @@ struct lnet_peer_ni *lnet_peer_ni_get_locked(struct lnet_peer *lp,
+ struct lnet_peer *lnet_find_peer4(lnet_nid_t nid);
+ struct lnet_peer *lnet_find_peer(struct lnet_nid *nid);
+ void lnet_peer_net_added(struct lnet_net *net);
+-void lnet_peer_primary_nid_locked(lnet_nid_t nid, struct lnet_nid *result);
++void lnet_peer_primary_nid_locked(struct lnet_nid *nid,
++				  struct lnet_nid *result);
+ int lnet_discover_peer_locked(struct lnet_peer_ni *lpni, int cpt, bool block);
+ void lnet_peer_queue_message(struct lnet_peer *lp, struct lnet_msg *msg);
+ int lnet_peer_discovery_start(void);
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index d7ada85..0389a89 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -1636,19 +1636,6 @@ struct lnet_ni *
+ EXPORT_SYMBOL(lnet_nid_to_ni_addref);
+ 
+ int
+-lnet_islocalnid4(lnet_nid_t nid)
+-{
+-	struct lnet_ni *ni;
+-	int cpt;
+-
+-	cpt = lnet_net_lock_current();
+-	ni = lnet_nid2ni_locked(nid, cpt);
+-	lnet_net_unlock(cpt);
+-
+-	return !!ni;
+-}
+-
+-int
+ lnet_islocalnid(struct lnet_nid *nid)
  {
--	return opg->ops_cl.cpl_page->cp_osc_index;
-+	return opg->ops_oap.oap_obj_off >> PAGE_SHIFT;
+ 	struct lnet_ni	*ni;
+diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
+index 496c895..051bea1 100644
+--- a/net/lnet/lnet/lib-move.c
++++ b/net/lnet/lnet/lib-move.c
+@@ -239,16 +239,14 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
  }
  
- static inline struct cl_page *oap2cl_page(struct osc_async_page *oap)
-diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
-index ecee321..c5e2a24 100644
---- a/fs/lustre/include/obd.h
-+++ b/fs/lustre/include/obd.h
-@@ -1213,6 +1213,9 @@ static inline void client_adjust_max_dirty(struct client_obd *cli)
- 					   1 << (20 - PAGE_SHIFT));
+ static int
+-fail_peer(lnet_nid_t nid4, int outgoing)
++fail_peer(struct lnet_nid *nid, int outgoing)
+ {
+ 	struct lnet_test_peer *tp;
+ 	struct list_head *el;
+ 	struct list_head *next;
+-	struct lnet_nid nid;
+ 	LIST_HEAD(cull);
+ 	int fail = 0;
+ 
+-	lnet_nid4_to_nid(nid4, &nid);
+ 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
+ 	lnet_net_lock(0);
+ 
+@@ -269,7 +267,7 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
+ 		}
+ 
+ 		if (LNET_NID_IS_ANY(&tp->tp_nid) ||	/* fail every peer */
+-		    nid_same(&nid, &tp->tp_nid)) {	/* fail this peer */
++		    nid_same(nid, &tp->tp_nid)) {	/* fail this peer */
+ 			fail = 1;
+ 
+ 			if (tp->tp_threshold != LNET_MD_THRESH_INF) {
+@@ -4238,8 +4236,8 @@ void lnet_monitor_thr_stop(void)
+ 	struct lnet_msg *msg;
+ 	u32 payload_length;
+ 	lnet_pid_t dest_pid;
+-	lnet_nid_t dest_nid;
+-	lnet_nid_t src_nid;
++	struct lnet_nid dest_nid;
++	struct lnet_nid src_nid;
+ 	struct lnet_nid from_nid;
+ 	bool push = false;
+ 	int for_me;
+@@ -4252,19 +4250,18 @@ void lnet_monitor_thr_stop(void)
+ 	lnet_nid4_to_nid(from_nid4, &from_nid);
+ 
+ 	type = hdr->type;
+-	src_nid = lnet_nid_to_nid4(&hdr->src_nid);
+-	dest_nid = lnet_nid_to_nid4(&hdr->dest_nid);
++	src_nid = hdr->src_nid;
++	dest_nid = hdr->dest_nid;
+ 	dest_pid = hdr->dest_pid;
+ 	payload_length = hdr->payload_length;
+ 
+-	/* FIXME handle large-addr nids */
+-	for_me = (lnet_nid_to_nid4(&ni->ni_nid) == dest_nid);
+-	cpt = lnet_cpt_of_nid(from_nid4, ni);
++	for_me = nid_same(&ni->ni_nid, &dest_nid);
++	cpt = lnet_nid2cpt(&from_nid, ni);
+ 
+ 	CDEBUG(D_NET, "TRACE: %s(%s) <- %s : %s\n",
+-	       libcfs_nid2str(dest_nid),
++	       libcfs_nidstr(&dest_nid),
+ 	       libcfs_nidstr(&ni->ni_nid),
+-	       libcfs_nid2str(src_nid),
++	       libcfs_nidstr(&src_nid),
+ 	       lnet_msgtyp2str(type));
+ 
+ 	switch (type) {
+@@ -4273,7 +4270,7 @@ void lnet_monitor_thr_stop(void)
+ 		if (payload_length > 0) {
+ 			CERROR("%s, src %s: bad %s payload %d (0 expected)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
++			       libcfs_nidstr(&src_nid),
+ 			       lnet_msgtyp2str(type), payload_length);
+ 			return -EPROTO;
+ 		}
+@@ -4285,7 +4282,7 @@ void lnet_monitor_thr_stop(void)
+ 		   (u32)(for_me ? LNET_MAX_PAYLOAD : LNET_MTU)) {
+ 			CERROR("%s, src %s: bad %s payload %d (%d max expected)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
++			       libcfs_nidstr(&src_nid),
+ 			       lnet_msgtyp2str(type),
+ 			       payload_length,
+ 			       for_me ? LNET_MAX_PAYLOAD : LNET_MTU);
+@@ -4296,7 +4293,7 @@ void lnet_monitor_thr_stop(void)
+ 	default:
+ 		CERROR("%s, src %s: Bad message type 0x%x\n",
+ 		       libcfs_nid2str(from_nid4),
+-		       libcfs_nid2str(src_nid), type);
++		       libcfs_nidstr(&src_nid), type);
+ 		return -EPROTO;
+ 	}
+ 
+@@ -4319,40 +4316,39 @@ void lnet_monitor_thr_stop(void)
+ 	 * or malicious so we chop them off at the knees :)
+ 	 */
+ 	if (!for_me) {
+-		if (LNET_NIDNET(dest_nid) == LNET_NID_NET(&ni->ni_nid)) {
++		if (LNET_NID_NET(&dest_nid) == LNET_NID_NET(&ni->ni_nid)) {
+ 			/* should have gone direct */
+ 			CERROR("%s, src %s: Bad dest nid %s (should have been sent direct)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
+-			       libcfs_nid2str(dest_nid));
++			       libcfs_nidstr(&src_nid),
++			       libcfs_nidstr(&dest_nid));
+ 			return -EPROTO;
+ 		}
+ 
+-		if (lnet_islocalnid4(dest_nid)) {
+-			/*
+-			 * dest is another local NI; sender should have used
++		if (lnet_islocalnid(&dest_nid)) {
++			/* dest is another local NI; sender should have used
+ 			 * this node's NID on its own network
+ 			 */
+ 			CERROR("%s, src %s: Bad dest nid %s (it's my nid but on a different network)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
+-			       libcfs_nid2str(dest_nid));
++			       libcfs_nidstr(&src_nid),
++			       libcfs_nidstr(&dest_nid));
+ 			return -EPROTO;
+ 		}
+ 
+ 		if (rdma_req && type == LNET_MSG_GET) {
+ 			CERROR("%s, src %s: Bad optimized GET for %s (final destination must be me)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
+-			       libcfs_nid2str(dest_nid));
++			       libcfs_nidstr(&src_nid),
++			       libcfs_nidstr(&dest_nid));
+ 			return -EPROTO;
+ 		}
+ 
+ 		if (!the_lnet.ln_routing) {
+ 			CERROR("%s, src %s: Dropping message for %s (routing not enabled)\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid),
+-			       libcfs_nid2str(dest_nid));
++			       libcfs_nidstr(&src_nid),
++			       libcfs_nidstr(&dest_nid));
+ 			goto drop;
+ 		}
+ 	}
+@@ -4361,10 +4357,10 @@ void lnet_monitor_thr_stop(void)
+ 	 * Message looks OK; we're not going to return an error, so we MUST
+ 	 * call back lnd_recv() come what may...
+ 	 */
+-	if (!list_empty(&the_lnet.ln_test_peers) && /* normally we don't */
+-	    fail_peer(src_nid, 0)) {		/* shall we now? */
++	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
++	    fail_peer(&src_nid, 0)) {			/* shall we now? */
+ 		CERROR("%s, src %s: Dropping %s to simulate failure\n",
+-		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
++		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
+ 		       lnet_msgtyp2str(type));
+ 		goto drop;
+ 	}
+@@ -4373,15 +4369,15 @@ void lnet_monitor_thr_stop(void)
+ 	if (!list_empty(&the_lnet.ln_drop_rules) &&
+ 	    lnet_drop_rule_match(hdr, lnet_nid_to_nid4(&ni->ni_nid), NULL)) {
+ 		CDEBUG(D_NET, "%s, src %s, dst %s: Dropping %s to simulate silent message loss\n",
+-		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
+-		       libcfs_nid2str(dest_nid), lnet_msgtyp2str(type));
++		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
++		       libcfs_nidstr(&dest_nid), lnet_msgtyp2str(type));
+ 		goto drop;
+ 	}
+ 
+ 	msg = kmem_cache_zalloc(lnet_msg_cachep, GFP_NOFS);
+ 	if (!msg) {
+ 		CERROR("%s, src %s: Dropping %s (out of memory)\n",
+-		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
++		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
+ 		       lnet_msgtyp2str(type));
+ 		goto drop;
+ 	}
+@@ -4401,7 +4397,7 @@ void lnet_monitor_thr_stop(void)
+ 	msg->msg_from = from_nid;
+ 	if (!for_me) {
+ 		msg->msg_target.pid = dest_pid;
+-		lnet_nid4_to_nid(dest_nid, &msg->msg_target.nid);
++		msg->msg_target.nid = dest_nid;
+ 		msg->msg_routing = 1;
+ 	}
+ 
+@@ -4411,7 +4407,7 @@ void lnet_monitor_thr_stop(void)
+ 		lnet_net_unlock(cpt);
+ 		rc = PTR_ERR(lpni);
+ 		CERROR("%s, src %s: Dropping %s (error %d looking up sender)\n",
+-		       libcfs_nid2str(from_nid4), libcfs_nid2str(src_nid),
++		       libcfs_nid2str(from_nid4), libcfs_nidstr(&src_nid),
+ 		       lnet_msgtyp2str(type), rc);
+ 		kfree(msg);
+ 		if (rc == -ESHUTDOWN)
+@@ -4426,8 +4422,8 @@ void lnet_monitor_thr_stop(void)
+ 	 */
+ 	if (((lnet_drop_asym_route && for_me) ||
+ 	     !lpni->lpni_peer_net->lpn_peer->lp_alive) &&
+-	    LNET_NIDNET(src_nid) != LNET_NIDNET(from_nid4)) {
+-		u32 src_net_id = LNET_NIDNET(src_nid);
++	    LNET_NID_NET(&src_nid) != LNET_NIDNET(from_nid4)) {
++		u32 src_net_id = LNET_NID_NET(&src_nid);
+ 		struct lnet_peer *gw = lpni->lpni_peer_net->lpn_peer;
+ 		struct lnet_route *route;
+ 		bool found = false;
+@@ -4462,7 +4458,7 @@ void lnet_monitor_thr_stop(void)
+ 			 */
+ 			CERROR("%s, src %s: Dropping asymmetrical route %s\n",
+ 			       libcfs_nid2str(from_nid4),
+-			       libcfs_nid2str(src_nid), lnet_msgtyp2str(type));
++			       libcfs_nidstr(&src_nid), lnet_msgtyp2str(type));
+ 			kfree(msg);
+ 			goto drop;
+ 		}
+@@ -4486,7 +4482,7 @@ void lnet_monitor_thr_stop(void)
+ 	msg->msg_rxni = ni;
+ 	lnet_ni_addref_locked(ni, cpt);
+ 	/* Multi-Rail: Primary NID of source. */
+-	lnet_peer_primary_nid_locked(src_nid, &msg->msg_initiator);
++	lnet_peer_primary_nid_locked(&src_nid, &msg->msg_initiator);
+ 
+ 	/* mark the status of this lpni as UP since we received a message
+ 	 * from it. The ping response reports back the ns_status which is
+@@ -4718,7 +4714,7 @@ void lnet_monitor_thr_stop(void)
+ 	target.pid = target4.pid;
+ 
+ 	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
+-	    fail_peer(target4.nid, 1)) {		/* shall we now? */
++	    fail_peer(&target.nid, 1)) {		/* shall we now? */
+ 		CERROR("Dropping PUT to %s: simulated failure\n",
+ 		       libcfs_id2str(target4));
+ 		return -EIO;
+@@ -4964,7 +4960,7 @@ struct lnet_msg *
+ 	target.pid = target4.pid;
+ 
+ 	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
+-	    fail_peer(target4.nid, 1)) {		/* shall we now? */
++	    fail_peer(&target.nid, 1)) {		/* shall we now? */
+ 		CERROR("Dropping GET to %s: simulated failure\n",
+ 		       libcfs_id2str(target4));
+ 		return -EIO;
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 494b7ef..8e7f44c 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -1345,13 +1345,12 @@ struct lnet_peer_ni *
  }
  
-+/* Must be used for page cache pages only,
-+ * not safe otherwise (e.g. direct IO pages)
-+ */
- static inline struct inode *page2inode(struct page *page)
+ void
+-lnet_peer_primary_nid_locked(lnet_nid_t nid, struct lnet_nid *result)
++lnet_peer_primary_nid_locked(struct lnet_nid *nid, struct lnet_nid *result)
  {
- 	if (page->mapping) {
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 373efdd..4855156 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -440,6 +440,9 @@ int ll_file_release(struct inode *inode, struct file *file)
+-	/* FIXME handle large-addr nid */
+ 	struct lnet_peer_ni *lpni;
  
- static inline int ll_dom_readpage(void *data, struct page *page)
- {
-+	/* since ll_dom_readpage is a page cache helper, it is safe to assume
-+	 * mapping and host pointers are set here
-+	 */
- 	struct inode *inode = page2inode(page);
- 	struct niobuf_local *lnb = data;
- 	void *kaddr;
-diff --git a/fs/lustre/obdclass/cl_page.c b/fs/lustre/obdclass/cl_page.c
-index 4bfa1c5..9326743 100644
---- a/fs/lustre/obdclass/cl_page.c
-+++ b/fs/lustre/obdclass/cl_page.c
-@@ -235,9 +235,16 @@ struct cl_page *cl_page_alloc(const struct lu_env *env, struct cl_object *o,
- 		cl_page->cp_vmpage = vmpage;
- 		cl_page->cp_state = CPS_CACHED;
- 		cl_page->cp_type = type;
--		cl_page->cp_inode = NULL;
-+		if (type == CPT_TRANSIENT)
-+			/* ref to correct inode will be added
-+			 * in ll_direct_rw_pages
-+			 */
-+			cl_page->cp_inode = NULL;
-+		else
-+			cl_page->cp_inode = page2inode(vmpage);
- 		INIT_LIST_HEAD(&cl_page->cp_batch);
- 		lu_ref_init(&cl_page->cp_reference);
-+		cl_page->cp_page_index = ind;
- 		cl_object_for_each(o2, o) {
- 			if (o2->co_ops->coo_page_init) {
- 				result = o2->co_ops->coo_page_init(env, o2,
-diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
-index cba5d02..f46b4e7 100644
---- a/fs/lustre/osc/osc_page.c
-+++ b/fs/lustre/osc/osc_page.c
-@@ -266,7 +266,6 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
- 
- 	opg->ops_srvlock = osc_io_srvlock(oio);
- 	cl_page_slice_add(cl_page, &opg->ops_cl, obj, &osc_page_ops);
--	cl_page->cp_osc_index = index;
- 
- 	/* reserve an LRU space for this cl_page */
- 	if (cl_page->cp_type == CPT_CACHEABLE) {
-diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
-index 43cd6c5..124d3c57 100644
---- a/fs/lustre/osc/osc_request.c
-+++ b/fs/lustre/osc/osc_request.c
-@@ -1417,21 +1417,13 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 	struct inode *inode = NULL;
- 	bool directio = false;
- 	bool enable_checksum = true;
-+	struct cl_page *clpage;
- 
- 	if (pga[0]->pg) {
--		inode = page2inode(pga[0]->pg);
--		if (!inode) {
--			/* Try to get reference to inode from cl_page if we are
--			 * dealing with direct IO, as handled pages are not
--			 * actual page cache pages.
--			 */
--			struct osc_async_page *oap = brw_page2oap(pga[0]);
--			struct cl_page *clpage = oap2cl_page(oap);
--
--			inode = clpage->cp_inode;
--			if (inode)
--				directio = true;
--		}
-+		clpage = oap2cl_page(brw_page2oap(pga[0]));
-+		inode = clpage->cp_inode;
-+		if (clpage->cp_type == CPT_TRANSIENT)
-+			directio = true;
- 	}
- 	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ))
- 		return -ENOMEM; /* Recoverable */
-@@ -1453,11 +1445,11 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 	if (opc == OST_WRITE && inode && IS_ENCRYPTED(inode) &&
- 	    fscrypt_has_encryption_key(inode)) {
- 		for (i = 0; i < page_count; i++) {
--			struct brw_page *pg = pga[i];
-+			struct brw_page *brwpg = pga[i];
- 			struct page *data_page = NULL;
- 			bool retried = false;
- 			bool lockedbymyself;
--			u32 nunits = (pg->off & ~PAGE_MASK) + pg->count;
-+			u32 nunits = (brwpg->off & ~PAGE_MASK) + brwpg->count;
- 			struct address_space *map_orig = NULL;
- 			pgoff_t index_orig;
- 
-@@ -1472,23 +1464,24 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 			 * end in vvp_page_completion_write/cl_page_completion,
- 			 * which means only once the page is fully processed.
- 			 */
--			lockedbymyself = trylock_page(pg->pg);
-+			lockedbymyself = trylock_page(brwpg->pg);
- 			if (directio) {
--				map_orig = pg->pg->mapping;
--				pg->pg->mapping = inode->i_mapping;
--				index_orig = pg->pg->index;
--				pg->pg->index = pg->off >> PAGE_SHIFT;
-+				map_orig = brwpg->pg->mapping;
-+				brwpg->pg->mapping = inode->i_mapping;
-+				index_orig = brwpg->pg->index;
-+				clpage = oap2cl_page(brw_page2oap(brwpg));
-+				brwpg->pg->index = clpage->cp_page_index;
- 			}
- 			data_page =
--				fscrypt_encrypt_pagecache_blocks(pg->pg,
-+				fscrypt_encrypt_pagecache_blocks(brwpg->pg,
- 								 nunits, 0,
- 								 GFP_NOFS);
- 			if (directio) {
--				pg->pg->mapping = map_orig;
--				pg->pg->index = index_orig;
-+				brwpg->pg->mapping = map_orig;
-+				brwpg->pg->index = index_orig;
- 			}
- 			if (lockedbymyself)
--				unlock_page(pg->pg);
-+				unlock_page(brwpg->pg);
- 			if (IS_ERR(data_page)) {
- 				rc = PTR_ERR(data_page);
- 				if (rc == -ENOMEM && !retried) {
-@@ -1503,10 +1496,11 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 			 * disambiguation in osc_release_bounce_pages().
- 			 */
- 			SetPageChecked(data_page);
--			pg->pg = data_page;
-+			brwpg->pg = data_page;
- 			/* there should be no gap in the middle of page array */
- 			if (i == page_count - 1) {
--				struct osc_async_page *oap = brw_page2oap(pg);
-+				struct osc_async_page *oap =
-+					brw_page2oap(brwpg);
- 
- 				oa->o_size = oap->oap_count +
- 					     oap->oap_obj_off +
-@@ -1515,10 +1509,10 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 			/* len is forced to nunits, and relative offset to 0
- 			 * so store the old, clear text info
- 			 */
--			pg->bp_count_diff = nunits - pg->count;
--			pg->count = nunits;
--			pg->bp_off_diff = pg->off & ~PAGE_MASK;
--			pg->off = pg->off & PAGE_MASK;
-+			brwpg->bp_count_diff = nunits - brwpg->count;
-+			brwpg->count = nunits;
-+			brwpg->bp_off_diff = brwpg->off & ~PAGE_MASK;
-+			brwpg->off = brwpg->off & PAGE_MASK;
- 		}
- 	} else if (opc == OST_WRITE && inode && IS_ENCRYPTED(inode)) {
- 		struct osc_async_page *oap = brw_page2oap(pga[0]);
-@@ -1991,8 +1985,9 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 	const char *obd_name = cli->cl_import->imp_obd->obd_name;
- 	struct ost_body *body;
- 	u32 client_cksum = 0;
--	struct inode *inode;
-+	struct inode *inode = NULL;
- 	unsigned int blockbits = 0, blocksize = 0;
-+	struct cl_page *clpage;
- 
- 	if (rc < 0 && rc != -EDQUOT) {
- 		DEBUG_REQ(D_INFO, req, "Failed request: rc = %d", rc);
-@@ -2186,19 +2181,12 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 		rc = 0;
- 	}
- 
--	inode = page2inode(aa->aa_ppga[0]->pg);
--	if (!inode) {
--		/* Try to get reference to inode from cl_page if we are
--		 * dealing with direct IO, as handled pages are not
--		 * actual page cache pages.
--		 */
--		struct osc_async_page *oap = brw_page2oap(aa->aa_ppga[0]);
--
--		inode = oap2cl_page(oap)->cp_inode;
--		if (inode) {
--			blockbits = inode->i_blkbits;
--			blocksize = 1 << blockbits;
--		}
-+	/* get the inode from the first cl_page */
-+	clpage = oap2cl_page(brw_page2oap(aa->aa_ppga[0]));
-+	inode = clpage->cp_inode;
-+	if (clpage->cp_type == CPT_TRANSIENT && inode) {
-+		blockbits = inode->i_blkbits;
-+		blocksize = 1 << blockbits;
- 	}
- 	if (inode && IS_ENCRYPTED(inode)) {
- 		int idx;
-@@ -2208,19 +2196,19 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 			goto out;
- 		}
- 		for (idx = 0; idx < aa->aa_page_count; idx++) {
--			struct brw_page *pg = aa->aa_ppga[idx];
-+			struct brw_page *brwpg = aa->aa_ppga[idx];
- 			unsigned int offs = 0;
- 
- 			while (offs < PAGE_SIZE) {
- 				/* do not decrypt if page is all 0s */
--				if (memchr_inv(page_address(pg->pg) + offs, 0,
--					       LUSTRE_ENCRYPTION_UNIT_SIZE) == NULL) {
-+				if (!memchr_inv(page_address(brwpg->pg) + offs, 0,
-+					        LUSTRE_ENCRYPTION_UNIT_SIZE)) {
- 					/* if page is empty forward info to
- 					 * upper layers (ll_io_zero_page) by
- 					 * clearing PagePrivate2
- 					 */
- 					if (!offs)
--						ClearPagePrivate2(pg->pg);
-+						ClearPagePrivate2(brwpg->pg);
- 					break;
- 				}
- 
-@@ -2230,24 +2218,25 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
- 					 * input parameter. Page does not need
- 					 * to be locked.
- 					 */
--					u64 lblk_num =
--						((u64)(pg->off >> PAGE_SHIFT) <<
--						      (PAGE_SHIFT - blockbits)) +
--						      (offs >> blockbits);
-+					u64 lblk_num;
- 					unsigned int i;
- 
-+					clpage = oap2cl_page(brw_page2oap(brwpg));
-+					lblk_num = ((u64)(brwpg->off >> PAGE_SHIFT) <<
-+							 (PAGE_SHIFT - blockbits)) +
-+							 (offs >> blockbits);
- 					for (i = offs;
- 					     i < offs + LUSTRE_ENCRYPTION_UNIT_SIZE;
- 					     i += blocksize, lblk_num++) {
- 						rc = fscrypt_decrypt_block_inplace(inode,
--										   pg->pg,
-+										   brwpg->pg,
- 										   blocksize, i,
- 										   lblk_num);
- 						if (rc)
- 							break;
- 					}
- 				} else {
--					rc = fscrypt_decrypt_pagecache_blocks(pg->pg,
-+					rc = fscrypt_decrypt_pagecache_blocks(brwpg->pg,
- 									      LUSTRE_ENCRYPTION_UNIT_SIZE,
- 									      offs);
- 				}
+-	lnet_nid4_to_nid(nid, result);
+-	lpni = lnet_find_peer_ni_locked(nid);
++	*result = *nid;
++	lpni = lnet_peer_ni_find_locked(nid);
+ 	if (lpni) {
+ 		*result = lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
+ 		lnet_peer_ni_decref_locked(lpni);
 -- 
 1.8.3.1
 
