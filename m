@@ -4,29 +4,29 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 12A9DC433EF
-	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:33:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id B7379C433F5
+	for <lustre-devel@archiver.kernel.org>; Sun, 20 Mar 2022 13:33:37 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 00F7A21FCAD;
-	Sun, 20 Mar 2022 06:32:25 -0700 (PDT)
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id CF16521FCCD;
+	Sun, 20 Mar 2022 06:32:28 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0994B21E083
- for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:14 -0700 (PDT)
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 0ACB921CABE
+ for <lustre-devel@lists.lustre.org>; Sun, 20 Mar 2022 06:31:16 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 22692EE4;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 3A5CCEEF;
  Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 20875AB; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
+ id 391B5D87DE; Sun, 20 Mar 2022 09:31:08 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 20 Mar 2022 09:30:31 -0400
-Message-Id: <1647783064-20688-18-git-send-email-jsimmons@infradead.org>
+Date: Sun, 20 Mar 2022 09:30:38 -0400
+Message-Id: <1647783064-20688-25-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
 References: <1647783064-20688-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 17/50] lnet: change lnet_prep_send to take
- net_processid
+Subject: [lustre-devel] [PATCH 24/50] lnet: Convert ping to support 16-bytes
+ address
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -48,266 +48,230 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Mr NeilBrown <neilb@suse.de>
 
-Instead of a 'struct lnet_process_id', lnet_prep_send() now takes a
-"struct lnet_processid *" with allows larger address.
+Now that ksocknal can send hello messages with 16-byte address, we can
+change lnet_send_ping() to ping hosts with large-address nids.
+
+Note that this doesn't change the addresses in the ping message sent,
+only the sending and receiving of the message.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: c0ccfaf1e35935273 ("LU-10391 lnet: change lnet_prep_send to take net_processid")
+Lustre-commit: 3e37ac8bb7e068a30 ("LU-10391 lnet: Convert ping to support 16-bytes address")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/43605
+Reviewed-on: https://review.whamcloud.com/43612
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/lnet/lib-lnet.h |  2 +-
- net/lnet/lnet/lib-move.c      | 61 +++++++++++++++++++++++--------------------
- net/lnet/lnet/lib-msg.c       |  3 +--
- 3 files changed, 35 insertions(+), 31 deletions(-)
+ include/linux/lnet/lib-lnet.h |  5 +++--
+ net/lnet/lnet/lib-move.c      | 42 ++++++++++++++++++++----------------------
+ net/lnet/lnet/peer.c          |  3 +--
+ 3 files changed, 24 insertions(+), 26 deletions(-)
 
 diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 8c4940f..ce18897 100644
+index 0155111..297e5ef 100644
 --- a/include/linux/lnet/lib-lnet.h
 +++ b/include/linux/lnet/lib-lnet.h
-@@ -613,7 +613,7 @@ void lnet_msg_attach_md(struct lnet_msg *msg, struct lnet_libmd *md,
- void lnet_msg_decommit(struct lnet_msg *msg, int cpt, int status);
- 
- void lnet_prep_send(struct lnet_msg *msg, int type,
--		    struct lnet_process_id target, unsigned int offset,
-+		    struct lnet_processid *target, unsigned int offset,
+@@ -643,8 +643,9 @@ void lnet_prep_send(struct lnet_msg *msg, int type,
  		    unsigned int len);
  int lnet_send(struct lnet_nid *nid, struct lnet_msg *msg,
  	      struct lnet_nid *rtr_nid);
+-int lnet_send_ping(lnet_nid_t dest_nid, struct lnet_handle_md *mdh, int nnis,
+-		   void *user_ptr, lnet_handler_t handler, bool recovery);
++int lnet_send_ping(struct lnet_nid *dest_nid, struct lnet_handle_md *mdh,
++		   int nnis, void *user_ptr, lnet_handler_t handler,
++		   bool recovery);
+ void lnet_return_tx_credits_locked(struct lnet_msg *msg);
+ void lnet_return_rx_credits_locked(struct lnet_msg *msg);
+ void lnet_schedule_blocked_locked(struct lnet_rtrbufpool *rbp);
 diff --git a/net/lnet/lnet/lib-move.c b/net/lnet/lnet/lib-move.c
-index f4c24ff..1c72ea2 100644
+index aa230d7..496c895 100644
 --- a/net/lnet/lnet/lib-move.c
 +++ b/net/lnet/lnet/lib-move.c
-@@ -513,12 +513,11 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- }
+@@ -2891,8 +2891,8 @@ enum lnet_mt_event_type {
+ };
  
- void
--lnet_prep_send(struct lnet_msg *msg, int type, struct lnet_process_id target,
-+lnet_prep_send(struct lnet_msg *msg, int type, struct lnet_processid *target,
- 	       unsigned int offset, unsigned int len)
- {
- 	msg->msg_type = type;
--	msg->msg_target.pid = target.pid;
--	lnet_nid4_to_nid(target.nid, &msg->msg_target.nid);
-+	msg->msg_target = *target;
- 	msg->msg_len = len;
- 	msg->msg_offset = offset;
+ struct lnet_mt_event_info {
+-	enum lnet_mt_event_type mt_type;
+-	lnet_nid_t mt_nid;
++	enum lnet_mt_event_type	mt_type;
++	struct lnet_nid		mt_nid;
+ };
  
-@@ -528,8 +527,8 @@ void lnet_usr_translate_stats(struct lnet_ioctl_element_msg_stats *msg_stats,
- 	memset(&msg->msg_hdr, 0, sizeof(msg->msg_hdr));
- 	msg->msg_hdr.type = type;
- 	/* dest_nid will be overwritten by lnet_select_pathway() */
--	lnet_nid4_to_nid(target.nid, &msg->msg_hdr.dest_nid);
--	msg->msg_hdr.dest_pid = target.pid;
-+	msg->msg_hdr.dest_nid = target->nid;
-+	msg->msg_hdr.dest_pid = target->pid;
- 	/* src_nid will be set later */
- 	msg->msg_hdr.src_pid = the_lnet.ln_pid;
- 	msg->msg_hdr.payload_length = len;
-@@ -3978,7 +3977,7 @@ void lnet_monitor_thr_stop(void)
+ /* called with res_lock held */
+@@ -3176,7 +3176,7 @@ struct lnet_mt_event_info {
+ 	struct lnet_handle_md mdh;
+ 	struct lnet_ni *tmp;
+ 	struct lnet_ni *ni;
+-	lnet_nid_t nid;
++	struct lnet_nid nid;
+ 	int healthv;
+ 	int rc;
+ 	time64_t now;
+@@ -3258,8 +3258,7 @@ struct lnet_mt_event_info {
+ 			 * We'll unlink the mdh in this case below.
+ 			 */
+ 			LNetInvalidateMDHandle(&ni->ni_ping_mdh);
+-			/* FIXME need to handle large-addr nid */
+-			nid = lnet_nid_to_nid4(&ni->ni_nid);
++			nid = ni->ni_nid;
+ 
+ 			/* remove the NI from the local queue and drop the
+ 			 * reference count to it while we're recovering
+@@ -3284,12 +3283,12 @@ struct lnet_mt_event_info {
+ 
+ 			ev_info->mt_type = MT_TYPE_LOCAL_NI;
+ 			ev_info->mt_nid = nid;
+-			rc = lnet_send_ping(nid, &mdh, LNET_INTERFACES_MIN,
++			rc = lnet_send_ping(&nid, &mdh, LNET_INTERFACES_MIN,
+ 					    ev_info, the_lnet.ln_mt_handler,
+ 					    true);
+ 			/* lookup the nid again */
+ 			lnet_net_lock(0);
+-			ni = lnet_nid2ni_locked(nid, 0);
++			ni = lnet_nid_to_ni_locked(&nid, 0);
+ 			if (!ni) {
+ 				/* the NI has been deleted when we dropped
+ 				 * the ref count
+@@ -3430,7 +3429,7 @@ struct lnet_mt_event_info {
+ 	struct lnet_handle_md mdh;
+ 	struct lnet_peer_ni *lpni;
+ 	struct lnet_peer_ni *tmp;
+-	lnet_nid_t nid;
++	struct lnet_nid nid;
+ 	time64_t now;
+ 	int healthv;
+ 	int rc;
+@@ -3504,9 +3503,8 @@ struct lnet_mt_event_info {
+ 
+ 			/* look at the comments in lnet_recover_local_nis() */
+ 			mdh = lpni->lpni_recovery_ping_mdh;
++			nid = lpni->lpni_nid;
+ 			LNetInvalidateMDHandle(&lpni->lpni_recovery_ping_mdh);
+-			/* FIXME handle large-addr nid */
+-			nid = lnet_nid_to_nid4(&lpni->lpni_nid);
+ 			lnet_net_lock(0);
+ 			list_del_init(&lpni->lpni_recovery);
+ 			lnet_peer_ni_decref_locked(lpni);
+@@ -3514,14 +3512,14 @@ struct lnet_mt_event_info {
+ 
+ 			ev_info->mt_type = MT_TYPE_PEER_NI;
+ 			ev_info->mt_nid = nid;
+-			rc = lnet_send_ping(nid, &mdh, LNET_INTERFACES_MIN,
++			rc = lnet_send_ping(&nid, &mdh, LNET_INTERFACES_MIN,
+ 					    ev_info, the_lnet.ln_mt_handler,
+ 					    true);
+ 			lnet_net_lock(0);
+ 			/* lnet_find_peer_ni_locked() grabs a refcount for
+ 			 * us. No need to take it explicitly.
+ 			 */
+-			lpni = lnet_find_peer_ni_locked(nid);
++			lpni = lnet_peer_ni_find_locked(&nid);
+ 			if (!lpni) {
+ 				lnet_net_unlock(0);
+ 				LNetMDUnlink(mdh);
+@@ -3622,7 +3620,7 @@ struct lnet_mt_event_info {
+  * Returns < 0 if LNetGet fails
+  */
+ int
+-lnet_send_ping(lnet_nid_t dest_nid,
++lnet_send_ping(struct lnet_nid *dest_nid,
+ 	       struct lnet_handle_md *mdh, int nnis,
+ 	       void *user_data, lnet_handler_t handler, bool recovery)
  {
- 	struct lnet_match_info info;
- 	struct lnet_hdr *hdr = &msg->msg_hdr;
--	struct lnet_process_id source_id;
-+	struct lnet_processid source_id;
- 	struct lnet_handle_wire reply_wmd;
+@@ -3631,7 +3629,7 @@ struct lnet_mt_event_info {
+ 	struct lnet_ping_buffer *pbuf;
  	int rc;
  
-@@ -3988,7 +3987,7 @@ void lnet_monitor_thr_stop(void)
- 	le32_to_cpus(&hdr->msg.get.sink_length);
- 	le32_to_cpus(&hdr->msg.get.src_offset);
+-	if (dest_nid == LNET_NID_ANY) {
++	if (LNET_NID_IS_ANY(dest_nid)) {
+ 		rc = -EHOSTUNREACH;
+ 		goto fail_error;
+ 	}
+@@ -3659,7 +3657,7 @@ struct lnet_mt_event_info {
+ 		goto fail_error;
+ 	}
+ 	id.pid = LNET_PID_LUSTRE;
+-	id.nid = dest_nid;
++	id.nid = lnet_nid_to_nid4(dest_nid);
  
--	source_id.nid = lnet_nid_to_nid4(&hdr->src_nid);
-+	source_id.nid = hdr->src_nid;
- 	source_id.pid = hdr->src_pid;
- 	/* Primary peer NID */
- 	info.mi_id.nid = msg->msg_initiator;
-@@ -4014,7 +4013,7 @@ void lnet_monitor_thr_stop(void)
- 
- 	reply_wmd = hdr->msg.get.return_wmd;
- 
--	lnet_prep_send(msg, LNET_MSG_REPLY, source_id,
-+	lnet_prep_send(msg, LNET_MSG_REPLY, &source_id,
- 		       msg->msg_offset, msg->msg_wanted);
- 
- 	msg->msg_hdr.msg.reply.dst_wmd = reply_wmd;
-@@ -4702,11 +4701,12 @@ void lnet_monitor_thr_stop(void)
-  */
- int
- LNetPut(lnet_nid_t self4, struct lnet_handle_md mdh, enum lnet_ack_req ack,
--	struct lnet_process_id target, unsigned int portal,
-+	struct lnet_process_id target4, unsigned int portal,
- 	u64 match_bits, unsigned int offset,
- 	u64 hdr_data)
+ 	rc = LNetGet(LNET_NID_ANY, *mdh, id,
+ 		     LNET_RESERVED_PORTAL,
+@@ -3680,13 +3678,13 @@ struct lnet_mt_event_info {
+ lnet_handle_recovery_reply(struct lnet_mt_event_info *ev_info,
+ 			   int status, bool send, bool unlink_event)
  {
- 	struct lnet_rsp_tracker *rspt = NULL;
-+	struct lnet_processid target;
- 	struct lnet_msg *msg;
- 	struct lnet_libmd *md;
- 	struct lnet_nid self;
-@@ -4716,18 +4716,20 @@ void lnet_monitor_thr_stop(void)
- 	LASSERT(the_lnet.ln_refcount > 0);
+-	lnet_nid_t nid = ev_info->mt_nid;
++	struct lnet_nid *nid = &ev_info->mt_nid;
  
- 	lnet_nid4_to_nid(self4, &self);
-+	lnet_nid4_to_nid(target4.nid, &target.nid);
-+	target.pid = target4.pid;
+ 	if (ev_info->mt_type == MT_TYPE_LOCAL_NI) {
+ 		struct lnet_ni *ni;
  
--	if (!list_empty(&the_lnet.ln_test_peers) && /* normally we don't */
--	    fail_peer(target.nid, 1)) { /* shall we now? */
-+	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
-+	    fail_peer(target4.nid, 1)) {		/* shall we now? */
- 		CERROR("Dropping PUT to %s: simulated failure\n",
--		       libcfs_id2str(target));
-+		       libcfs_id2str(target4));
- 		return -EIO;
- 	}
+ 		lnet_net_lock(0);
+-		ni = lnet_nid2ni_locked(nid, 0);
++		ni = lnet_nid_to_ni_locked(nid, 0);
+ 		if (!ni) {
+ 			lnet_net_unlock(0);
+ 			return;
+@@ -3701,7 +3699,7 @@ struct lnet_mt_event_info {
  
- 	msg = kmem_cache_zalloc(lnet_msg_cachep, GFP_NOFS);
- 	if (!msg) {
- 		CERROR("Dropping PUT to %s: ENOMEM on struct lnet_msg\n",
--		       libcfs_id2str(target));
-+		       libcfs_id2str(target4));
- 		return -ENOMEM;
- 	}
- 	msg->msg_vmflush = !!(current->flags & PF_MEMALLOC);
-@@ -4738,7 +4740,7 @@ void lnet_monitor_thr_stop(void)
- 		rspt = lnet_rspt_alloc(cpt);
- 		if (!rspt) {
- 			CERROR("Dropping PUT to %s: ENOMEM on response tracker\n",
--			       libcfs_id2str(target));
-+			       libcfs_id2str(target4));
- 			return -ENOMEM;
+ 		if (status != 0) {
+ 			CERROR("local NI (%s) recovery failed with %d\n",
+-			       libcfs_nid2str(nid), status);
++			       libcfs_nidstr(nid), status);
+ 			return;
  		}
- 		INIT_LIST_HEAD(&rspt->rspt_on_list);
-@@ -4749,7 +4751,7 @@ void lnet_monitor_thr_stop(void)
- 	md = lnet_handle2md(&mdh);
- 	if (!md || !md->md_threshold || md->md_me) {
- 		CERROR("Dropping PUT (%llu:%d:%s): MD (%d) invalid\n",
--		       match_bits, portal, libcfs_id2str(target),
-+		       match_bits, portal, libcfs_id2str(target4),
- 		       !md ? -1 : md->md_threshold);
- 		if (md && md->md_me)
- 			CERROR("Source MD also attached to portal %d\n",
-@@ -4763,11 +4765,11 @@ void lnet_monitor_thr_stop(void)
- 		return -ENOENT;
+ 		/* need to increment healthv for the ni here, because in
+@@ -3718,7 +3716,7 @@ struct lnet_mt_event_info {
+ 		int cpt;
+ 
+ 		cpt = lnet_net_lock_current();
+-		lpni = lnet_find_peer_ni_locked(nid);
++		lpni = lnet_peer_ni_find_locked(nid);
+ 		if (!lpni) {
+ 			lnet_net_unlock(cpt);
+ 			return;
+@@ -3733,7 +3731,7 @@ struct lnet_mt_event_info {
+ 
+ 		if (status != 0)
+ 			CERROR("peer NI (%s) recovery failed with %d\n",
+-			       libcfs_nid2str(nid), status);
++			       libcfs_nidstr(nid), status);
  	}
+ }
  
--	CDEBUG(D_NET, "%s -> %s\n", __func__, libcfs_id2str(target));
-+	CDEBUG(D_NET, "%s -> %s\n", __func__, libcfs_id2str(target4));
+@@ -3754,7 +3752,7 @@ struct lnet_mt_event_info {
+ 	switch (event->type) {
+ 	case LNET_EVENT_UNLINK:
+ 		CDEBUG(D_NET, "%s recovery ping unlinked\n",
+-		       libcfs_nid2str(ev_info->mt_nid));
++		       libcfs_nidstr(&ev_info->mt_nid));
+ 		/* fall-through */
+ 	case LNET_EVENT_REPLY:
+ 		lnet_handle_recovery_reply(ev_info, event->status, false,
+@@ -3762,7 +3760,7 @@ struct lnet_mt_event_info {
+ 		break;
+ 	case LNET_EVENT_SEND:
+ 		CDEBUG(D_NET, "%s recovery message sent %s:%d\n",
+-		       libcfs_nid2str(ev_info->mt_nid),
++		       libcfs_nidstr(&ev_info->mt_nid),
+ 		       (event->status) ? "unsuccessfully" :
+ 		       "successfully", event->status);
+ 		lnet_handle_recovery_reply(ev_info, event->status, true, false);
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index d0b7bc8..494b7ef 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -3471,8 +3471,7 @@ static int lnet_peer_send_ping(struct lnet_peer *lp)
  
- 	lnet_msg_attach_md(msg, md, 0, 0);
+ 	nnis = max_t(int, lp->lp_data_nnis, LNET_INTERFACES_MIN);
  
--	lnet_prep_send(msg, LNET_MSG_PUT, target, 0, md->md_length);
-+	lnet_prep_send(msg, LNET_MSG_PUT, &target, 0, md->md_length);
- 
- 	msg->msg_hdr.msg.put.match_bits = cpu_to_le64(match_bits);
- 	msg->msg_hdr.msg.put.ptl_index = cpu_to_le32(portal);
-@@ -4804,7 +4806,7 @@ void lnet_monitor_thr_stop(void)
- 		rc = lnet_send(&self, msg, NULL);
- 	if (rc) {
- 		CNETERR("Error sending PUT to %s: %d\n",
--			libcfs_id2str(target), rc);
-+			libcfs_id2str(target4), rc);
- 		msg->msg_no_resend = true;
- 		lnet_finalize(msg, rc);
- 	}
-@@ -4946,10 +4948,11 @@ struct lnet_msg *
-  */
- int
- LNetGet(lnet_nid_t self4, struct lnet_handle_md mdh,
--	struct lnet_process_id target, unsigned int portal,
-+	struct lnet_process_id target4, unsigned int portal,
- 	u64 match_bits, unsigned int offset, bool recovery)
- {
- 	struct lnet_rsp_tracker *rspt;
-+	struct lnet_processid target;
- 	struct lnet_msg *msg;
- 	struct lnet_libmd *md;
- 	struct lnet_nid self;
-@@ -4959,18 +4962,20 @@ struct lnet_msg *
- 	LASSERT(the_lnet.ln_refcount > 0);
- 
- 	lnet_nid4_to_nid(self4, &self);
-+	lnet_nid4_to_nid(target4.nid, &target.nid);
-+	target.pid = target4.pid;
- 
--	if (!list_empty(&the_lnet.ln_test_peers) && /* normally we don't */
--	    fail_peer(target.nid, 1)) {		/* shall we now? */
-+	if (!list_empty(&the_lnet.ln_test_peers) &&	/* normally we don't */
-+	    fail_peer(target4.nid, 1)) {		/* shall we now? */
- 		CERROR("Dropping GET to %s: simulated failure\n",
--		       libcfs_id2str(target));
-+		       libcfs_id2str(target4));
- 		return -EIO;
- 	}
- 
- 	msg = kmem_cache_zalloc(lnet_msg_cachep, GFP_NOFS);
- 	if (!msg) {
- 		CERROR("Dropping GET to %s: ENOMEM on struct lnet_msg\n",
--		       libcfs_id2str(target));
-+		       libcfs_id2str(target4));
- 		return -ENOMEM;
- 	}
- 
-@@ -4979,7 +4984,7 @@ struct lnet_msg *
- 	rspt = lnet_rspt_alloc(cpt);
- 	if (!rspt) {
- 		CERROR("Dropping GET to %s: ENOMEM on response tracker\n",
--		       libcfs_id2str(target));
-+		       libcfs_id2str(target4));
- 		return -ENOMEM;
- 	}
- 	INIT_LIST_HEAD(&rspt->rspt_on_list);
-@@ -4991,7 +4996,7 @@ struct lnet_msg *
- 	md = lnet_handle2md(&mdh);
- 	if (!md || !md->md_threshold || md->md_me) {
- 		CERROR("Dropping GET (%llu:%d:%s): MD (%d) invalid\n",
--		       match_bits, portal, libcfs_id2str(target),
-+		       match_bits, portal, libcfs_id2str(target4),
- 		       !md ? -1 : md->md_threshold);
- 		if (md && md->md_me)
- 			CERROR("REPLY MD also attached to portal %d\n",
-@@ -5004,11 +5009,11 @@ struct lnet_msg *
- 		return -ENOENT;
- 	}
- 
--	CDEBUG(D_NET, "%s -> %s\n", __func__, libcfs_id2str(target));
-+	CDEBUG(D_NET, "%s -> %s\n", __func__, libcfs_id2str(target4));
- 
- 	lnet_msg_attach_md(msg, md, 0, 0);
- 
--	lnet_prep_send(msg, LNET_MSG_GET, target, 0, 0);
-+	lnet_prep_send(msg, LNET_MSG_GET, &target, 0, 0);
- 
- 	msg->msg_hdr.msg.get.match_bits = cpu_to_le64(match_bits);
- 	msg->msg_hdr.msg.get.ptl_index = cpu_to_le32(portal);
-@@ -5033,7 +5038,7 @@ struct lnet_msg *
- 	rc = lnet_send(&self, msg, NULL);
- 	if (rc < 0) {
- 		CNETERR("Error sending GET to %s: %d\n",
--			libcfs_id2str(target), rc);
-+			libcfs_id2str(target4), rc);
- 		msg->msg_no_resend = true;
- 		lnet_finalize(msg, rc);
- 	}
-diff --git a/net/lnet/lnet/lib-msg.c b/net/lnet/lnet/lib-msg.c
-index 9a4e268..88f017b 100644
---- a/net/lnet/lnet/lib-msg.c
-+++ b/net/lnet/lnet/lib-msg.c
-@@ -390,8 +390,7 @@
- 
- 		ack_wmd = msg->msg_hdr.msg.put.ack_wmd;
- 
--		lnet_prep_send(msg, LNET_MSG_ACK,
--			       lnet_pid_to_pid4(&msg->msg_ev.source), 0, 0);
-+		lnet_prep_send(msg, LNET_MSG_ACK, &msg->msg_ev.source, 0, 0);
- 
- 		msg->msg_hdr.msg.ack.dst_wmd = ack_wmd;
- 		msg->msg_hdr.msg.ack.match_bits = msg->msg_ev.match_bits;
+-	rc = lnet_send_ping(lnet_nid_to_nid4(&lp->lp_primary_nid),
+-			    &lp->lp_ping_mdh, nnis, lp,
++	rc = lnet_send_ping(&lp->lp_primary_nid, &lp->lp_ping_mdh, nnis, lp,
+ 			    the_lnet.ln_dc_handler, false);
+ 	/* if LNetMDBind in lnet_send_ping fails we need to decrement the
+ 	 * refcount on the peer, otherwise LNetMDUnlink will be called
 -- 
 1.8.3.1
 
