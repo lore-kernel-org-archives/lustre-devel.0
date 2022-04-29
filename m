@@ -4,26 +4,116 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 063C3C433F5
-	for <lustre-devel@archiver.kernel.org>; Thu, 28 Apr 2022 17:23:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 79BCEC433F5
+	for <lustre-devel@archiver.kernel.org>; Fri, 29 Apr 2022 14:44:28 +0000 (UTC)
 Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E20DF21E053;
-	Thu, 28 Apr 2022 10:23:27 -0700 (PDT)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 113B921CBC4
- for <lustre-devel@lists.lustre.org>; Thu, 28 Apr 2022 10:23:25 -0700 (PDT)
-Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 7FFBF5F3;
- Thu, 28 Apr 2022 13:23:23 -0400 (EDT)
-Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 7A239D35C8; Thu, 28 Apr 2022 13:23:23 -0400 (EDT)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>, Sebastien Buisson <sbuisson@ddn.com>
-Date: Thu, 28 Apr 2022 13:23:20 -0400
-Message-Id: <1651166600-21269-1-git-send-email-jsimmons@infradead.org>
-X-Mailer: git-send-email 1.8.3.1
-Subject: [lustre-devel] [PATCH] fscrypt: allow alternative bounce buffers
+	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id E319721CBDF;
+	Fri, 29 Apr 2022 07:44:27 -0700 (PDT)
+Received: from NAM02-BN1-obe.outbound.protection.outlook.com
+ (mail-bn1nam07on2049.outbound.protection.outlook.com [40.107.212.49])
+ by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id F3C3621CB90
+ for <lustre-devel@lists.lustre.org>; Fri, 29 Apr 2022 07:44:25 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=NaYIhMnzp07s1/EF9S54isIfnSM10U4FmBHZrReIP2EoqOxSOK+eV5EtZINqWPbGoK7HflwZeJphXaiBs7mDdAkVSeFsElEjkbgNSvCUNlvylfCZC2cUkoV1yDuhbXi3CfIBesGTCnV03VfIHRSNgCObWS+XybPM91zISvJ1L8JBKW8YVINuC7wpFa9WYfkKWHpmjNbxpRKku4TN9dEX3iJzjc2vrtaIHHi6+R/6QOTmcBhwVJnaWqfWqi8JeUPuTTMoagcuRXpIG1fJJZDoiWULbgUuPOWx7sWFdGhED9wArETOO68h6PSdH4VidOcEp4BpWdycT7nKYDrhEgdBiQ==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=j5A2Y1a2ylPcD+wOkn3EPv0lDsN8AvCLfFsgnFf22UE=;
+ b=ZOmD7VgB/Hvc5mzIe4+AWIyxtcvQ1FqF3UxZAKh9SHJUElHrUN0v8oIs/5qT2WnZhyUnIwjyqTBatyjZMCUSEWzsZaSJwKjLlwTIGEmav85qsOKxyJOC4xPJyOtlKO6XWIkpkzaqiJF4fGxKm4GdvxfiG3r7GTs1JCOq556GADzuPsjLP9d85BW/q8P/4uoxsXDiHzpDjp1liqBW6rTDxagPw5LvnoaXXdtYYOn2VKIaUGSkvP3j2YGcKCTXY1ZYuH0Z1bU0qUfGorMuUcGYFp7ygpbvqb3rZw2hbNJ9txtaMKXtIobmy+ZuirYM2J6nUzjABIbj0l6bICQLgj/n+Q==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
+ header.d=ddn.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=j5A2Y1a2ylPcD+wOkn3EPv0lDsN8AvCLfFsgnFf22UE=;
+ b=X580A/2VXFJpbMuaixxO2hEsBsO7pJl6pDbIIAfcGpDtVaJUr1K1UC6qLkpJ0tKrvTCwK+djLXkkPX4BJ8oHa4tqlzJQOjqyfBRbp4hmQt94RMhxqE89Lj9DvRomNljk7Gse8M+7liqKhN7VIjeBf1yhrBkqzYBo1Q7cYdgdHog=
+Received: from DM6PR19MB3769.namprd19.prod.outlook.com (2603:10b6:5:229::19)
+ by DS7PR19MB4520.namprd19.prod.outlook.com (2603:10b6:5:2c1::12) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.5186.26; Fri, 29 Apr
+ 2022 14:44:23 +0000
+Received: from DM6PR19MB3769.namprd19.prod.outlook.com
+ ([fe80::5d57:a4b1:9e86:7243]) by DM6PR19MB3769.namprd19.prod.outlook.com
+ ([fe80::5d57:a4b1:9e86:7243%6]) with mapi id 15.20.5206.013; Fri, 29 Apr 2022
+ 14:44:23 +0000
+To: James Simmons <jsimmons@infradead.org>
+Thread-Topic: [PATCH] fscrypt: allow alternative bounce buffers
+Thread-Index: AQHYWySs3W28Z2kyY02XC+PiT/B4/K0G+O+A
+Date: Fri, 29 Apr 2022 14:44:23 +0000
+Message-ID: <CDDEBB3C-B3F0-43E4-9E3C-2AA83EFBD176@ddn.com>
+References: <1651166600-21269-1-git-send-email-jsimmons@infradead.org>
+In-Reply-To: <1651166600-21269-1-git-send-email-jsimmons@infradead.org>
+Accept-Language: fr-FR, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=ddn.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: a4bd9ae1-b5d7-4def-150c-08da29eec05c
+x-ms-traffictypediagnostic: DS7PR19MB4520:EE_
+x-microsoft-antispam-prvs: <DS7PR19MB45200BF028853ACF5CC9A2DCD7FC9@DS7PR19MB4520.namprd19.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: S7PHmBmFEj/aWM9O/wzFnQNjqpw5/ZoZhTYI1RAuvQYxlhaEsP4ROcvSC0xTYGwtDQAsvylTnhfRl1Vw5gXp03KQWRZ6a0NL1rB7XV3LfSMOdwKsfzOx0fN4b4FkR+gP073st83R89M9X1FqGKwcM8Ty3Ki72Z7vk1+s4Fnwe7ErVyXxQOzK8sx7klsa7QgYpHgMce/kBPQTZscJIUfAimnyhsSO7KdfKLUX3H4OrnyqbDg5jeXy+GjOlzZqo9xQzd5PvFkIn37GwYRHSAkGUYZ2lQ+jsyF9EpD0PdBL1AFFqj8ikNsM85I5ZbuF4T1SGDngQBFtB2TXmitkOdHcGLc7mZa0042rMvQ2iKKGHwnoyyMLfa62PvQEuPShK2PhxfACU5em1Txb+9ATnShFfEEpzzd/Yz91u4jWxKiss9gRb5zwI3yVqpmvF5iaoYZRLdcB0gIXSBmbYqMXQji+P4rLpBXbjAZJ50otMFQrkBU9THCJW8+WqyN3hMo+F/rBKsSWHGV+DdgeDqrxd6bQ0bx0ZAfDeo3Yc/9Hyon88K25OEHg4Mw71exPjCirlOsem7Dmi8uGl7u0cp96FW++sQX7Cp7lMbUoMwgOWXeRlBBAOcRfWV0T43l2jhWoFXzPmhUokvyqhCCxx4xfjoRYDLbxC12aTtaQ8hRWp0a0JPjUETnsm2pEAp23LNIkWPdTekGNX+nptPzQS2KCELz2jfWsOTKUt5DMgoiL0xapJVmNqNOGmM6vbgIDGhr0JjDBOjhLrjJaI3s1uYO9FqdyuaOniGLjJ2kqv04/8aa/bbHM6eNBkPLezEBvzDD7UGBW
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:DM6PR19MB3769.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230001)(4636009)(366004)(76116006)(66946007)(66556008)(66446008)(66476007)(2616005)(6512007)(4326008)(8676002)(186003)(91956017)(64756008)(26005)(83380400001)(5660300002)(33656002)(2906002)(8936002)(122000001)(54906003)(38100700002)(71200400001)(38070700005)(86362001)(966005)(316002)(6486002)(6506007)(36756003)(66574015)(6916009)(508600001)(45980500001);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?SVI0RWwwTXVGUEdhOHdEc1FjRmhFNFlFaTZ6UkI3ZDFuY3VMNm41VVZZMWRG?=
+ =?utf-8?B?MjFielNOK2t0QVQvWkJKbHZia2lsVTIvK3Z1TkdRaFMwK0hGVllhK0lJZDlQ?=
+ =?utf-8?B?cVJ5am1hOVVSb3p1YmdqcGZndkpZbFRtNWZxcm0xd3FlZHJsbWJjNlNpWmYx?=
+ =?utf-8?B?b0ZobmFla3VWNGpQZUV5cU5xMXZKZUMwYUJJVnhDWHc5Mzd5MDh5S3pBeFpB?=
+ =?utf-8?B?ZHZ5dVRlYlBTajFnZS9mbGZMQWFmeGdrVDNWQjA0SVFTMWM5RkJ0eEFzUGE3?=
+ =?utf-8?B?Y1ZNcnRGb3dIN0dsMjMwc3hXMUN0NmZ1WEoxM3cxUUJKQTJ5SHNtRDQxS1Zk?=
+ =?utf-8?B?S1hSdmMwR3paUm5MRzFsZ05QK2NmcXQ5Y0NRTlQ2bC94aDV5MFNIc1p4bXFO?=
+ =?utf-8?B?eWY2Q0wxWVJCRFUyR0VLSjh0eHlvKytqNTNqT3F4eFdNUjBFMi9OWlI0V3Vx?=
+ =?utf-8?B?Q0RBZjZnQ211Y002aW1QUy9IMVRrOGp5ZXdoc2NuVUloUUpWZEF5bnZtYnBy?=
+ =?utf-8?B?cFd5UlRBUkJHbWdHRVZ6aHpXTW1yQURlTFZRN3U2Nlp5aU90bmE3T0lweVRZ?=
+ =?utf-8?B?V3RVVFdmU0ZFazQwOUtYRm1hckhWNS9hTHAwSDRoaDFQWXM3bE5JNUdyQUxE?=
+ =?utf-8?B?OWRGU2FYVk1oaDhOS3ZaQVRmcU40LzU2KzNnQ3hoNjdHcGFhMjMraVkwWS9F?=
+ =?utf-8?B?ZGROaXdQcURRdGNDWXpDK2tPYnpjWkdscDlTR1h6ajhXaERpZXJteG1VSXhD?=
+ =?utf-8?B?Z3EvL0c5S0xyK21VcFc3VWhnaVlWd1VzeG15R0MrY3NHK1pHNVVLMEt5OERD?=
+ =?utf-8?B?NXUvSEYxSUJveGZGVGtDdXh5bnFSVW5uTG5LMDFJNEJUWXROYmNUNGgydFls?=
+ =?utf-8?B?TG91WkpYTC9yL2ROWlMrMlBXaWpwT3R1NExqcHhKOGdmc08rU2g0Nk1WWHk3?=
+ =?utf-8?B?OHNwTlNOUTN6MzhtRXMwL1liMkQ0RTFzZXVlZXZPWG1YcFlyeE5wOTNiNkVL?=
+ =?utf-8?B?N1pnRStNQmNnQmdOMVVGQXlZeElIeVRqRlVBL3hJL0lJenVPSVZmS0g0dXAy?=
+ =?utf-8?B?SUFPc1M0RHVZMjZQV1pVMDh5NnoyQjVrbGV0VjIrdStBbytXOVFMc1dTQm9u?=
+ =?utf-8?B?ZWtTcjg5UVdzVisvSVNaN2Z1aHVWR05NbjFWUVBZVk1QNXNxMGsrckU0WGk5?=
+ =?utf-8?B?SzZFZVpMVlRXVzEyd3QvQXZPbzlwNkIxNE93Z1I1ZGdqdFl6eEtsZjdpRmJw?=
+ =?utf-8?B?ZzFaWGNxc2x4RlVjYVluNWFUUXc2R0k0d3JvSzZkZ3lXVmFURFVER1BGNkVF?=
+ =?utf-8?B?QmNvUDJiOUY3V2NvMjF3R2FCSHJVMVdwZmo3NmFvQ2g5RTdHaFptaDlqVTlm?=
+ =?utf-8?B?SEJKSVVjRDFqeE1UVDVvdkxUOExMRHBueTJiNEp1VEh2di8zWXlJZ2c4bW9S?=
+ =?utf-8?B?QWF0NGlWby9hbGlDSHZPM3c5M0piYk1LSi9qVTdlNlo1cTBSMmN4OGxvY0RJ?=
+ =?utf-8?B?ZDVGeGhINVkrdWdZTk1YbWVmSGkxNHhUY09pRm8vRGVFRUJmTWcyR0lpZVRE?=
+ =?utf-8?B?QS9OeEQrTWlWY2kyRTI3V3lkMFZUcmR3bENzVWtZN2ZWR2I5QmpoTkdrSUFQ?=
+ =?utf-8?B?SlpyZzd5RGhkbjlXUlJNNVB0eWZIUjdwNmh5b0RuOEFiM1NiZ2xjeG5zSEw1?=
+ =?utf-8?B?LzIyb0U5RXg2QWhTb0hlUXdhaCt6ZVZkUXFIYTZHSEFlQXNhVEIwS25Lcmcy?=
+ =?utf-8?B?ZjlsMkdaZlZmdmxiUmFvV2hPRi9vL1FnK3FtOEdCNkVNaTlnMHI4VUpuS2pw?=
+ =?utf-8?B?ZStTRlJGL1dDK3VYV29SQmJEUUxZMFAxNkdZK0FycDBjN2JwNVU0Q2FQTHpI?=
+ =?utf-8?B?c2RWbFlCdWZKRTNkVi8wL0t2d3hmOGtxYm1ybUNyWTd4bXV4ZmhtUDVsd3c1?=
+ =?utf-8?B?cmhyM1RQR3JRUU94VHM3ZzNMK3YyWGt2VUREV043NE9vcUpaSGxWWXd4ZUhB?=
+ =?utf-8?B?eVN3aW01VzYwaWU5MFVUU2dXcGFaKzYxYUV2Uk0zaG4rY1RVUyt5NnM4c0xQ?=
+ =?utf-8?B?MWh2b0F4R21vd1JzSlo3UTYwTTZXbXhLS0w4SDdJRFFHY3ptWGNIdThUcjdt?=
+ =?utf-8?B?cUlKOE5YNWJOYitHMVVoQU11REcxbXM1WjBLOTRibW03ek1DVUp2OUk2eGgv?=
+ =?utf-8?B?TFFEUnhWQXVBWEFzQ1JnT1FBeFY4WG5nT1VtTUNHR1AxSVhnWE9UY2gyMCt5?=
+ =?utf-8?B?QlYzcERwdzlLRDJvU0x5SU5ydng4NWZER3dRMDZrOXRKUkM1elFWb3ByQU0v?=
+ =?utf-8?B?ZnVKb0I4QzhoTG1iQzV2S0s2U2JpMkNJZWNYNGFwNEExRzBoTkRtUT09?=
+Content-ID: <B50B66A2EE2597429FF2CB04DE10AC9D@namprd19.prod.outlook.com>
+MIME-Version: 1.0
+X-OriginatorOrg: ddn.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: DM6PR19MB3769.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: a4bd9ae1-b5d7-4def-150c-08da29eec05c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Apr 2022 14:44:23.1936 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: m6SfspAnnSdBixaS90kBYxSrdtEqofc/IvrGcjzPT6YeidNIDSwqFD+b0yCawL+9ZfaJ3ZoA8/3tL+426Ze+hQ==
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DS7PR19MB4520
+Subject: Re: [lustre-devel] [PATCH] fscrypt: allow alternative bounce buffers
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.23
 Precedence: list
@@ -36,159 +126,133 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
+From: Sebastien Buisson via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Sebastien Buisson <sbuisson@ddn.com>
 Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-Currently fscrypt offers two options. One option is to use the
-internal bounce buffer allocated or perform inline encrpytion.
-Add the option to use an external bounce buffer. This change can
-be used useful for example for a network file systems which can
-pass in a page from the page cache and place the encrypted data
-into a page for a network packet to be sent. Another potential
-use is the use of GPU pages with RDMA being the final destination
-for the encrypted data.
-
-Signed-off-By: James Simmons <jsimmons@infradead.org>
----
- fs/crypto/crypto.c      | 34 +++++++++++++++++++---------------
- include/linux/fscrypt.h | 34 ++++++++++++++++++++++++++++------
- 2 files changed, 47 insertions(+), 21 deletions(-)
-
-diff --git a/fs/crypto/crypto.c b/fs/crypto/crypto.c
-index e78be66..f241c69 100644
---- a/fs/crypto/crypto.c
-+++ b/fs/crypto/crypto.c
-@@ -210,9 +210,10 @@ struct page *fscrypt_encrypt_pagecache_blocks(struct page *page,
- EXPORT_SYMBOL(fscrypt_encrypt_pagecache_blocks);
- 
- /**
-- * fscrypt_encrypt_block_inplace() - Encrypt a filesystem block in-place
-+ * fscrypt_encrypt_page() - Cache an encrypt filesystem block in a page
-  * @inode:     The inode to which this block belongs
-- * @page:      The page containing the block to encrypt
-+ * @src:       The page containing the block to encrypt
-+ * @dst:       The page which will contain the encrypted data
-  * @len:       Size of block to encrypt.  This must be a multiple of
-  *		FSCRYPT_CONTENTS_ALIGNMENT.
-  * @offs:      Byte offset within @page at which the block to encrypt begins
-@@ -223,17 +224,18 @@ struct page *fscrypt_encrypt_pagecache_blocks(struct page *page,
-  * Encrypt a possibly-compressed filesystem block that is located in an
-  * arbitrary page, not necessarily in the original pagecache page.  The @inode
-  * and @lblk_num must be specified, as they can't be determined from @page.
-+ * The decrypted data will be stored in @dst.
-  *
-  * Return: 0 on success; -errno on failure
-  */
--int fscrypt_encrypt_block_inplace(const struct inode *inode, struct page *page,
--				  unsigned int len, unsigned int offs,
--				  u64 lblk_num, gfp_t gfp_flags)
-+int fscrypt_encrypt_page(const struct inode *inode, struct page *src,
-+			 struct page *dst, unsigned int len, unsigned int offs,
-+			 u64 lblk_num, gfp_t gfp_flags)
- {
--	return fscrypt_crypt_block(inode, FS_ENCRYPT, lblk_num, page, page,
-+	return fscrypt_crypt_block(inode, FS_ENCRYPT, lblk_num, src, dst,
- 				   len, offs, gfp_flags);
- }
--EXPORT_SYMBOL(fscrypt_encrypt_block_inplace);
-+EXPORT_SYMBOL(fscrypt_encrypt_page);
- 
- /**
-  * fscrypt_decrypt_pagecache_blocks() - Decrypt filesystem blocks in a
-@@ -280,9 +282,10 @@ int fscrypt_decrypt_pagecache_blocks(struct page *page, unsigned int len,
- EXPORT_SYMBOL(fscrypt_decrypt_pagecache_blocks);
- 
- /**
-- * fscrypt_decrypt_block_inplace() - Decrypt a filesystem block in-place
-+ * fscrypt_decrypt_page() - Cache a decrypt a filesystem block in a page
-  * @inode:     The inode to which this block belongs
-- * @page:      The page containing the block to decrypt
-+ * @src:       The page containing the block to decrypt
-+ * @dst:       The page which will contain the plain data
-  * @len:       Size of block to decrypt.  This must be a multiple of
-  *		FSCRYPT_CONTENTS_ALIGNMENT.
-  * @offs:      Byte offset within @page at which the block to decrypt begins
-@@ -292,17 +295,18 @@ int fscrypt_decrypt_pagecache_blocks(struct page *page, unsigned int len,
-  * Decrypt a possibly-compressed filesystem block that is located in an
-  * arbitrary page, not necessarily in the original pagecache page.  The @inode
-  * and @lblk_num must be specified, as they can't be determined from @page.
-+ * The encrypted data will be stored in @dst.
-  *
-  * Return: 0 on success; -errno on failure
-  */
--int fscrypt_decrypt_block_inplace(const struct inode *inode, struct page *page,
--				  unsigned int len, unsigned int offs,
--				  u64 lblk_num)
-+int fscrypt_decrypt_page(const struct inode *inode, struct page *src,
-+			 struct page *dst, unsigned int len, unsigned int offs,
-+			 u64 lblk_num, gfp_t gfp_flags)
- {
--	return fscrypt_crypt_block(inode, FS_DECRYPT, lblk_num, page, page,
--				   len, offs, GFP_NOFS);
-+	return fscrypt_crypt_block(inode, FS_DECRYPT, lblk_num, src, dst,
-+				   len, offs, gfp_flags);
- }
--EXPORT_SYMBOL(fscrypt_decrypt_block_inplace);
-+EXPORT_SYMBOL(fscrypt_decrypt_page);
- 
- /**
-  * fscrypt_initialize() - allocate major buffers for fs encryption.
-diff --git a/include/linux/fscrypt.h b/include/linux/fscrypt.h
-index efc7f96..c2b67d1 100644
---- a/include/linux/fscrypt.h
-+++ b/include/linux/fscrypt.h
-@@ -255,15 +255,37 @@ struct page *fscrypt_encrypt_pagecache_blocks(struct page *page,
- 					      unsigned int len,
- 					      unsigned int offs,
- 					      gfp_t gfp_flags);
--int fscrypt_encrypt_block_inplace(const struct inode *inode, struct page *page,
--				  unsigned int len, unsigned int offs,
--				  u64 lblk_num, gfp_t gfp_flags);
-+int fscrypt_encrypt_page(const struct inode *inode, struct page *src,
-+			 struct page *dst, unsigned int len,
-+			 unsigned int offs, u64 lblk_num, gfp_t gfp_flags);
-+
-+static inline int fscrypt_encrypt_block_inplace(const struct inode *inode,
-+						struct page *page,
-+						unsigned int len,
-+						unsigned int offs,
-+						u64 lblk_num,
-+						gfp_t gfp_flags)
-+{
-+	return fscrypt_encrypt_page(inode, page, page, len, offs, lblk_num,
-+				    gfp_flags);
-+}
- 
- int fscrypt_decrypt_pagecache_blocks(struct page *page, unsigned int len,
- 				     unsigned int offs);
--int fscrypt_decrypt_block_inplace(const struct inode *inode, struct page *page,
--				  unsigned int len, unsigned int offs,
--				  u64 lblk_num);
-+
-+int fscrypt_decrypt_page(const struct inode *inode, struct page *src,
-+			 struct page *dst, unsigned int len,
-+			 unsigned int offs, u64 lblk_num, gfp_t gfp_flags);
-+
-+static inline int fscrypt_decrypt_block_inplace(const struct inode *inode,
-+						struct page *page,
-+						unsigned int len,
-+						unsigned int offs,
-+						u64 lblk_num)
-+{
-+	return fscrypt_decrypt_page(inode, page, page, len, offs, lblk_num,
-+				    GFP_NOFS);
-+}
- 
- static inline bool fscrypt_is_bounce_page(struct page *page)
- {
--- 
-1.8.3.1
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+VGhpcyBsb29rcyBnb29kIHRvIG1lLCB0aGFua3MgSmFtZXMuDQpJIGhhdmUgdXBkYXRlZCBMdXN0
+cmUgcGF0Y2ggaHR0cHM6Ly9yZXZpZXcud2hhbWNsb3VkLmNvbS80NzE0OSB0byBpbnRlZ3JhdGUg
+dGhpcyBjaGFuZ2UuDQoNCj4gTGUgMjggYXZyLiAyMDIyIMOgIDE5OjIzLCBKYW1lcyBTaW1tb25z
+IDxqc2ltbW9uc0BpbmZyYWRlYWQub3JnPiBhIMOpY3JpdCA6DQo+IA0KPiBDdXJyZW50bHkgZnNj
+cnlwdCBvZmZlcnMgdHdvIG9wdGlvbnMuIE9uZSBvcHRpb24gaXMgdG8gdXNlIHRoZQ0KPiBpbnRl
+cm5hbCBib3VuY2UgYnVmZmVyIGFsbG9jYXRlZCBvciBwZXJmb3JtIGlubGluZSBlbmNycHl0aW9u
+Lg0KPiBBZGQgdGhlIG9wdGlvbiB0byB1c2UgYW4gZXh0ZXJuYWwgYm91bmNlIGJ1ZmZlci4gVGhp
+cyBjaGFuZ2UgY2FuDQo+IGJlIHVzZWQgdXNlZnVsIGZvciBleGFtcGxlIGZvciBhIG5ldHdvcmsg
+ZmlsZSBzeXN0ZW1zIHdoaWNoIGNhbg0KPiBwYXNzIGluIGEgcGFnZSBmcm9tIHRoZSBwYWdlIGNh
+Y2hlIGFuZCBwbGFjZSB0aGUgZW5jcnlwdGVkIGRhdGENCj4gaW50byBhIHBhZ2UgZm9yIGEgbmV0
+d29yayBwYWNrZXQgdG8gYmUgc2VudC4gQW5vdGhlciBwb3RlbnRpYWwNCj4gdXNlIGlzIHRoZSB1
+c2Ugb2YgR1BVIHBhZ2VzIHdpdGggUkRNQSBiZWluZyB0aGUgZmluYWwgZGVzdGluYXRpb24NCj4g
+Zm9yIHRoZSBlbmNyeXB0ZWQgZGF0YS4NCj4gDQo+IFNpZ25lZC1vZmYtQnk6IEphbWVzIFNpbW1v
+bnMgPGpzaW1tb25zQGluZnJhZGVhZC5vcmc+DQo+IC0tLQ0KPiBmcy9jcnlwdG8vY3J5cHRvLmMg
+ICAgICB8IDM0ICsrKysrKysrKysrKysrKysrKystLS0tLS0tLS0tLS0tLS0NCj4gaW5jbHVkZS9s
+aW51eC9mc2NyeXB0LmggfCAzNCArKysrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0tDQo+
+IDIgZmlsZXMgY2hhbmdlZCwgNDcgaW5zZXJ0aW9ucygrKSwgMjEgZGVsZXRpb25zKC0pDQo+IA0K
+PiBkaWZmIC0tZ2l0IGEvZnMvY3J5cHRvL2NyeXB0by5jIGIvZnMvY3J5cHRvL2NyeXB0by5jDQo+
+IGluZGV4IGU3OGJlNjYuLmYyNDFjNjkgMTAwNjQ0DQo+IC0tLSBhL2ZzL2NyeXB0by9jcnlwdG8u
+Yw0KPiArKysgYi9mcy9jcnlwdG8vY3J5cHRvLmMNCj4gQEAgLTIxMCw5ICsyMTAsMTAgQEAgc3Ry
+dWN0IHBhZ2UgKmZzY3J5cHRfZW5jcnlwdF9wYWdlY2FjaGVfYmxvY2tzKHN0cnVjdCBwYWdlICpw
+YWdlLA0KPiBFWFBPUlRfU1lNQk9MKGZzY3J5cHRfZW5jcnlwdF9wYWdlY2FjaGVfYmxvY2tzKTsN
+Cj4gDQo+IC8qKg0KPiAtICogZnNjcnlwdF9lbmNyeXB0X2Jsb2NrX2lucGxhY2UoKSAtIEVuY3J5
+cHQgYSBmaWxlc3lzdGVtIGJsb2NrIGluLXBsYWNlDQo+ICsgKiBmc2NyeXB0X2VuY3J5cHRfcGFn
+ZSgpIC0gQ2FjaGUgYW4gZW5jcnlwdCBmaWxlc3lzdGVtIGJsb2NrIGluIGEgcGFnZQ0KPiAgKiBA
+aW5vZGU6ICAgICBUaGUgaW5vZGUgdG8gd2hpY2ggdGhpcyBibG9jayBiZWxvbmdzDQo+IC0gKiBA
+cGFnZTogICAgICBUaGUgcGFnZSBjb250YWluaW5nIHRoZSBibG9jayB0byBlbmNyeXB0DQo+ICsg
+KiBAc3JjOiAgICAgICBUaGUgcGFnZSBjb250YWluaW5nIHRoZSBibG9jayB0byBlbmNyeXB0DQo+
+ICsgKiBAZHN0OiAgICAgICBUaGUgcGFnZSB3aGljaCB3aWxsIGNvbnRhaW4gdGhlIGVuY3J5cHRl
+ZCBkYXRhDQo+ICAqIEBsZW46ICAgICAgIFNpemUgb2YgYmxvY2sgdG8gZW5jcnlwdC4gIFRoaXMg
+bXVzdCBiZSBhIG11bHRpcGxlIG9mDQo+ICAqCQlGU0NSWVBUX0NPTlRFTlRTX0FMSUdOTUVOVC4N
+Cj4gICogQG9mZnM6ICAgICAgQnl0ZSBvZmZzZXQgd2l0aGluIEBwYWdlIGF0IHdoaWNoIHRoZSBi
+bG9jayB0byBlbmNyeXB0IGJlZ2lucw0KPiBAQCAtMjIzLDE3ICsyMjQsMTggQEAgc3RydWN0IHBh
+Z2UgKmZzY3J5cHRfZW5jcnlwdF9wYWdlY2FjaGVfYmxvY2tzKHN0cnVjdCBwYWdlICpwYWdlLA0K
+PiAgKiBFbmNyeXB0IGEgcG9zc2libHktY29tcHJlc3NlZCBmaWxlc3lzdGVtIGJsb2NrIHRoYXQg
+aXMgbG9jYXRlZCBpbiBhbg0KPiAgKiBhcmJpdHJhcnkgcGFnZSwgbm90IG5lY2Vzc2FyaWx5IGlu
+IHRoZSBvcmlnaW5hbCBwYWdlY2FjaGUgcGFnZS4gIFRoZSBAaW5vZGUNCj4gICogYW5kIEBsYmxr
+X251bSBtdXN0IGJlIHNwZWNpZmllZCwgYXMgdGhleSBjYW4ndCBiZSBkZXRlcm1pbmVkIGZyb20g
+QHBhZ2UuDQo+ICsgKiBUaGUgZGVjcnlwdGVkIGRhdGEgd2lsbCBiZSBzdG9yZWQgaW4gQGRzdC4N
+Cj4gICoNCj4gICogUmV0dXJuOiAwIG9uIHN1Y2Nlc3M7IC1lcnJubyBvbiBmYWlsdXJlDQo+ICAq
+Lw0KPiAtaW50IGZzY3J5cHRfZW5jcnlwdF9ibG9ja19pbnBsYWNlKGNvbnN0IHN0cnVjdCBpbm9k
+ZSAqaW5vZGUsIHN0cnVjdCBwYWdlICpwYWdlLA0KPiAtCQkJCSAgdW5zaWduZWQgaW50IGxlbiwg
+dW5zaWduZWQgaW50IG9mZnMsDQo+IC0JCQkJICB1NjQgbGJsa19udW0sIGdmcF90IGdmcF9mbGFn
+cykNCj4gK2ludCBmc2NyeXB0X2VuY3J5cHRfcGFnZShjb25zdCBzdHJ1Y3QgaW5vZGUgKmlub2Rl
+LCBzdHJ1Y3QgcGFnZSAqc3JjLA0KPiArCQkJIHN0cnVjdCBwYWdlICpkc3QsIHVuc2lnbmVkIGlu
+dCBsZW4sIHVuc2lnbmVkIGludCBvZmZzLA0KPiArCQkJIHU2NCBsYmxrX251bSwgZ2ZwX3QgZ2Zw
+X2ZsYWdzKQ0KPiB7DQo+IC0JcmV0dXJuIGZzY3J5cHRfY3J5cHRfYmxvY2soaW5vZGUsIEZTX0VO
+Q1JZUFQsIGxibGtfbnVtLCBwYWdlLCBwYWdlLA0KPiArCXJldHVybiBmc2NyeXB0X2NyeXB0X2Js
+b2NrKGlub2RlLCBGU19FTkNSWVBULCBsYmxrX251bSwgc3JjLCBkc3QsDQo+IAkJCQkgICBsZW4s
+IG9mZnMsIGdmcF9mbGFncyk7DQo+IH0NCj4gLUVYUE9SVF9TWU1CT0woZnNjcnlwdF9lbmNyeXB0
+X2Jsb2NrX2lucGxhY2UpOw0KPiArRVhQT1JUX1NZTUJPTChmc2NyeXB0X2VuY3J5cHRfcGFnZSk7
+DQo+IA0KPiAvKioNCj4gICogZnNjcnlwdF9kZWNyeXB0X3BhZ2VjYWNoZV9ibG9ja3MoKSAtIERl
+Y3J5cHQgZmlsZXN5c3RlbSBibG9ja3MgaW4gYQ0KPiBAQCAtMjgwLDkgKzI4MiwxMCBAQCBpbnQg
+ZnNjcnlwdF9kZWNyeXB0X3BhZ2VjYWNoZV9ibG9ja3Moc3RydWN0IHBhZ2UgKnBhZ2UsIHVuc2ln
+bmVkIGludCBsZW4sDQo+IEVYUE9SVF9TWU1CT0woZnNjcnlwdF9kZWNyeXB0X3BhZ2VjYWNoZV9i
+bG9ja3MpOw0KPiANCj4gLyoqDQo+IC0gKiBmc2NyeXB0X2RlY3J5cHRfYmxvY2tfaW5wbGFjZSgp
+IC0gRGVjcnlwdCBhIGZpbGVzeXN0ZW0gYmxvY2sgaW4tcGxhY2UNCj4gKyAqIGZzY3J5cHRfZGVj
+cnlwdF9wYWdlKCkgLSBDYWNoZSBhIGRlY3J5cHQgYSBmaWxlc3lzdGVtIGJsb2NrIGluIGEgcGFn
+ZQ0KPiAgKiBAaW5vZGU6ICAgICBUaGUgaW5vZGUgdG8gd2hpY2ggdGhpcyBibG9jayBiZWxvbmdz
+DQo+IC0gKiBAcGFnZTogICAgICBUaGUgcGFnZSBjb250YWluaW5nIHRoZSBibG9jayB0byBkZWNy
+eXB0DQo+ICsgKiBAc3JjOiAgICAgICBUaGUgcGFnZSBjb250YWluaW5nIHRoZSBibG9jayB0byBk
+ZWNyeXB0DQo+ICsgKiBAZHN0OiAgICAgICBUaGUgcGFnZSB3aGljaCB3aWxsIGNvbnRhaW4gdGhl
+IHBsYWluIGRhdGENCj4gICogQGxlbjogICAgICAgU2l6ZSBvZiBibG9jayB0byBkZWNyeXB0LiAg
+VGhpcyBtdXN0IGJlIGEgbXVsdGlwbGUgb2YNCj4gICoJCUZTQ1JZUFRfQ09OVEVOVFNfQUxJR05N
+RU5ULg0KPiAgKiBAb2ZmczogICAgICBCeXRlIG9mZnNldCB3aXRoaW4gQHBhZ2UgYXQgd2hpY2gg
+dGhlIGJsb2NrIHRvIGRlY3J5cHQgYmVnaW5zDQo+IEBAIC0yOTIsMTcgKzI5NSwxOCBAQCBpbnQg
+ZnNjcnlwdF9kZWNyeXB0X3BhZ2VjYWNoZV9ibG9ja3Moc3RydWN0IHBhZ2UgKnBhZ2UsIHVuc2ln
+bmVkIGludCBsZW4sDQo+ICAqIERlY3J5cHQgYSBwb3NzaWJseS1jb21wcmVzc2VkIGZpbGVzeXN0
+ZW0gYmxvY2sgdGhhdCBpcyBsb2NhdGVkIGluIGFuDQo+ICAqIGFyYml0cmFyeSBwYWdlLCBub3Qg
+bmVjZXNzYXJpbHkgaW4gdGhlIG9yaWdpbmFsIHBhZ2VjYWNoZSBwYWdlLiAgVGhlIEBpbm9kZQ0K
+PiAgKiBhbmQgQGxibGtfbnVtIG11c3QgYmUgc3BlY2lmaWVkLCBhcyB0aGV5IGNhbid0IGJlIGRl
+dGVybWluZWQgZnJvbSBAcGFnZS4NCj4gKyAqIFRoZSBlbmNyeXB0ZWQgZGF0YSB3aWxsIGJlIHN0
+b3JlZCBpbiBAZHN0Lg0KPiAgKg0KPiAgKiBSZXR1cm46IDAgb24gc3VjY2VzczsgLWVycm5vIG9u
+IGZhaWx1cmUNCj4gICovDQo+IC1pbnQgZnNjcnlwdF9kZWNyeXB0X2Jsb2NrX2lucGxhY2UoY29u
+c3Qgc3RydWN0IGlub2RlICppbm9kZSwgc3RydWN0IHBhZ2UgKnBhZ2UsDQo+IC0JCQkJICB1bnNp
+Z25lZCBpbnQgbGVuLCB1bnNpZ25lZCBpbnQgb2ZmcywNCj4gLQkJCQkgIHU2NCBsYmxrX251bSkN
+Cj4gK2ludCBmc2NyeXB0X2RlY3J5cHRfcGFnZShjb25zdCBzdHJ1Y3QgaW5vZGUgKmlub2RlLCBz
+dHJ1Y3QgcGFnZSAqc3JjLA0KPiArCQkJIHN0cnVjdCBwYWdlICpkc3QsIHVuc2lnbmVkIGludCBs
+ZW4sIHVuc2lnbmVkIGludCBvZmZzLA0KPiArCQkJIHU2NCBsYmxrX251bSwgZ2ZwX3QgZ2ZwX2Zs
+YWdzKQ0KPiB7DQo+IC0JcmV0dXJuIGZzY3J5cHRfY3J5cHRfYmxvY2soaW5vZGUsIEZTX0RFQ1JZ
+UFQsIGxibGtfbnVtLCBwYWdlLCBwYWdlLA0KPiAtCQkJCSAgIGxlbiwgb2ZmcywgR0ZQX05PRlMp
+Ow0KPiArCXJldHVybiBmc2NyeXB0X2NyeXB0X2Jsb2NrKGlub2RlLCBGU19ERUNSWVBULCBsYmxr
+X251bSwgc3JjLCBkc3QsDQo+ICsJCQkJICAgbGVuLCBvZmZzLCBnZnBfZmxhZ3MpOw0KPiB9DQo+
+IC1FWFBPUlRfU1lNQk9MKGZzY3J5cHRfZGVjcnlwdF9ibG9ja19pbnBsYWNlKTsNCj4gK0VYUE9S
+VF9TWU1CT0woZnNjcnlwdF9kZWNyeXB0X3BhZ2UpOw0KPiANCj4gLyoqDQo+ICAqIGZzY3J5cHRf
+aW5pdGlhbGl6ZSgpIC0gYWxsb2NhdGUgbWFqb3IgYnVmZmVycyBmb3IgZnMgZW5jcnlwdGlvbi4N
+Cj4gZGlmZiAtLWdpdCBhL2luY2x1ZGUvbGludXgvZnNjcnlwdC5oIGIvaW5jbHVkZS9saW51eC9m
+c2NyeXB0LmgNCj4gaW5kZXggZWZjN2Y5Ni4uYzJiNjdkMSAxMDA2NDQNCj4gLS0tIGEvaW5jbHVk
+ZS9saW51eC9mc2NyeXB0LmgNCj4gKysrIGIvaW5jbHVkZS9saW51eC9mc2NyeXB0LmgNCj4gQEAg
+LTI1NSwxNSArMjU1LDM3IEBAIHN0cnVjdCBwYWdlICpmc2NyeXB0X2VuY3J5cHRfcGFnZWNhY2hl
+X2Jsb2NrcyhzdHJ1Y3QgcGFnZSAqcGFnZSwNCj4gCQkJCQkgICAgICB1bnNpZ25lZCBpbnQgbGVu
+LA0KPiAJCQkJCSAgICAgIHVuc2lnbmVkIGludCBvZmZzLA0KPiAJCQkJCSAgICAgIGdmcF90IGdm
+cF9mbGFncyk7DQo+IC1pbnQgZnNjcnlwdF9lbmNyeXB0X2Jsb2NrX2lucGxhY2UoY29uc3Qgc3Ry
+dWN0IGlub2RlICppbm9kZSwgc3RydWN0IHBhZ2UgKnBhZ2UsDQo+IC0JCQkJICB1bnNpZ25lZCBp
+bnQgbGVuLCB1bnNpZ25lZCBpbnQgb2ZmcywNCj4gLQkJCQkgIHU2NCBsYmxrX251bSwgZ2ZwX3Qg
+Z2ZwX2ZsYWdzKTsNCj4gK2ludCBmc2NyeXB0X2VuY3J5cHRfcGFnZShjb25zdCBzdHJ1Y3QgaW5v
+ZGUgKmlub2RlLCBzdHJ1Y3QgcGFnZSAqc3JjLA0KPiArCQkJIHN0cnVjdCBwYWdlICpkc3QsIHVu
+c2lnbmVkIGludCBsZW4sDQo+ICsJCQkgdW5zaWduZWQgaW50IG9mZnMsIHU2NCBsYmxrX251bSwg
+Z2ZwX3QgZ2ZwX2ZsYWdzKTsNCj4gKw0KPiArc3RhdGljIGlubGluZSBpbnQgZnNjcnlwdF9lbmNy
+eXB0X2Jsb2NrX2lucGxhY2UoY29uc3Qgc3RydWN0IGlub2RlICppbm9kZSwNCj4gKwkJCQkJCXN0
+cnVjdCBwYWdlICpwYWdlLA0KPiArCQkJCQkJdW5zaWduZWQgaW50IGxlbiwNCj4gKwkJCQkJCXVu
+c2lnbmVkIGludCBvZmZzLA0KPiArCQkJCQkJdTY0IGxibGtfbnVtLA0KPiArCQkJCQkJZ2ZwX3Qg
+Z2ZwX2ZsYWdzKQ0KPiArew0KPiArCXJldHVybiBmc2NyeXB0X2VuY3J5cHRfcGFnZShpbm9kZSwg
+cGFnZSwgcGFnZSwgbGVuLCBvZmZzLCBsYmxrX251bSwNCj4gKwkJCQkgICAgZ2ZwX2ZsYWdzKTsN
+Cj4gK30NCj4gDQo+IGludCBmc2NyeXB0X2RlY3J5cHRfcGFnZWNhY2hlX2Jsb2NrcyhzdHJ1Y3Qg
+cGFnZSAqcGFnZSwgdW5zaWduZWQgaW50IGxlbiwNCj4gCQkJCSAgICAgdW5zaWduZWQgaW50IG9m
+ZnMpOw0KPiAtaW50IGZzY3J5cHRfZGVjcnlwdF9ibG9ja19pbnBsYWNlKGNvbnN0IHN0cnVjdCBp
+bm9kZSAqaW5vZGUsIHN0cnVjdCBwYWdlICpwYWdlLA0KPiAtCQkJCSAgdW5zaWduZWQgaW50IGxl
+biwgdW5zaWduZWQgaW50IG9mZnMsDQo+IC0JCQkJICB1NjQgbGJsa19udW0pOw0KPiArDQo+ICtp
+bnQgZnNjcnlwdF9kZWNyeXB0X3BhZ2UoY29uc3Qgc3RydWN0IGlub2RlICppbm9kZSwgc3RydWN0
+IHBhZ2UgKnNyYywNCj4gKwkJCSBzdHJ1Y3QgcGFnZSAqZHN0LCB1bnNpZ25lZCBpbnQgbGVuLA0K
+PiArCQkJIHVuc2lnbmVkIGludCBvZmZzLCB1NjQgbGJsa19udW0sIGdmcF90IGdmcF9mbGFncyk7
+DQo+ICsNCj4gK3N0YXRpYyBpbmxpbmUgaW50IGZzY3J5cHRfZGVjcnlwdF9ibG9ja19pbnBsYWNl
+KGNvbnN0IHN0cnVjdCBpbm9kZSAqaW5vZGUsDQo+ICsJCQkJCQlzdHJ1Y3QgcGFnZSAqcGFnZSwN
+Cj4gKwkJCQkJCXVuc2lnbmVkIGludCBsZW4sDQo+ICsJCQkJCQl1bnNpZ25lZCBpbnQgb2ZmcywN
+Cj4gKwkJCQkJCXU2NCBsYmxrX251bSkNCj4gK3sNCj4gKwlyZXR1cm4gZnNjcnlwdF9kZWNyeXB0
+X3BhZ2UoaW5vZGUsIHBhZ2UsIHBhZ2UsIGxlbiwgb2ZmcywgbGJsa19udW0sDQo+ICsJCQkJICAg
+IEdGUF9OT0ZTKTsNCj4gK30NCj4gDQo+IHN0YXRpYyBpbmxpbmUgYm9vbCBmc2NyeXB0X2lzX2Jv
+dW5jZV9wYWdlKHN0cnVjdCBwYWdlICpwYWdlKQ0KPiB7DQo+IC0tIA0KPiAxLjguMy4xDQo+IA0K
+DQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsdXN0cmUt
+ZGV2ZWwgbWFpbGluZyBsaXN0Cmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnCmh0dHA6Ly9s
+aXN0cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZwo=
