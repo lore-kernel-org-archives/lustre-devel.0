@@ -1,54 +1,125 @@
 Return-Path: <lustre-devel-bounces@lists.lustre.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-Received: from pdx1-mailman02.dreamhost.com (pdx1-mailman02.dreamhost.com [64.90.62.194])
+Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id C033FC433EF
-	for <lustre-devel@archiver.kernel.org>; Tue, 24 May 2022 19:34:53 +0000 (UTC)
-Received: from pdx1-mailman02.dreamhost.com (localhost [IPv6:::1])
-	by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id B40C921F728;
-	Tue, 24 May 2022 12:34:51 -0700 (PDT)
-Received: from mxchg03.rrz.uni-hamburg.de (mxchg03.rrz.uni-hamburg.de
- [134.100.38.113])
- by pdx1-mailman02.dreamhost.com (Postfix) with ESMTP id 8F60021F700;
- Tue, 24 May 2022 12:34:40 -0700 (PDT)
-Authentication-Results: mxchg03.rrz.uni-hamburg.de (amavisd-new);
- dkim=pass (2048-bit key) reason="pass (just generated, assumed good)"
- header.d=uni-hamburg.de
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=uni-hamburg.de;
- h=subject:subject:from:from:to:user-agent:mime-version:date
- :date:message-id:content-type:content-type; s=rrzs002; t=
- 1653420878; x=1654284879; bh=scwEbiGaR3n5RR/30s9HBMmOmPhblCcEZCS
- 5qazCAZE=; b=pIMzJRSfZEMhez2aPAyIFcuBr6iLx5Uy2NFEZbqSmTacKz4yJgb
- xeofDhaHEILwZ5f0GBZzsatLXqHo5ZjELb9y7FrkFsEX7yjDF46ImvPTwnlkPffF
- DwbBTOfmj02fOBF/BxzjFgnJvDHxWZH31I1fzypcZxNBmzYnhUsNtcSVjiz6biG9
- IVOLMji1Wej99yjz4ankQzPsquuzT79k4fWRdEw6Gf6m3Am0Os7S1VoMT+bcwsvY
- rL/qFdXw0gXgEX+3pSPrSOYQ9J0KPrNDyMdnGN+Tj0k1XTSwnIFKIzmzlr0TqYWM
- xoYLrogDEjgmWRDUifiFQiAfqNWbPNK65/w==
-X-Virus-Scanned: by University of Hamburg ( RRZ / mgw05.rrz.uni-hamburg.de )
-Received: from exchange.uni-hamburg.de (UN-EX-MR03.uni-hamburg.de
- [134.100.84.70]) by mxchg03.rrz.uni-hamburg.de (Postfix) with ESMTPS;
- Tue, 24 May 2022 21:34:38 +0200 (CEST)
-Received: from [192.168.178.28] (46.59.212.222) by UN-EX-MR03.uni-hamburg.de
- (134.100.84.70) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.2507.9; Tue, 24
- May 2022 21:34:37 +0200
-Message-ID: <d7a983ae-4aa8-1e25-4755-e4417e7a93c1@informatik.uni-hamburg.de>
-Date: Tue, 24 May 2022 21:34:34 +0200
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 47906C43334
+	for <lustre-devel@archiver.kernel.org>; Fri, 17 Jun 2022 05:50:39 +0000 (UTC)
+Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4LPSnT64zpz22rR;
+	Thu, 16 Jun 2022 22:50:37 -0700 (PDT)
+Received: from NAM12-BN8-obe.outbound.protection.outlook.com
+ (mail-bn8nam12on2056.outbound.protection.outlook.com [40.107.237.56])
+ by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id
+ 4LPSnR1GSYz1wP3; Thu, 16 Jun 2022 22:50:35 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=XHDTEIVbFtmAhaoLhSAgHLGqSVdkeIQQ3mZ040bLToWIhA4R7avDeHWSXsyH27kwDczWov9zX3SXU6QNOF/sq0MYbgr+zzMJ9q4niJfMKzx0WRn0OIUB3q6pDnAhrC1xdH90oqKY+VIBFhdIAvB3uCva4Cv07bp8okSGttCKZ1N5/+S1qR/p0PPTd4hN+XRgeYeehz/aRDysN+5nDHelLiRWy52i44c/VWI2QUG1k/pjYTTpEX17kQvZNILi4U0eyJ+pU+VuyHbeUQL4iyKiRxEOkt+1vZ0JNtEI32zjHOcAS2CkK26JAvd0M/ktVjtV+ECLixAJ4+DHard30B4EdA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=A4GNkAljrasTDiztoSgsbT/zNWvLgtUVim2Q2KTsh+o=;
+ b=jwjnqoKDESEWfNuh+Y+9wsLgazreCCippBhFn7goaSHBPGhMJvCf02cQkCYBGytYH1FMcnuYHLO5QxC63LBGiLvzJ7T3lhTyQNx+jWqIFy//phRA7tpNQLXYoV+yodyyrCWb16Ie9wpuZvShVMul21NUKvH1mSwLfiPO3ZSxIh8S7YYAAcGP+/SvIU1jOeZNyh4GPdrSrlzm/hD1HXiDSdIL6x9eUuCTSygp2zlIxYMxISe8ITCYfedrrRPM9s+Uclm0dZQXmmdjKw2WkBIUhBYNX6nbrUczLdEZwdYht5jsaHoJgygbSI9fgpD8Rjnh7EiiZUG9IHPmpQ8NqNtKcw==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=whamcloud.com; dmarc=pass action=none
+ header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=A4GNkAljrasTDiztoSgsbT/zNWvLgtUVim2Q2KTsh+o=;
+ b=KgN4jSj8lpgt5ABaoyLToRkZuE9+C2p2r/hodUsBbDiaUpV7WtOb+pkUyAnmliZGD6ekhaDUOHyLi3dDJ8gfNgc4DRMMLoY/GOGO5QPhRkAKAXY78qY6CQ3SS+NngvWVEBKQoSoANp6kYs7Owxcng+LprWvH3xW3yutltiANjUA=
+Received: from BL1PR19MB6034.namprd19.prod.outlook.com (2603:10b6:208:39d::12)
+ by CY4PR19MB0966.namprd19.prod.outlook.com (2603:10b6:903:a5::12)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.5353.16; Fri, 17 Jun
+ 2022 05:50:32 +0000
+Received: from BL1PR19MB6034.namprd19.prod.outlook.com
+ ([fe80::f010:da3c:d122:b7b1]) by BL1PR19MB6034.namprd19.prod.outlook.com
+ ([fe80::f010:da3c:d122:b7b1%6]) with mapi id 15.20.5353.014; Fri, 17 Jun 2022
+ 05:50:32 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
+ "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
+ "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>, lustre-discuss
+ <lustre-discuss-bounces@lists.lustre.org>
+Thread-Topic: Lustre 2.15.0 released
+Thread-Index: AQHYgg4obrfqvCamP0qp4lyuA0EhMQ==
+Date: Fri, 17 Jun 2022 05:50:32 +0000
+Message-ID: <CAD790CA-E64C-4471-82F7-687881599449@ddn.com>
+Accept-Language: en-CA, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Microsoft-MacOutlook/16.61.22050700
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=whamcloud.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 9b83f8ae-3fd9-4afb-32d7-08da50254ae0
+x-ms-traffictypediagnostic: CY4PR19MB0966:EE_
+x-microsoft-antispam-prvs: <CY4PR19MB09663CC71BF3084F77EAA881DAAF9@CY4PR19MB0966.namprd19.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: p2bNsmW3Q6WObVUMeNtiQSO2KOBHaMqTD+L4MliKTJ/CEdqN6AgZCJnSXxXTX6lpygMr+QcY2jVQWxTOH3qRnsSy/e5YwVROdEs0oe92yCxwJ74f76MR35u2b5hWoi5RwSwZ+ptmBzyIBY4bnYpCMHmtPpmP2apyVhUqQ4fcG1jXr/Xxl1KpYr/mXbOaKAoVZG3VXSB8YzNS48lnU7khFTSBHnM7sdZ95JJNsNNbhMnRe/5uqq5Hl57BpmBYn8sT+tFYEz1/7IeNYJHXbaOzwCL/vqxd6/e2IT6dotWEp1KvqmsTmkNlmygucuhM0bIuilBvO4TMU3rTAI+GNExA+xTg5vBqMKeMnbXbx5syM/mz0GasnD7ZTnFnt9RXvqp4u9Fw++6AHEHZQkfJzkp1CFKZfwumXuBFsKLpy4Ez/QZw5GUHqBZBhr5bLndeGIXf9xRQsYShfku+Zopvi1YtHLNiM3MSRg3mGV84E4KhqZQHxlp0gGv2YLGTw0KSdmkADOqai0awUvmZPpOm8j9PnOt79B4a82mwApQS5Pu7OR8eX5bOI79mu+ZrXOrDUx+EnH0HnBjiw2O2GtQkT23H/7P1fDPEgGCAt/hxl/k6QtCkbz+bVSo50ZcLW1An1pEKaxx0q3PFWoiySoHowv0V3PjccpN7AkT+avDYU7pS/AOTEMuiAFE78YBOOHELe49wy6Tt/Lzq3MkABu0Kg0Jt2N07wmQPFT0+w1PvpmCfVwLIwH71cQKipJ+iKreTO1/7J1aSXI/7/DGetvzZaE5GzajtzHCspwpZY66Q0mYdoBv5z9gpofJfVMOE1BQ8pVhFUk9VKJhK25Z0juLA5enT49MNTtP1OgCqwypg2Q/C2g0=
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:BL1PR19MB6034.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230016)(4636009)(366004)(122000001)(110136005)(9686003)(6506007)(66946007)(6512007)(66476007)(86362001)(38070700005)(186003)(6486002)(38100700002)(7116003)(4744005)(5660300002)(71200400001)(8936002)(508600001)(316002)(36756003)(83380400001)(76116006)(2906002)(33656002)(166002)(91956017)(66556008)(64756008)(8676002)(66446008)(13693001);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 2
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?bUF4TVVtQWZjK056R3hGTjVXRElwK3JaUW8rSTRoblZVQUZOVUZ2UFczWUVE?=
+ =?utf-8?B?RHlTYUR3dnBRUDZRQ1cwOE9QT2paUElCRElHWUZLRkFuWUNhT21ka3ErbHcy?=
+ =?utf-8?B?SlorY2sybEo1L0lPZHZKVDVociswa1hjSmZaOUphQVBwUFBhNDMrSGRlUGNC?=
+ =?utf-8?B?ZjM4WjVBQzVWT3V2bFoyZ2NPNFZjRzIzb05zMVdUMzIweGxKcXVUTlZnQjdn?=
+ =?utf-8?B?V2MybzVrL1c4Z3cwaUF5UkJPVllHYWZQSmxodyt4WmdsTTRzdTF2SlZpcTNM?=
+ =?utf-8?B?dk9DUzJjQmhoVW9raHZkZklaVXFxWTh5KzdZQThaT1Fha1kwWkJKMU1JYUFL?=
+ =?utf-8?B?bC9LNjVhZTBkOHlUd3FjeEZGOThDWnJnenZUeHBHZVordHFpU0VQeVVpQ3dN?=
+ =?utf-8?B?eGZBdEdUbEI5M0MyakttNnZkLzBsRmNYYmFsYitrTlBHcW9pZmo5RjBibGJ2?=
+ =?utf-8?B?blN3RUtISUNTN3hjYnRFYnRaTmtxMDNsQ3F1ZWFDN09wUjhZTzNjTmhJejd5?=
+ =?utf-8?B?ZTZzSlU0UUFYcjRuMDdPMlVUeFBYd2F1d0tKaS9ITEdVR0Y3bmk1dktOYTYw?=
+ =?utf-8?B?NHFWbUJYRUV0MEJVTEtyMGhJTUxTN3BqMCsyaWc1UHdCNHNQYVd5WWhIUWVB?=
+ =?utf-8?B?Rk81eVJOM0dkTklIWlFxazhERHRwUm5JUTZHUjFlaWZSWWtzdG5XVTlHazRM?=
+ =?utf-8?B?YXUyTTJwOURYZ0dCb0ZyNnNPMFVrR2FuWEwxSTZRSnQrdUJzcVZrU0hsaWJ0?=
+ =?utf-8?B?ZDZKSVk2d2FFU3NiZG9WWVhnSXVDdGExVHliWWJoZ2NWQ1Fsa2ppa3R6Zzhp?=
+ =?utf-8?B?ZmNOZnVua1BJOU5KY0E5UDBRQmdTRkNhWStTWjEzR29LdVJLN0J4bG5wc2pm?=
+ =?utf-8?B?THdSYitUOEtDaHQ3SCsvdE40eGt1aGRwUEJSSjRZNXJvS28wNnM4NENRRDFC?=
+ =?utf-8?B?dFB1aXNrcGN5ZnBwN2pWNW9IRzlURGZNOXVPdUE0S25IZ3BmcTJObW5oTnR2?=
+ =?utf-8?B?VXFSTWJrL3lmWjl5dDJrS0N0NmhzTXdTTUFNdHg1eG5jcEhDVmlQV2xpN2dN?=
+ =?utf-8?B?M3Z6aU1zcXdkRHNCUTlia0ZpV3VrVEdGeDIwSGtYdXNDdGJsQTlQY3V6WGNU?=
+ =?utf-8?B?bS9XemxzSG5iRUtHY001RGczSlgyVFlWaUMveWRhdmwzVkgvVW0rRW5MblRz?=
+ =?utf-8?B?Z3ZEYTBiQTZVeXZQaGdsMThDSGVIRkdFMllTTGdDUkx1bUR4dWhLM01CbFJW?=
+ =?utf-8?B?WmVDZ2RqSUxpZExUeTNjd01Va0o0bkNGWWJRdXNib0kvdEtDbkQyL2ZPcitO?=
+ =?utf-8?B?NmxUVkJaUjlVaktnZVdRN2lLeVkrK2QvNnJocXhMQ0RONlhwcmsxU2lqM0Ns?=
+ =?utf-8?B?LytMSFZmc29zaGRicDErMmVyeWExZE8wZDA4cFNhZXNjMEVrL3YxUXdRMity?=
+ =?utf-8?B?UlhpMzdGYmxtSWt4bkhLbGNNcnErN2xadzZjN0IvcTVvMTFDLzhFZ2x5emVV?=
+ =?utf-8?B?WFI3Z0JmWHpHaFVnL2JFU3dDbDBZN2VIdDZVaHExUEpRQ2NRcDZOREdLNUtU?=
+ =?utf-8?B?R3BMbThhM2xUUGs1RmlVMXNSS1pTQmZ5dTJoZ09aeGJHQWZjdkdxRG5FdnMx?=
+ =?utf-8?B?Y0s1SXI0SWRRREhOdmQvdDhweDk4YWFES2p3SEkydnVIZ09YbjRkRXdxNVFn?=
+ =?utf-8?B?YUVQeXFJOEVlTm9ML0E3MWQ4SklwV1UyYlMrK2pZdEJOamJFRVU3RnplUFhN?=
+ =?utf-8?B?N1ZMY1lZOWtVbGhuL2ppR1I3ZmpwSzVNSDQ0d0t5bWcrT0FESGk4Uy9vNlM3?=
+ =?utf-8?B?Ym13VzFHSmVCSG1yQWR6alUrTFBFcTlFT0IrdkhyblpMMTRSZGpnN2UrRGdD?=
+ =?utf-8?B?bm1YdTNNSU1QbEJrSlVIZERhOVp6K0c4ZnhReDhIak9ZV1VRVUIzQXdaMjBS?=
+ =?utf-8?B?bFJSbFZGMG5GSXh5ZmJ6ZnA4eTV3VWpXRTM4d2xrTWRQaklzUm1lRmtibEtS?=
+ =?utf-8?B?YVRSZGR3bWdYdkwycThzY0VPeHIwTHBrbmI3blpWRkJiZ093MXNhdEVzTks2?=
+ =?utf-8?B?OUd3MzFrWGg3a2dub1l3eXQ5WTlDZ1d1bGx2alA5VXdrNk1FY0RQa0RSQXht?=
+ =?utf-8?B?VFMrdWNvZCtVbStyYTlzRzFPcUZSaWpsYUV6N2Jha1RmeVJHU1k2N3VSUzYr?=
+ =?utf-8?B?ZzRMTzM3dXowdEJmYi9MamJSQ1FXVnkwSDJ2ZGpIV3doRW1oNVdkOERwWVhp?=
+ =?utf-8?B?Qyszd09EV3p6dENsMG9PT2VlQkdUZG1oa28xOVlBNEJJVm5DS0s1Rkd6VHZG?=
+ =?utf-8?B?cHNoNllZdjRxY29TS2R0REJBOVlONGVqU0pyS296djBPYlNKdGlWY0pWWERm?=
+ =?utf-8?Q?nzG/rOi6oeE9q5Sx9w7K5DSA2ld0dmBNElqwdDd42SVcB?=
+x-ms-exchange-antispam-messagedata-1: CzYZZVXTHiql5Q==
 MIME-Version: 1.0
-User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:91.0) Gecko/20100101
- Thunderbird/91.9.1
-To: <lustre-discuss@lists.lustre.org>, Lustre Development List
- <lustre-devel@lists.lustre.org>
-X-Antivirus: Avast (VPS 220524-4, 24.5.2022), Outbound message
-X-Antivirus-Status: Clean
-X-Originating-IP: [46.59.212.222]
-X-ClientProxiedBy: UN-EX-MR02.uni-hamburg.de (134.100.84.69) To
- UN-EX-MR03.uni-hamburg.de (134.100.84.70)
-Subject: [lustre-devel] I/O in HPC applications and systems SURVEY
+X-OriginatorOrg: whamcloud.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: BL1PR19MB6034.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9b83f8ae-3fd9-4afb-32d7-08da50254ae0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Jun 2022 05:50:32.5940 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: h+dq//4wnfHTYRaoDQKLePrYa8SF8Ys4Psqi7OOTW8VTduP48bJjHtZiPu6M7/sg
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR19MB0966
+Subject: [lustre-devel] Lustre 2.15.0 released
 X-BeenThere: lustre-devel@lists.lustre.org
-X-Mailman-Version: 2.1.23
+X-Mailman-Version: 2.1.39
 Precedence: list
 List-Id: "For discussing Lustre software development."
  <lustre-devel-lustre.org>
@@ -59,98 +130,143 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Anna Fuchs via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
-Content-Type: multipart/mixed; boundary="===============2557996004510042123=="
+From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Peter Jones <pjones@whamcloud.com>
+Content-Type: multipart/mixed; boundary="===============2631694092625978108=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============2557996004510042123==
+--===============2631694092625978108==
+Content-Language: en-US
 Content-Type: multipart/alternative;
-	boundary="------------ZNLduPgXpuIDu9CFM0F4TJQM"
+	boundary="_000_CAD790CAE64C447182F7687881599449ddncom_"
 
---------------ZNLduPgXpuIDu9CFM0F4TJQM
-Content-Type: text/plain; charset="UTF-8"; format=flowed
-Content-Transfer-Encoding: 8bit
+--_000_CAD790CAE64C447182F7687881599449ddncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Dear all,
+V2UgYXJlIHBsZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTUuMCBSZWxlYXNl
+IGhhcyBiZWVuIGRlY2xhcmVkIEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yIGRvd25sb2FkPGh0dHBz
+Oi8vZG93bmxvYWRzLndoYW1jbG91ZC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4xNS4wLz4g
+PGh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwuY29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIu
+MTEuMC8+IC4gWW91IGNhbiBhbHNvIGdyYWIgdGhlIHNvdXJjZSBmcm9tIGdpdDxodHRwczovL2dp
+dC53aGFtY2xvdWQuY29tLz9wPWZzL2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDtoPTc0NTU4
+MGExNDE5NjVmYjhkNGQzYWQ1NjExZDk4YjllNzJjMzUwYjY+DQoNClRoaXMgbWFqb3IgcmVsZWFz
+ZSBpbmNsdWRlcyBuZXcgZmVhdHVyZXM6DQoNCkNsaWVudCBEaXJlY3RvcnkgRW5jcnlwdGlvbiBB
+IG1lY2hhbmlzbSBsZXZlcmFnaW5nIGZzY3J5cHQgaGFzIGJlZW4gaW50cm9kdWNlZCB0byBhbGxv
+dyBmaWxlIG5hbWVzIHRvIGJlIGVuY3J5cHRlZCBvbiB0aGUgY2xpZW50IGJlZm9yZSBuZXR3b3Jr
+IHRyYW5zZmVyIGFuZCBwZXJzaXN0ZW50IE9TVCBhbmQgTURUIHN0b3JhZ2UgKExVLTEzNzE3PGh0
+dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xMzcxNz4pDQoNCk5ldHdvcmsgU2Vs
+ZWN0aW9uIFBvbGljeSAoVURTUCkgQWxsb3dzIGNyZWF0aW9uIG9mIHBvbGljaWVzIGFib3V0IHdo
+aWNoIG5ldHdvcmsgaW50ZXJmYWNlcyB0byB1c2UgdW5kZXIgZ2l2ZW4gY2lyY3Vtc3RhbmNlcyAo
+TFUtOTEyMTxodHRwczovL2ppcmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtOTEyMT4pDQoNCkZ1
+bGxlciBkZXRhaWxzIGFib3V0IHRoaXMgcmVsZWFzZSBjYW4gYmUgZm91bmQgaW4gdGhlIDIuMTUg
+d2lraSBwYWdlIDxodHRwOi8vd2lraS5sdXN0cmUub3JnL1JlbGVhc2VfMi4xNS4wPiAoaW5jbHVk
+aW5nIHRoZSBjaGFuZ2UgbG9nIDxodHRwOi8vd2lraS5sdXN0cmUub3JnL0x1c3RyZV8yLjE0LjBf
+Q2hhbmdlbG9nPiBhbmQgdGVzdCBtYXRyaXg8aHR0cHM6Ly93aWtpLmx1c3RyZS5vcmcvUmVsZWFz
+ZV8yLjE1LjAjVGVzdF9NYXRyaXg+KQ0KDQpMdXN0cmUgMi4xNS54IHdpbGwgYmUgdGhlIG5ldyBM
+VFMgc3RyZWFtIGFuZCBhIDIuMTUuMSByZWxlYXNlIHdpbGwgYmUgaXNzdWVkIHNob3J0bHkgdG8g
+cHJvdmlkZSBzdXBwb3J0IGZvciByZWNlbnQgTGludXggZGlzdHJpYnV0aW9ucy4NCg0KUGxlYXNl
+IGxvZyBhbnkgaXNzdWVzIGZvdW5kIGluIHRoZSBpc3N1ZSB0cmFja2luZyBzeXN0ZW08aHR0cHM6
+Ly9qaXJhLndoYW1jbG91ZC5jb20vPg0KDQpUaGFua3MgdG8gYWxsIHRob3NlIHdobyBoYXZlIGNv
+bnRyaWJ1dGVkIHRvIHRoZSBjcmVhdGlvbiBvZiB0aGlzIHJlbGVhc2UuDQoNCg==
 
-I have prepared a survey 'I/O in HPC applications and systems' for my 
-studies about compression in Lustre.
-I would be excited if you would fill in the survey and forward the link 
-to any user or admin of an HPC system.
-https://www.limesurvey.uni-hamburg.de/index.php/237926?lang=en
+--_000_CAD790CAE64C447182F7687881599449ddncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <753C75251608B745A561651DC559CBB4@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: base64
 
-The most questions are of type multiple choice and it will take you 
-about 5-10 minutes.
-I would share the results later, if desired.
+PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
+bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
+dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
+dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
+dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
+dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
+bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
+ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
+IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
+IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQpAZm9udC1mYWNlDQoJe2ZvbnQtZmFtaWx5OiJUaW1lcyBO
+ZXcgUm9tYW4gXChCb2R5IENTXCkiOw0KCXBhbm9zZS0xOjIgMiA2IDMgNSA0IDUgMiAzIDQ7fQ0K
+LyogU3R5bGUgRGVmaW5pdGlvbnMgKi8NCnAuTXNvTm9ybWFsLCBsaS5Nc29Ob3JtYWwsIGRpdi5N
+c29Ob3JtYWwNCgl7bWFyZ2luOjBjbTsNCglmb250LXNpemU6MTIuMHB0Ow0KCWZvbnQtZmFtaWx5
+OiJDYWxpYnJpIixzYW5zLXNlcmlmO30NCmE6bGluaywgc3Bhbi5Nc29IeXBlcmxpbmsNCgl7bXNv
+LXN0eWxlLXByaW9yaXR5Ojk5Ow0KCWNvbG9yOiMwNTYzQzE7DQoJdGV4dC1kZWNvcmF0aW9uOnVu
+ZGVybGluZTt9DQouTXNvQ2hwRGVmYXVsdA0KCXttc28tc3R5bGUtdHlwZTpleHBvcnQtb25seTsN
+Cglmb250LXNpemU6MTAuMHB0O30NCkBwYWdlIFdvcmRTZWN0aW9uMQ0KCXtzaXplOjYxMi4wcHQg
+NzkyLjBwdDsNCgltYXJnaW46NzIuMHB0IDcyLjBwdCA3Mi4wcHQgNzIuMHB0O30NCmRpdi5Xb3Jk
+U2VjdGlvbjENCgl7cGFnZTpXb3JkU2VjdGlvbjE7fQ0KLS0+PC9zdHlsZT4NCjwvaGVhZD4NCjxi
+b2R5IGxhbmc9IkVOLUNBIiBsaW5rPSIjMDU2M0MxIiB2bGluaz0iIzk1NEY3MiIgc3R5bGU9Indv
+cmQtd3JhcDpicmVhay13b3JkIj4NCjxkaXYgY2xhc3M9IldvcmRTZWN0aW9uMSI+DQo8cCBjbGFz
+cz0iTXNvTm9ybWFsIj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj5XZSBh
+cmUgcGxlYXNlZCB0byBhbm5vdW5jZSB0aGF0IHRoZSBMdXN0cmUgMi4xPC9zcGFuPjxzcGFuIGxh
+bmc9IkVOLVVTIj41PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4uMCBSZWxlYXNlIGhhcyBiZWVu
+IGRlY2xhcmVkIEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yJm5ic3A7PC9zcGFuPjwvc3Bhbj48YSBo
+cmVmPSJodHRwczovL2Rvd25sb2Fkcy53aGFtY2xvdWQuY29tL3B1YmxpYy9sdXN0cmUvbHVzdHJl
+LTIuMTUuMC8iPjxzcGFuIGxhbmc9IkVOLVVTIj5kb3dubG9hZDwvc3Bhbj48L2E+PGEgaHJlZj0i
+aHR0cHM6Ly9kb3dubG9hZHMuaHBkZC5pbnRlbC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4x
+MS4wLyI+PHNwYW4gbGFuZz0iRU4tVVMiPiZuYnNwOzwvc3Bhbj48L2E+PHNwYW4gbGFuZz0iRU4t
+VVMiIHN0eWxlPSJjb2xvcjpibGFjayI+Lg0KIFlvdSBjYW4gYWxzbyBncmFiIHRoZSBzb3VyY2Ug
+ZnJvbSZuYnNwOzwvc3Bhbj48YSBocmVmPSJodHRwczovL2dpdC53aGFtY2xvdWQuY29tLz9wPWZz
+L2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDtoPTc0NTU4MGExNDE5NjVmYjhkNGQzYWQ1NjEx
+ZDk4YjllNzJjMzUwYjYiPjxzcGFuIGxhbmc9IkVOLVVTIj5naXQ8L3NwYW4+PC9hPjwvcD4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2si
+PiZuYnNwOzwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBsYW5nPSJFTi1V
+UyIgc3R5bGU9ImNvbG9yOmJsYWNrIj5UaGlzIG1ham9yIHJlbGVhc2UgaW5jbHVkZXMgbmV3IGZl
+YXR1cmVzOiZuYnNwOzwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBsYW5n
+PSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PC9wPg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCI+PGI+PHNwYW4gbGFuZz0iRU4tVVMiPkNsaWVudCBEaXJlY3RvcnkgRW5jcnlw
+dGlvbjwvc3Bhbj48L2I+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+Jm5i
+c3A7QSBtZWNoYW5pc20gbGV2ZXJhZ2luZyBmc2NyeXB0IGhhcyBiZWVuIGludHJvZHVjZWQgdG8g
+YWxsb3cgZmlsZQ0KPC9zcGFuPjxzcGFuIGxhbmc9IkVOLVVTIj5uYW1lczxzcGFuIHN0eWxlPSJj
+b2xvcjpibGFjayI+IHRvIGJlIGVuY3J5cHRlZCBvbiB0aGUgY2xpZW50Jm5ic3A7YmVmb3JlIG5l
+dHdvcmsgdHJhbnNmZXIgYW5kIHBlcnNpc3RlbnQgT1NUIGFuZCBNRFQgc3RvcmFnZSAoPC9zcGFu
+Pjwvc3Bhbj48YSBocmVmPSJodHRwczovL2ppcmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTM3
+MTciPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6d2luZG93dGV4dCI+TFUtMTM3MTc8
+L3NwYW4+PC9hPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPik8L3NwYW4+
+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTQuMHB0Ij48bzpwPiZu
+YnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48Yj48c3BhbiBsYW5n
+PSJFTi1VUyI+TmV0d29yayBTZWxlY3Rpb24gUG9saWN5IChVRFNQKTwvc3Bhbj48L2I+PHNwYW4g
+bGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+Jm5ic3A7PC9zcGFuPkFsbG93cyBjcmVh
+dGlvbiBvZiBwb2xpY2llcyBhYm91dCB3aGljaCBuZXR3b3JrIGludGVyZmFjZXMgdG8gdXNlIHVu
+ZGVyIGdpdmVuIGNpcmN1bXN0YW5jZXMNCjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6
+YmxhY2siPig8L3NwYW4+PGEgaHJlZj0iaHR0cHM6Ly9qaXJhLndoYW1jbG91ZC5jb20vYnJvd3Nl
+L0xVLTkxMjEiPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6d2luZG93dGV4dCI+TFUt
+OTEyMTwvc3Bhbj48L2E+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+KTxv
+OnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9IkVO
+LVVTIj4mbmJzcDs8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48L3NwYW4+
+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xv
+cjpibGFjayI+RnVsbGVyIGRldGFpbHMgYWJvdXQgdGhpcyByZWxlYXNlIGNhbiBiZSBmb3VuZCBp
+biZuYnNwO3RoZSZuYnNwOzwvc3Bhbj48YSBocmVmPSJodHRwOi8vd2lraS5sdXN0cmUub3JnL1Jl
+bGVhc2VfMi4xNS4wIj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOndpbmRvd3RleHQi
+PjIuMTUgd2lraSBwYWdlJm5ic3A7PC9zcGFuPjwvYT48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9
+ImNvbG9yOmJsYWNrIj4oaW5jbHVkaW5nJm5ic3A7dGhlJm5ic3A7PC9zcGFuPjxhIGhyZWY9Imh0
+dHA6Ly93aWtpLmx1c3RyZS5vcmcvTHVzdHJlXzIuMTQuMF9DaGFuZ2Vsb2ciPjxzcGFuIGxhbmc9
+IkVOLVVTIj5jaGFuZ2UNCiBsb2cmbmJzcDs8L3NwYW4+PC9hPjxzcGFuIGxhbmc9IkVOLVVTIiBz
+dHlsZT0iY29sb3I6YmxhY2siPmFuZCZuYnNwOzwvc3Bhbj48YSBocmVmPSJodHRwczovL3dpa2ku
+bHVzdHJlLm9yZy9SZWxlYXNlXzIuMTUuMCNUZXN0X01hdHJpeCI+PHNwYW4gbGFuZz0iRU4tVVMi
+PnRlc3QgbWF0cml4PC9zcGFuPjwvYT48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJs
+YWNrIj4pPG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4g
+bGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+
+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xv
+cjpibGFjayI+THVzdHJlIDIuMTUueCB3aWxsIGJlIHRoZSBuZXcgTFRTIHN0cmVhbSBhbmQgYSAy
+LjE1LjEgcmVsZWFzZSB3aWxsIGJlIGlzc3VlZCBzaG9ydGx5IHRvIHByb3ZpZGUgc3VwcG9ydCBm
+b3IgcmVjZW50IExpbnV4IGRpc3RyaWJ1dGlvbnMuPC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29O
+b3JtYWwiPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bh
+bj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNv
+bG9yOmJsYWNrIj5QbGVhc2UgbG9nIGFueSBpc3N1ZXMgZm91bmQgaW4gdGhlJm5ic3A7PC9zcGFu
+PjxhIGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tLyI+PHNwYW4gbGFuZz0iRU4tVVMi
+IHN0eWxlPSJjb2xvcjpwdXJwbGUiPmlzc3VlIHRyYWNraW5nIHN5c3RlbTwvc3Bhbj48L2E+PC9w
+Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpi
+bGFjayI+Jm5ic3A7PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIGxhbmc9
+IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPlRoYW5rcyB0byBhbGwgdGhvc2Ugd2hvIGhhdmUg
+Y29udHJpYnV0ZWQgdG8gdGhlIGNyZWF0aW9uIG9mIHRoaXMgcmVsZWFzZS48L3NwYW4+PC9wPg0K
+PHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiPiZuYnNwOzwvc3Bhbj48L3A+
+DQo8L2Rpdj4NCjwvYm9keT4NCjwvaHRtbD4NCg==
 
-Thank you for the support!
+--_000_CAD790CAE64C447182F7687881599449ddncom_--
 
-Best regards
-Anna
-
--- 
-Anna Fuchs
-Universität Hamburg
-https://wr.informatik.uni-hamburg.de
-
-anna.fuchs@informatik.uni-hamburg.de
-https://wr.informatik.uni-hamburg.de/people/anna_fuchs
-
---------------ZNLduPgXpuIDu9CFM0F4TJQM
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: 8bit
-
-<html>
-  <head>
-
-    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-  </head>
-  <body>
-    <div>
-      <div id="5xi9ekm8kt8378zgmpex8ns5xy_message" class="post__body ">
-        <div class="post-message post-message--collapsed">
-          <div style="max-height: 600px;"
-            class="post-message__text-container">
-            <div aria-readonly="true" tabindex="0"
-              id="postMessageText_5xi9ekm8kt8378zgmpex8ns5xy"
-              class="post-message__text" dir="auto">Dear all,<br>
-              <br>
-              I have prepared a survey 'I/O in HPC applications and
-              systems' for my studies about compression in Lustre.<br>
-              I would be excited if you would fill in the survey and
-              forward the link to any user or admin of an HPC system.<br>
-              <a
-                href="https://www.limesurvey.uni-hamburg.de/index.php/237926?lang=en"
-                target="_blank" class="moz-txt-link-freetext">https://www.limesurvey.uni-hamburg.de/index.php/237926?lang=en</a><br>
-              <br>
-              The most questions are of type multiple choice and it will
-              take you about 5-10 minutes.<br>
-              I would share the results later, if desired.<br>
-              <br>
-              Thank you for the support!<br>
-              <br>
-              Best regards<br>
-              Anna<br>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <pre class="moz-signature" cols="72">-- 
-Anna Fuchs
-Universität Hamburg
-<a class="moz-txt-link-freetext" href="https://wr.informatik.uni-hamburg.de">https://wr.informatik.uni-hamburg.de</a>
-
-<a class="moz-txt-link-abbreviated" href="mailto:anna.fuchs@informatik.uni-hamburg.de">anna.fuchs@informatik.uni-hamburg.de</a>
-<a class="moz-txt-link-freetext" href="https://wr.informatik.uni-hamburg.de/people/anna_fuchs">https://wr.informatik.uni-hamburg.de/people/anna_fuchs</a></pre>
-  </body>
-</html>
-
---------------ZNLduPgXpuIDu9CFM0F4TJQM--
-
---===============2557996004510042123==
+--===============2631694092625978108==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -161,4 +277,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============2557996004510042123==--
+--===============2631694092625978108==--
