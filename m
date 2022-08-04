@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 6C966C19F29
-	for <lustre-devel@archiver.kernel.org>; Thu,  4 Aug 2022 01:39:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8C5A3C19F29
+	for <lustre-devel@archiver.kernel.org>; Thu,  4 Aug 2022 01:39:53 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Lyrxw6ZTGz23L2;
-	Wed,  3 Aug 2022 18:39:48 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Lyry109r8z23Lc;
+	Wed,  3 Aug 2022 18:39:53 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Lyrwc4NGGz23Jk
- for <lustre-devel@lists.lustre.org>; Wed,  3 Aug 2022 18:38:40 -0700 (PDT)
+ 4Lyrwj0k9gz21H0
+ for <lustre-devel@lists.lustre.org>; Wed,  3 Aug 2022 18:38:45 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id DBF55100B02F;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id EF2AF100B036;
  Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id DADA980795; Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
+ id EDA878BBFC; Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Wed,  3 Aug 2022 21:38:05 -0400
-Message-Id: <1659577097-19253-21-git-send-email-jsimmons@infradead.org>
+Date: Wed,  3 Aug 2022 21:38:11 -0400
+Message-Id: <1659577097-19253-27-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
 References: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 20/32] lnet: libcfs: debugfs file_operation
- should have an owner
+Subject: [lustre-devel] [PATCH 26/32] lustre: mdc: pack default LMV in open
+ reply
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,225 +42,108 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-If debugfs a file is open when unloading the libcfs/lnet module, it
-produces a kernel Oops (debugfs file_operations callbacks no longer
-exist).
+Add flag MDS_OPEN_DEFAULT_LMV to indicate that default LMV should be
+packed in open reply, otherwise if open fetches LOOKUP lock, client
+won't know directory has default LMV, and in subdir creation default
+LMV won't take effect.
 
-Crash generated with routerstat (/sys/kernel/debug/lnet/stats):
-[ 1449.750396] IP: [<ffffffffab24e093>] SyS_lseek+0x83/0x100
-[ 1449.750412] PGD 9fa14067 PUD 9fa16067 PMD d4e5d067 PTE 0
-[ 1449.750428] Oops: 0000 [#1] SMP
-[ 1449.750883]  [<ffffffffab7aaf92>] system_call_fastpath+0x25/0x2a
-[ 1449.750897]  [<ffffffffab7aaed5>] ?
-system_call_after_swapgs+0xa2/0x13a
-
-This patch adds an owner to debugfs file_operation for libcfs and
-lnet_router entries (/sys/kernel/debug/lnet/*).
-
-The following behavior is expected:
-$ modprobe lustre
-$ routerstat 10 > /dev/null &
-$ lustre_rmmod
-rmmod: ERROR: Module lnet is in use
-Can't read statfile (ENODEV)
-[1]+  Exit 1                  routerstat 10 > /dev/null
-$ lustre_rmmod
-
-Note that the allocated 'struct file_operations' cannot be freed until
-the module_exit() function is called, as files could still be open
-until then.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15759
-Lustre-commit: b2dfb4457f0f1e56f ("LU-15759 libcfs: debugfs file_operation should have an owner")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/47335
-Reviewed-by: Etienne AUJAMES <eaujames@ddn.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15850
+Lustre-commit: f6e4272fb0be5b798 ("LU-15850 mdt: pack default LMV in open reply")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/47576
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/libcfs/libcfs.h |  4 +++-
- include/linux/lnet/lib-lnet.h |  1 +
- net/lnet/libcfs/module.c      | 43 ++++++++++++++++++++++++++++++++++++-------
- net/lnet/lnet/module.c        |  1 +
- net/lnet/lnet/router_proc.c   | 10 +++++++++-
- 5 files changed, 50 insertions(+), 9 deletions(-)
+ fs/lustre/mdc/mdc_lib.c                 | 1 +
+ fs/lustre/mdc/mdc_locks.c               | 2 ++
+ fs/lustre/ptlrpc/layout.c               | 1 +
+ fs/lustre/ptlrpc/wiretest.c             | 2 ++
+ include/uapi/linux/lustre/lustre_user.h | 5 ++++-
+ 5 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/libcfs/libcfs.h b/include/linux/libcfs/libcfs.h
-index b59ef9b..e29b007 100644
---- a/include/linux/libcfs/libcfs.h
-+++ b/include/linux/libcfs/libcfs.h
-@@ -57,8 +57,10 @@ static inline int notifier_from_ioctl_errno(int err)
- 
- extern struct workqueue_struct *cfs_rehash_wq;
- 
--void lnet_insert_debugfs(struct ctl_table *table);
-+void lnet_insert_debugfs(struct ctl_table *table, struct module *mod,
-+			 void **statep);
- void lnet_remove_debugfs(struct ctl_table *table);
-+void lnet_debugfs_fini(void **statep);
- 
- int debugfs_doint(struct ctl_table *table, int write,
- 		  void __user *buffer, size_t *lenp, loff_t *ppos);
-diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
-index 5a83190..57c8dc2 100644
---- a/include/linux/lnet/lib-lnet.h
-+++ b/include/linux/lnet/lib-lnet.h
-@@ -569,6 +569,7 @@ unsigned int lnet_nid_cpt_hash(struct lnet_nid *nid,
- 
- int lnet_lib_init(void);
- void lnet_lib_exit(void);
-+void lnet_router_exit(void);
- 
- void lnet_mt_event_handler(struct lnet_event *event);
- 
-diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
-index a249bdd..a126683 100644
---- a/net/lnet/libcfs/module.c
-+++ b/net/lnet/libcfs/module.c
-@@ -746,19 +746,23 @@ static ssize_t lnet_debugfs_write(struct file *filp, const char __user *buf,
- 	.llseek		= default_llseek,
- };
- 
--static const struct file_operations *lnet_debugfs_fops_select(umode_t mode)
-+static const struct file_operations *
-+lnet_debugfs_fops_select(umode_t mode, const struct file_operations state[3])
- {
- 	if (!(mode & 0222))
--		return &lnet_debugfs_file_operations_ro;
-+		return &state[0];
- 
- 	if (!(mode & 0444))
--		return &lnet_debugfs_file_operations_wo;
-+		return &state[1];
- 
--	return &lnet_debugfs_file_operations_rw;
-+	return &state[2];
- }
- 
--void lnet_insert_debugfs(struct ctl_table *table)
-+void lnet_insert_debugfs(struct ctl_table *table, struct module *mod,
-+			 void **statep)
- {
-+	struct file_operations *state = *statep;
-+
- 	if (!lnet_debugfs_root)
- 		lnet_debugfs_root = debugfs_create_dir("lnet", NULL);
- 
-@@ -766,6 +770,19 @@ void lnet_insert_debugfs(struct ctl_table *table)
- 	if (IS_ERR_OR_NULL(lnet_debugfs_root))
- 		return;
- 
-+	if (!state) {
-+		state = kmalloc(3 * sizeof(*state), GFP_KERNEL);
-+		if (!state)
-+			return;
-+		state[0] = lnet_debugfs_file_operations_ro;
-+		state[0].owner = mod;
-+		state[1] = lnet_debugfs_file_operations_wo;
-+		state[1].owner = mod;
-+		state[2] = lnet_debugfs_file_operations_rw;
-+		state[2].owner = mod;
-+		*statep = state;
-+	}
-+
- 	/*
- 	 * We don't save the dentry returned because we don't call
- 	 * debugfs_remove() but rather remove_recursive()
-@@ -773,10 +790,18 @@ void lnet_insert_debugfs(struct ctl_table *table)
- 	for (; table && table->procname; table++)
- 		debugfs_create_file(table->procname, table->mode,
- 				    lnet_debugfs_root, table,
--				    lnet_debugfs_fops_select(table->mode));
-+				    lnet_debugfs_fops_select(table->mode,
-+							     (const struct file_operations *)state));
- }
- EXPORT_SYMBOL_GPL(lnet_insert_debugfs);
- 
-+void lnet_debugfs_fini(void **state)
-+{
-+	kfree(*state);
-+	*state = NULL;
-+}
-+EXPORT_SYMBOL_GPL(lnet_debugfs_fini);
-+
- static void lnet_insert_debugfs_links(
- 	const struct lnet_debugfs_symlink_def *symlinks)
- {
-@@ -801,6 +826,8 @@ void lnet_remove_debugfs(struct ctl_table *table)
- static DEFINE_MUTEX(libcfs_startup);
- static int libcfs_active;
- 
-+static void *debugfs_state;
-+
- int libcfs_setup(void)
- {
- 	int rc = -EINVAL;
-@@ -855,7 +882,7 @@ static int libcfs_init(void)
- {
- 	int rc;
- 
--	lnet_insert_debugfs(lnet_table);
-+	lnet_insert_debugfs(lnet_table, THIS_MODULE, &debugfs_state);
- 	if (!IS_ERR_OR_NULL(lnet_debugfs_root))
- 		lnet_insert_debugfs_links(lnet_debugfs_symlinks);
- 
-@@ -875,6 +902,8 @@ static void libcfs_exit(void)
- 	debugfs_remove_recursive(lnet_debugfs_root);
- 	lnet_debugfs_root = NULL;
- 
-+	lnet_debugfs_fini(&debugfs_state);
-+
- 	if (cfs_rehash_wq)
- 		destroy_workqueue(cfs_rehash_wq);
- 
-diff --git a/net/lnet/lnet/module.c b/net/lnet/lnet/module.c
-index aba9589..9d7b39a 100644
---- a/net/lnet/lnet/module.c
-+++ b/net/lnet/lnet/module.c
-@@ -271,6 +271,7 @@ static void __exit lnet_exit(void)
- 						&lnet_ioctl_handler);
- 	LASSERT(!rc);
- 
-+	lnet_router_exit();
- 	lnet_lib_exit();
- }
- 
-diff --git a/net/lnet/lnet/router_proc.c b/net/lnet/lnet/router_proc.c
-index f231da1..689670a 100644
---- a/net/lnet/lnet/router_proc.c
-+++ b/net/lnet/lnet/router_proc.c
-@@ -888,12 +888,20 @@ static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
+index 51080a1..077639d 100644
+--- a/fs/lustre/mdc/mdc_lib.c
++++ b/fs/lustre/mdc/mdc_lib.c
+@@ -329,6 +329,7 @@ void mdc_open_pack(struct req_capsule *pill, struct md_op_data *op_data,
+ 			rec->cr_archive_id = op_data->op_archive_id;
+ 		}
  	}
++	cr_flags |= MDS_OPEN_DEFAULT_LMV;
+ 	set_mrc_cr_flags(rec, cr_flags);
+ }
+ 
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index b86d1b9..2a9b9a8 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -393,6 +393,8 @@ static int mdc_save_lovea(struct ptlrpc_request *req, void *data, u32 size)
+ 	 */
+ 	req_capsule_set_size(&req->rq_pill, &RMF_NIOBUF_INLINE, RCL_SERVER,
+ 			     sizeof(struct niobuf_remote));
++	req_capsule_set_size(&req->rq_pill, &RMF_DEFAULT_MDT_MD, RCL_SERVER,
++			     sizeof(struct lmv_user_md));
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	/* Get real repbuf allocated size as rounded up power of 2 */
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index 8725edd..82ec899 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -447,6 +447,7 @@
+ 	&RMF_NIOBUF_INLINE,
+ 	&RMF_FILE_SECCTX,
+ 	&RMF_FILE_ENCCTX,
++	&RMF_DEFAULT_MDT_MD,
  };
  
-+static void *debugfs_state;
-+
- void lnet_router_debugfs_init(void)
- {
--	lnet_insert_debugfs(lnet_table);
-+	lnet_insert_debugfs(lnet_table, THIS_MODULE,
-+			    &debugfs_state);
- }
+ static const struct req_msg_field *ldlm_intent_getattr_client[] = {
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 81e0485..60a7fd0 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -2326,6 +2326,8 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)MDS_OPEN_RESYNC);
+ 	LASSERTF(MDS_OPEN_PCC == 00000000010000000000000ULL, "found 0%.22lloULL\n",
+ 		 (long long)MDS_OPEN_PCC);
++	LASSERTF(MDS_OPEN_DEFAULT_LMV == 00000000040000000000000ULL, "found 0%.22lloULL\n",
++		 (long long)MDS_OPEN_DEFAULT_LMV);
+ 	LASSERTF(LUSTRE_SYNC_FL == 0x00000008, "found 0x%.8x\n",
+ 		 LUSTRE_SYNC_FL);
+ 	LASSERTF(LUSTRE_IMMUTABLE_FL == 0x00000010, "found 0x%.8x\n",
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index c57929b..7b79604 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -1246,12 +1246,15 @@ enum la_valid {
+ 					      * for newly created file
+ 					      */
+ #define MDS_OP_WITH_FID	  020000000000000ULL /* operation carried out by FID */
++#define MDS_OPEN_DEFAULT_LMV  040000000000000ULL /* open fetches default LMV */
  
- void lnet_router_debugfs_fini(void)
- {
- 	lnet_remove_debugfs(lnet_table);
- }
-+
-+void lnet_router_exit(void)
-+{
-+	lnet_debugfs_fini(&debugfs_state);
-+}
++/* lustre internal open flags, which should not be set from user space */
+ #define MDS_OPEN_FL_INTERNAL (MDS_OPEN_HAS_EA | MDS_OPEN_HAS_OBJS |	\
+ 			      MDS_OPEN_OWNEROVERRIDE | MDS_OPEN_LOCK |	\
+ 			      MDS_OPEN_BY_FID | MDS_OPEN_LEASE |	\
+ 			      MDS_OPEN_RELEASE | MDS_OPEN_RESYNC |	\
+-			      MDS_OPEN_PCC | MDS_OP_WITH_FID)
++			      MDS_OPEN_PCC | MDS_OP_WITH_FID |		\
++			      MDS_OPEN_DEFAULT_LMV)
+ 
+ /********* Changelogs **********/
+ /** Changelog record types */
 -- 
 1.8.3.1
 
