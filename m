@@ -4,32 +4,31 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8C5A3C19F29
-	for <lustre-devel@archiver.kernel.org>; Thu,  4 Aug 2022 01:39:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 12C47C19F2D
+	for <lustre-devel@archiver.kernel.org>; Thu,  4 Aug 2022 01:39:54 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Lyry109r8z23Lc;
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Lyry15G3gz23Jm;
 	Wed,  3 Aug 2022 18:39:53 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Lyrwj0k9gz21H0
- for <lustre-devel@lists.lustre.org>; Wed,  3 Aug 2022 18:38:45 -0700 (PDT)
+ 4Lyrwf1CzLz21Hc
+ for <lustre-devel@lists.lustre.org>; Wed,  3 Aug 2022 18:38:42 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id EF2AF100B036;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id E23D1100B031;
  Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id EDA878BBFC; Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
+ id E10638D620; Wed,  3 Aug 2022 21:38:23 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Wed,  3 Aug 2022 21:38:11 -0400
-Message-Id: <1659577097-19253-27-git-send-email-jsimmons@infradead.org>
+Date: Wed,  3 Aug 2022 21:38:07 -0400
+Message-Id: <1659577097-19253-23-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
 References: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 26/32] lustre: mdc: pack default LMV in open
- reply
+Subject: [lustre-devel] [PATCH 22/32] lustre: lmv: support striped LMVs
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -52,98 +51,44 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Lai Siyao <lai.siyao@whamcloud.com>
 
-Add flag MDS_OPEN_DEFAULT_LMV to indicate that default LMV should be
-packed in open reply, otherwise if open fetches LOOKUP lock, client
-won't know directory has default LMV, and in subdir creation default
-LMV won't take effect.
+lmv_name_to_stripe_index() should support stripe LMV, which is used
+by LFSCK to verify name hash.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15850
-Lustre-commit: f6e4272fb0be5b798 ("LU-15850 mdt: pack default LMV in open reply")
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15868
+Lustre-commit: 54a2d4662b58e2ba4 ("LU-15868 lfsck: don't crash upon dir migration failure")
 Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/47576
+Reviewed-on: https://review.whamcloud.com/47381
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/mdc/mdc_lib.c                 | 1 +
- fs/lustre/mdc/mdc_locks.c               | 2 ++
- fs/lustre/ptlrpc/layout.c               | 1 +
- fs/lustre/ptlrpc/wiretest.c             | 2 ++
- include/uapi/linux/lustre/lustre_user.h | 5 ++++-
- 5 files changed, 10 insertions(+), 1 deletion(-)
+ fs/lustre/include/lustre_lmv.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
-index 51080a1..077639d 100644
---- a/fs/lustre/mdc/mdc_lib.c
-+++ b/fs/lustre/mdc/mdc_lib.c
-@@ -329,6 +329,7 @@ void mdc_open_pack(struct req_capsule *pill, struct md_op_data *op_data,
- 			rec->cr_archive_id = op_data->op_archive_id;
- 		}
- 	}
-+	cr_flags |= MDS_OPEN_DEFAULT_LMV;
- 	set_mrc_cr_flags(rec, cr_flags);
- }
+diff --git a/fs/lustre/include/lustre_lmv.h b/fs/lustre/include/lustre_lmv.h
+index b1d8ed9..cd7cf9e 100644
+--- a/fs/lustre/include/lustre_lmv.h
++++ b/fs/lustre/include/lustre_lmv.h
+@@ -366,14 +366,16 @@ static inline u32 crush_hash(u32 a, u32 b)
+ static inline int lmv_name_to_stripe_index(struct lmv_mds_md_v1 *lmv,
+ 					   const char *name, int namelen)
+ {
+-	if (lmv->lmv_magic == LMV_MAGIC_V1)
++	if (lmv->lmv_magic == LMV_MAGIC_V1 ||
++	    lmv->lmv_magic == LMV_MAGIC_STRIPE)
+ 		return __lmv_name_to_stripe_index(lmv->lmv_hash_type,
+ 						  lmv->lmv_stripe_count,
+ 						  lmv->lmv_migrate_hash,
+ 						  lmv->lmv_migrate_offset,
+ 						  name, namelen, true);
  
-diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
-index b86d1b9..2a9b9a8 100644
---- a/fs/lustre/mdc/mdc_locks.c
-+++ b/fs/lustre/mdc/mdc_locks.c
-@@ -393,6 +393,8 @@ static int mdc_save_lovea(struct ptlrpc_request *req, void *data, u32 size)
- 	 */
- 	req_capsule_set_size(&req->rq_pill, &RMF_NIOBUF_INLINE, RCL_SERVER,
- 			     sizeof(struct niobuf_remote));
-+	req_capsule_set_size(&req->rq_pill, &RMF_DEFAULT_MDT_MD, RCL_SERVER,
-+			     sizeof(struct lmv_user_md));
- 	ptlrpc_request_set_replen(req);
- 
- 	/* Get real repbuf allocated size as rounded up power of 2 */
-diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
-index 8725edd..82ec899 100644
---- a/fs/lustre/ptlrpc/layout.c
-+++ b/fs/lustre/ptlrpc/layout.c
-@@ -447,6 +447,7 @@
- 	&RMF_NIOBUF_INLINE,
- 	&RMF_FILE_SECCTX,
- 	&RMF_FILE_ENCCTX,
-+	&RMF_DEFAULT_MDT_MD,
- };
- 
- static const struct req_msg_field *ldlm_intent_getattr_client[] = {
-diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
-index 81e0485..60a7fd0 100644
---- a/fs/lustre/ptlrpc/wiretest.c
-+++ b/fs/lustre/ptlrpc/wiretest.c
-@@ -2326,6 +2326,8 @@ void lustre_assert_wire_constants(void)
- 		 (long long)MDS_OPEN_RESYNC);
- 	LASSERTF(MDS_OPEN_PCC == 00000000010000000000000ULL, "found 0%.22lloULL\n",
- 		 (long long)MDS_OPEN_PCC);
-+	LASSERTF(MDS_OPEN_DEFAULT_LMV == 00000000040000000000000ULL, "found 0%.22lloULL\n",
-+		 (long long)MDS_OPEN_DEFAULT_LMV);
- 	LASSERTF(LUSTRE_SYNC_FL == 0x00000008, "found 0x%.8x\n",
- 		 LUSTRE_SYNC_FL);
- 	LASSERTF(LUSTRE_IMMUTABLE_FL == 0x00000010, "found 0x%.8x\n",
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index c57929b..7b79604 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -1246,12 +1246,15 @@ enum la_valid {
- 					      * for newly created file
- 					      */
- #define MDS_OP_WITH_FID	  020000000000000ULL /* operation carried out by FID */
-+#define MDS_OPEN_DEFAULT_LMV  040000000000000ULL /* open fetches default LMV */
- 
-+/* lustre internal open flags, which should not be set from user space */
- #define MDS_OPEN_FL_INTERNAL (MDS_OPEN_HAS_EA | MDS_OPEN_HAS_OBJS |	\
- 			      MDS_OPEN_OWNEROVERRIDE | MDS_OPEN_LOCK |	\
- 			      MDS_OPEN_BY_FID | MDS_OPEN_LEASE |	\
- 			      MDS_OPEN_RELEASE | MDS_OPEN_RESYNC |	\
--			      MDS_OPEN_PCC | MDS_OP_WITH_FID)
-+			      MDS_OPEN_PCC | MDS_OP_WITH_FID |		\
-+			      MDS_OPEN_DEFAULT_LMV)
- 
- /********* Changelogs **********/
- /** Changelog record types */
+-	if (lmv->lmv_magic == cpu_to_le32(LMV_MAGIC_V1))
++	if (lmv->lmv_magic == cpu_to_le32(LMV_MAGIC_V1) ||
++	    lmv->lmv_magic == cpu_to_le32(LMV_MAGIC_STRIPE))
+ 		return __lmv_name_to_stripe_index(
+ 					le32_to_cpu(lmv->lmv_hash_type),
+ 					le32_to_cpu(lmv->lmv_stripe_count),
 -- 
 1.8.3.1
 
