@@ -4,32 +4,117 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 15A8EC19F29
-	for <lustre-devel@archiver.kernel.org>; Thu,  4 Aug 2022 01:40:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 2482EC00140
+	for <lustre-devel@archiver.kernel.org>; Wed, 10 Aug 2022 23:11:59 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Lyryd4tS7z23Hq;
-	Wed,  3 Aug 2022 18:40:25 -0700 (PDT)
-Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4M35L62vfkz1wgF;
+	Wed, 10 Aug 2022 16:11:58 -0700 (PDT)
+Received: from NAM02-BN1-obe.outbound.protection.outlook.com
+ (mail-bn1nam07on2053.outbound.protection.outlook.com [40.107.212.53])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Lyrwl1zQvz23Hx
- for <lustre-devel@lists.lustre.org>; Wed,  3 Aug 2022 18:38:47 -0700 (PDT)
-Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 05A84100B055;
- Wed,  3 Aug 2022 21:38:24 -0400 (EDT)
-Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 02DD180795; Wed,  3 Aug 2022 21:38:24 -0400 (EDT)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>
-Date: Wed,  3 Aug 2022 21:38:14 -0400
-Message-Id: <1659577097-19253-30-git-send-email-jsimmons@infradead.org>
-X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
-References: <1659577097-19253-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 29/32] lustre: ec: code to add support for M
- to N parity
+ 4M35Ks41g7z1wbB; Wed, 10 Aug 2022 16:11:45 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=ZkdDRAIOmO0tX5csctQvwG+1gxn91d3GBgF+GNCeG44aRHVSWrmDn0y9uOQJp+QGCbW1o2Lzk0iDsBtuLDQPKnTLWdFPVuJDyKWZzp3LgiuoGQvkgS6Lxn3qujlK6hX1xvdQCBKtMInkb4dn7xYM8CzxFu8Ak4xbhhVYmwp9GHIRLEQlSnGIzAAHxJOjj7NbZgrD/o21+BL24lCMw6s7rH5goUS8cZBZVzLmq0irKlivmzJly9wy6O/MkRf2T6y/bxgv25Zjnw3yA3az0An+i/8w1SEzPzrNzRo633AZNpA85Xj+xe/UAXr1YgazyraekKs6rvOUzKcJxbXIEefDYg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=Az9hq6Nwbufg3sGzLUdFRNwuAx/QxenbNn4ailiAZ5I=;
+ b=cuc8JInQndg0MqrE3SHPg0tnKZRxhReSunpjkudl/DaIyxUm7uKJJc+5wiQShWeZYtkjSN78iDG8B54AolwgZgnjTKqwZsfuu3m/OgCZPU0PLYa1Uj5da+0b7JIAMSK/zn72y6KX/WQUeDhuPovwYRCBFzI7o6A5s0++bf9XBG+c2Ccq2xZYACknFsBdF9lPeLekrZev69Ty2A4zx6DrKkTYyLsS0YvGHJCEuBDKF8bvQXsuewM8JqDooeybSPKiOrFimzsKGTxvP6xHDqpW8p4Ap80UkiH98q4TGO9lOVrhTlY0UUTPuFFQOT37mwlv2Uf+GR+Ssa9tyQy3WIcpSg==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=whamcloud.com; dmarc=pass action=none
+ header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Az9hq6Nwbufg3sGzLUdFRNwuAx/QxenbNn4ailiAZ5I=;
+ b=sxBx96+qpJFuY/G0tUJefd9P6ZgKYFHeW+T9ZOZlYIdHdLMeHDjOrafgSKpbvLf4tpiD1zkKvD/Y7/074nZ96Y8VrDKBUErFYa6NsCPpgbF2/ZnB2VN+QyyD92I2QFCdrKqw2keeuKHlwLAGzHZ+fy2WeUdi2pjNoNo8XnVfZm4=
+Received: from BL1PR19MB6034.namprd19.prod.outlook.com (2603:10b6:208:39d::12)
+ by DM6PR19MB4060.namprd19.prod.outlook.com (2603:10b6:5:249::24) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.5525.11; Wed, 10 Aug
+ 2022 23:11:41 +0000
+Received: from BL1PR19MB6034.namprd19.prod.outlook.com
+ ([fe80::894:c7c:c8f2:d561]) by BL1PR19MB6034.namprd19.prod.outlook.com
+ ([fe80::894:c7c:c8f2:d561%8]) with mapi id 15.20.5504.020; Wed, 10 Aug 2022
+ 23:11:41 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
+ "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
+ "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>, lustre-discuss
+ <lustre-discuss-bounces@lists.lustre.org>
+Thread-Topic: Lustre 2.15.1 released
+Thread-Index: AQHYrQ6N6hjXqoU2ikikvoTyopygbg==
+Date: Wed, 10 Aug 2022 23:11:41 +0000
+Message-ID: <6A776CA0-A82B-418C-8BC8-8B5A76AE1DBF@ddn.com>
+Accept-Language: en-CA, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Microsoft-MacOutlook/16.63.22070801
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=whamcloud.com;
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 32a5c32c-304b-44f1-a21b-08da7b25af96
+x-ms-traffictypediagnostic: DM6PR19MB4060:EE_
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: IC2/qk4Mz44mu+uwEPXNF+VxsV5+Jh4vaJS80KUMrYb0fhj3zOdcfB2xvAKY8bkG9Y/WcoA50kzuOtbmEqrnJvaz3Ga1O0vLQywjW5hlIWhKLyck6jAOiGtTPzIwX5Jca94jdBFuXbnPaCU9G7SCezzIg6faWbFfK4yOf9BcR3j8lN8txFY5OTIfZToAsg/p7GpbpAdtchGRl4H+aDyCqN/3ERMSKyVIGx9LA1NlpYNtjZq5VcBujtO5X+UkniJ4E4yGUIhiQTq6wC6j9gzI2jtcbT/u4uORlVvT107nrHuxNhM4AKCjB0CLhjFUQnZBHSG0meADVgZen456pGpGzezAbDHt8qtRBfnFgnHh5s+SZZfQAQDJYdZoQvZ9bgQsCxk0FnvCGAiE79oyob8ESl6o0M24iAjjlHguPYk/F+4YdvrhJcYsxu1O/Ri8JQ/mCRbeWIlhBOaGjajYqxjT/PP99PKl3SLpqwZVef8/kEFZhUoG4R+nxcFscKoj3COPt36o5I96XNqqHuHhiWMShIYYpE2JMhZ1fDSufLHMF7OWUBQGi8hrIQgUYsM81/vcTpMeSOm17yqtDUs7hjR9k+lz1UfWA4z9wmF9fMoRTyqWbeqlFHzz3onwjbwwKjZAUq59uVnZc3oaejJAMgOWxBpgOkA/UafxcJAVjNrtXCE/PiE+1qJAt8SBhCZpA9feysfIFt1EC7xn5rVWaGxcILCHAQeaVevXDvnnda99SiL9jT3TzzfQnsS75BLbNpw/6rZIHcHSoiaJXACcfPRis0I5HJYC7vvENPVRn9jUtMup/vnCtcCk2nwVg2c4+iokwkiasVCTle2OJ3mfxj+sHrkkyak4GfguAV4mwjlOa6095vmJf2GyJkGlJI68ujgpzMVbGz4le5LTNazG8HmV2w==
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:BL1PR19MB6034.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230016)(4636009)(39850400004)(136003)(396003)(376002)(346002)(366004)(36756003)(5660300002)(66946007)(64756008)(76116006)(66556008)(8676002)(66446008)(7116003)(66476007)(8936002)(316002)(91956017)(4744005)(2906002)(38100700002)(122000001)(33656002)(41300700001)(86362001)(166002)(478600001)(38070700005)(6506007)(6512007)(9686003)(71200400001)(6486002)(110136005)(83380400001)(186003)(13693001);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?N1Yyak5wVjFjRmFMaS94QVk1Nk5mM0t6SWFTVzR4ODZ4YXVUWnRMRWdwaHRs?=
+ =?utf-8?B?MXh0T3hIMzExejZnb2NoU3lVVVR6UGlSbFVydXlNYzgwbFhEKysvaVgvWWtC?=
+ =?utf-8?B?Q3Z0VFEvaEhDamwyYmpLTGdyOXFMS3I0d3pKT3Z6MDdraHZmQ3lPYi81eita?=
+ =?utf-8?B?Nnp1QnZMRTR5YTNQK1E1L0cyL2ZTdTNRNjRFTStrV0hlNTZkUytzb25MdE1r?=
+ =?utf-8?B?enNDTG1keXJTZHZyVW0vaXVIQkxUMUx2ZHArLzVHaXk1WDAxNHVPYi9TbUwv?=
+ =?utf-8?B?KzZkVkJnajJ2MmN3RE9lWWxaWThpTkxRZGRrcm9ORHJzQVJsSEhmNHd2bGN3?=
+ =?utf-8?B?d2xtLzM5SUtHTVptdUZ4a21jeHhteWtHcmRDWDJ6b3VOM1ZSZS91Rm5nN3Va?=
+ =?utf-8?B?QVF5bE5zMlB3RGlvU09jK1FrQzZsTjdqcHdjWUo4eGZKNmp6azdzWnNOR2dW?=
+ =?utf-8?B?SmhWUWp6U0lsQ052bTMvUU9WMHY4MVNZMVZ4RWxsYW15QUVHV2ZiWld6b3RC?=
+ =?utf-8?B?bmExUUQrcjh6VHZWbHpWZExEdFBnZC9EWXZMNHFnY0RLR2ZkREdwUzQwRnNp?=
+ =?utf-8?B?aS95aWk3M2RwTVN0dTdnb05vL2pveDRvdzlRaTlLbzdhZ3ZBU2p2TEhQYVpi?=
+ =?utf-8?B?TTdxZndIUUNiSUx2RGphbzliUmZXZ3pUSVZUd1o2UkpBZDVaOTBIUndOZmZS?=
+ =?utf-8?B?VXNoMWZ2NC9mTU1PMjMvWk15TmdIdnJ4Z29SMUdON3JEWkNkTXkzWWJTeGM0?=
+ =?utf-8?B?cUkxM1VtMGhBQUJUTEFEb0dUR0ZKWUFnU2taS0ptb0xjSGcwOHp1S3VDbktZ?=
+ =?utf-8?B?aVBTbmJFWlZFaHRqWkxmZFNETzB1ckdkM2F0WXVsdDcwN25lL25ncVZZdmpq?=
+ =?utf-8?B?a1JmY0l5YTlON0lYRVF6NVoxdFQzVmI5WGFZajQwUzZtQmFSY0IvYkFxb092?=
+ =?utf-8?B?TzBQQit3R0FBRENkaVNEN29BcTZYenJ1SmYrL0Zud1d0a0I4ZC83OWhFTkhp?=
+ =?utf-8?B?UGh6WnhjWEpLRW8vU0dRTnBDT09DaEhFeEIvL0JWalZsWEU5MC9oeXBLNTdP?=
+ =?utf-8?B?NXVQNlN4Nmt1MmZYd2draXJYcmxodW8xL1ZacUdXMHdLYTFiclUwYTloVnVY?=
+ =?utf-8?B?ZTJkY1VEcytuYlVuRU5oUkNZcGRndzI3RFpTckd1aE9xek1tV2NwYkZFN2F3?=
+ =?utf-8?B?V1UzTWk2ZFhTelhTaTA0Q0NKbnRRbHJQYTJiRXY4SEVJRmVIeDdKZmI4V0NT?=
+ =?utf-8?B?M1dsMnJ1WEFabGgzY2tGVElIaTZ2enZpc2s3VHdmOGJubWx0UXhocSswT1Bw?=
+ =?utf-8?B?ckFYRHhpbmhBZXlhOW1ldzdoOEFWNFV3Q2RjaXh4dmJaVWlrRFFneTIyU25n?=
+ =?utf-8?B?Vzk3SDl2b1k4ZnFDZm5iRW9Nb3hkYUFBd1BLZWZ5c052RnZldEl5RW51QUVL?=
+ =?utf-8?B?RHkzWm93QXQwTTJTdHBTU00rY0g3ZDJDak5NUGkwZ0c5SFJpQmtOMmJCWDd2?=
+ =?utf-8?B?QmZZb01WS3NEY21ReWUrRGdhSWlvMk94QVZiaXoyLzFJUkxaOTE5aU14SGFN?=
+ =?utf-8?B?c3QrVThnOTFldDRrOTE2ZUFsSXZiZmd3NXNxb0JOUXhxMFRFemJEYzJlOU1R?=
+ =?utf-8?B?VkNINHc4c1N6RDRmOWR4dy8ycTZqRXp0Z3Ixa2ptYzBob2Z5NG04VU9ETVc3?=
+ =?utf-8?B?L0VTeUZUR24yT2g2bWFNdytmbTc3SmR5cnFUbjR1eERHYkU2RGxlR2tWZlF3?=
+ =?utf-8?B?bFYxblRlcmRTMkw1NWhXeUlqR3BpNWpqczZ6MjlLYzA3Zy93ZjBtRjdubUtk?=
+ =?utf-8?B?bW5KN3lUMjJFeXVHUGNJTjY4R2t1TTRVcjVmRFFLS3JMb0toU3dpT1JjblhX?=
+ =?utf-8?B?MXBxT0s1UGdHN3VkaTVzQ244aFFIMkNVTEhZZm1PNTZQQkE4L2krMXpUc2pG?=
+ =?utf-8?B?dTBucVRHL3dEcklhQ0xBSUZFTG9xZHA3R0UyNDlKV3cwYytNWGtmZXRMdHN5?=
+ =?utf-8?B?OHJFM0JpOThDdk1xNUhmYU9VTTcwOGNQWEluUjdBeEFVSjFmZncwcUFjS29X?=
+ =?utf-8?B?NFRrL3kyTktWWTZwcndCU2hwRzBJTkppRDRWcFZxZmx4UHZoMDljbkljR0tY?=
+ =?utf-8?B?bmJqSEZEam1uZ3ZjSmxhSjVYNkt4MUN3aFhya0tra0RmU2ZoQTNDSUl5d0Zy?=
+ =?utf-8?Q?VYV4jgbpPGe8nGFWF0dIrrqbaC/MmXU3miCWUb3fWya0?=
+MIME-Version: 1.0
+X-OriginatorOrg: whamcloud.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: BL1PR19MB6034.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 32a5c32c-304b-44f1-a21b-08da7b25af96
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Aug 2022 23:11:41.5612 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: PsbFk+hMdQ3v4V2Src94MFT5OUbfdvzhEAcl27BMxk/mBiiP9gcJojxq/3ZNeBp8
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR19MB4060
+Subject: [lustre-devel] Lustre 2.15.1 released
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,567 +127,207 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Adam Disney <disneyaw@ornl.gov>,
- Lustre Development List <lustre-devel@lists.lustre.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Peter Jones <pjones@whamcloud.com>
+Content-Type: multipart/mixed; boundary="===============1771126376934301689=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-This code adds basic functionality for calculating N parities
-for M data units. This allows much more than just working with
-raid6 calculations. The code is derived from the Intel isa-l
-userland library. Keep the code in an separate module for easy
-merger upstream at a latter time.
+--===============1771126376934301689==
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_"
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-12189
-Lustre-commit: 047347170b8aece43 ("LU-12189 ec: code to add support for M to N parity")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: Adam Disney <disneyaw@ornl.gov>
-Reviewed-on: https://review.whamcloud.com/47628
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
----
- fs/lustre/Makefile               |   2 +-
- fs/lustre/ec/Makefile            |   4 +
- fs/lustre/ec/ec_base.c           | 352 +++++++++++++++++++++++++++++++++++++++
- fs/lustre/include/erasure_code.h | 142 ++++++++++++++++
- 4 files changed, 499 insertions(+), 1 deletion(-)
- create mode 100644 fs/lustre/ec/Makefile
- create mode 100644 fs/lustre/ec/ec_base.c
- create mode 100644 fs/lustre/include/erasure_code.h
+--_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-diff --git a/fs/lustre/Makefile b/fs/lustre/Makefile
-index 4a02463..4af6ff6 100644
---- a/fs/lustre/Makefile
-+++ b/fs/lustre/Makefile
-@@ -1,3 +1,3 @@
- 
--obj-$(CONFIG_LUSTRE_FS) += obdclass/ ptlrpc/ fld/ osc/ mgc/ \
-+obj-$(CONFIG_LUSTRE_FS) += obdclass/ ptlrpc/ fld/ osc/ mgc/ ec/ \
- 			   fid/ lov/ mdc/ lmv/ llite/ obdecho/
-diff --git a/fs/lustre/ec/Makefile b/fs/lustre/ec/Makefile
-new file mode 100644
-index 0000000..aba8ea3
---- /dev/null
-+++ b/fs/lustre/ec/Makefile
-@@ -0,0 +1,4 @@
-+ccflags-y += -I$(srctree)/$(src)/../include
-+
-+obj-$(CONFIG_LUSTRE_FS) += ec.o
-+ec-y := ec_base.o
-diff --git a/fs/lustre/ec/ec_base.c b/fs/lustre/ec/ec_base.c
-new file mode 100644
-index 0000000..e520466
---- /dev/null
-+++ b/fs/lustre/ec/ec_base.c
-@@ -0,0 +1,352 @@
-+// SPDX-License-Identifier: BSD-2-Clause
-+/**********************************************************************
-+ * Copyright(c) 2011-2015 Intel Corporation All rights reserved.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ *    Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ *    Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in
-+ *    the documentation and/or other materials provided with the
-+ *    distribution.
-+ *    Neither the name of Intel Corporation nor the names of its
-+ *    contributors may be used to endorse or promote products derived
-+ *    from this software without specific prior written permission.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include <linux/limits.h>
-+#include <linux/module.h>
-+#include <linux/string.h>	/* for memset */
-+
-+#include "erasure_code.h"
-+
-+/* Global GF(256) tables */
-+static const unsigned char gff_base[] = {
-+	0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1d, 0x3a,
-+	0x74, 0xe8, 0xcd, 0x87, 0x13, 0x26, 0x4c, 0x98, 0x2d, 0x5a,
-+	0xb4, 0x75, 0xea, 0xc9, 0x8f, 0x03, 0x06, 0x0c, 0x18, 0x30,
-+	0x60, 0xc0, 0x9d, 0x27, 0x4e, 0x9c, 0x25, 0x4a, 0x94, 0x35,
-+	0x6a, 0xd4, 0xb5, 0x77, 0xee, 0xc1, 0x9f, 0x23, 0x46, 0x8c,
-+	0x05, 0x0a, 0x14, 0x28, 0x50, 0xa0, 0x5d, 0xba, 0x69, 0xd2,
-+	0xb9, 0x6f, 0xde, 0xa1, 0x5f, 0xbe, 0x61, 0xc2, 0x99, 0x2f,
-+	0x5e, 0xbc, 0x65, 0xca, 0x89, 0x0f, 0x1e, 0x3c, 0x78, 0xf0,
-+	0xfd, 0xe7, 0xd3, 0xbb, 0x6b, 0xd6, 0xb1, 0x7f, 0xfe, 0xe1,
-+	0xdf, 0xa3, 0x5b, 0xb6, 0x71, 0xe2, 0xd9, 0xaf, 0x43, 0x86,
-+	0x11, 0x22, 0x44, 0x88, 0x0d, 0x1a, 0x34, 0x68, 0xd0, 0xbd,
-+	0x67, 0xce, 0x81, 0x1f, 0x3e, 0x7c, 0xf8, 0xed, 0xc7, 0x93,
-+	0x3b, 0x76, 0xec, 0xc5, 0x97, 0x33, 0x66, 0xcc, 0x85, 0x17,
-+	0x2e, 0x5c, 0xb8, 0x6d, 0xda, 0xa9, 0x4f, 0x9e, 0x21, 0x42,
-+	0x84, 0x15, 0x2a, 0x54, 0xa8, 0x4d, 0x9a, 0x29, 0x52, 0xa4,
-+	0x55, 0xaa, 0x49, 0x92, 0x39, 0x72, 0xe4, 0xd5, 0xb7, 0x73,
-+	0xe6, 0xd1, 0xbf, 0x63, 0xc6, 0x91, 0x3f, 0x7e, 0xfc, 0xe5,
-+	0xd7, 0xb3, 0x7b, 0xf6, 0xf1, 0xff, 0xe3, 0xdb, 0xab, 0x4b,
-+	0x96, 0x31, 0x62, 0xc4, 0x95, 0x37, 0x6e, 0xdc, 0xa5, 0x57,
-+	0xae, 0x41, 0x82, 0x19, 0x32, 0x64, 0xc8, 0x8d, 0x07, 0x0e,
-+	0x1c, 0x38, 0x70, 0xe0, 0xdd, 0xa7, 0x53, 0xa6, 0x51, 0xa2,
-+	0x59, 0xb2, 0x79, 0xf2, 0xf9, 0xef, 0xc3, 0x9b, 0x2b, 0x56,
-+	0xac, 0x45, 0x8a, 0x09, 0x12, 0x24, 0x48, 0x90, 0x3d, 0x7a,
-+	0xf4, 0xf5, 0xf7, 0xf3, 0xfb, 0xeb, 0xcb, 0x8b, 0x0b, 0x16,
-+	0x2c, 0x58, 0xb0, 0x7d, 0xfa, 0xe9, 0xcf, 0x83, 0x1b, 0x36,
-+	0x6c, 0xd8, 0xad, 0x47, 0x8e, 0x01
-+};
-+
-+static const unsigned char gflog_base[] = {
-+	0x00, 0xff, 0x01, 0x19, 0x02, 0x32, 0x1a, 0xc6, 0x03, 0xdf,
-+	0x33, 0xee, 0x1b, 0x68, 0xc7, 0x4b, 0x04, 0x64, 0xe0, 0x0e,
-+	0x34, 0x8d, 0xef, 0x81, 0x1c, 0xc1, 0x69, 0xf8, 0xc8, 0x08,
-+	0x4c, 0x71, 0x05, 0x8a, 0x65, 0x2f, 0xe1, 0x24, 0x0f, 0x21,
-+	0x35, 0x93, 0x8e, 0xda, 0xf0, 0x12, 0x82, 0x45, 0x1d, 0xb5,
-+	0xc2, 0x7d, 0x6a, 0x27, 0xf9, 0xb9, 0xc9, 0x9a, 0x09, 0x78,
-+	0x4d, 0xe4, 0x72, 0xa6, 0x06, 0xbf, 0x8b, 0x62, 0x66, 0xdd,
-+	0x30, 0xfd, 0xe2, 0x98, 0x25, 0xb3, 0x10, 0x91, 0x22, 0x88,
-+	0x36, 0xd0, 0x94, 0xce, 0x8f, 0x96, 0xdb, 0xbd, 0xf1, 0xd2,
-+	0x13, 0x5c, 0x83, 0x38, 0x46, 0x40, 0x1e, 0x42, 0xb6, 0xa3,
-+	0xc3, 0x48, 0x7e, 0x6e, 0x6b, 0x3a, 0x28, 0x54, 0xfa, 0x85,
-+	0xba, 0x3d, 0xca, 0x5e, 0x9b, 0x9f, 0x0a, 0x15, 0x79, 0x2b,
-+	0x4e, 0xd4, 0xe5, 0xac, 0x73, 0xf3, 0xa7, 0x57, 0x07, 0x70,
-+	0xc0, 0xf7, 0x8c, 0x80, 0x63, 0x0d, 0x67, 0x4a, 0xde, 0xed,
-+	0x31, 0xc5, 0xfe, 0x18, 0xe3, 0xa5, 0x99, 0x77, 0x26, 0xb8,
-+	0xb4, 0x7c, 0x11, 0x44, 0x92, 0xd9, 0x23, 0x20, 0x89, 0x2e,
-+	0x37, 0x3f, 0xd1, 0x5b, 0x95, 0xbc, 0xcf, 0xcd, 0x90, 0x87,
-+	0x97, 0xb2, 0xdc, 0xfc, 0xbe, 0x61, 0xf2, 0x56, 0xd3, 0xab,
-+	0x14, 0x2a, 0x5d, 0x9e, 0x84, 0x3c, 0x39, 0x53, 0x47, 0x6d,
-+	0x41, 0xa2, 0x1f, 0x2d, 0x43, 0xd8, 0xb7, 0x7b, 0xa4, 0x76,
-+	0xc4, 0x17, 0x49, 0xec, 0x7f, 0x0c, 0x6f, 0xf6, 0x6c, 0xa1,
-+	0x3b, 0x52, 0x29, 0x9d, 0x55, 0xaa, 0xfb, 0x60, 0x86, 0xb1,
-+	0xbb, 0xcc, 0x3e, 0x5a, 0xcb, 0x59, 0x5f, 0xb0, 0x9c, 0xa9,
-+	0xa0, 0x51, 0x0b, 0xf5, 0x16, 0xeb, 0x7a, 0x75, 0x2c, 0xd7,
-+	0x4f, 0xae, 0xd5, 0xe9, 0xe6, 0xe7, 0xad, 0xe8, 0x74, 0xd6,
-+	0xf4, 0xea, 0xa8, 0x50, 0x58, 0xaf
-+};
-+
-+void ec_init_tables(int k, int rows, unsigned char *a, unsigned char *g_tbls)
-+{
-+	int i, j;
-+
-+	for (i = 0; i < rows; i++) {
-+		for (j = 0; j < k; j++) {
-+			gf_vect_mul_init(*a++, g_tbls);
-+			g_tbls += 32;
-+		}
-+	}
-+}
-+EXPORT_SYMBOL(ec_init_tables);
-+
-+unsigned char gf_mul(unsigned char a, unsigned char b)
-+{
-+	int i;
-+
-+	if ((a == 0) || (b == 0))
-+		return 0;
-+
-+	i = gflog_base[a] + gflog_base[b];
-+	return gff_base[i > 254 ? i - 255 : i];
-+}
-+
-+unsigned char gf_inv(unsigned char a)
-+{
-+	if (a == 0)
-+		return 0;
-+
-+	return gff_base[255 - gflog_base[a]];
-+}
-+
-+void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k)
-+{
-+	int i, j;
-+	unsigned char *p;
-+
-+	/* Identity matrix in high position */
-+	memset(a, 0, k * m);
-+	for (i = 0; i < k; i++)
-+		a[k * i + i] = 1;
-+
-+	/* For the rest choose 1/(i + j) | i != j */
-+	p = &a[k * k];
-+	for (i = k; i < m; i++)
-+		for (j = 0; j < k; j++)
-+			*p++ = gf_inv(i ^ j);
-+
-+}
-+EXPORT_SYMBOL(gf_gen_cauchy1_matrix);
-+
-+int gf_invert_matrix(unsigned char *in_mat, unsigned char *out_mat, const int n)
-+{
-+	int i, j, k;
-+	unsigned char temp;
-+
-+	/* Set out_mat[] to the identity matrix */
-+	for (i = 0; i < n * n; i++)	/* memset(out_mat, 0, n*n) */
-+		out_mat[i] = 0;
-+
-+	for (i = 0; i < n; i++)
-+		out_mat[i * n + i] = 1;
-+
-+	/* Inverse */
-+	for (i = 0; i < n; i++) {
-+		/* Check for 0 in pivot element */
-+		if (in_mat[i * n + i] == 0) {
-+			/* Find a row with non-zero in current column and swap */
-+			for (j = i + 1; j < n; j++)
-+				if (in_mat[j * n + i])
-+					break;
-+
-+			if (j == n)	/* Couldn't find means it's singular */
-+				return -1;
-+
-+			for (k = 0; k < n; k++) {	/* Swap rows i,j */
-+				temp = in_mat[i * n + k];
-+				in_mat[i * n + k] = in_mat[j * n + k];
-+				in_mat[j * n + k] = temp;
-+
-+				temp = out_mat[i * n + k];
-+				out_mat[i * n + k] = out_mat[j * n + k];
-+				out_mat[j * n + k] = temp;
-+			}
-+		}
-+
-+		temp = gf_inv(in_mat[i * n + i]);	/* 1/pivot */
-+		for (j = 0; j < n; j++) {	/* Scale row i by 1/pivot */
-+			in_mat[i * n + j] = gf_mul(in_mat[i * n + j], temp);
-+			out_mat[i * n + j] = gf_mul(out_mat[i * n + j], temp);
-+		}
-+
-+		for (j = 0; j < n; j++) {
-+			if (j == i)
-+				continue;
-+
-+			temp = in_mat[j * n + i];
-+			for (k = 0; k < n; k++) {
-+				out_mat[j * n + k] ^= gf_mul(temp, out_mat[i * n + k]);
-+				in_mat[j * n + k] ^= gf_mul(temp, in_mat[i * n + k]);
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL(gf_invert_matrix);
-+
-+/* Calculates const table gftbl in GF(2^8) from single input A
-+ * gftbl(A) = {A{00}, A{01}, A{02}, ... , A{0f} }, {A{00}, A{10}, A{20}, ... ,
-+ * A{f0} }
-+ */
-+void gf_vect_mul_init(unsigned char c, unsigned char *tbl)
-+{
-+	unsigned char c2 = (c << 1) ^ ((c & 0x80) ? 0x1d : 0);	/* Mult by
-+								 * GF{2}
-+								 */
-+	unsigned char c4 = (c2 << 1) ^ ((c2 & 0x80) ? 0x1d : 0); /* Mult by
-+								  * GF{2}
-+								  */
-+	unsigned char c8 = (c4 << 1) ^ ((c4 & 0x80) ? 0x1d : 0); /* Mult by
-+								  * GF{2}
-+								  */
-+#if BITS_PER_LONG == 64
-+	unsigned long long v1, v2, v4, v8, *t;
-+	unsigned long long v10, v20, v40, v80;
-+	unsigned char c17, c18, c20, c24;
-+
-+	t = (unsigned long long *)tbl;
-+
-+	v1 = c * 0x0100010001000100ull;
-+	v2 = c2 * 0x0101000001010000ull;
-+	v4 = c4 * 0x0101010100000000ull;
-+	v8 = c8 * 0x0101010101010101ull;
-+
-+	v4 = v1 ^ v2 ^ v4;
-+	t[0] = v4;
-+	t[1] = v8 ^ v4;
-+
-+	c17 = (c8 << 1) ^ ((c8 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
-+	c18 = (c17 << 1) ^ ((c17 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
-+	c20 = (c18 << 1) ^ ((c18 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
-+	c24 = (c20 << 1) ^ ((c20 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
-+
-+	v10 = c17 * 0x0100010001000100ull;
-+	v20 = c18 * 0x0101000001010000ull;
-+	v40 = c20 * 0x0101010100000000ull;
-+	v80 = c24 * 0x0101010101010101ull;
-+
-+	v40 = v10 ^ v20 ^ v40;
-+	t[2] = v40;
-+	t[3] = v80 ^ v40;
-+
-+#else /* 32-bit or other */
-+	unsigned char c3, c5, c6, c7, c9, c10, c11, c12, c13, c14, c15;
-+	unsigned char c17, c18, c19, c20, c21, c22, c23, c24, c25, c26;
-+	unsigned char c27, c28, c29, c30, c31;
-+
-+	c3 = c2 ^ c;
-+	c5 = c4 ^ c;
-+	c6 = c4 ^ c2;
-+	c7 = c4 ^ c3;
-+
-+	c9 = c8 ^ c;
-+	c10 = c8 ^ c2;
-+	c11 = c8 ^ c3;
-+	c12 = c8 ^ c4;
-+	c13 = c8 ^ c5;
-+	c14 = c8 ^ c6;
-+	c15 = c8 ^ c7;
-+
-+	tbl[0] = 0;
-+	tbl[1] = c;
-+	tbl[2] = c2;
-+	tbl[3] = c3;
-+	tbl[4] = c4;
-+	tbl[5] = c5;
-+	tbl[6] = c6;
-+	tbl[7] = c7;
-+	tbl[8] = c8;
-+	tbl[9] = c9;
-+	tbl[10] = c10;
-+	tbl[11] = c11;
-+	tbl[12] = c12;
-+	tbl[13] = c13;
-+	tbl[14] = c14;
-+	tbl[15] = c15;
-+
-+	c17 = (c8 << 1) ^ ((c8 & 0x80) ? 0x1d : 0);	/* Mult by GF{2} */
-+	c18 = (c17 << 1) ^ ((c17 & 0x80) ? 0x1d : 0);	/* Mult by GF{2} */
-+	c19 = c18 ^ c17;
-+	c20 = (c18 << 1) ^ ((c18 & 0x80) ? 0x1d : 0);	/* Mult by GF{2} */
-+	c21 = c20 ^ c17;
-+	c22 = c20 ^ c18;
-+	c23 = c20 ^ c19;
-+	c24 = (c20 << 1) ^ ((c20 & 0x80) ? 0x1d : 0);	/* Mult by GF{2} */
-+	c25 = c24 ^ c17;
-+	c26 = c24 ^ c18;
-+	c27 = c24 ^ c19;
-+	c28 = c24 ^ c20;
-+	c29 = c24 ^ c21;
-+	c30 = c24 ^ c22;
-+	c31 = c24 ^ c23;
-+
-+	tbl[16] = 0;
-+	tbl[17] = c17;
-+	tbl[18] = c18;
-+	tbl[19] = c19;
-+	tbl[20] = c20;
-+	tbl[21] = c21;
-+	tbl[22] = c22;
-+	tbl[23] = c23;
-+	tbl[24] = c24;
-+	tbl[25] = c25;
-+	tbl[26] = c26;
-+	tbl[27] = c27;
-+	tbl[28] = c28;
-+	tbl[29] = c29;
-+	tbl[30] = c30;
-+	tbl[31] = c31;
-+
-+#endif /* BITS_PER_LONG == 64 */
-+}
-+
-+void ec_encode_data(int len, int srcs, int dests, unsigned char *v,
-+		    unsigned char **src, unsigned char **dest)
-+{
-+	int i, j, l;
-+	unsigned char s;
-+
-+	for (l = 0; l < dests; l++) {
-+		for (i = 0; i < len; i++) {
-+			s = 0;
-+			for (j = 0; j < srcs; j++)
-+				s ^= gf_mul(src[j][i], v[j * 32 + l * srcs * 32 + 1]);
-+
-+			dest[l][i] = s;
-+		}
-+	}
-+}
-+EXPORT_SYMBOL(ec_encode_data);
-+
-+static int __init ec_init(void)
-+{
-+	return 0;
-+}
-+
-+static void __exit ec_exit(void)
-+{
-+}
-+
-+MODULE_AUTHOR("Intel Corporation");
-+MODULE_DESCRIPTION("M to N erasure code handling");
-+MODULE_VERSION("1.0.0");
-+MODULE_LICENSE("Dual BSD/GPL");
-+
-+module_init(ec_init);
-+module_exit(ec_exit);
-diff --git a/fs/lustre/include/erasure_code.h b/fs/lustre/include/erasure_code.h
-new file mode 100644
-index 0000000..9e62c2b
---- /dev/null
-+++ b/fs/lustre/include/erasure_code.h
-@@ -0,0 +1,142 @@
-+// SPDX-License-Identifier: BSD-2-Clause
-+/**********************************************************************
-+ * Copyright(c) 2011-2015 Intel Corporation All rights reserved.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *    Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ *  Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in
-+ *    the documentation and/or other materials provided with the
-+ *    distribution.
-+ *  Neither the name of Intel Corporation nor the names of its
-+ *    contributors may be used to endorse or promote products derived
-+ *    from this software without specific prior written permission.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#ifndef _ERASURE_CODE_H_
-+#define _ERASURE_CODE_H_
-+
-+/**
-+ *  @file erasure_code.h
-+ *  @brief Interface to functions supporting erasure code encode and decode.
-+ *
-+ *  This file defines the interface to optimized functions used in erasure
-+ *  codes.  Encode and decode of erasures in GF(2^8) are made by calculating the
-+ *  dot product of the symbols (bytes in GF(2^8)) across a set of buffers and a
-+ *  set of coefficients.  Values for the coefficients are determined by the type
-+ *  of erasure code.  Using a general dot product means that any sequence of
-+ *  coefficients may be used including erasure codes based on random
-+ *  coefficients.
-+ *  Multiple versions of dot product are supplied to calculate 1-6 output
-+ *  vectors in one pass.
-+ *  Base GF multiply and divide functions can be sped up by defining
-+ *  GF_LARGE_TABLES at the expense of memory size.
-+ *
-+ */
-+
-+#ifdef __cplusplus
-+extern "C" {
-+#endif
-+
-+/**
-+ * @brief Initialize 32-byte constant array for GF(2^8) vector multiply
-+ *
-+ * Calculates array {C{00}, C{01}, C{02}, ... , C{0f} }, {C{00}, C{10},
-+ * C{20}, ... , C{f0} } as required by other fast vector multiply
-+ * functions.
-+ * @param c     Constant input.
-+ * @param gftbl Table output.
-+ */
-+void gf_vect_mul_init(unsigned char c, unsigned char *gftbl);
-+
-+/**
-+ * @brief Initialize tables for fast Erasure Code encode and decode.
-+ *
-+ * Generates the expanded tables needed for fast encode or decode for erasure
-+ * codes on blocks of data.  32bytes is generated for each input coefficient.
-+ *
-+ * @param k      The number of vector sources or rows in the generator matrix
-+ *               for coding.
-+ * @param rows   The number of output vectors to concurrently encode/decode.
-+ * @param a      Pointer to sets of arrays of input coefficients used to encode
-+ *               or decode data.
-+ * @param gftbls Pointer to start of space for concatenated output tables
-+ *               generated from input coefficients.  Must be of size 32*k*rows.
-+ * @returns none
-+ */
-+void ec_init_tables(int k, int rows, unsigned char *a, unsigned char *gftbls);
-+
-+/**
-+ * @brief Generate or decode erasure codes on blocks of data, runs appropriate
-+ * version.
-+ *
-+ * Given a list of source data blocks, generate one or multiple blocks of
-+ * encoded data as specified by a matrix of GF(2^8) coefficients. When given a
-+ * suitable set of coefficients, this function will perform the fast generation
-+ * or decoding of Reed-Solomon type erasure codes.
-+ *
-+ * This function determines what instruction sets are enabled and
-+ * selects the appropriate version at runtime.
-+ *
-+ * @param len    Length of each block of data (vector) of source or dest data.
-+ * @param k      The number of vector sources or rows in the generator matrix
-+ *		 for coding.
-+ * @param rows   The number of output vectors to concurrently encode/decode.
-+ * @param gftbls Pointer to array of input tables generated from coding
-+ *		  coefficients in ec_init_tables(). Must be of size 32*k*rows
-+ * @param data   Array of pointers to source input buffers.
-+ * @param coding Array of pointers to coded output buffers.
-+ * @returns none
-+ */
-+void ec_encode_data(int len, int k, int rows, unsigned char *gftbls,
-+		    unsigned char **data, unsigned char **coding);
-+
-+/**
-+ * @brief Generate a Cauchy matrix of coefficients to be used for encoding.
-+ *
-+ * Cauchy matrix example of encoding coefficients where high portion of matrix
-+ * is identity matrix I and lower portion is constructed as 1/(i + j) | i != j,
-+ * i:{0,k-1} j:{k,m-1}.  Any sub-matrix of a Cauchy matrix should be invertable.
-+ *
-+ * @param a  [m x k] array to hold coefficients
-+ * @param m  number of rows in matrix corresponding to srcs + parity.
-+ * @param k  number of columns in matrix corresponding to srcs.
-+ * @returns  none
-+ */
-+void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k);
-+
-+/**
-+ * @brief Invert a matrix in GF(2^8)
-+ *
-+ * Attempts to construct an n x n inverse of the input matrix. Returns non-zero
-+ * if singular. Will always destroy input matrix in process.
-+ *
-+ * @param in  input matrix, destroyed by invert process
-+ * @param out output matrix such that [in] x [out] = [I] - identity matrix
-+ * @param n   size of matrix [nxn]
-+ * @returns 0 successful, other fail on singular input matrix
-+ */
-+int gf_invert_matrix(unsigned char *in, unsigned char *out, const int n);
-+
-+/*************************************************************/
-+
-+#ifdef __cplusplus
-+}
-+#endif
-+
-+#endif /* _ERASURE_CODE_H_ */
--- 
-1.8.3.1
+V2UgYXJlIHBsZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTUuMSBSZWxlYXNl
+IGhhcyBiZWVuIGRlY2xhcmVkIEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yIGRvd25sb2FkPGh0dHBz
+Oi8vZG93bmxvYWRzLndoYW1jbG91ZC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4xNS4xLz4g
+PGh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwuY29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIu
+MTEuMC8+IC4gWW91IGNhbiBhbHNvIGdyYWIgdGhlIHNvdXJjZSBmcm9tIGdpdDxodHRwczovL2dp
+dC53aGFtY2xvdWQuY29tLz9wPWZzL2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDtoPTJmOWZm
+YmJkNjI3NjdlZjlkOTYyMGZmMmYxYTdhYjdlYmUwM2ZhMjc+DQoNCkRldGFpbHMgb2YgY2hhbmdl
+cyBzaW5jZSAyLjE1LjA8aHR0cHM6Ly93aWtpLmx1c3RyZS5vcmcvTHVzdHJlXzIuMTUuMF9DaGFu
+Z2Vsb2c+IGNhbiBiZSBmb3VuZCBpbiB0aGUgMi4xNS4xIGNoYW5nZSBsb2cuPGh0dHA6Ly93aWtp
+Lmx1c3RyZS5vcmcvTHVzdHJlXzIuMTUuMV9DaGFuZ2Vsb2c+DQoNClRoZXJlIGlzIHRoZSBmb2xs
+b3dpbmcgbm90YWJsZSBlbmhhbmNlbWVudHMgb3ZlciAyLjE1LjA6DQoNClJIRUwgOC42IGlzIG5v
+dyBzdXBwb3J0ZWQgZm9yIHNlcnZlcnMgYW5kIGNsaWVudHMgIChMVS0xNTc5NTxodHRwczovL2pp
+cmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTU3OTU+KS4NCg0KVWJ1bnR1IDIyLjA0IGlzIG5v
+dyBzdXBwb3J0ZWQgZm9yIGNsaWVudHMgIChMVS0xMzc4MzxodHRwczovL2ppcmEud2hhbWNsb3Vk
+LmNvbS9icm93c2UvTFUtMTM3ODM+KS4NCg0KUGxlYXNlIGxvZyBhbnkgaXNzdWVzIGZvdW5kIGlu
+IHRoZSBpc3N1ZSB0cmFja2luZyBzeXN0ZW08aHR0cHM6Ly9qaXJhLndoYW1jbG91ZC5jb20vPi4N
+Cg0KVGhhbmtzIHRvIGFsbCB0aG9zZSB3aG8gaGF2ZSBjb250cmlidXRlZCB0byB0aGUgY3JlYXRp
+b24gb2YgdGhpcyByZWxlYXNlLg0KDQpUaGUgbmV4dCBMVFMgcmVsZWFzZSB3aWxsIGxpa2VseSBi
+ZSAyLjE1LjI7IHdoZXJlIHdlIHdpbGwgYWRkIHN1cHBvcnQgZm9yIFNMRVMgMTUgU1A0IGNsaWVu
+dHMgKExVLTE1OTU5PGh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xNTk1OT4p
+IGFuZCBSSEVMIDkuMCBjbGllbnRzIChMVS0xNTg3NDxodHRwczovL2ppcmEud2hhbWNsb3VkLmNv
+bS9icm93c2UvTFUtMTU4NzQ+KQ0KDQo=
+
+--_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <6DECA7890E746F4DB98D3A3E0D639ECA@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: base64
+
+PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
+bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
+dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
+dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
+dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
+dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
+bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
+ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
+IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
+IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQpAZm9udC1mYWNlDQoJe2ZvbnQtZmFtaWx5OiJUaW1lcyBO
+ZXcgUm9tYW4gXChCb2R5IENTXCkiOw0KCXBhbm9zZS0xOjIgMiA2IDMgNSA0IDUgMiAzIDQ7fQ0K
+LyogU3R5bGUgRGVmaW5pdGlvbnMgKi8NCnAuTXNvTm9ybWFsLCBsaS5Nc29Ob3JtYWwsIGRpdi5N
+c29Ob3JtYWwNCgl7bWFyZ2luOjBjbTsNCglmb250LXNpemU6MTIuMHB0Ow0KCWZvbnQtZmFtaWx5
+OiJDYWxpYnJpIixzYW5zLXNlcmlmO30NCmE6bGluaywgc3Bhbi5Nc29IeXBlcmxpbmsNCgl7bXNv
+LXN0eWxlLXByaW9yaXR5Ojk5Ow0KCWNvbG9yOiMwNTYzQzE7DQoJdGV4dC1kZWNvcmF0aW9uOnVu
+ZGVybGluZTt9DQpzcGFuLkVtYWlsU3R5bGUxOA0KCXttc28tc3R5bGUtdHlwZTpwZXJzb25hbC1y
+ZXBseTsNCglmb250LWZhbWlseToiQ2FsaWJyaSIsc2Fucy1zZXJpZjsNCgljb2xvcjp3aW5kb3d0
+ZXh0Ow0KCWZvbnQtd2VpZ2h0Om5vcm1hbDsNCglmb250LXN0eWxlOm5vcm1hbDt9DQpzcGFuLmFw
+cGxlLWNvbnZlcnRlZC1zcGFjZQ0KCXttc28tc3R5bGUtbmFtZTphcHBsZS1jb252ZXJ0ZWQtc3Bh
+Y2U7fQ0KLk1zb0NocERlZmF1bHQNCgl7bXNvLXN0eWxlLXR5cGU6ZXhwb3J0LW9ubHk7DQoJZm9u
+dC1zaXplOjEwLjBwdDt9DQpAcGFnZSBXb3JkU2VjdGlvbjENCgl7c2l6ZTo2MTIuMHB0IDc5Mi4w
+cHQ7DQoJbWFyZ2luOjcyLjBwdCA3Mi4wcHQgNzIuMHB0IDcyLjBwdDt9DQpkaXYuV29yZFNlY3Rp
+b24xDQoJe3BhZ2U6V29yZFNlY3Rpb24xO30NCi0tPjwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keSBs
+YW5nPSJFTi1DQSIgbGluaz0iIzA1NjNDMSIgdmxpbms9IiM5NTRGNzIiIHN0eWxlPSJ3b3JkLXdy
+YXA6YnJlYWstd29yZCI+DQo8ZGl2IGNsYXNzPSJXb3JkU2VjdGlvbjEiPg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+V2UgYXJlIHBs
+ZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTwvc3Bhbj48c3BhbiBsYW5nPSJF
+Ti1VUyI+NTxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+Ljwvc3Bhbj4xPHNwYW4gc3R5bGU9ImNv
+bG9yOmJsYWNrIj4gUmVsZWFzZSBoYXMgYmVlbiBkZWNsYXJlZCBHQSBhbmQgaXMgYXZhaWxhYmxl
+IGZvciZuYnNwOzwvc3Bhbj48L3NwYW4+PGEgaHJlZj0iaHR0cHM6Ly9kb3dubG9hZHMud2hhbWNs
+b3VkLmNvbS9wdWJsaWMvbHVzdHJlL2x1c3RyZS0yLjE1LjEvIj48c3BhbiBsYW5nPSJFTi1VUyI+
+ZG93bmxvYWQ8L3NwYW4+PC9hPjxhIGhyZWY9Imh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwu
+Y29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIuMTEuMC8iPjxzcGFuIGxhbmc9IkVOLVVTIj4mbmJz
+cDs8L3NwYW4+PC9hPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPi4NCiBZ
+b3UgY2FuIGFsc28gZ3JhYiB0aGUgc291cmNlIGZyb20mbmJzcDs8L3NwYW4+PGEgaHJlZj0iaHR0
+cHM6Ly9naXQud2hhbWNsb3VkLmNvbS8/cD1mcy9sdXN0cmUtcmVsZWFzZS5naXQ7YT1jb21taXQ7
+aD0yZjlmZmJiZDYyNzY3ZWY5ZDk2MjBmZjJmMWE3YWI3ZWJlMDNmYTI3Ij48c3BhbiBsYW5nPSJF
+Ti1VUyI+Z2l0PC9zcGFuPjwvYT48bzpwPjwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwi
+PjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48bzpw
+PjwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4tcmlnaHQ6MzYu
+MHB0Ij48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj5EZXRhaWxzIG9mIGNo
+YW5nZXMgc2luY2UmbmJzcDs8YSBocmVmPSJodHRwczovL3dpa2kubHVzdHJlLm9yZy9MdXN0cmVf
+Mi4xNS4wX0NoYW5nZWxvZyIgdGl0bGU9Imh0dHBzOi8vd2lraS5sdXN0cmUub3JnL0x1c3RyZV8y
+LjEyLjhfQ2hhbmdlbG9nIj48c3BhbiBzdHlsZT0iY29sb3I6d2luZG93dGV4dCI+Mi4xNS4wPC9z
+cGFuPjwvYT48c3BhbiBjbGFzcz0iYXBwbGUtY29udmVydGVkLXNwYWNlIj4mbmJzcDs8L3NwYW4+
+Y2FuDQogYmUgZm91bmQgaW4gdGhlJm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFj
+ayI+PGEgaHJlZj0iaHR0cDovL3dpa2kubHVzdHJlLm9yZy9MdXN0cmVfMi4xNS4xX0NoYW5nZWxv
+ZyI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjp3aW5kb3d0ZXh0Ij4yLjE1LjEgY2hh
+bmdlIGxvZy48L3NwYW4+PC9hPjwvc3Bhbj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjExLjBwdDtj
+b2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1h
+bDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4
+dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1z
+cGFjaW5nOjBweCI+DQo8c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJz
+cDs8L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+
+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtm
+b250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3
+aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1z
+dHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBz
+dHlsZT0iY29sb3I6YmxhY2siPlRoZXJlIGlzIHRoZSBmb2xsb3dpbmcgbm90YWJsZSBlbmhhbmNl
+bWVudHMgb3ZlciAyLjE1LjA6PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48
+L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9y
+OiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3Rl
+eHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0
+bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8Yj48
+c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrO2JhY2tncm91bmQ6d2hpdGUiPiZu
+YnNwOzwvc3Bhbj48L2I+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bh
+bj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAw
+LCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpz
+dGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQt
+dGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxiPjxzcGFuIGxhbmc9
+IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dyb3VuZDp3aGl0ZSI+UkhFTCA4LjYmbmJz
+cDs8L3NwYW4+PC9iPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dy
+b3VuZDp3aGl0ZSI+aXMgbm93IHN1cHBvcnRlZCBmb3Igc2VydmVycyBhbmQgY2xpZW50czxzcGFu
+IGNsYXNzPSJhcHBsZS1jb252ZXJ0ZWQtc3BhY2UiPiZuYnNwOzwvc3Bhbj48L3NwYW4+PHNwYW4g
+bGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+Jm5ic3A7KDwvc3Bhbj48c3BhbiBzdHls
+ZT0iY29sb3I6YmxhY2siPjxhIGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dz
+ZS9MVS0xNTc5NSIgdGl0bGU9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0x
+NTc5NSI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjp3aW5kb3d0ZXh0Ij5MVS0xNTc5
+NTwvc3Bhbj48L2E+PC9zcGFuPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2si
+PikuJm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48L286cD48L3Nw
+YW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwg
+MCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246
+c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0
+LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8c3BhbiBzdHlsZT0i
+Zm9udC1zaXplOjE0LjBwdDtjb2xvcjpibGFjayI+Jm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJj
+b2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1h
+bDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4
+dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1z
+cGFjaW5nOjBweCI+DQo8Yj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrO2Jh
+Y2tncm91bmQ6d2hpdGUiPlVidW50dSAyMi4wNCZuYnNwOzwvc3Bhbj48L2I+PHNwYW4gbGFuZz0i
+RU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjaztiYWNrZ3JvdW5kOndoaXRlIj5pcyBub3cgc3VwcG9y
+dGVkIGZvciBjbGllbnRzPHNwYW4gY2xhc3M9ImFwcGxlLWNvbnZlcnRlZC1zcGFjZSI+Jm5ic3A7
+PC9zcGFuPjwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJz
+cDsoPC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PGEgaHJlZj0iaHR0cHM6Ly9qaXJh
+LndoYW1jbG91ZC5jb20vYnJvd3NlL0xVLTEzNzgzIiB0aXRsZT0iaHR0cHM6Ly9qaXJhLndoYW1j
+bG91ZC5jb20vYnJvd3NlL0xVLTE1Nzk1Ij48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9y
+OndpbmRvd3RleHQiPkxVLTEzNzgzPC9zcGFuPjwvYT48L3NwYW4+PHNwYW4gbGFuZz0iRU4tVVMi
+IHN0eWxlPSJjb2xvcjpibGFjayI+KS4mbmJzcDs8L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJs
+YWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
+Y2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhh
+bnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUt
+YWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6
+MHB4Ij4NCjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTQuMHB0O2NvbG9yOmJsYWNrIj4mbmJzcDs8
+L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8
+cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250
+LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRv
+d3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJv
+a2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBzdHls
+ZT0iY29sb3I6YmxhY2siPlBsZWFzZSBsb2cgYW55IGlzc3VlcyBmb3VuZCBpbiB0aGUmbmJzcDs8
+L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48YSBocmVmPSJodHRwczovL2ppcmEud2hh
+bWNsb3VkLmNvbS8iPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6cHVycGxlIj5pc3N1
+ZSB0cmFja2luZyBzeXN0ZW08L3NwYW4+PC9hPjwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5
+bGU9ImNvbG9yOmJsYWNrIj4uPC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48
+L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9y
+OiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3Rl
+eHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0
+bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8c3Bh
+biBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PHNwYW4gc3R5
+bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9y
+bWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczog
+bm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtp
+dC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3
+b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2si
+PlRoYW5rcyB0byBhbGwgdGhvc2Ugd2hvIGhhdmUgY29udHJpYnV0ZWQgdG8gdGhlIGNyZWF0aW9u
+IG9mIHRoaXMgcmVsZWFzZS48L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwv
+bzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6
+IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4
+dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRv
+Oy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFu
+IGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48c3BhbiBzdHls
+ZT0iY29sb3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3Jt
+YWwiIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApO2ZvbnQtdmFyaWFudC1jYXBzOiBu
+b3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0LWFsaWduOnN0YXJ0O3dpZG93czogYXV0bzstd2Via2l0
+LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4O3dv
+cmQtc3BhY2luZzowcHgiPg0KPHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+
+VGhlIG5leHQgTFRTIHJlbGVhc2Ugd2lsbCBsaWtlbHkgYmUgMi4xNS4yOyB3aGVyZSB3ZSB3aWxs
+IGFkZCBzdXBwb3J0IGZvciBTTEVTIDE1IFNQNCBjbGllbnRzICg8YSBocmVmPSJodHRwczovL2pp
+cmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTU5NTkiPkxVLTE1OTU5PC9hPikgYW5kIFJIRUwg
+OS4wIGNsaWVudHMgKDwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyI+PGEgaHJlZj0iaHR0cHM6Ly9q
+aXJhLndoYW1jbG91ZC5jb20vYnJvd3NlL0xVLTE1ODc0Ij5MVS0xNTg3NDwvYT48c3BhbiBzdHls
+ZT0iY29sb3I6YmxhY2siPik8L3NwYW4+PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+
+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0i
+RU4tVVMiPiZuYnNwOzwvc3Bhbj48bzpwPjwvbzpwPjwvcD4NCjwvZGl2Pg0KPC9ib2R5Pg0KPC9o
+dG1sPg0K
+
+--_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_--
+
+--===============1771126376934301689==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============1771126376934301689==--
