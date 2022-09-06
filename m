@@ -4,117 +4,30 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 2482EC00140
-	for <lustre-devel@archiver.kernel.org>; Wed, 10 Aug 2022 23:11:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E7C35ECAAD3
+	for <lustre-devel@archiver.kernel.org>; Tue,  6 Sep 2022 01:55:43 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4M35L62vfkz1wgF;
-	Wed, 10 Aug 2022 16:11:58 -0700 (PDT)
-Received: from NAM02-BN1-obe.outbound.protection.outlook.com
- (mail-bn1nam07on2053.outbound.protection.outlook.com [40.107.212.53])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MM7l318hwz1y3F;
+	Mon,  5 Sep 2022 18:55:43 -0700 (PDT)
+Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4M35Ks41g7z1wbB; Wed, 10 Aug 2022 16:11:45 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=ZkdDRAIOmO0tX5csctQvwG+1gxn91d3GBgF+GNCeG44aRHVSWrmDn0y9uOQJp+QGCbW1o2Lzk0iDsBtuLDQPKnTLWdFPVuJDyKWZzp3LgiuoGQvkgS6Lxn3qujlK6hX1xvdQCBKtMInkb4dn7xYM8CzxFu8Ak4xbhhVYmwp9GHIRLEQlSnGIzAAHxJOjj7NbZgrD/o21+BL24lCMw6s7rH5goUS8cZBZVzLmq0irKlivmzJly9wy6O/MkRf2T6y/bxgv25Zjnw3yA3az0An+i/8w1SEzPzrNzRo633AZNpA85Xj+xe/UAXr1YgazyraekKs6rvOUzKcJxbXIEefDYg==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=Az9hq6Nwbufg3sGzLUdFRNwuAx/QxenbNn4ailiAZ5I=;
- b=cuc8JInQndg0MqrE3SHPg0tnKZRxhReSunpjkudl/DaIyxUm7uKJJc+5wiQShWeZYtkjSN78iDG8B54AolwgZgnjTKqwZsfuu3m/OgCZPU0PLYa1Uj5da+0b7JIAMSK/zn72y6KX/WQUeDhuPovwYRCBFzI7o6A5s0++bf9XBG+c2Ccq2xZYACknFsBdF9lPeLekrZev69Ty2A4zx6DrKkTYyLsS0YvGHJCEuBDKF8bvQXsuewM8JqDooeybSPKiOrFimzsKGTxvP6xHDqpW8p4Ap80UkiH98q4TGO9lOVrhTlY0UUTPuFFQOT37mwlv2Uf+GR+Ssa9tyQy3WIcpSg==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Az9hq6Nwbufg3sGzLUdFRNwuAx/QxenbNn4ailiAZ5I=;
- b=sxBx96+qpJFuY/G0tUJefd9P6ZgKYFHeW+T9ZOZlYIdHdLMeHDjOrafgSKpbvLf4tpiD1zkKvD/Y7/074nZ96Y8VrDKBUErFYa6NsCPpgbF2/ZnB2VN+QyyD92I2QFCdrKqw2keeuKHlwLAGzHZ+fy2WeUdi2pjNoNo8XnVfZm4=
-Received: from BL1PR19MB6034.namprd19.prod.outlook.com (2603:10b6:208:39d::12)
- by DM6PR19MB4060.namprd19.prod.outlook.com (2603:10b6:5:249::24) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.5525.11; Wed, 10 Aug
- 2022 23:11:41 +0000
-Received: from BL1PR19MB6034.namprd19.prod.outlook.com
- ([fe80::894:c7c:c8f2:d561]) by BL1PR19MB6034.namprd19.prod.outlook.com
- ([fe80::894:c7c:c8f2:d561%8]) with mapi id 15.20.5504.020; Wed, 10 Aug 2022
- 23:11:41 +0000
-To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
- "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
- "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>, lustre-discuss
- <lustre-discuss-bounces@lists.lustre.org>
-Thread-Topic: Lustre 2.15.1 released
-Thread-Index: AQHYrQ6N6hjXqoU2ikikvoTyopygbg==
-Date: Wed, 10 Aug 2022 23:11:41 +0000
-Message-ID: <6A776CA0-A82B-418C-8BC8-8B5A76AE1DBF@ddn.com>
-Accept-Language: en-CA, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Microsoft-MacOutlook/16.63.22070801
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 32a5c32c-304b-44f1-a21b-08da7b25af96
-x-ms-traffictypediagnostic: DM6PR19MB4060:EE_
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: IC2/qk4Mz44mu+uwEPXNF+VxsV5+Jh4vaJS80KUMrYb0fhj3zOdcfB2xvAKY8bkG9Y/WcoA50kzuOtbmEqrnJvaz3Ga1O0vLQywjW5hlIWhKLyck6jAOiGtTPzIwX5Jca94jdBFuXbnPaCU9G7SCezzIg6faWbFfK4yOf9BcR3j8lN8txFY5OTIfZToAsg/p7GpbpAdtchGRl4H+aDyCqN/3ERMSKyVIGx9LA1NlpYNtjZq5VcBujtO5X+UkniJ4E4yGUIhiQTq6wC6j9gzI2jtcbT/u4uORlVvT107nrHuxNhM4AKCjB0CLhjFUQnZBHSG0meADVgZen456pGpGzezAbDHt8qtRBfnFgnHh5s+SZZfQAQDJYdZoQvZ9bgQsCxk0FnvCGAiE79oyob8ESl6o0M24iAjjlHguPYk/F+4YdvrhJcYsxu1O/Ri8JQ/mCRbeWIlhBOaGjajYqxjT/PP99PKl3SLpqwZVef8/kEFZhUoG4R+nxcFscKoj3COPt36o5I96XNqqHuHhiWMShIYYpE2JMhZ1fDSufLHMF7OWUBQGi8hrIQgUYsM81/vcTpMeSOm17yqtDUs7hjR9k+lz1UfWA4z9wmF9fMoRTyqWbeqlFHzz3onwjbwwKjZAUq59uVnZc3oaejJAMgOWxBpgOkA/UafxcJAVjNrtXCE/PiE+1qJAt8SBhCZpA9feysfIFt1EC7xn5rVWaGxcILCHAQeaVevXDvnnda99SiL9jT3TzzfQnsS75BLbNpw/6rZIHcHSoiaJXACcfPRis0I5HJYC7vvENPVRn9jUtMup/vnCtcCk2nwVg2c4+iokwkiasVCTle2OJ3mfxj+sHrkkyak4GfguAV4mwjlOa6095vmJf2GyJkGlJI68ujgpzMVbGz4le5LTNazG8HmV2w==
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:BL1PR19MB6034.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230016)(4636009)(39850400004)(136003)(396003)(376002)(346002)(366004)(36756003)(5660300002)(66946007)(64756008)(76116006)(66556008)(8676002)(66446008)(7116003)(66476007)(8936002)(316002)(91956017)(4744005)(2906002)(38100700002)(122000001)(33656002)(41300700001)(86362001)(166002)(478600001)(38070700005)(6506007)(6512007)(9686003)(71200400001)(6486002)(110136005)(83380400001)(186003)(13693001);
- DIR:OUT; SFP:1101; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?N1Yyak5wVjFjRmFMaS94QVk1Nk5mM0t6SWFTVzR4ODZ4YXVUWnRMRWdwaHRs?=
- =?utf-8?B?MXh0T3hIMzExejZnb2NoU3lVVVR6UGlSbFVydXlNYzgwbFhEKysvaVgvWWtC?=
- =?utf-8?B?Q3Z0VFEvaEhDamwyYmpLTGdyOXFMS3I0d3pKT3Z6MDdraHZmQ3lPYi81eita?=
- =?utf-8?B?Nnp1QnZMRTR5YTNQK1E1L0cyL2ZTdTNRNjRFTStrV0hlNTZkUytzb25MdE1r?=
- =?utf-8?B?enNDTG1keXJTZHZyVW0vaXVIQkxUMUx2ZHArLzVHaXk1WDAxNHVPYi9TbUwv?=
- =?utf-8?B?KzZkVkJnajJ2MmN3RE9lWWxaWThpTkxRZGRrcm9ORHJzQVJsSEhmNHd2bGN3?=
- =?utf-8?B?d2xtLzM5SUtHTVptdUZ4a21jeHhteWtHcmRDWDJ6b3VOM1ZSZS91Rm5nN3Va?=
- =?utf-8?B?QVF5bE5zMlB3RGlvU09jK1FrQzZsTjdqcHdjWUo4eGZKNmp6azdzWnNOR2dW?=
- =?utf-8?B?SmhWUWp6U0lsQ052bTMvUU9WMHY4MVNZMVZ4RWxsYW15QUVHV2ZiWld6b3RC?=
- =?utf-8?B?bmExUUQrcjh6VHZWbHpWZExEdFBnZC9EWXZMNHFnY0RLR2ZkREdwUzQwRnNp?=
- =?utf-8?B?aS95aWk3M2RwTVN0dTdnb05vL2pveDRvdzlRaTlLbzdhZ3ZBU2p2TEhQYVpi?=
- =?utf-8?B?TTdxZndIUUNiSUx2RGphbzliUmZXZ3pUSVZUd1o2UkpBZDVaOTBIUndOZmZS?=
- =?utf-8?B?VXNoMWZ2NC9mTU1PMjMvWk15TmdIdnJ4Z29SMUdON3JEWkNkTXkzWWJTeGM0?=
- =?utf-8?B?cUkxM1VtMGhBQUJUTEFEb0dUR0ZKWUFnU2taS0ptb0xjSGcwOHp1S3VDbktZ?=
- =?utf-8?B?aVBTbmJFWlZFaHRqWkxmZFNETzB1ckdkM2F0WXVsdDcwN25lL25ncVZZdmpq?=
- =?utf-8?B?a1JmY0l5YTlON0lYRVF6NVoxdFQzVmI5WGFZajQwUzZtQmFSY0IvYkFxb092?=
- =?utf-8?B?TzBQQit3R0FBRENkaVNEN29BcTZYenJ1SmYrL0Zud1d0a0I4ZC83OWhFTkhp?=
- =?utf-8?B?UGh6WnhjWEpLRW8vU0dRTnBDT09DaEhFeEIvL0JWalZsWEU5MC9oeXBLNTdP?=
- =?utf-8?B?NXVQNlN4Nmt1MmZYd2draXJYcmxodW8xL1ZacUdXMHdLYTFiclUwYTloVnVY?=
- =?utf-8?B?ZTJkY1VEcytuYlVuRU5oUkNZcGRndzI3RFpTckd1aE9xek1tV2NwYkZFN2F3?=
- =?utf-8?B?V1UzTWk2ZFhTelhTaTA0Q0NKbnRRbHJQYTJiRXY4SEVJRmVIeDdKZmI4V0NT?=
- =?utf-8?B?M1dsMnJ1WEFabGgzY2tGVElIaTZ2enZpc2s3VHdmOGJubWx0UXhocSswT1Bw?=
- =?utf-8?B?ckFYRHhpbmhBZXlhOW1ldzdoOEFWNFV3Q2RjaXh4dmJaVWlrRFFneTIyU25n?=
- =?utf-8?B?Vzk3SDl2b1k4ZnFDZm5iRW9Nb3hkYUFBd1BLZWZ5c052RnZldEl5RW51QUVL?=
- =?utf-8?B?RHkzWm93QXQwTTJTdHBTU00rY0g3ZDJDak5NUGkwZ0c5SFJpQmtOMmJCWDd2?=
- =?utf-8?B?QmZZb01WS3NEY21ReWUrRGdhSWlvMk94QVZiaXoyLzFJUkxaOTE5aU14SGFN?=
- =?utf-8?B?c3QrVThnOTFldDRrOTE2ZUFsSXZiZmd3NXNxb0JOUXhxMFRFemJEYzJlOU1R?=
- =?utf-8?B?VkNINHc4c1N6RDRmOWR4dy8ycTZqRXp0Z3Ixa2ptYzBob2Z5NG04VU9ETVc3?=
- =?utf-8?B?L0VTeUZUR24yT2g2bWFNdytmbTc3SmR5cnFUbjR1eERHYkU2RGxlR2tWZlF3?=
- =?utf-8?B?bFYxblRlcmRTMkw1NWhXeUlqR3BpNWpqczZ6MjlLYzA3Zy93ZjBtRjdubUtk?=
- =?utf-8?B?bW5KN3lUMjJFeXVHUGNJTjY4R2t1TTRVcjVmRFFLS3JMb0toU3dpT1JjblhX?=
- =?utf-8?B?MXBxT0s1UGdHN3VkaTVzQ244aFFIMkNVTEhZZm1PNTZQQkE4L2krMXpUc2pG?=
- =?utf-8?B?dTBucVRHL3dEcklhQ0xBSUZFTG9xZHA3R0UyNDlKV3cwYytNWGtmZXRMdHN5?=
- =?utf-8?B?OHJFM0JpOThDdk1xNUhmYU9VTTcwOGNQWEluUjdBeEFVSjFmZncwcUFjS29X?=
- =?utf-8?B?NFRrL3kyTktWWTZwcndCU2hwRzBJTkppRDRWcFZxZmx4UHZoMDljbkljR0tY?=
- =?utf-8?B?bmJqSEZEam1uZ3ZjSmxhSjVYNkt4MUN3aFhya0tra0RmU2ZoQTNDSUl5d0Zy?=
- =?utf-8?Q?VYV4jgbpPGe8nGFWF0dIrrqbaC/MmXU3miCWUb3fWya0?=
-MIME-Version: 1.0
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: BL1PR19MB6034.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 32a5c32c-304b-44f1-a21b-08da7b25af96
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Aug 2022 23:11:41.5612 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: PsbFk+hMdQ3v4V2Src94MFT5OUbfdvzhEAcl27BMxk/mBiiP9gcJojxq/3ZNeBp8
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR19MB4060
-Subject: [lustre-devel] Lustre 2.15.1 released
+ 4MM7l072Xvz1wn4
+ for <lustre-devel@lists.lustre.org>; Mon,  5 Sep 2022 18:55:40 -0700 (PDT)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 95F4F100AFF2;
+ Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id 8C87237C; Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Mon,  5 Sep 2022 21:55:13 -0400
+Message-Id: <1662429337-18737-1-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+Subject: [lustre-devel] [PATCH 00/24] lustre: update to OpenSFS tree Sept 5,
+ 2022
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -127,207 +40,130 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Peter Jones <pjones@whamcloud.com>
-Content-Type: multipart/mixed; boundary="===============1771126376934301689=="
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1771126376934301689==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_"
+Port the patches from the OpenSFS tree to the Linux native
+client as of Sept 5, 2022. The crush2 patch is still held back
+and we integrated the fscrypt changes to give a big performance
+boost to Lustre.
 
---_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Alexey Lyashkov (1):
+  lnet: selftest: use preallocate bulk for server
 
-V2UgYXJlIHBsZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTUuMSBSZWxlYXNl
-IGhhcyBiZWVuIGRlY2xhcmVkIEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yIGRvd25sb2FkPGh0dHBz
-Oi8vZG93bmxvYWRzLndoYW1jbG91ZC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4xNS4xLz4g
-PGh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwuY29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIu
-MTEuMC8+IC4gWW91IGNhbiBhbHNvIGdyYWIgdGhlIHNvdXJjZSBmcm9tIGdpdDxodHRwczovL2dp
-dC53aGFtY2xvdWQuY29tLz9wPWZzL2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDtoPTJmOWZm
-YmJkNjI3NjdlZjlkOTYyMGZmMmYxYTdhYjdlYmUwM2ZhMjc+DQoNCkRldGFpbHMgb2YgY2hhbmdl
-cyBzaW5jZSAyLjE1LjA8aHR0cHM6Ly93aWtpLmx1c3RyZS5vcmcvTHVzdHJlXzIuMTUuMF9DaGFu
-Z2Vsb2c+IGNhbiBiZSBmb3VuZCBpbiB0aGUgMi4xNS4xIGNoYW5nZSBsb2cuPGh0dHA6Ly93aWtp
-Lmx1c3RyZS5vcmcvTHVzdHJlXzIuMTUuMV9DaGFuZ2Vsb2c+DQoNClRoZXJlIGlzIHRoZSBmb2xs
-b3dpbmcgbm90YWJsZSBlbmhhbmNlbWVudHMgb3ZlciAyLjE1LjA6DQoNClJIRUwgOC42IGlzIG5v
-dyBzdXBwb3J0ZWQgZm9yIHNlcnZlcnMgYW5kIGNsaWVudHMgIChMVS0xNTc5NTxodHRwczovL2pp
-cmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTU3OTU+KS4NCg0KVWJ1bnR1IDIyLjA0IGlzIG5v
-dyBzdXBwb3J0ZWQgZm9yIGNsaWVudHMgIChMVS0xMzc4MzxodHRwczovL2ppcmEud2hhbWNsb3Vk
-LmNvbS9icm93c2UvTFUtMTM3ODM+KS4NCg0KUGxlYXNlIGxvZyBhbnkgaXNzdWVzIGZvdW5kIGlu
-IHRoZSBpc3N1ZSB0cmFja2luZyBzeXN0ZW08aHR0cHM6Ly9qaXJhLndoYW1jbG91ZC5jb20vPi4N
-Cg0KVGhhbmtzIHRvIGFsbCB0aG9zZSB3aG8gaGF2ZSBjb250cmlidXRlZCB0byB0aGUgY3JlYXRp
-b24gb2YgdGhpcyByZWxlYXNlLg0KDQpUaGUgbmV4dCBMVFMgcmVsZWFzZSB3aWxsIGxpa2VseSBi
-ZSAyLjE1LjI7IHdoZXJlIHdlIHdpbGwgYWRkIHN1cHBvcnQgZm9yIFNMRVMgMTUgU1A0IGNsaWVu
-dHMgKExVLTE1OTU5PGh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xNTk1OT4p
-IGFuZCBSSEVMIDkuMCBjbGllbnRzIChMVS0xNTg3NDxodHRwczovL2ppcmEud2hhbWNsb3VkLmNv
-bS9icm93c2UvTFUtMTU4NzQ+KQ0KDQo=
+Andreas Dilger (2):
+  lustre: obdclass: use consistent stats units
+  lustre: idl: add checks for OBD_CONNECT flags
 
---_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_
-Content-Type: text/html; charset="utf-8"
-Content-ID: <6DECA7890E746F4DB98D3A3E0D639ECA@namprd19.prod.outlook.com>
-Content-Transfer-Encoding: base64
+Bobi Jam (1):
+  lustre: ldlm: rid of obsolete param of ldlm_resource_get()
 
-PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
-bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
-dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
-dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
-dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
-dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
-bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
-ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
-IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
-IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQpAZm9udC1mYWNlDQoJe2ZvbnQtZmFtaWx5OiJUaW1lcyBO
-ZXcgUm9tYW4gXChCb2R5IENTXCkiOw0KCXBhbm9zZS0xOjIgMiA2IDMgNSA0IDUgMiAzIDQ7fQ0K
-LyogU3R5bGUgRGVmaW5pdGlvbnMgKi8NCnAuTXNvTm9ybWFsLCBsaS5Nc29Ob3JtYWwsIGRpdi5N
-c29Ob3JtYWwNCgl7bWFyZ2luOjBjbTsNCglmb250LXNpemU6MTIuMHB0Ow0KCWZvbnQtZmFtaWx5
-OiJDYWxpYnJpIixzYW5zLXNlcmlmO30NCmE6bGluaywgc3Bhbi5Nc29IeXBlcmxpbmsNCgl7bXNv
-LXN0eWxlLXByaW9yaXR5Ojk5Ow0KCWNvbG9yOiMwNTYzQzE7DQoJdGV4dC1kZWNvcmF0aW9uOnVu
-ZGVybGluZTt9DQpzcGFuLkVtYWlsU3R5bGUxOA0KCXttc28tc3R5bGUtdHlwZTpwZXJzb25hbC1y
-ZXBseTsNCglmb250LWZhbWlseToiQ2FsaWJyaSIsc2Fucy1zZXJpZjsNCgljb2xvcjp3aW5kb3d0
-ZXh0Ow0KCWZvbnQtd2VpZ2h0Om5vcm1hbDsNCglmb250LXN0eWxlOm5vcm1hbDt9DQpzcGFuLmFw
-cGxlLWNvbnZlcnRlZC1zcGFjZQ0KCXttc28tc3R5bGUtbmFtZTphcHBsZS1jb252ZXJ0ZWQtc3Bh
-Y2U7fQ0KLk1zb0NocERlZmF1bHQNCgl7bXNvLXN0eWxlLXR5cGU6ZXhwb3J0LW9ubHk7DQoJZm9u
-dC1zaXplOjEwLjBwdDt9DQpAcGFnZSBXb3JkU2VjdGlvbjENCgl7c2l6ZTo2MTIuMHB0IDc5Mi4w
-cHQ7DQoJbWFyZ2luOjcyLjBwdCA3Mi4wcHQgNzIuMHB0IDcyLjBwdDt9DQpkaXYuV29yZFNlY3Rp
-b24xDQoJe3BhZ2U6V29yZFNlY3Rpb24xO30NCi0tPjwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keSBs
-YW5nPSJFTi1DQSIgbGluaz0iIzA1NjNDMSIgdmxpbms9IiM5NTRGNzIiIHN0eWxlPSJ3b3JkLXdy
-YXA6YnJlYWstd29yZCI+DQo8ZGl2IGNsYXNzPSJXb3JkU2VjdGlvbjEiPg0KPHAgY2xhc3M9Ik1z
-b05vcm1hbCI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+V2UgYXJlIHBs
-ZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTwvc3Bhbj48c3BhbiBsYW5nPSJF
-Ti1VUyI+NTxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+Ljwvc3Bhbj4xPHNwYW4gc3R5bGU9ImNv
-bG9yOmJsYWNrIj4gUmVsZWFzZSBoYXMgYmVlbiBkZWNsYXJlZCBHQSBhbmQgaXMgYXZhaWxhYmxl
-IGZvciZuYnNwOzwvc3Bhbj48L3NwYW4+PGEgaHJlZj0iaHR0cHM6Ly9kb3dubG9hZHMud2hhbWNs
-b3VkLmNvbS9wdWJsaWMvbHVzdHJlL2x1c3RyZS0yLjE1LjEvIj48c3BhbiBsYW5nPSJFTi1VUyI+
-ZG93bmxvYWQ8L3NwYW4+PC9hPjxhIGhyZWY9Imh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwu
-Y29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIuMTEuMC8iPjxzcGFuIGxhbmc9IkVOLVVTIj4mbmJz
-cDs8L3NwYW4+PC9hPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPi4NCiBZ
-b3UgY2FuIGFsc28gZ3JhYiB0aGUgc291cmNlIGZyb20mbmJzcDs8L3NwYW4+PGEgaHJlZj0iaHR0
-cHM6Ly9naXQud2hhbWNsb3VkLmNvbS8/cD1mcy9sdXN0cmUtcmVsZWFzZS5naXQ7YT1jb21taXQ7
-aD0yZjlmZmJiZDYyNzY3ZWY5ZDk2MjBmZjJmMWE3YWI3ZWJlMDNmYTI3Ij48c3BhbiBsYW5nPSJF
-Ti1VUyI+Z2l0PC9zcGFuPjwvYT48bzpwPjwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwi
-PjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48bzpw
-PjwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4tcmlnaHQ6MzYu
-MHB0Ij48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj5EZXRhaWxzIG9mIGNo
-YW5nZXMgc2luY2UmbmJzcDs8YSBocmVmPSJodHRwczovL3dpa2kubHVzdHJlLm9yZy9MdXN0cmVf
-Mi4xNS4wX0NoYW5nZWxvZyIgdGl0bGU9Imh0dHBzOi8vd2lraS5sdXN0cmUub3JnL0x1c3RyZV8y
-LjEyLjhfQ2hhbmdlbG9nIj48c3BhbiBzdHlsZT0iY29sb3I6d2luZG93dGV4dCI+Mi4xNS4wPC9z
-cGFuPjwvYT48c3BhbiBjbGFzcz0iYXBwbGUtY29udmVydGVkLXNwYWNlIj4mbmJzcDs8L3NwYW4+
-Y2FuDQogYmUgZm91bmQgaW4gdGhlJm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFj
-ayI+PGEgaHJlZj0iaHR0cDovL3dpa2kubHVzdHJlLm9yZy9MdXN0cmVfMi4xNS4xX0NoYW5nZWxv
-ZyI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjp3aW5kb3d0ZXh0Ij4yLjE1LjEgY2hh
-bmdlIGxvZy48L3NwYW4+PC9hPjwvc3Bhbj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjExLjBwdDtj
-b2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
-c3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1h
-bDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4
-dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1z
-cGFjaW5nOjBweCI+DQo8c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJz
-cDs8L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+
-DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtm
-b250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3
-aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1z
-dHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBz
-dHlsZT0iY29sb3I6YmxhY2siPlRoZXJlIGlzIHRoZSBmb2xsb3dpbmcgbm90YWJsZSBlbmhhbmNl
-bWVudHMgb3ZlciAyLjE1LjA6PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48
-L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9y
-OiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3Rl
-eHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0
-bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8Yj48
-c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrO2JhY2tncm91bmQ6d2hpdGUiPiZu
-YnNwOzwvc3Bhbj48L2I+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bh
-bj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAw
-LCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpz
-dGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQt
-dGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxiPjxzcGFuIGxhbmc9
-IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dyb3VuZDp3aGl0ZSI+UkhFTCA4LjYmbmJz
-cDs8L3NwYW4+PC9iPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2s7YmFja2dy
-b3VuZDp3aGl0ZSI+aXMgbm93IHN1cHBvcnRlZCBmb3Igc2VydmVycyBhbmQgY2xpZW50czxzcGFu
-IGNsYXNzPSJhcHBsZS1jb252ZXJ0ZWQtc3BhY2UiPiZuYnNwOzwvc3Bhbj48L3NwYW4+PHNwYW4g
-bGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+Jm5ic3A7KDwvc3Bhbj48c3BhbiBzdHls
-ZT0iY29sb3I6YmxhY2siPjxhIGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dz
-ZS9MVS0xNTc5NSIgdGl0bGU9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0x
-NTc5NSI+PHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjp3aW5kb3d0ZXh0Ij5MVS0xNTc5
-NTwvc3Bhbj48L2E+PC9zcGFuPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2si
-PikuJm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48L286cD48L3Nw
-YW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwg
-MCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246
-c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0
-LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8c3BhbiBzdHlsZT0i
-Zm9udC1zaXplOjE0LjBwdDtjb2xvcjpibGFjayI+Jm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJj
-b2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
-c3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1h
-bDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4
-dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1z
-cGFjaW5nOjBweCI+DQo8Yj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrO2Jh
-Y2tncm91bmQ6d2hpdGUiPlVidW50dSAyMi4wNCZuYnNwOzwvc3Bhbj48L2I+PHNwYW4gbGFuZz0i
-RU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjaztiYWNrZ3JvdW5kOndoaXRlIj5pcyBub3cgc3VwcG9y
-dGVkIGZvciBjbGllbnRzPHNwYW4gY2xhc3M9ImFwcGxlLWNvbnZlcnRlZC1zcGFjZSI+Jm5ic3A7
-PC9zcGFuPjwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJz
-cDsoPC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PGEgaHJlZj0iaHR0cHM6Ly9qaXJh
-LndoYW1jbG91ZC5jb20vYnJvd3NlL0xVLTEzNzgzIiB0aXRsZT0iaHR0cHM6Ly9qaXJhLndoYW1j
-bG91ZC5jb20vYnJvd3NlL0xVLTE1Nzk1Ij48c3BhbiBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9y
-OndpbmRvd3RleHQiPkxVLTEzNzgzPC9zcGFuPjwvYT48L3NwYW4+PHNwYW4gbGFuZz0iRU4tVVMi
-IHN0eWxlPSJjb2xvcjpibGFjayI+KS4mbmJzcDs8L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJs
-YWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
-Y2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhh
-bnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUt
-YWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6
-MHB4Ij4NCjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTQuMHB0O2NvbG9yOmJsYWNrIj4mbmJzcDs8
-L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8
-cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250
-LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRv
-d3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJv
-a2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBzdHls
-ZT0iY29sb3I6YmxhY2siPlBsZWFzZSBsb2cgYW55IGlzc3VlcyBmb3VuZCBpbiB0aGUmbmJzcDs8
-L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48YSBocmVmPSJodHRwczovL2ppcmEud2hh
-bWNsb3VkLmNvbS8iPjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6cHVycGxlIj5pc3N1
-ZSB0cmFja2luZyBzeXN0ZW08L3NwYW4+PC9hPjwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyIgc3R5
-bGU9ImNvbG9yOmJsYWNrIj4uPC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+PG86cD48
-L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0LWNvbG9y
-OiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBhdXRvO3Rl
-eHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVzdDogYXV0
-bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+DQo8c3Bh
-biBsYW5nPSJFTi1VUyIgc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PHNwYW4gc3R5
-bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9y
-bWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczog
-bm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtp
-dC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3
-b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2si
-PlRoYW5rcyB0byBhbGwgdGhvc2Ugd2hvIGhhdmUgY29udHJpYnV0ZWQgdG8gdGhlIGNyZWF0aW9u
-IG9mIHRoaXMgcmVsZWFzZS48L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwv
-bzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6
-IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4
-dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRv
-Oy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFu
-IGxhbmc9IkVOLVVTIiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48c3BhbiBzdHls
-ZT0iY29sb3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3Jt
-YWwiIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApO2ZvbnQtdmFyaWFudC1jYXBzOiBu
-b3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0LWFsaWduOnN0YXJ0O3dpZG93czogYXV0bzstd2Via2l0
-LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4O3dv
-cmQtc3BhY2luZzowcHgiPg0KPHNwYW4gbGFuZz0iRU4tVVMiIHN0eWxlPSJjb2xvcjpibGFjayI+
-VGhlIG5leHQgTFRTIHJlbGVhc2Ugd2lsbCBsaWtlbHkgYmUgMi4xNS4yOyB3aGVyZSB3ZSB3aWxs
-IGFkZCBzdXBwb3J0IGZvciBTTEVTIDE1IFNQNCBjbGllbnRzICg8YSBocmVmPSJodHRwczovL2pp
-cmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTU5NTkiPkxVLTE1OTU5PC9hPikgYW5kIFJIRUwg
-OS4wIGNsaWVudHMgKDwvc3Bhbj48c3BhbiBsYW5nPSJFTi1VUyI+PGEgaHJlZj0iaHR0cHM6Ly9q
-aXJhLndoYW1jbG91ZC5jb20vYnJvd3NlL0xVLTE1ODc0Ij5MVS0xNTg3NDwvYT48c3BhbiBzdHls
-ZT0iY29sb3I6YmxhY2siPik8L3NwYW4+PC9zcGFuPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+
-PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0i
-RU4tVVMiPiZuYnNwOzwvc3Bhbj48bzpwPjwvbzpwPjwvcD4NCjwvZGl2Pg0KPC9ib2R5Pg0KPC9o
-dG1sPg0K
+Chris Horn (3):
+  lnet: LNet peer aliveness broken
+  lnet: Correct net selection for router ping
+  lnet: Remove duplicate checks for peer sensitivity
 
---_000_6A776CA0A82B418C8BC88B5A76AE1DBFddncom_--
+Frank Sehr (1):
+  lnet: Memory leak on adding existing interface
 
---===============1771126376934301689==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Ian Ziemba (1):
+  lnet: o2iblnd: Salt comp_vector
+
+Lai Siyao (1):
+  lustre: lmv: always space-balance r-r directories
+
+Mr NeilBrown (1):
+  lnet: change ni_status in lnet_ni to u32*
+
+Oleg Drokin (1):
+  lustre: update version to 2.15.51
+
+Patrick Farrell (3):
+  lustre: llite: Rework upper/lower DIO/AIO
+  lustre: llite: Unify range unlock
+  lustre: llite: Refactor DIO/AIO free code
+
+Qian Yingjin (4):
+  lustre: llite: fully disable readahead in kernel I/O path
+  lustre: llite: use fatal_signal_pending in range_lock
+  lustre: llite: simplify callback handling for async getattr
+  lustre: statahead: add total hit/miss count stats
+
+Sebastien Buisson (4):
+  lustre: sec: new connect flag for name encryption
+  lustre: sec: use enc pool for bounce pages
+  lustre: sec: fix detection of SELinux enforcement
+  lustre: llite: fix stat attributes_mask
+
+Serguei Smirnov (1):
+  lnet: Use fatal NI if none other available
+
+ fs/crypto/crypto.c                     |  34 +--
+ fs/lustre/include/cl_object.h          |  40 ++-
+ fs/lustre/include/lprocfs_status.h     |  27 +-
+ fs/lustre/include/lustre_crypto.h      |   2 +
+ fs/lustre/include/lustre_dlm.h         |   1 -
+ fs/lustre/include/lustre_intent.h      |   2 +
+ fs/lustre/include/lustre_sec.h         |   3 +
+ fs/lustre/include/obd.h                |  27 +-
+ fs/lustre/include/obd_class.h          |   4 +-
+ fs/lustre/ldlm/ldlm_lock.c             |   6 +-
+ fs/lustre/ldlm/ldlm_pool.c             |  34 ++-
+ fs/lustre/ldlm/ldlm_request.c          |   4 +-
+ fs/lustre/ldlm/ldlm_resource.c         |   9 +-
+ fs/lustre/llite/crypto.c               |  19 +-
+ fs/lustre/llite/dir.c                  |   8 +-
+ fs/lustre/llite/file.c                 |  62 +++--
+ fs/lustre/llite/llite_internal.h       |  52 +++-
+ fs/lustre/llite/llite_lib.c            |  25 +-
+ fs/lustre/llite/lproc_llite.c          |  57 +++--
+ fs/lustre/llite/namei.c                |   8 +-
+ fs/lustre/llite/rw26.c                 |  86 ++++---
+ fs/lustre/llite/statahead.c            | 385 ++++++++++++++--------------
+ fs/lustre/llite/symlink.c              |   2 +-
+ fs/lustre/llite/xattr_cache.c          |   8 +-
+ fs/lustre/llite/xattr_security.c       |  12 +-
+ fs/lustre/lmv/lmv_obd.c                |  44 ++--
+ fs/lustre/mdc/mdc_dev.c                |   5 +-
+ fs/lustre/mdc/mdc_internal.h           |   3 +-
+ fs/lustre/mdc/mdc_locks.c              |  32 +--
+ fs/lustre/mdc/mdc_reint.c              |   2 +-
+ fs/lustre/obdclass/cl_internal.h       |   1 +
+ fs/lustre/obdclass/cl_io.c             | 136 ++++++----
+ fs/lustre/obdclass/cl_object.c         |   6 +
+ fs/lustre/obdclass/lprocfs_status.c    | 244 ++++++++++--------
+ fs/lustre/obdclass/lu_object.c         |  17 +-
+ fs/lustre/obdclass/range_lock.c        |   2 +-
+ fs/lustre/osc/osc_object.c             |   6 +-
+ fs/lustre/osc/osc_request.c            | 136 +++++++++-
+ fs/lustre/ptlrpc/lproc_ptlrpc.c        |  32 +--
+ fs/lustre/ptlrpc/sec_bulk.c            | 452 +++++++++++++++++++++++++++++++--
+ fs/lustre/ptlrpc/wiretest.c            |   2 +
+ include/linux/fscrypt.h                |  49 +++-
+ include/linux/lnet/lib-lnet.h          |  52 +++-
+ include/linux/lnet/lib-types.h         |   2 +-
+ include/uapi/linux/lustre/lustre_idl.h | 290 ++++++++++-----------
+ include/uapi/linux/lustre/lustre_ver.h |   4 +-
+ net/lnet/klnds/o2iblnd/o2iblnd.c       |  14 +-
+ net/lnet/klnds/o2iblnd/o2iblnd.h       |   2 +
+ net/lnet/lnet/api-ni.c                 |  19 +-
+ net/lnet/lnet/lib-move.c               |  98 +++----
+ net/lnet/lnet/lib-msg.c                |  37 +--
+ net/lnet/lnet/router.c                 |  11 +-
+ net/lnet/selftest/brw_test.c           |  67 +++--
+ net/lnet/selftest/framework.c          |  18 +-
+ net/lnet/selftest/rpc.c                |  51 ++--
+ net/lnet/selftest/selftest.h           |  15 +-
+ 56 files changed, 1806 insertions(+), 960 deletions(-)
+
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============1771126376934301689==--
