@@ -4,32 +4,31 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 2FBEBECAAD3
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id C326EECAAA1
 	for <lustre-devel@archiver.kernel.org>; Tue,  6 Sep 2022 01:56:32 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MM7lz6PWsz1yBh;
-	Mon,  5 Sep 2022 18:56:31 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MM7m03XTVz1yD4;
+	Mon,  5 Sep 2022 18:56:32 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4MM7lK3DtFz1y6G
- for <lustre-devel@lists.lustre.org>; Mon,  5 Sep 2022 18:55:57 -0700 (PDT)
+ 4MM7l74RJnz1y76
+ for <lustre-devel@lists.lustre.org>; Mon,  5 Sep 2022 18:55:47 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id EAF10100B036;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id BA210100B003;
  Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id E97CA58999; Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
+ id B43D7589A2; Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  5 Sep 2022 21:55:35 -0400
-Message-Id: <1662429337-18737-23-git-send-email-jsimmons@infradead.org>
+Date: Mon,  5 Sep 2022 21:55:22 -0400
+Message-Id: <1662429337-18737-10-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1662429337-18737-1-git-send-email-jsimmons@infradead.org>
 References: <1662429337-18737-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 22/24] lustre: sec: fix detection of SELinux
- enforcement
+Subject: [lustre-devel] [PATCH 09/24] lnet: o2iblnd: Salt comp_vector
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,118 +41,109 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Ian Ziemba <ian.ziemba@hpe.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Sebastien Buisson <sbuisson@ddn.com>
+From: Ian Ziemba <ian.ziemba@hpe.com>
 
-For newer kernels, for which selinux_is_enabled() does not exist
-anymore, the only way to find out if SELinux is enforced when
-initializing the security context is to fetch the length of the
-security attribute name. If it is 0, we conclude SELinux is disabled.
+If conns_per_peer is greater than 1, all the connections targeting
+the same peer are assigned the same comp_vector. This results in
+multiple IB CQs targeting the same peer to be serialized on a single
+comp_vector.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16012
-Lustre-commit: 155cbc22ba4f758cf ("LU-16012 sec: fix detection of SELinux enforcement")
-Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-on: https://review.whamcloud.com/48049
-Reviewed-by: Jian Yu <yujian@whamcloud.com>
-Reviewed-by: Yingjin Qian <qian@ddn.com>
+Help spread out the IB CQ work to multiple cores by salting
+comp_vector based on number of connections.
+
+1 client to 1 server LST 1M write results with 4 conns_per_peer and
+RXE configured to spread out work based on comp_vector.
+
+Before: 1377.92 MB/s
+After: 3828.48 MB/s
+
+HPE-bug-id: LUS-11043
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16078
+Lustre-commit: 1ef1fa06b20c424f5 ("LU-16078 o2iblnd: Salt comp_vector")
+Signed-off-by: Ian Ziemba <ian.ziemba@hpe.com>
+Reviewed-on: https://review.whamcloud.com/48148
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/dir.c            |  3 ++-
- fs/lustre/llite/llite_internal.h |  3 ++-
- fs/lustre/llite/namei.c          |  6 ++++--
- fs/lustre/llite/xattr_security.c | 12 +++++++++++-
- 4 files changed, 19 insertions(+), 5 deletions(-)
+ net/lnet/klnds/o2iblnd/o2iblnd.c | 14 +++++++++++---
+ net/lnet/klnds/o2iblnd/o2iblnd.h |  2 ++
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index bffd34c..9e7812d 100644
---- a/fs/lustre/llite/dir.c
-+++ b/fs/lustre/llite/dir.c
-@@ -513,7 +513,8 @@ static int ll_dir_setdirstripe(struct dentry *dparent, struct lmv_user_md *lump,
- 		 * to determine the security context for the file. So our fake
- 		 * dentry should be real enough for this purpose.
- 		 */
--		err = ll_dentry_init_security(&dentry, mode, &dentry.d_name,
-+		err = ll_dentry_init_security(parent,
-+					      &dentry, mode, &dentry.d_name,
- 					      &op_data->op_file_secctx_name,
- 					      &op_data->op_file_secctx,
- 					      &op_data->op_file_secctx_size);
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 227b944..6d85b96 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -447,7 +447,8 @@ static inline void obd_connect_set_secctx(struct obd_connect_data *data)
- #endif
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.c b/net/lnet/klnds/o2iblnd/o2iblnd.c
+index ea28c65..c713528 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -338,6 +338,7 @@ int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer_ni **peerp,
+ 	peer_ni->ibp_queue_depth = ni->ni_net->net_tunables.lct_peer_tx_credits;
+ 	peer_ni->ibp_queue_depth_mod = 0;	/* try to use the default */
+ 	kref_init(&peer_ni->ibp_kref);
++	atomic_set(&peer_ni->ibp_nconns, 0);
+ 
+ 	INIT_HLIST_NODE(&peer_ni->ibp_list);
+ 	INIT_LIST_HEAD(&peer_ni->ibp_conns);
+@@ -569,7 +570,7 @@ static int kiblnd_get_completion_vector(struct kib_conn *conn, int cpt)
+ 	int vectors;
+ 	int off;
+ 	int i;
+-	lnet_nid_t nid = conn->ibc_peer->ibp_nid;
++	lnet_nid_t ibp_nid;
+ 
+ 	vectors = conn->ibc_cmid->device->num_comp_vectors;
+ 	if (vectors <= 1)
+@@ -579,8 +580,13 @@ static int kiblnd_get_completion_vector(struct kib_conn *conn, int cpt)
+ 	if (!mask)
+ 		return 0;
+ 
+-	/* hash NID to CPU id in this partition... */
+-	off = do_div(nid, cpumask_weight(*mask));
++	/* hash NID to CPU id in this partition... when targeting a single peer
++	 * with multiple QPs, to engage more cores in CQ processing to a single
++	 * peer, use ibp_nconns to salt the value the comp_vector value
++	 */
++	ibp_nid = conn->ibc_peer->ibp_nid +
++		  atomic_read(&conn->ibc_peer->ibp_nconns);
++	off = do_div(ibp_nid, cpumask_weight(*mask));
+ 	for_each_cpu(i, *mask) {
+ 		if (!off--)
+ 			return i % vectors;
+@@ -889,6 +895,7 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ 	conn->ibc_state = state;
+ 
+ 	/* 1 more conn */
++	atomic_inc(&peer_ni->ibp_nconns);
+ 	atomic_inc(&net->ibn_nconns);
+ 	return conn;
+ 
+@@ -954,6 +961,7 @@ void kiblnd_destroy_conn(struct kib_conn *conn)
+ 
+ 		kiblnd_peer_decref(peer_ni);
+ 		rdma_destroy_id(cmid);
++		atomic_dec(&peer_ni->ibp_nconns);
+ 		atomic_dec(&net->ibn_nconns);
+ 	}
  }
+diff --git a/net/lnet/klnds/o2iblnd/o2iblnd.h b/net/lnet/klnds/o2iblnd/o2iblnd.h
+index 0066e85..56d486f 100644
+--- a/net/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/net/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -522,6 +522,8 @@ struct kib_peer_ni {
+ 	u16			ibp_queue_depth;
+ 	/* reduced value which allows conn to be created if max fails */
+ 	u16			ibp_queue_depth_mod;
++	/* Number of connections allocated. */
++	atomic_t		ibp_nconns;
+ };
  
--int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
-+int ll_dentry_init_security(struct inode *parent, struct dentry *dentry,
-+			    int mode, struct qstr *name,
- 			    const char **secctx_name, void **secctx,
- 			    u32 *secctx_size);
- int ll_inode_init_security(struct dentry *dentry, struct inode *inode,
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index a08b1c1..d382554 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -891,7 +891,8 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 
- 	if (it->it_op & IT_CREAT &&
- 	    test_bit(LL_SBI_FILE_SECCTX, ll_i2sbi(parent)->ll_flags)) {
--		rc = ll_dentry_init_security(dentry, it->it_create_mode,
-+		rc = ll_dentry_init_security(parent,
-+					     dentry, it->it_create_mode,
- 					     &dentry->d_name,
- 					     &op_data->op_file_secctx_name,
- 					     &op_data->op_file_secctx,
-@@ -1570,7 +1571,8 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
- 		ll_qos_mkdir_prep(op_data, dir);
- 
- 	if (test_bit(LL_SBI_FILE_SECCTX, sbi->ll_flags)) {
--		err = ll_dentry_init_security(dchild, mode, &dchild->d_name,
-+		err = ll_dentry_init_security(dir,
-+					      dchild, mode, &dchild->d_name,
- 					      &op_data->op_file_secctx_name,
- 					      &op_data->op_file_secctx,
- 					      &op_data->op_file_secctx_size);
-diff --git a/fs/lustre/llite/xattr_security.c b/fs/lustre/llite/xattr_security.c
-index f14021d..39229d3 100644
---- a/fs/lustre/llite/xattr_security.c
-+++ b/fs/lustre/llite/xattr_security.c
-@@ -38,7 +38,8 @@
- /*
-  * Check for LL_SBI_FILE_SECCTX before calling.
-  */
--int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
-+int ll_dentry_init_security(struct inode *parent, struct dentry *dentry,
-+			    int mode, struct qstr *name,
- 			    const char **secctx_name, void **secctx,
- 			    u32 *secctx_size)
- {
-@@ -58,6 +59,15 @@ int ll_dentry_init_security(struct dentry *dentry, int mode, struct qstr *name,
- 	 * from SELinux.
- 	 */
- 
-+	/* fetch length of security xattr name */
-+	rc = security_inode_listsecurity(parent, NULL, 0);
-+	/* xattr name length == 0 means SELinux is disabled */
-+	if (rc == 0)
-+		return 0;
-+	/* we support SELinux only */
-+	if (rc != strlen(XATTR_NAME_SELINUX) + 1)
-+		return -EOPNOTSUPP;
-+
- 	rc = security_dentry_init_security(dentry, mode, name, secctx,
- 					   secctx_size);
- 	/* Usually, security_dentry_init_security() returns -EOPNOTSUPP when
+ extern struct kib_data kiblnd_data;
 -- 
 1.8.3.1
 
