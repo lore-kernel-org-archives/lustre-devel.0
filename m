@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id DF3A0ECAAD3
-	for <lustre-devel@archiver.kernel.org>; Tue,  6 Sep 2022 01:56:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E6B32ECAAA1
+	for <lustre-devel@archiver.kernel.org>; Tue,  6 Sep 2022 01:56:23 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MM7lp4qJTz1y57;
-	Mon,  5 Sep 2022 18:56:22 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MM7lq4Rw5z1y6T;
+	Mon,  5 Sep 2022 18:56:23 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4MM7lL1Tk4z1yBr
- for <lustre-devel@lists.lustre.org>; Mon,  5 Sep 2022 18:55:58 -0700 (PDT)
+ 4MM7l60ZXMz1y6W
+ for <lustre-devel@lists.lustre.org>; Mon,  5 Sep 2022 18:55:46 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id F1134100B053;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id B6BDB100B000;
  Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id EE69158992; Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
+ id AC1DA58992; Mon,  5 Sep 2022 21:55:39 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon,  5 Sep 2022 21:55:36 -0400
-Message-Id: <1662429337-18737-24-git-send-email-jsimmons@infradead.org>
+Date: Mon,  5 Sep 2022 21:55:20 -0400
+Message-Id: <1662429337-18737-8-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1662429337-18737-1-git-send-email-jsimmons@infradead.org>
 References: <1662429337-18737-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 23/24] lustre: idl: add checks for
- OBD_CONNECT flags
+Subject: [lustre-devel] [PATCH 07/24] lustre: llite: simplify callback
+ handling for async getattr
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -49,545 +49,917 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Andreas Dilger <adilger@whamcloud.com>
+From: Qian Yingjin <qian@ddn.com>
 
-Make it harder to accidentally declare OBD_CONNECT flags without
-properly defining their names.  Otherwise, this can cause serious
-compatibility problems if two features are using the same flag.
+In this patch, it prepares the inode and set lock data directly in
+the callback interpret of the intent async getattr RPC request (in
+ptlrpcd context), simplifies the old impementation that defer this
+work in the statahead thread.
 
-Make it clear whom to contact when reserving a new feature flag.
+If the statahead entry is a striped directory, it may generate
+new RPCs in the ptlrpcd interpret context to obtain the
+attributes for slaves of the striped directory:
+  @ll_prep_inode()->@lmv_revaildate_slaves()
+This is dangerous and may result in deadlock in ptlrpcd interpret
+context, thus we use work queue to handle these extra RPCs.
+Add sanity 123d to verify that it works correctly.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-1904
-Lustre-commit: d851381ea69472448 ("LU-1904 idl: add checks for OBD_CONNECT flags")
-Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/48053
+According to the benchmark result, the workload "ls -l" to a large
+directory on a client without any caching (server and client),
+containing 1M files (47001 bytes) shows the results with measured
+elapsed time:
+- w/o patch:    180 seconds;
+- w patch:      181 seconds;
+
+There is no any obvious performance regession.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14139
+Lustre-commit: 509d7305ce8a01351 ("LU-14139 llite: simplify callback handling for async getattr")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/45648
 Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/obdclass/lprocfs_status.c    | 189 +++++++++++----------
- include/uapi/linux/lustre/lustre_idl.h | 291 +++++++++++++++------------------
- 2 files changed, 227 insertions(+), 253 deletions(-)
+ fs/lustre/include/lustre_intent.h |   2 +
+ fs/lustre/include/obd.h           |  27 +--
+ fs/lustre/include/obd_class.h     |   4 +-
+ fs/lustre/llite/llite_internal.h  |  17 +-
+ fs/lustre/llite/llite_lib.c       |   8 +
+ fs/lustre/llite/statahead.c       | 380 +++++++++++++++++++-------------------
+ fs/lustre/lmv/lmv_obd.c           |   6 +-
+ fs/lustre/mdc/mdc_internal.h      |   3 +-
+ fs/lustre/mdc/mdc_locks.c         |  30 +--
+ 9 files changed, 241 insertions(+), 236 deletions(-)
 
-diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 7ce20b6..64d7cc48c 100644
---- a/fs/lustre/obdclass/lprocfs_status.c
-+++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -43,101 +43,100 @@
- #include <linux/seq_file.h>
- #include <linux/ctype.h>
- 
--static const char * const obd_connect_names[] = {
--	/* flags names */
--	"read_only",
--	"lov_index",
--	"connect_from_mds",
--	"write_grant",
--	"server_lock",
--	"version",
--	"request_portal",
--	"acl",
--	"xattr",
--	"create_on_write",
--	"truncate_lock",
--	"initial_transno",
--	"inode_bit_locks",
--	"join_file(obsolete)",
--	"getattr_by_fid",
--	"no_oh_for_devices",
--	"remote_client",
--	"remote_client_by_force",
--	"max_byte_per_rpc",
--	"64bit_qdata",
--	"mds_capability",
--	"oss_capability",
--	"early_lock_cancel",
--	"som",
--	"adaptive_timeouts",
--	"lru_resize",
--	"mds_mds_connection",
--	"real_conn",
--	"change_qunit_size",
--	"alt_checksum_algorithm",
--	"fid_is_enabled",
--	"version_recovery",
--	"pools",
--	"grant_shrink",
--	"skip_orphan",
--	"large_ea",
--	"full20",
--	"layout_lock",
--	"64bithash",
--	"object_max_bytes",
--	"imp_recov",
--	"jobstats",
--	"umask",
--	"einprogress",
--	"grant_param",
--	"flock_owner",
--	"lvb_type",
--	"nanoseconds_times",
--	"lightweight_conn",
--	"short_io",
--	"pingless",
--	"flock_deadlock",
--	"disp_stripe",
--	"open_by_fid",
--	"lfsck",
--	"unknown",
--	"unlink_close",
--	"multi_mod_rpcs",
--	"dir_stripe",
--	"subtree",
--	"lockahead",
--	"bulk_mbits",
--	"compact_obdo",
--	"second_flags",
--	/* flags2 names */
--	"file_secctx",	/* 0x01 */
--	"lockaheadv2",	/* 0x02 */
--	"dir_migrate",	/* 0x04 */
--	"sum_statfs",	/* 0x08 */
--	"overstriping",	/* 0x10 */
--	"flr",		/* 0x20 */
--	"wbc",		/* 0x40 */
--	"lock_convert",	/* 0x80 */
--	"archive_id_array",	/* 0x100 */
--	"increasing_xid",	/* 0x200 */
--	"selinux_policy",	/* 0x400 */
--	"lsom",			/* 0x800 */
--	"pcc",			/* 0x1000 */
--	"crush",		/* 0x2000 */
--	"async_discard",	/* 0x4000 */
--	"client_encryption",	/* 0x8000 */
--	"fidmap",		/* 0x10000 */
--	"getattr_pfid",		/* 0x20000 */
--	"lseek",		/* 0x40000 */
--	"dom_lvb",		/* 0x80000 */
--	"reply_mbits",		/* 0x100000 */
--	"mode_convert",		/* 0x200000 */
--	"batch_rpc",		/* 0x400000 */
--	"pcc_ro",		/* 0x800000 */
--	"mne_nid_type",		/* 0x1000000 */
--	"lock_contend",		/* 0x2000000 */
--	"atomic_open_lock",	/* 0x4000000 */
--	"name_encryption",	/* 0x8000000 */
-+static const char *const obd_connect_names[] = {
-+	"read_only",			/* 0x01 */
-+	"lov_index",			/* 0x02 */
-+	"connect_from_mds",		/* 0x03 */
-+	"write_grant",			/* 0x04 */
-+	"server_lock",			/* 0x10 */
-+	"version",			/* 0x20 */
-+	"request_portal",		/* 0x40 */
-+	"acl",				/* 0x80 */
-+	"xattr",			/* 0x100 */
-+	"create_on_write",		/* 0x200 */
-+	"truncate_lock",		/* 0x400 */
-+	"initial_transno",		/* 0x800 */
-+	"inode_bit_locks",		/* 0x1000 */
-+	"barrier",			/* 0x2000 */
-+	"getattr_by_fid",		/* 0x4000 */
-+	"no_oh_for_devices",		/* 0x8000 */
-+	"remote_client",		/* 0x10000 */
-+	"remote_client_by_force",	/* 0x20000 */
-+	"max_byte_per_rpc",		/* 0x40000 */
-+	"64bit_qdata",			/* 0x80000 */
-+	"mds_capability",		/* 0x100000 */
-+	"oss_capability",		/* 0x200000 */
-+	"early_lock_cancel",		/* 0x400000 */
-+	"som",				/* 0x800000 */
-+	"adaptive_timeouts",		/* 0x1000000 */
-+	"lru_resize",			/* 0x2000000 */
-+	"mds_mds_connection",		/* 0x4000000 */
-+	"real_conn",			/* 0x8000000 */
-+	"change_qunit_size",		/* 0x10000000 */
-+	"alt_checksum_algorithm",	/* 0x20000000 */
-+	"fid_is_enabled",		/* 0x40000000 */
-+	"version_recovery",		/* 0x80000000 */
-+	"pools",			/* 0x100000000 */
-+	"grant_shrink",			/* 0x200000000 */
-+	"skip_orphan",			/* 0x400000000 */
-+	"large_ea",			/* 0x800000000 */
-+	"full20",			/* 0x1000000000 */
-+	"layout_lock",			/* 0x2000000000 */
-+	"64bithash",			/* 0x4000000000 */
-+	"object_max_bytes",		/* 0x8000000000 */
-+	"imp_recov",			/* 0x10000000000 */
-+	"jobstats",			/* 0x20000000000 */
-+	"umask",			/* 0x40000000000 */
-+	"einprogress",			/* 0x80000000000 */
-+	"grant_param",			/* 0x100000000000 */
-+	"flock_owner",			/* 0x200000000000 */
-+	"lvb_type",			/* 0x400000000000 */
-+	"nanoseconds_times",		/* 0x800000000000 */
-+	"lightweight_conn",		/* 0x1000000000000 */
-+	"short_io",			/* 0x2000000000000 */
-+	"pingless",			/* 0x4000000000000 */
-+	"flock_deadlock",		/* 0x8000000000000 */
-+	"disp_stripe",			/* 0x10000000000000 */
-+	"open_by_fid",			/* 0x20000000000000 */
-+	"lfsck",			/* 0x40000000000000 */
-+	"unknown",			/* 0x80000000000000 */
-+	"unlink_close",			/* 0x100000000000000 */
-+	"multi_mod_rpcs",		/* 0x200000000000000 */
-+	"dir_stripe",			/* 0x400000000000000 */
-+	"subtree",			/* 0x800000000000000 */
-+	"lockahead",			/* 0x1000000000000000 */
-+	"bulk_mbits",			/* 0x2000000000000000 */
-+	"compact_obdo",			/* 0x4000000000000000 */
-+	"second_flags",			/* 0x8000000000000000 */
-+	/* ocd_connect_flags2 names */
-+	"file_secctx",			/* 0x01 */
-+	"lockaheadv2",			/* 0x02 */
-+	"dir_migrate",			/* 0x04 */
-+	"sum_statfs",			/* 0x08 */
-+	"overstriping",			/* 0x10 */
-+	"flr",				/* 0x20 */
-+	"wbc",				/* 0x40 */
-+	"lock_convert",			/* 0x80 */
-+	"archive_id_array",		/* 0x100 */
-+	"increasing_xid",		/* 0x200 */
-+	"selinux_policy",		/* 0x400 */
-+	"lsom",				/* 0x800 */
-+	"pcc",				/* 0x1000 */
-+	"crush",			/* 0x2000 */
-+	"async_discard",		/* 0x4000 */
-+	"client_encryption",		/* 0x8000 */
-+	"fidmap",			/* 0x10000 */
-+	"getattr_pfid",			/* 0x20000 */
-+	"lseek",			/* 0x40000 */
-+	"dom_lvb",			/* 0x80000 */
-+	"reply_mbits",			/* 0x100000 */
-+	"mode_convert",			/* 0x200000 */
-+	"batch_rpc",			/* 0x400000 */
-+	"pcc_ro",			/* 0x800000 */
-+	"mne_nid_type",			/* 0x1000000 */
-+	"lock_contend",			/* 0x2000000 */
-+	"atomic_open_lock",		/* 0x4000000 */
-+	"name_encryption",		/* 0x8000000 */
- 	NULL
+diff --git a/fs/lustre/include/lustre_intent.h b/fs/lustre/include/lustre_intent.h
+index e7d81f6..298270b 100644
+--- a/fs/lustre/include/lustre_intent.h
++++ b/fs/lustre/include/lustre_intent.h
+@@ -50,6 +50,8 @@ struct lookup_intent {
+ 	u64			it_remote_lock_handle;
+ 	struct ptlrpc_request	*it_request;
+ 	unsigned int		it_lock_set:1;
++	unsigned int		it_extra_rpc_check:1;
++	unsigned int		it_extra_rpc_need:1;
  };
  
-diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
-index 319dc81d..475151c 100644
---- a/include/uapi/linux/lustre/lustre_idl.h
-+++ b/include/uapi/linux/lustre/lustre_idl.h
-@@ -681,147 +681,122 @@ struct ptlrpc_body_v2 {
- #define MSG_PTLRPC_HEADER_OFF		31
+ static inline int it_disposition(struct lookup_intent *it, int flag)
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index c5e2a24..c452da7 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -834,18 +834,19 @@ struct md_readdir_info {
+ 	int mr_partial_readdir_rc;
+ };
  
- /* Connect flags */
--#define OBD_CONNECT_RDONLY		  0x1ULL /*client has read-only access*/
--#define OBD_CONNECT_INDEX		  0x2ULL /*connect specific LOV idx */
--#define OBD_CONNECT_MDS			  0x4ULL /*connect from MDT to OST */
--#define OBD_CONNECT_GRANT		  0x8ULL /*OSC gets grant at connect */
--#define OBD_CONNECT_SRVLOCK		 0x10ULL /*server takes locks for cli */
--#define OBD_CONNECT_VERSION		 0x20ULL /*Lustre versions in ocd */
--#define OBD_CONNECT_REQPORTAL		 0x40ULL /*Separate non-IO req portal */
--#define OBD_CONNECT_ACL			 0x80ULL /*access control lists */
--#define OBD_CONNECT_XATTR		0x100ULL /*client use extended attr */
--#define OBD_CONNECT_LARGE_ACL		0x200ULL /* more than 32 ACL entries */
--/* was OBD_CONNECT_TRUNCLOCK		0x400ULL *locks on server for punch */
-+#define OBD_CONNECT_RDONLY			0x1ULL /* client is read-only */
-+#define OBD_CONNECT_INDEX			0x2ULL /* connect to LOV idx */
-+#define OBD_CONNECT_MDS				0x4ULL /* connect MDT to OST */
-+#define OBD_CONNECT_GRANT			0x8ULL /* fetch grant connect */
-+#define OBD_CONNECT_SRVLOCK		       0x10ULL /* server lock for RPC */
-+#define OBD_CONNECT_VERSION		       0x20ULL /* versions in OCD */
-+#define OBD_CONNECT_REQPORTAL		       0x40ULL /* non-IO portal */
-+#define OBD_CONNECT_ACL			       0x80ULL /* access control list */
-+#define OBD_CONNECT_XATTR		      0x100ULL /* extended attributes */
-+#define OBD_CONNECT_LARGE_ACL		      0x200ULL /* over 32 ACL entries */
-+/* was OBD_CONNECT_TRUNCLOCK		      0x400ULL  * server locks punch */
- /* temporary reuse until 2.21.53 to indicate pre-2.15 client, see LU-15478 */
--#define OBD_CONNECT_OLD_FALLOC		0x400ULL /* missing o_valid flags */
--#define OBD_CONNECT_TRANSNO		0x800ULL /*replay sends init transno */
--#define OBD_CONNECT_IBITS	       0x1000ULL /* not checked in 2.11+ */
--#define OBD_CONNECT_BARRIER	       0x2000ULL /* write barrier. Resevered to
--						  * avoid use on client.
--						  */
--#define OBD_CONNECT_ATTRFID	       0x4000ULL /*Server can GetAttr By Fid*/
--#define OBD_CONNECT_NODEVOH	       0x8000ULL /*No open hndl on specl nodes*/
--#define OBD_CONNECT_RMT_CLIENT	      0x10000ULL /* Remote client, never used
--						  * in production. Removed in
--						  * 2.9. Keep this flag to
--						  * avoid reuse.
--						  */
--#define OBD_CONNECT_RMT_CLIENT_FORCE  0x20000ULL /* Remote client by force,
--						  * never used in production.
--						  * Removed in 2.9. Keep this
--						  * flag to avoid reuse
--						  */
--#define OBD_CONNECT_BRW_SIZE	      0x40000ULL /*Max bytes per rpc */
--#define OBD_CONNECT_QUOTA64	      0x80000ULL /*Not used since 2.4 */
--#define OBD_CONNECT_MDS_CAPA	     0x100000ULL /*MDS capability */
--#define OBD_CONNECT_OSS_CAPA	     0x200000ULL /*OSS capability */
--#define OBD_CONNECT_CANCELSET	     0x400000ULL /*Early batched cancels. */
--#define OBD_CONNECT_SOM		     0x800000ULL /*Size on MDS */
--#define OBD_CONNECT_AT		    0x1000000ULL /*client uses AT */
--#define OBD_CONNECT_LRU_RESIZE      0x2000000ULL /*LRU resize feature. */
--#define OBD_CONNECT_MDS_MDS	    0x4000000ULL /*MDS-MDS connection */
--#define OBD_CONNECT_REAL	    0x8000000ULL /* obsolete since 2.8 */
--#define OBD_CONNECT_CHANGE_QS      0x10000000ULL /*Not used since 2.4 */
--#define OBD_CONNECT_CKSUM	   0x20000000ULL /*support several cksum algos*/
--#define OBD_CONNECT_FID		   0x40000000ULL /*FID is supported by server */
--#define OBD_CONNECT_VBR		   0x80000000ULL /*version based recovery */
--#define OBD_CONNECT_LOV_V3	  0x100000000ULL /*client supports LOV v3 EA */
--#define OBD_CONNECT_GRANT_SHRINK  0x200000000ULL /* support grant shrink */
--#define OBD_CONNECT_SKIP_ORPHAN   0x400000000ULL /* don't reuse orphan objids */
--#define OBD_CONNECT_MAX_EASIZE    0x800000000ULL /* preserved for large EA */
--#define OBD_CONNECT_FULL20       0x1000000000ULL /* it is 2.0 client */
--#define OBD_CONNECT_LAYOUTLOCK   0x2000000000ULL /* client uses layout lock */
--#define OBD_CONNECT_64BITHASH    0x4000000000ULL /* client supports 64-bits
--						  * directory hash
--						  */
--#define OBD_CONNECT_MAXBYTES     0x8000000000ULL /* max stripe size */
--#define OBD_CONNECT_IMP_RECOV   0x10000000000ULL /* imp recovery support */
--#define OBD_CONNECT_JOBSTATS    0x20000000000ULL /* jobid in ptlrpc_body */
--#define OBD_CONNECT_UMASK       0x40000000000ULL /* create uses client umask */
--#define OBD_CONNECT_EINPROGRESS 0x80000000000ULL /* client handles -EINPROGRESS
--						  * RPC error properly
--						  */
--#define OBD_CONNECT_GRANT_PARAM 0x100000000000ULL/* extra grant params used for
--						  * finer space reservation
--						  */
--#define OBD_CONNECT_FLOCK_OWNER 0x200000000000ULL /* for the fixed 1.8
--						   * policy and 2.x server
--						   */
--#define OBD_CONNECT_LVB_TYPE	0x400000000000ULL /* variable type of LVB */
--#define OBD_CONNECT_NANOSEC_TIME 0x800000000000ULL /* nanosecond timestamps */
--#define OBD_CONNECT_LIGHTWEIGHT 0x1000000000000ULL/* lightweight connection */
--#define OBD_CONNECT_SHORTIO     0x2000000000000ULL/* short io */
--#define OBD_CONNECT_PINGLESS	0x4000000000000ULL/* pings not required */
--#define OBD_CONNECT_FLOCK_DEAD	0x8000000000000ULL/* flock deadlock detection */
--#define OBD_CONNECT_DISP_STRIPE 0x10000000000000ULL/*create stripe disposition*/
--#define OBD_CONNECT_OPEN_BY_FID	0x20000000000000ULL	/* open by fid won't pack
--							 * name in request
--							 */
--#define OBD_CONNECT_LFSCK	0x40000000000000ULL/* support online LFSCK */
--#define OBD_CONNECT_UNLINK_CLOSE 0x100000000000000ULL/* close file in unlink */
--#define OBD_CONNECT_MULTIMODRPCS 0x200000000000000ULL /* support multiple modify
--						       *  RPCs in parallel
--						       */
--#define OBD_CONNECT_DIR_STRIPE	 0x400000000000000ULL/* striped DNE dir */
--#define OBD_CONNECT_SUBTREE	 0x800000000000000ULL /* fileset mount */
-+#define OBD_CONNECT_OLD_FALLOC		      0x400ULL /* no o_valid flags */
-+#define OBD_CONNECT_TRANSNO		      0x800ULL /* replay send transno */
-+#define OBD_CONNECT_IBITS		     0x1000ULL /* not checked 2.11+ */
-+#define OBD_CONNECT_BARRIER		     0x2000ULL /* write barrier */
-+#define OBD_CONNECT_ATTRFID		     0x4000ULL /* Server GetAttr FID */
-+#define OBD_CONNECT_NODEVOH		     0x8000ULL /* No open handle spec */
-+#define OBD_CONNECT_RMT_CLIENT		    0x10000ULL /* Never used, gone 2.9*/
-+#define OBD_CONNECT_RMT_CLIENT_FORCE	    0x20000ULL /* Never used, gone 2.9*/
-+#define OBD_CONNECT_BRW_SIZE		    0x40000ULL /* Max bytes per rpc */
-+#define OBD_CONNECT_QUOTA64		    0x80000ULL /* Unused since 2.4 */
-+#define OBD_CONNECT_MDS_CAPA		   0x100000ULL /* Unused since 2.7 */
-+#define OBD_CONNECT_OSS_CAPA		   0x200000ULL /* Unused since 2.7 */
-+#define OBD_CONNECT_CANCELSET		   0x400000ULL /* Early batch cancel */
-+#define OBD_CONNECT_SOM			   0x800000ULL /* Unused since 2.7 */
-+#define OBD_CONNECT_AT			  0x1000000ULL /* client uses AT */
-+#define OBD_CONNECT_LRU_RESIZE		  0x2000000ULL /* LRU resize feature */
-+#define OBD_CONNECT_MDS_MDS		  0x4000000ULL /* MDS-MDS connection */
-+#define OBD_CONNECT_REAL		  0x8000000ULL /* Unused since 2.8 */
-+#define OBD_CONNECT_CHANGE_QS		 0x10000000ULL /* Unused since 2.4 */
-+#define OBD_CONNECT_CKSUM		 0x20000000ULL /* cksum algo choice */
-+#define OBD_CONNECT_FID			 0x40000000ULL /* server handles FIDs */
-+#define OBD_CONNECT_VBR			 0x80000000ULL /* version based recov */
-+#define OBD_CONNECT_LOV_V3		0x100000000ULL /* client LOV v3 EA */
-+#define OBD_CONNECT_GRANT_SHRINK	0x200000000ULL /* handle grant shrink */
-+#define OBD_CONNECT_SKIP_ORPHAN		0x400000000ULL /* no orph objid reuse */
-+#define OBD_CONNECT_MAX_EASIZE		0x800000000ULL /* EA size in reply */
-+#define OBD_CONNECT_FULL20	       0x1000000000ULL /* it is 2.0 client */
-+#define OBD_CONNECT_LAYOUTLOCK	       0x2000000000ULL /* client layout lock */
-+#define OBD_CONNECT_64BITHASH	       0x4000000000ULL /* 64-bits dir hash */
-+#define OBD_CONNECT_MAXBYTES	       0x8000000000ULL /* max stripe size */
-+#define OBD_CONNECT_IMP_RECOV	      0x10000000000ULL /* imp recov support */
-+#define OBD_CONNECT_JOBSTATS	      0x20000000000ULL /* ptlrpc_body jobid */
-+#define OBD_CONNECT_UMASK	      0x40000000000ULL /* create client umask */
-+#define OBD_CONNECT_EINPROGRESS	      0x80000000000ULL /* client -EINPROGRESS
-+							* RPC error handling
-+							*/
-+#define OBD_CONNECT_GRANT_PARAM	     0x100000000000ULL /* extra grant params for
-+							* space reservation
-+							*/
-+#define OBD_CONNECT_FLOCK_OWNER	     0x200000000000ULL /* unused since 2.0 */
-+#define OBD_CONNECT_LVB_TYPE	     0x400000000000ULL /* variable LVB type */
-+#define OBD_CONNECT_NANOSEC_TIME     0x800000000000ULL /* nanosec timestamp */
-+#define OBD_CONNECT_LIGHTWEIGHT	    0x1000000000000ULL /* lightweight connect */
-+#define OBD_CONNECT_SHORTIO	    0x2000000000000ULL /* short io */
-+#define OBD_CONNECT_PINGLESS	    0x4000000000000ULL /* pings not required */
-+#define OBD_CONNECT_FLOCK_DEAD	    0x8000000000000ULL /* flk deadlock detect */
-+#define OBD_CONNECT_DISP_STRIPE	   0x10000000000000ULL /* create stripe disp */
-+#define OBD_CONNECT_OPEN_BY_FID	   0x20000000000000ULL /* open by FID won't pack
-+							* name in request
-+							*/
-+#define OBD_CONNECT_LFSCK	   0x40000000000000ULL /* allow online LFSCK */
-+#define OBD_CONNECT_UNLINK_CLOSE  0x100000000000000ULL /* unlink closes file */
-+#define OBD_CONNECT_MULTIMODRPCS  0x200000000000000ULL /* allow multiple change
-+							* RPCs in parallel
-+							*/
-+#define OBD_CONNECT_DIR_STRIPE	  0x400000000000000ULL /* striped DNE dir */
-+#define OBD_CONNECT_SUBTREE	  0x800000000000000ULL /* fileset mount */
- /* was OBD_CONNECT_LOCKAHEAD_OLD 0x1000000000000000ULL old lockahead 2.12-2.13*/
+-struct md_enqueue_info;
+-/* metadata stat-ahead */
 -
--/** bulk matchbits is sent within ptlrpc_body */
--#define OBD_CONNECT_BULK_MBITS	 0x2000000000000000ULL
-+#define OBD_CONNECT_BULK_MBITS	 0x2000000000000000ULL /* ptlrpc_body matchbit*/
- #define OBD_CONNECT_OBDOPACK	 0x4000000000000000ULL /* compact OUT obdo */
- #define OBD_CONNECT_FLAGS2	 0x8000000000000000ULL /* second flags word */
- /* ocd_connect_flags2 flags */
--#define OBD_CONNECT2_FILE_SECCTX	0x1ULL		/* set file security
--							 * context at create
--							 */
--#define OBD_CONNECT2_LOCKAHEAD		0x2ULL		/* ladvise lockahead
--							 * v2
--							 */
--#define OBD_CONNECT2_DIR_MIGRATE	0x4ULL		/* migrate striped dir
--							 */
--#define OBD_CONNECT2_SUM_STATFS		0x8ULL /* MDT return aggregated stats */
--#define OBD_CONNECT2_OVERSTRIPING	0x10ULL /* OST overstriping support */
--#define OBD_CONNECT2_FLR		0x20ULL		/* FLR support */
--#define OBD_CONNECT2_WBC_INTENTS	0x40ULL /* create/unlink/... intents
--						 * for wbc, also operations
--						 * under client-held parent
--						 * locks
--						 */
--#define OBD_CONNECT2_LOCK_CONVERT	0x80ULL /* IBITS lock convert support */
--#define OBD_CONNECT2_ARCHIVE_ID_ARRAY  0x100ULL	/* store HSM archive_id in array */
--#define OBD_CONNECT2_INC_XID	       0x200ULL /* Increasing xid */
--#define OBD_CONNECT2_SELINUX_POLICY    0x400ULL	/* has client SELinux policy */
--#define OBD_CONNECT2_LSOM	       0x800ULL	/* LSOM support */
--#define OBD_CONNECT2_PCC	       0x1000ULL /* Persistent Client Cache */
--#define OBD_CONNECT2_CRUSH	       0x2000ULL /* crush hash striped directory
--						  */
--#define OBD_CONNECT2_ASYNC_DISCARD     0x4000ULL /* support async DoM data
--						  * discard
--						  */
--#define OBD_CONNECT2_ENCRYPT	       0x8000ULL /* client-to-disk encrypt */
--#define OBD_CONNECT2_FIDMAP	      0x10000ULL /* FID map */
--#define OBD_CONNECT2_GETATTR_PFID     0x20000ULL /* pack parent FID in getattr */
--#define OBD_CONNECT2_LSEEK	      0x40000ULL /* SEEK_HOLE/DATA RPC */
--#define OBD_CONNECT2_DOM_LVB	      0x80000ULL /* pack DOM glimpse data in LVB */
--#define OBD_CONNECT2_REP_MBITS	     0x100000ULL /* match reply by mbits, not xid */
--#define OBD_CONNECT2_REP_MBITS       0x100000ULL /* match reply mbits not xid*/
--#define OBD_CONNECT2_MODE_CONVERT    0x200000ULL /* LDLM mode convert */
--#define OBD_CONNECT2_BATCH_RPC	     0x400000ULL /* Multi-RPC batch request */
--#define OBD_CONNECT2_PCCRO	     0x800000ULL /* Read-only PCC */
--#define OBD_CONNECT2_ATOMIC_OPEN_LOCK 0x4000000ULL/* request lock on 1st open */
--#define OBD_CONNECT2_ENCRYPT_NAME     0x8000000ULL /* name encrypt */
--/* XXX README XXX:
-- * Please DO NOT add flag values here before first ensuring that this same
-- * flag value is not in use on some other branch.  Please clear any such
-- * changes with senior engineers before starting to use a new flag.  Then,
-- * submit a small patch against EVERY branch that ONLY adds the new flag,
-+#define OBD_CONNECT2_FILE_SECCTX		0x1ULL /* security context */
-+#define OBD_CONNECT2_LOCKAHEAD			0x2ULL /* ladvise lockahead */
-+#define OBD_CONNECT2_DIR_MIGRATE		0x4ULL /* migrate striped dir */
-+#define OBD_CONNECT2_SUM_STATFS			0x8ULL /* MDT aggregate statfs*/
-+#define OBD_CONNECT2_OVERSTRIPING	       0x10ULL /* OST overstriping */
-+#define OBD_CONNECT2_FLR		       0x20ULL /* FLR mirror handling */
-+#define OBD_CONNECT2_WBC_INTENTS	       0x40ULL /* MDS wb cache intent */
-+#define OBD_CONNECT2_LOCK_CONVERT	       0x80ULL /* IBITS lock convert */
-+#define OBD_CONNECT2_ARCHIVE_ID_ARRAY	      0x100ULL /* HSM archive_id array*/
-+#define OBD_CONNECT2_INC_XID		      0x200ULL /* Increasing xid */
-+#define OBD_CONNECT2_SELINUX_POLICY	      0x400ULL /* cli SELinux policy */
-+#define OBD_CONNECT2_LSOM		      0x800ULL /* Lazy Size on MDT */
-+#define OBD_CONNECT2_PCC		     0x1000ULL /* Persist Client Cache*/
-+#define OBD_CONNECT2_CRUSH		     0x2000ULL /* CRUSH dir hash */
-+#define OBD_CONNECT2_ASYNC_DISCARD	     0x4000ULL /* async DoM discard */
-+#define OBD_CONNECT2_ENCRYPT		    0x8000ULL /* client disk encrypt */
-+#define OBD_CONNECT2_FIDMAP		    0x10000ULL /* MDT migrate FID map */
-+#define OBD_CONNECT2_GETATTR_PFID	    0x20000ULL /* parent FID getattr */
-+#define OBD_CONNECT2_LSEEK		    0x40000ULL /* SEEK_HOLE/DATA RPC */
-+#define OBD_CONNECT2_DOM_LVB		    0x80000ULL /* DoM glimpse in LVB */
-+#define OBD_CONNECT2_REP_MBITS		   0x100000ULL /* reply mbits, not XID*/
-+#define OBD_CONNECT2_MODE_CONVERT	   0x200000ULL /* LDLM mode convert */
-+#define OBD_CONNECT2_BATCH_RPC		   0x400000ULL /* Multi-op batch RPCs */
-+#define OBD_CONNECT2_PCCRO		   0x800000ULL /* PCC read-only */
-+#define OBD_CONNECT2_MNE_TYPE		  0x1000000ULL /* mne_nid_type IPv6 */
-+#define OBD_CONNECT2_LOCK_CONTENTION	  0x2000000ULL /* contention detect */
-+#define OBD_CONNECT2_ATOMIC_OPEN_LOCK	  0x4000000ULL /* lock on first open */
-+#define OBD_CONNECT2_ENCRYPT_NAME	  0x8000000ULL /* name encrypt */
-+/* XXX README XXX README XXX README XXX README XXX README XXX README XXX
-+ * Please DO NOT add OBD_CONNECT flags before first ensuring that this value
-+ * is not in use by some other branch/patch.  Email adilger@whamcloud.com
-+ * to reserve the new OBD_CONNECT value for use by your feature. Then, submit
-+ * a small patch against master and LTS branches that ONLY adds the new flag,
-  * updates obd_connect_names[], adds the flag to check_obd_connect_data(),
-  * and updates wiretests accordingly, so it can be approved and landed easily
-- * to reserve the flag for future use.
-+ * to reserve the flag for future use by your feature (submitted separately).
-  */
+-struct md_enqueue_info {
+-	struct md_op_data		mi_data;
+-	struct lookup_intent		mi_it;
+-	struct lustre_handle		mi_lockh;
+-	struct inode		       *mi_dir;
+-	struct ldlm_enqueue_info	mi_einfo;
+-	int (*mi_cb)(struct ptlrpc_request *req,
+-		     struct md_enqueue_info *minfo, int rc);
+-	void			       *mi_cbdata;
++struct md_op_item;
++typedef int (*md_op_item_cb_t)(struct req_capsule *pill,
++			       struct md_op_item *item,
++			       int rc);
++
++struct md_op_item {
++	struct md_op_data		 mop_data;
++	struct lookup_intent		 mop_it;
++	struct lustre_handle		 mop_lockh;
++	struct ldlm_enqueue_info	 mop_einfo;
++	md_op_item_cb_t                  mop_cb;
++	void				*mop_cbdata;
++	struct inode			*mop_dir;
+ };
  
--#define OCD_HAS_FLAG(ocd, flg)  \
--	(!!((ocd)->ocd_connect_flags & OBD_CONNECT_##flg))
-+#define OCD_HAS_FLAG(ocd, flag)	\
-+	(!!((ocd)->ocd_connect_flags & OBD_CONNECT_##flag))
-+#define OCD_HAS_FLAG2(ocd, flag2) (OCD_HAS_FLAG(ocd, FLAGS2) && \
-+	 !!((ocd)->ocd_connect_flags2 & OBD_CONNECT2_##flag2))
+ struct obd_ops {
+@@ -1078,7 +1079,7 @@ struct md_ops {
+ 				struct lu_fid *fid);
  
- /* Features required for this version of the client to work with server */
- #define CLIENT_CONNECT_MDT_REQD (OBD_CONNECT_FID |	\
-@@ -855,32 +830,32 @@ struct obd_connect_data {
- 	 * any field after ocd_maxbytes on the receiver without a valid flag
- 	 * may result in out-of-bound memory access and kernel oops.
- 	 */
--	__u16 ocd_maxmodrpcs;		/* Maximum modify RPCs in parallel */
--	__u16 padding0;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u32 padding1;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 ocd_connect_flags2;
--	__u64 padding3;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding4;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding5;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding6;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding7;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding8;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 padding9;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingA;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingB;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingC;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingD;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingE;		/* added 2.1.0. also fix lustre_swab_connect */
--	__u64 paddingF;		/* added 2.1.0. also fix lustre_swab_connect */
--};
--
--/* XXX README XXX:
-- * Please DO NOT use any fields here before first ensuring that this same
-- * field is not in use on some other branch.  Please clear any such changes
-- * with senior engineers before starting to use a new field.  Then, submit
-- * a small patch against EVERY branch that ONLY adds the new field along with
-- * the matching OBD_CONNECT flag, so that can be approved and landed easily to
-- * reserve the flag for future use.
-+	__u16 ocd_maxmodrpcs;	/* Maximum modify RPCs in parallel */
-+	__u16 padding0;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u32 padding1;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 ocd_connect_flags2;/* OBD_CONNECT2_* per above */
-+	__u64 padding3;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding4;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding5;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding6;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding7;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding8;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 padding9;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingA;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingB;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingC;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingD;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingE;		/* READ BELOW! also fix lustre_swab_connect */
-+	__u64 paddingF;		/* READ BELOW! also fix lustre_swab_connect */
+ 	int (*intent_getattr_async)(struct obd_export *exp,
+-				    struct md_enqueue_info *minfo);
++				    struct md_op_item *item);
+ 
+ 	int (*revalidate_lock)(struct obd_export *, struct lookup_intent *,
+ 			       struct lu_fid *, u64 *bits);
+diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
+index f603140..80ff4e8 100644
+--- a/fs/lustre/include/obd_class.h
++++ b/fs/lustre/include/obd_class.h
+@@ -1593,7 +1593,7 @@ static inline int md_init_ea_size(struct obd_export *exp, u32 easize,
+ }
+ 
+ static inline int md_intent_getattr_async(struct obd_export *exp,
+-					  struct md_enqueue_info *minfo)
++					  struct md_op_item *item)
+ {
+ 	int rc;
+ 
+@@ -1604,7 +1604,7 @@ static inline int md_intent_getattr_async(struct obd_export *exp,
+ 	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
+ 			     LPROC_MD_INTENT_GETATTR_ASYNC);
+ 
+-	return MDP(exp->exp_obd, intent_getattr_async)(exp, minfo);
++	return MDP(exp->exp_obd, intent_getattr_async)(exp, item);
+ }
+ 
+ static inline int md_revalidate_lock(struct obd_export *exp,
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index b018515..e7f703a 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -1504,17 +1504,12 @@ struct ll_statahead_info {
+ 					     * is not a hidden one
+ 					     */
+ 	unsigned int	    sai_skip_hidden;/* skipped hidden dentry count */
+-	unsigned int	    sai_ls_all:1,   /* "ls -al", do stat-ahead for
+-					     * hidden entries
+-					     */
+-				sai_in_readpage:1;/* statahead in readdir() */
++	unsigned int		sai_ls_all:1; /* "ls -al", do stat-ahead for
++					       * hidden entries
++					       */
+ 	wait_queue_head_t	sai_waitq;      /* stat-ahead wait queue */
+ 	struct task_struct     *sai_task;       /* stat-ahead thread */
+ 	struct task_struct     *sai_agl_task;   /* AGL thread */
+-	struct list_head	sai_interim_entries; /* entries which got async
+-						      * stat reply, but not
+-						      * instantiated
+-						      */
+ 	struct list_head	sai_entries;	/* completed entries */
+ 	struct list_head	sai_agls;	/* AGLs to be sent */
+ 	struct list_head	sai_cache[LL_SA_CACHE_SIZE];
+@@ -1522,6 +1517,12 @@ struct ll_statahead_info {
+ 	atomic_t		sai_cache_count; /* entry count in cache */
+ };
+ 
++struct ll_interpret_work {
++	struct work_struct	 lpw_work;
++	struct md_op_item	*lpw_item;
++	struct req_capsule	*lpw_pill;
 +};
-+/* XXX README XXX README XXX README XXX README XXX README XXX README XXX
-+ * Please DO NOT use any fields before first ensuring that this field is
-+ * not in use by some other branch/patch.  Email adilger@whamcloud.com to
-+ * reserve the new obd_connect_data field for use by your feature. Then, submit
-+ * a small patch against master and LTS branch that ONLY adds the new field,
-+ * updates lustre_swab_connect(), along with the matching OBD_CONNECT flag,
-+ * and updates wiretests accordingly,so it can be approved and landed easily
-+ * to reserve the field for future use by your feature (submitted separately).
-  */
++
+ int ll_revalidate_statahead(struct inode *dir, struct dentry **dentry,
+ 			    bool unplug);
+ int ll_start_statahead(struct inode *dir, struct dentry *dentry, bool agl);
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index 5931258..0bffe5e 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -3080,6 +3080,14 @@ int ll_prep_inode(struct inode **inode, struct req_capsule *pill,
+ 	if (rc)
+ 		goto out;
+ 
++	if (S_ISDIR(md.body->mbo_mode) && md.lmv && lmv_dir_striped(md.lmv) &&
++	    it && it->it_extra_rpc_check) {
++		/* TODO: Check @lsm unchanged via @lsm_md_eq. */
++		it->it_extra_rpc_need = 1;
++		rc = -EAGAIN;
++		goto out;
++	}
++
+ 	/*
+ 	 * clear default_lmv only if intent_getattr reply doesn't contain it.
+ 	 * but it needs to be done after iget, check this early because
+diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
+index c6779eb..5662f44 100644
+--- a/fs/lustre/llite/statahead.c
++++ b/fs/lustre/llite/statahead.c
+@@ -56,13 +56,12 @@ enum se_stat {
  
  /*
+  * sa_entry is not refcounted: statahead thread allocates it and do async stat,
+- * and in async stat callback ll_statahead_interpret() will add it into
+- * sai_interim_entries, later statahead thread will call sa_handle_callback() to
+- * instantiate entry and move it into sai_entries, and then only scanner process
+- * can access and free it.
++ * and in async stat callback ll_statahead_interpret() will prepare the inode
++ * and set lock data in the ptlrpcd context. Then the scanner process will be
++ * woken up if this entry is the waiting one, can access and free it.
+  */
+ struct sa_entry {
+-	/* link into sai_interim_entries or sai_entries */
++	/* link into sai_entries */
+ 	struct list_head	se_list;
+ 	/* link into sai hash table locally */
+ 	struct list_head	se_hash;
+@@ -74,10 +73,6 @@ struct sa_entry {
+ 	enum se_stat		se_state;
+ 	/* entry size, contains name */
+ 	int			se_size;
+-	/* pointer to async getattr enqueue info */
+-	struct md_enqueue_info	*se_minfo;
+-	/* pointer to the async getattr request */
+-	struct ptlrpc_request	*se_req;
+ 	/* pointer to the target inode */
+ 	struct inode		*se_inode;
+ 	/* entry name */
+@@ -137,12 +132,6 @@ static inline int sa_sent_full(struct ll_statahead_info *sai)
+ 	return atomic_read(&sai->sai_cache_count) >= sai->sai_max;
+ }
+ 
+-/* got async stat replies */
+-static inline int sa_has_callback(struct ll_statahead_info *sai)
+-{
+-	return !list_empty(&sai->sai_interim_entries);
+-}
+-
+ static inline int agl_list_empty(struct ll_statahead_info *sai)
+ {
+ 	return list_empty(&sai->sai_agls);
+@@ -328,61 +317,61 @@ static void sa_free(struct ll_statahead_info *sai, struct sa_entry *entry)
+ }
+ 
+ /* finish async stat RPC arguments */
+-static void sa_fini_data(struct md_enqueue_info *minfo)
++static void sa_fini_data(struct md_op_item *item)
+ {
+-	struct md_op_data *op_data = &minfo->mi_data;
++	struct md_op_data *op_data = &item->mop_data;
+ 
+ 	if (op_data->op_flags & MF_OPNAME_KMALLOCED)
+ 		/* allocated via ll_setup_filename called from sa_prep_data */
+ 		kfree(op_data->op_name);
+-	ll_unlock_md_op_lsm(&minfo->mi_data);
+-	iput(minfo->mi_dir);
+-	kfree(minfo);
++	ll_unlock_md_op_lsm(op_data);
++	iput(item->mop_dir);
++	kfree(item);
+ }
+ 
+-static int ll_statahead_interpret(struct ptlrpc_request *req,
+-				  struct md_enqueue_info *minfo, int rc);
++static int ll_statahead_interpret(struct req_capsule *pill,
++				  struct md_op_item *item, int rc);
+ 
+ /*
+  * prepare arguments for async stat RPC.
+  */
+-static struct md_enqueue_info *
++static struct md_op_item *
+ sa_prep_data(struct inode *dir, struct inode *child, struct sa_entry *entry)
+ {
+-	struct md_enqueue_info   *minfo;
++	struct md_op_item *item;
+ 	struct ldlm_enqueue_info *einfo;
+-	struct md_op_data        *op_data;
++	struct md_op_data *op_data;
+ 
+-	minfo = kzalloc(sizeof(*minfo), GFP_NOFS);
+-	if (!minfo)
++	item = kzalloc(sizeof(*item), GFP_NOFS);
++	if (!item)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	op_data = ll_prep_md_op_data(&minfo->mi_data, dir, child,
++	op_data = ll_prep_md_op_data(&item->mop_data, dir, child,
+ 				     entry->se_qstr.name, entry->se_qstr.len, 0,
+ 				     LUSTRE_OPC_ANY, NULL);
+ 	if (IS_ERR(op_data)) {
+-		kfree(minfo);
+-		return (struct md_enqueue_info *)op_data;
++		kfree(item);
++		return (struct md_op_item *)op_data;
+ 	}
+ 
+ 	if (!child)
+ 		op_data->op_fid2 = entry->se_fid;
+ 
+-	minfo->mi_it.it_op = IT_GETATTR;
+-	minfo->mi_dir = igrab(dir);
+-	minfo->mi_cb = ll_statahead_interpret;
+-	minfo->mi_cbdata = entry;
+-
+-	einfo = &minfo->mi_einfo;
+-	einfo->ei_type   = LDLM_IBITS;
+-	einfo->ei_mode   = it_to_lock_mode(&minfo->mi_it);
+-	einfo->ei_cb_bl  = ll_md_blocking_ast;
+-	einfo->ei_cb_cp  = ldlm_completion_ast;
+-	einfo->ei_cb_gl  = NULL;
++	item->mop_it.it_op = IT_GETATTR;
++	item->mop_dir = igrab(dir);
++	item->mop_cb = ll_statahead_interpret;
++	item->mop_cbdata = entry;
++
++	einfo = &item->mop_einfo;
++	einfo->ei_type = LDLM_IBITS;
++	einfo->ei_mode = it_to_lock_mode(&item->mop_it);
++	einfo->ei_cb_bl = ll_md_blocking_ast;
++	einfo->ei_cb_cp = ldlm_completion_ast;
++	einfo->ei_cb_gl = NULL;
+ 	einfo->ei_cbdata = NULL;
+ 	einfo->ei_req_slot = 1;
+ 
+-	return minfo;
++	return item;
+ }
+ 
+ /*
+@@ -393,22 +382,8 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ sa_make_ready(struct ll_statahead_info *sai, struct sa_entry *entry, int ret)
+ {
+ 	struct ll_inode_info *lli = ll_i2info(sai->sai_dentry->d_inode);
+-	struct md_enqueue_info *minfo = entry->se_minfo;
+-	struct ptlrpc_request *req = entry->se_req;
+ 	bool wakeup;
+ 
+-	/* release resources used in RPC */
+-	if (minfo) {
+-		entry->se_minfo = NULL;
+-		ll_intent_release(&minfo->mi_it);
+-		sa_fini_data(minfo);
+-	}
+-
+-	if (req) {
+-		entry->se_req = NULL;
+-		ptlrpc_req_finished(req);
+-	}
+-
+ 	spin_lock(&lli->lli_sa_lock);
+ 	wakeup = __sa_make_ready(sai, entry, ret);
+ 	spin_unlock(&lli->lli_sa_lock);
+@@ -465,7 +440,6 @@ static struct ll_statahead_info *ll_sai_alloc(struct dentry *dentry)
+ 	sai->sai_index = 1;
+ 	init_waitqueue_head(&sai->sai_waitq);
+ 
+-	INIT_LIST_HEAD(&sai->sai_interim_entries);
+ 	INIT_LIST_HEAD(&sai->sai_entries);
+ 	INIT_LIST_HEAD(&sai->sai_agls);
+ 
+@@ -528,7 +502,6 @@ static void ll_sai_put(struct ll_statahead_info *sai)
+ 		LASSERT(sai->sai_task == NULL);
+ 		LASSERT(sai->sai_agl_task == NULL);
+ 		LASSERT(sai->sai_sent == sai->sai_replied);
+-		LASSERT(!sa_has_callback(sai));
+ 
+ 		list_for_each_entry_safe(entry, next, &sai->sai_entries,
+ 					 se_list)
+@@ -618,52 +591,18 @@ static void ll_agl_trigger(struct inode *inode, struct ll_statahead_info *sai)
+ 	iput(inode);
+ }
+ 
+-/*
+- * prepare inode for sa entry, add it into agl list, now sa_entry is ready
+- * to be used by scanner process.
+- */
+-static void sa_instantiate(struct ll_statahead_info *sai,
+-			   struct sa_entry *entry)
++static int ll_statahead_interpret_common(struct inode *dir,
++					 struct ll_statahead_info *sai,
++					 struct req_capsule *pill,
++					 struct lookup_intent *it,
++					 struct sa_entry *entry,
++					 struct mdt_body *body)
+ {
+-	struct inode *dir = sai->sai_dentry->d_inode;
+ 	struct inode *child;
+-	struct md_enqueue_info *minfo;
+-	struct lookup_intent *it;
+-	struct ptlrpc_request *req;
+-	struct mdt_body	*body;
+-	int rc = 0;
+-
+-	LASSERT(entry->se_handle != 0);
+-
+-	minfo = entry->se_minfo;
+-	it = &minfo->mi_it;
+-	req = entry->se_req;
+-	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	if (!body) {
+-		rc = -EFAULT;
+-		goto out;
+-	}
++	int rc;
+ 
+ 	child = entry->se_inode;
+-	/* revalidate; unlinked and re-created with the same name */
+-	if (unlikely(!lu_fid_eq(&minfo->mi_data.op_fid2, &body->mbo_fid1))) {
+-		if (child) {
+-			entry->se_inode = NULL;
+-			iput(child);
+-		}
+-		/* The mdt_body is invalid. Skip this entry */
+-		rc = -EAGAIN;
+-		goto out;
+-	}
+-
+-	it->it_lock_handle = entry->se_handle;
+-	rc = md_revalidate_lock(ll_i2mdexp(dir), it, ll_inode2fid(dir), NULL);
+-	if (rc != 1) {
+-		rc = -EAGAIN;
+-		goto out;
+-	}
+-
+-	rc = ll_prep_inode(&child, &req->rq_pill, dir->i_sb, it);
++	rc = ll_prep_inode(&child, pill, dir->i_sb, it);
+ 	if (rc)
+ 		goto out;
+ 
+@@ -671,10 +610,8 @@ static void sa_instantiate(struct ll_statahead_info *sai,
+ 	 * inode now to save an extra getxattr.
+ 	 */
+ 	if (body->mbo_valid & OBD_MD_ENCCTX) {
+-		void *encctx = req_capsule_server_get(&req->rq_pill,
+-						      &RMF_FILE_ENCCTX);
+-		u32 encctxlen = req_capsule_get_size(&req->rq_pill,
+-						     &RMF_FILE_ENCCTX,
++		void *encctx = req_capsule_server_get(pill, &RMF_FILE_ENCCTX);
++		u32 encctxlen = req_capsule_get_size(pill, &RMF_FILE_ENCCTX,
+ 						     RCL_SERVER);
+ 
+ 		if (encctxlen) {
+@@ -691,7 +628,7 @@ static void sa_instantiate(struct ll_statahead_info *sai,
+ 		}
+ 	}
+ 
+-	CDEBUG(D_READA, "%s: setting %.*s" DFID " l_data to inode %p\n",
++	CDEBUG(D_READA, "%s: setting %.*s"DFID" l_data to inode %p\n",
+ 	       ll_i2sbi(dir)->ll_fsname, entry->se_qstr.len,
+ 	       entry->se_qstr.name, PFID(ll_inode2fid(child)), child);
+ 	ll_set_lock_data(ll_i2sbi(dir)->ll_md_exp, child, it, NULL);
+@@ -700,51 +637,100 @@ static void sa_instantiate(struct ll_statahead_info *sai,
+ 
+ 	if (agl_should_run(sai, child))
+ 		ll_agl_add(sai, child, entry->se_index);
+-
+ out:
++	return rc;
++}
++
++static void ll_statahead_interpret_fini(struct ll_inode_info *lli,
++					struct ll_statahead_info *sai,
++					struct md_op_item *item,
++					struct sa_entry *entry,
++					struct ptlrpc_request *req,
++					int rc)
++{
+ 	/*
+-	 * sa_make_ready() will drop ldlm ibits lock refcount by calling
++	 * First it will drop ldlm ibits lock refcount by calling
+ 	 * ll_intent_drop_lock() in spite of failures. Do not worry about
+ 	 * calling ll_intent_drop_lock() more than once.
+ 	 */
++	ll_intent_release(&item->mop_it);
++	sa_fini_data(item);
++	if (req)
++		ptlrpc_req_finished(req);
+ 	sa_make_ready(sai, entry, rc);
++
++	spin_lock(&lli->lli_sa_lock);
++	sai->sai_replied++;
++	spin_unlock(&lli->lli_sa_lock);
+ }
+ 
+-/* once there are async stat replies, instantiate sa_entry from replies */
+-static void sa_handle_callback(struct ll_statahead_info *sai)
++static void ll_statahead_interpret_work(struct work_struct *data)
+ {
+-	struct ll_inode_info *lli;
++	struct ll_interpret_work *work = container_of(data,
++						     struct ll_interpret_work,
++						     lpw_work);
++	struct md_op_item *item = work->lpw_item;
++	struct req_capsule *pill = work->lpw_pill;
++	struct inode *dir = item->mop_dir;
++	struct ll_inode_info *lli = ll_i2info(dir);
++	struct ll_statahead_info *sai = lli->lli_sai;
++	struct lookup_intent *it;
++	struct sa_entry *entry;
++	struct mdt_body *body;
++	struct inode *child;
++	int rc;
+ 
+-	lli = ll_i2info(sai->sai_dentry->d_inode);
++	entry = (struct sa_entry *)item->mop_cbdata;
++	LASSERT(entry->se_handle != 0);
+ 
+-	spin_lock(&lli->lli_sa_lock);
+-	while (sa_has_callback(sai)) {
+-		struct sa_entry *entry;
++	it = &item->mop_it;
++	body = req_capsule_server_get(pill, &RMF_MDT_BODY);
++	if (!body) {
++		rc = -EFAULT;
++		goto out;
++	}
+ 
+-		entry = list_first_entry(&sai->sai_interim_entries,
+-					 struct sa_entry, se_list);
+-		list_del_init(&entry->se_list);
+-		spin_unlock(&lli->lli_sa_lock);
++	child = entry->se_inode;
++	/* revalidate; unlinked and re-created with the same name */
++	if (unlikely(!lu_fid_eq(&item->mop_data.op_fid2, &body->mbo_fid1))) {
++		if (child) {
++			entry->se_inode = NULL;
++			iput(child);
++		}
++		/* The mdt_body is invalid. Skip this entry */
++		rc = -EAGAIN;
++		goto out;
++	}
+ 
+-		sa_instantiate(sai, entry);
+-		spin_lock(&lli->lli_sa_lock);
++	it->it_lock_handle = entry->se_handle;
++	rc = md_revalidate_lock(ll_i2mdexp(dir), it, ll_inode2fid(dir), NULL);
++	if (rc != 1) {
++		rc = -EAGAIN;
++		goto out;
+ 	}
+-	spin_unlock(&lli->lli_sa_lock);
++
++	LASSERT(it->it_extra_rpc_check == 0);
++	rc = ll_statahead_interpret_common(dir, sai, pill, it, entry, body);
++out:
++	ll_statahead_interpret_fini(lli, sai, item, entry, pill->rc_req, rc);
++	kfree(work);
+ }
+ 
+ /*
+- * callback for async stat RPC, because this is called in ptlrpcd context, we
+- * only put sa_entry in sai_interim_entries, and wake up statahead thread to
+- * really prepare inode and instantiate sa_entry later.
++ * Callback for async stat RPC, this is called in ptlrpcd context. It prepares
++ * the inode and set lock data directly in the ptlrpcd context. It will wake up
++ * the directory listing process if the dentry is the waiting one.
+  */
+-static int ll_statahead_interpret(struct ptlrpc_request *req,
+-				  struct md_enqueue_info *minfo, int rc)
++static int ll_statahead_interpret(struct req_capsule *pill,
++				  struct md_op_item *item, int rc)
+ {
+-	struct lookup_intent *it = &minfo->mi_it;
+-	struct inode *dir = minfo->mi_dir;
++	struct lookup_intent *it = &item->mop_it;
++	struct inode *dir = item->mop_dir;
+ 	struct ll_inode_info *lli = ll_i2info(dir);
+ 	struct ll_statahead_info *sai = lli->lli_sai;
+-	struct sa_entry *entry = (struct sa_entry *)minfo->mi_cbdata;
++	struct sa_entry *entry = (struct sa_entry *)item->mop_cbdata;
++	struct mdt_body *body;
++	struct inode *child;
+ 	u64 handle = 0;
+ 
+ 	if (it_disposition(it, DISP_LOOKUP_NEG))
+@@ -760,10 +746,37 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 	CDEBUG(D_READA, "sa_entry %.*s rc %d\n",
+ 	       entry->se_qstr.len, entry->se_qstr.name, rc);
+ 
+-	if (rc) {
+-		ll_intent_release(it);
+-		sa_fini_data(minfo);
+-	} else {
++	if (rc)
++		goto out;
++
++	body = req_capsule_server_get(pill, &RMF_MDT_BODY);
++	if (!body) {
++		rc = -EFAULT;
++		goto out;
++	}
++
++	child = entry->se_inode;
++	/* revalidate; unlinked and re-created with the same name */
++	if (unlikely(!lu_fid_eq(&item->mop_data.op_fid2, &body->mbo_fid1))) {
++		if (child) {
++			entry->se_inode = NULL;
++			iput(child);
++		}
++		/* The mdt_body is invalid. Skip this entry */
++		rc = -EAGAIN;
++		goto out;
++	}
++
++	entry->se_handle = it->it_lock_handle;
++	/*
++	 * In ptlrpcd context, it is not allowed to generate new RPCs
++	 * especially for striped directories.
++	 */
++	it->it_extra_rpc_check = 1;
++	rc = ll_statahead_interpret_common(dir, sai, pill, it, entry, body);
++	if (rc == -EAGAIN && it->it_extra_rpc_need) {
++		struct ll_interpret_work *work;
++
+ 		/*
+ 		 * release ibits lock ASAP to avoid deadlock when statahead
+ 		 * thread enqueues lock on parent in readdir and another
+@@ -772,53 +785,53 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 		 */
+ 		handle = it->it_lock_handle;
+ 		ll_intent_drop_lock(it);
+-		ll_unlock_md_op_lsm(&minfo->mi_data);
+-	}
+-
+-	spin_lock(&lli->lli_sa_lock);
+-	if (rc) {
+-		if (__sa_make_ready(sai, entry, rc))
+-			wake_up(&sai->sai_waitq);
+-	} else {
+-		int first = 0;
++		ll_unlock_md_op_lsm(&item->mop_data);
++		it->it_extra_rpc_check = 0;
++		it->it_extra_rpc_need = 0;
+ 
+-		entry->se_minfo = minfo;
+-		entry->se_req = ptlrpc_request_addref(req);
+ 		/*
+-		 * Release the async ibits lock ASAP to avoid deadlock
+-		 * when statahead thread tries to enqueue lock on parent
+-		 * for readpage and other tries to enqueue lock on child
+-		 * with parent's lock held, for example: unlink.
++		 * If the stat-ahead entry is a striped directory, there are two
++		 * solutions:
++		 * 1. It can drop the result, let the scanning process do stat()
++		 * on the striped directory in synchronous way. By this way, it
++		 * can avoid to generate new RPCs to obtain the attributes for
++		 * slaves of the striped directory in the ptlrpcd context as it
++		 * is dangerous of blocking in ptlrpcd thread.
++		 * 2. Use work queue or the separate statahead thread to handle
++		 * the extra RPCs (@ll_prep_inode->@lmv_revalidate_slaves).
++		 * Here we adopt the second solution.
+ 		 */
+-		entry->se_handle = handle;
+-		if (!sa_has_callback(sai))
+-			first = 1;
+-
+-		list_add_tail(&entry->se_list, &sai->sai_interim_entries);
+-
+-		if (first && sai->sai_task)
+-			wake_up_process(sai->sai_task);
++		work = kmalloc(sizeof(*work), GFP_ATOMIC);
++		if (!work) {
++			rc = -ENOMEM;
++			goto out;
++		}
++		INIT_WORK(&work->lpw_work, ll_statahead_interpret_work);
++		work->lpw_item = item;
++		work->lpw_pill = pill;
++		ptlrpc_request_addref(pill->rc_req);
++		schedule_work(&work->lpw_work);
++		return 0;
+ 	}
+-	sai->sai_replied++;
+-
+-	spin_unlock(&lli->lli_sa_lock);
+ 
++out:
++	ll_statahead_interpret_fini(lli, sai, item, entry, NULL, rc);
+ 	return rc;
+ }
+ 
+ /* async stat for file not found in dcache */
+ static int sa_lookup(struct inode *dir, struct sa_entry *entry)
+ {
+-	struct md_enqueue_info *minfo;
++	struct md_op_item *item;
+ 	int rc;
+ 
+-	minfo = sa_prep_data(dir, NULL, entry);
+-	if (IS_ERR(minfo))
+-		return PTR_ERR(minfo);
++	item = sa_prep_data(dir, NULL, entry);
++	if (IS_ERR(item))
++		return PTR_ERR(item);
+ 
+-	rc = md_intent_getattr_async(ll_i2mdexp(dir), minfo);
++	rc = md_intent_getattr_async(ll_i2mdexp(dir), item);
+ 	if (rc)
+-		sa_fini_data(minfo);
++		sa_fini_data(item);
+ 
+ 	return rc;
+ }
+@@ -838,7 +851,7 @@ static int sa_revalidate(struct inode *dir, struct sa_entry *entry,
+ 		.it_op = IT_GETATTR,
+ 		.it_lock_handle = 0
+ 	};
+-	struct md_enqueue_info *minfo;
++	struct md_op_item *item;
+ 	int rc;
+ 
+ 	if (unlikely(!inode))
+@@ -847,9 +860,9 @@ static int sa_revalidate(struct inode *dir, struct sa_entry *entry,
+ 	if (d_mountpoint(dentry))
+ 		return 1;
+ 
+-	minfo = sa_prep_data(dir, inode, entry);
+-	if (IS_ERR(minfo))
+-		return PTR_ERR(minfo);
++	item = sa_prep_data(dir, inode, entry);
++	if (IS_ERR(item))
++		return PTR_ERR(item);
+ 
+ 	entry->se_inode = igrab(inode);
+ 	rc = md_revalidate_lock(ll_i2mdexp(dir), &it, ll_inode2fid(inode),
+@@ -857,15 +870,15 @@ static int sa_revalidate(struct inode *dir, struct sa_entry *entry,
+ 	if (rc == 1) {
+ 		entry->se_handle = it.it_lock_handle;
+ 		ll_intent_release(&it);
+-		sa_fini_data(minfo);
++		sa_fini_data(item);
+ 		return 1;
+ 	}
+ 
+-	rc = md_intent_getattr_async(ll_i2mdexp(dir), minfo);
++	rc = md_intent_getattr_async(ll_i2mdexp(dir), item);
+ 	if (rc) {
+ 		entry->se_inode = NULL;
+ 		iput(inode);
+-		sa_fini_data(minfo);
++		sa_fini_data(item);
+ 	}
+ 
+ 	return rc;
+@@ -1040,10 +1053,8 @@ static int ll_statahead_thread(void *arg)
+ 			break;
+ 		}
+ 
+-		sai->sai_in_readpage = 1;
+ 		page = ll_get_dir_page(dir, op_data, pos, NULL);
+ 		ll_unlock_md_op_lsm(op_data);
+-		sai->sai_in_readpage = 0;
+ 		if (IS_ERR(page)) {
+ 			rc = PTR_ERR(page);
+ 			CDEBUG(D_READA,
+@@ -1108,11 +1119,6 @@ static int ll_statahead_thread(void *arg)
+ 
+ 			while (({set_current_state(TASK_IDLE);
+ 				 sai->sai_task; })) {
+-				if (sa_has_callback(sai)) {
+-					__set_current_state(TASK_RUNNING);
+-					sa_handle_callback(sai);
+-				}
+-
+ 				spin_lock(&lli->lli_agl_lock);
+ 				while (sa_sent_full(sai) &&
+ 				       !agl_list_empty(sai)) {
+@@ -1191,16 +1197,11 @@ static int ll_statahead_thread(void *arg)
+ 
+ 	/*
+ 	 * statahead is finished, but statahead entries need to be cached, wait
+-	 * for file release to stop me.
++	 * for file release closedir() call to stop me.
+ 	 */
+ 	while (({set_current_state(TASK_IDLE);
+ 		 sai->sai_task; })) {
+-		if (sa_has_callback(sai)) {
+-			__set_current_state(TASK_RUNNING);
+-			sa_handle_callback(sai);
+-		} else {
+-			schedule();
+-		}
++		schedule();
+ 	}
+ 	__set_current_state(TASK_RUNNING);
+ out:
+@@ -1215,9 +1216,6 @@ static int ll_statahead_thread(void *arg)
+ 		msleep(125);
+ 	}
+ 
+-	/* release resources held by statahead RPCs */
+-	sa_handle_callback(sai);
+-
+ 	CDEBUG(D_READA, "statahead thread stopped: sai %p, parent %pd\n",
+ 	       sai, parent);
+ 
+@@ -1502,10 +1500,6 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 		goto out_unplug;
+ 	}
+ 
+-	/* if statahead is busy in readdir, help it do post-work */
+-	if (!sa_ready(entry) && sai->sai_in_readpage)
+-		sa_handle_callback(sai);
+-
+ 	if (!sa_ready(entry)) {
+ 		spin_lock(&lli->lli_sa_lock);
+ 		sai->sai_index_wait = entry->se_index;
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index 0988b1a..e10d1bf 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -3626,9 +3626,9 @@ static int lmv_clear_open_replay_data(struct obd_export *exp,
+ }
+ 
+ static int lmv_intent_getattr_async(struct obd_export *exp,
+-				    struct md_enqueue_info *minfo)
++				    struct md_op_item *item)
+ {
+-	struct md_op_data *op_data = &minfo->mi_data;
++	struct md_op_data *op_data = &item->mop_data;
+ 	struct obd_device *obd = exp->exp_obd;
+ 	struct lmv_obd *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *ptgt = NULL;
+@@ -3652,7 +3652,7 @@ static int lmv_intent_getattr_async(struct obd_export *exp,
+ 	if (ctgt != ptgt)
+ 		return -EREMOTE;
+ 
+-	return md_intent_getattr_async(ptgt->ltd_exp, minfo);
++	return md_intent_getattr_async(ptgt->ltd_exp, item);
+ }
+ 
+ static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+diff --git a/fs/lustre/mdc/mdc_internal.h b/fs/lustre/mdc/mdc_internal.h
+index fab40bd..2416607 100644
+--- a/fs/lustre/mdc/mdc_internal.h
++++ b/fs/lustre/mdc/mdc_internal.h
+@@ -130,8 +130,7 @@ int mdc_cancel_unused(struct obd_export *exp, const struct lu_fid *fid,
+ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+ 			struct lu_fid *fid, u64 *bits);
+ 
+-int mdc_intent_getattr_async(struct obd_export *exp,
+-			     struct md_enqueue_info *minfo);
++int mdc_intent_getattr_async(struct obd_export *exp, struct md_op_item *item);
+ 
+ enum ldlm_mode mdc_lock_match(struct obd_export *exp, u64 flags,
+ 			      const struct lu_fid *fid, enum ldlm_type type,
+diff --git a/fs/lustre/mdc/mdc_locks.c b/fs/lustre/mdc/mdc_locks.c
+index ae55cc3..31c5bc0 100644
+--- a/fs/lustre/mdc/mdc_locks.c
++++ b/fs/lustre/mdc/mdc_locks.c
+@@ -49,7 +49,7 @@
+ 
+ struct mdc_getattr_args {
+ 	struct obd_export	*ga_exp;
+-	struct md_enqueue_info	*ga_minfo;
++	struct md_op_item	*ga_item;
+ };
+ 
+ int it_open_error(int phase, struct lookup_intent *it)
+@@ -1365,10 +1365,10 @@ static int mdc_intent_getattr_async_interpret(const struct lu_env *env,
+ {
+ 	struct mdc_getattr_args *ga = args;
+ 	struct obd_export *exp = ga->ga_exp;
+-	struct md_enqueue_info *minfo = ga->ga_minfo;
+-	struct ldlm_enqueue_info *einfo = &minfo->mi_einfo;
+-	struct lookup_intent *it = &minfo->mi_it;
+-	struct lustre_handle *lockh = &minfo->mi_lockh;
++	struct md_op_item *item = ga->ga_item;
++	struct ldlm_enqueue_info *einfo = &item->mop_einfo;
++	struct lookup_intent *it = &item->mop_it;
++	struct lustre_handle *lockh = &item->mop_lockh;
+ 	struct ldlm_reply *lockrep;
+ 	u64 flags = LDLM_FL_HAS_INTENT;
+ 
+@@ -1393,18 +1393,18 @@ static int mdc_intent_getattr_async_interpret(const struct lu_env *env,
+ 	if (rc)
+ 		goto out;
+ 
+-	rc = mdc_finish_intent_lock(exp, req, &minfo->mi_data, it, lockh);
++	rc = mdc_finish_intent_lock(exp, req, &item->mop_data, it, lockh);
+ 
+ out:
+-	minfo->mi_cb(req, minfo, rc);
++	item->mop_cb(&req->rq_pill, item, rc);
+ 	return 0;
+ }
+ 
+ int mdc_intent_getattr_async(struct obd_export *exp,
+-			     struct md_enqueue_info *minfo)
++			     struct md_op_item *item)
+ {
+-	struct md_op_data *op_data = &minfo->mi_data;
+-	struct lookup_intent *it = &minfo->mi_it;
++	struct md_op_data *op_data = &item->mop_data;
++	struct lookup_intent *it = &item->mop_it;
+ 	struct ptlrpc_request *req;
+ 	struct mdc_getattr_args *ga;
+ 	struct ldlm_res_id res_id;
+@@ -1433,11 +1433,11 @@ int mdc_intent_getattr_async(struct obd_export *exp,
+ 	 * to avoid possible races. It is safe to have glimpse handler
+ 	 * for non-DOM locks and costs nothing.
+ 	 */
+-	if (!minfo->mi_einfo.ei_cb_gl)
+-		minfo->mi_einfo.ei_cb_gl = mdc_ldlm_glimpse_ast;
++	if (!item->mop_einfo.ei_cb_gl)
++		item->mop_einfo.ei_cb_gl = mdc_ldlm_glimpse_ast;
+ 
+-	rc = ldlm_cli_enqueue(exp, &req, &minfo->mi_einfo, &res_id, &policy,
+-			      &flags, NULL, 0, LVB_T_NONE, &minfo->mi_lockh, 1);
++	rc = ldlm_cli_enqueue(exp, &req, &item->mop_einfo, &res_id, &policy,
++			      &flags, NULL, 0, LVB_T_NONE, &item->mop_lockh, 1);
+ 	if (rc < 0) {
+ 		ptlrpc_req_finished(req);
+ 		return rc;
+@@ -1445,7 +1445,7 @@ int mdc_intent_getattr_async(struct obd_export *exp,
+ 
+ 	ga = ptlrpc_req_async_args(ga, req);
+ 	ga->ga_exp = exp;
+-	ga->ga_minfo = minfo;
++	ga->ga_item = item;
+ 
+ 	req->rq_interpret_reply = mdc_intent_getattr_async_interpret;
+ 	ptlrpcd_add_req(req);
 -- 
 1.8.3.1
 
