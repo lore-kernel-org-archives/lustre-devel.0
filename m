@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 476DCC6FA86
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id BAFA4C32771
 	for <lustre-devel@archiver.kernel.org>; Sun, 18 Sep 2022 05:22:36 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MVbm951yTz1yDm;
-	Sat, 17 Sep 2022 22:22:33 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MVbmB0pj4z1yDs;
+	Sat, 17 Sep 2022 22:22:34 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4MVbly3Lbpz1y6l
- for <lustre-devel@lists.lustre.org>; Sat, 17 Sep 2022 22:22:22 -0700 (PDT)
+ 4MVblw6ns4z1wLC
+ for <lustre-devel@lists.lustre.org>; Sat, 17 Sep 2022 22:22:20 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id DB6298F03;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id D59B58ABE;
  Sun, 18 Sep 2022 01:22:16 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id D338027E5; Sun, 18 Sep 2022 01:22:16 -0400 (EDT)
+ id CBE6527E1; Sun, 18 Sep 2022 01:22:16 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 18 Sep 2022 01:21:55 -0400
-Message-Id: <1663478534-19917-6-git-send-email-jsimmons@infradead.org>
+Date: Sun, 18 Sep 2022 01:21:53 -0400
+Message-Id: <1663478534-19917-4-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1663478534-19917-1-git-send-email-jsimmons@infradead.org>
 References: <1663478534-19917-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 05/24] lustre: ptlrpc: change rq_source to
- struct lnet_nid
+Subject: [lustre-devel] [PATCH 03/24] lustre: ptlrpc: pass net num to
+ ptlrpc_uuid_to_connection
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -51,122 +51,141 @@ Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
 From: Mr NeilBrown <neilb@suse.de>
 
-rq_source in struct ptlrpc_request can now store large NIDs.
-ptl_send_buf() now takes a struct lnet_processid for the peer.
+Rather than passing a nid to indicate which net to choose,
+pass just the net number.  This will make it easier to convert to
+'struct lnet_nid'.
+
+Also change ptlrpc_uuid_to_peer() to take the refnet as an explicit
+argument, rather than embedding in in the peer pid.
+
+This makes the refnet test more obvious, and removes the (strange)
+need to test the address part against zero.
 
 WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: 1c250cbfa127a1517 ("LU-10391 ptlrpc: change rq_source to struct lnet_nid")
+Lustre-commit: a0bdb01ad05b24d24 ("LU-10391 ptlrpc: pass net num to ptlrpc_uuid_to_connection")
 Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/44639
+Reviewed-on: https://review.whamcloud.com/44637
+Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Frank Sehr <fsehr@whamcloud.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Chris Horn <chris.horn@hpe.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_net.h |  2 +-
- fs/lustre/ptlrpc/events.c      |  4 ++--
- fs/lustre/ptlrpc/niobuf.c      | 14 ++++++--------
- 3 files changed, 9 insertions(+), 11 deletions(-)
+ fs/lustre/include/lustre_net.h |  5 +++--
+ fs/lustre/ldlm/ldlm_lib.c      | 10 +++++-----
+ fs/lustre/ptlrpc/client.c      |  5 ++---
+ fs/lustre/ptlrpc/events.c      |  7 ++++---
+ 4 files changed, 14 insertions(+), 13 deletions(-)
 
 diff --git a/fs/lustre/include/lustre_net.h b/fs/lustre/include/lustre_net.h
-index da90d4f..d9aa530 100644
+index 3a35b03..d564e28 100644
 --- a/fs/lustre/include/lustre_net.h
 +++ b/fs/lustre/include/lustre_net.h
-@@ -945,7 +945,7 @@ struct ptlrpc_request {
- 	/** Peer description (the other side) */
- 	struct lnet_processid	rq_peer;
- 	/** Descriptor for the NID from which the peer sent the request. */
--	struct lnet_process_id	rq_source;
-+	struct lnet_processid	rq_source;
- 	/**
- 	 * service time estimate (secs)
- 	 * If the request is not served by this time, it is marked as timed out.
+@@ -1707,7 +1707,8 @@ static inline bool nrs_policy_compat_one(const struct ptlrpc_service *svc,
+ /* ptlrpc/events.c */
+ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
+ 			struct lnet_process_id *peer,
+-			struct lnet_nid *self);
++			struct lnet_nid *self,
++			u32 refnet);
+ /**
+  * These callbacks are invoked by LNet when something happened to
+  * underlying buffer
+@@ -1811,7 +1812,7 @@ static inline int ptlrpc_client_bulk_active(struct ptlrpc_request *req)
+ void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
+ 			struct ptlrpc_client *);
+ struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid,
+-						    lnet_nid_t nid4refnet);
++						    u32 refnet);
+ 
+ int ptlrpc_queue_wait(struct ptlrpc_request *req);
+ int ptlrpc_replay_req(struct ptlrpc_request *req);
+diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
+index 02d1eea..804bb9c 100644
+--- a/fs/lustre/ldlm/ldlm_lib.c
++++ b/fs/lustre/ldlm/ldlm_lib.c
+@@ -56,7 +56,7 @@ static int import_set_conn(struct obd_import *imp, struct obd_uuid *uuid,
+ {
+ 	struct ptlrpc_connection *ptlrpc_conn;
+ 	struct obd_import_conn *imp_conn = NULL, *item;
+-	lnet_nid_t nid4refnet = LNET_NID_ANY;
++	u32 refnet = LNET_NET_ANY;
+ 	int rc = 0;
+ 
+ 	if (!create && !priority) {
+@@ -66,10 +66,10 @@ static int import_set_conn(struct obd_import *imp, struct obd_uuid *uuid,
+ 
+ 	if (imp->imp_connection &&
+ 	    imp->imp_connection->c_remote_uuid.uuid[0] == 0)
+-		/* nid4refnet is used to restrict network connections */
+-		nid4refnet = lnet_nid_to_nid4(&imp->imp_connection->c_self);
++		/* refnet is used to restrict network connections */
++		refnet = LNET_NID_NET(&imp->imp_connection->c_self);
+ 
+-	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, nid4refnet);
++	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, refnet);
+ 	if (!ptlrpc_conn) {
+ 		CDEBUG(D_HA, "can't find connection %s\n", uuid->uuid);
+ 		return -ENOENT;
+@@ -145,7 +145,7 @@ int client_import_dyn_add_conn(struct obd_import *imp, struct obd_uuid *uuid,
+ 	struct ptlrpc_connection *ptlrpc_conn;
+ 	int rc;
+ 
+-	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, prim_nid);
++	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, LNET_NIDNET(prim_nid));
+ 	if (!ptlrpc_conn) {
+ 		const char *str_uuid = obd_uuid2str(uuid);
+ 
+diff --git a/fs/lustre/ptlrpc/client.c b/fs/lustre/ptlrpc/client.c
+index 7a4a9c9..7ca7d35 100644
+--- a/fs/lustre/ptlrpc/client.c
++++ b/fs/lustre/ptlrpc/client.c
+@@ -102,7 +102,7 @@ void ptlrpc_init_client(int req_portal, int rep_portal, const char *name,
+  * Return PortalRPC connection for remote uud @uuid
+  */
+ struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid,
+-						    lnet_nid_t nid4refnet)
++						    u32 refnet)
+ {
+ 	struct ptlrpc_connection *c;
+ 	struct lnet_nid self;
+@@ -114,8 +114,7 @@ struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid,
+ 	 * before accessing its values.
+ 	 * coverity[uninit_use_in_call]
+ 	 */
+-	peer.nid = nid4refnet;
+-	err = ptlrpc_uuid_to_peer(uuid, &peer, &self);
++	err = ptlrpc_uuid_to_peer(uuid, &peer, &self, refnet);
+ 	if (err != 0) {
+ 		CNETERR("cannot find peer %s!\n", uuid->uuid);
+ 		return NULL;
 diff --git a/fs/lustre/ptlrpc/events.c b/fs/lustre/ptlrpc/events.c
-index 6b6fd97..e6313af 100644
+index 231eace..793c078 100644
 --- a/fs/lustre/ptlrpc/events.c
 +++ b/fs/lustre/ptlrpc/events.c
-@@ -347,7 +347,7 @@ void request_in_callback(struct lnet_event *ev)
- 	ktime_get_real_ts64(&req->rq_arrival_time);
- 	/* Multi-Rail: keep track of both initiator and source NID. */
- 	req->rq_peer = ev->initiator;
--	req->rq_source = lnet_pid_to_pid4(&ev->source);
-+	req->rq_source = ev->source;
- 	req->rq_self = ev->target.nid;
- 	req->rq_rqbd = rqbd;
- 	req->rq_phase = RQ_PHASE_NEW;
-@@ -356,7 +356,7 @@ void request_in_callback(struct lnet_event *ev)
- 		       req, req->rq_xid, ev->mlength);
+@@ -469,7 +469,8 @@ static void ptlrpc_master_callback(struct lnet_event *ev)
  
- 	CDEBUG(D_RPCTRACE, "peer: %s (source: %s)\n",
--	       libcfs_idstr(&req->rq_peer), libcfs_id2str(req->rq_source));
-+	       libcfs_idstr(&req->rq_peer), libcfs_idstr(&req->rq_source));
- 
- 	spin_lock(&svcpt->scp_lock);
- 
-diff --git a/fs/lustre/ptlrpc/niobuf.c b/fs/lustre/ptlrpc/niobuf.c
-index 099f105..8f19e92 100644
---- a/fs/lustre/ptlrpc/niobuf.c
-+++ b/fs/lustre/ptlrpc/niobuf.c
-@@ -46,20 +46,18 @@
-  */
- static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
- 			enum lnet_ack_req ack, struct ptlrpc_cb_id *cbid,
--			lnet_nid_t self4, struct lnet_process_id peer_id4,
-+			lnet_nid_t self4, struct lnet_processid *peer_id,
- 			int portal, u64 xid, unsigned int offset,
- 			struct lnet_handle_md *bulk_cookie)
+ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
+ 			struct lnet_process_id *peer,
+-			struct lnet_nid *self)
++			struct lnet_nid *self,
++			u32 refnet)
  {
- 	int rc;
- 	struct lnet_md md;
- 	struct lnet_nid self;
--	struct lnet_processid peer_id;
+ 	int best_dist = 0;
+ 	u32 best_order = 0;
+@@ -484,8 +485,8 @@ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
  
- 	lnet_nid4_to_nid(self4, &self);
--	lnet_pid4_to_pid(peer_id4, &peer_id);
+ 	/* Choose the matching UUID that's closest */
+ 	while (lustre_uuid_to_peer(uuid->uuid, &dst_nid, count++) == 0) {
+-		if (peer->nid != LNET_NID_ANY && LNET_NIDADDR(peer->nid) == 0 &&
+-		    LNET_NID_NET(&dst_nid) != LNET_NIDNET(peer->nid))
++		if (refnet != LNET_NET_ANY &&
++		    LNET_NID_NET(&dst_nid) != refnet)
+ 			continue;
  
- 	LASSERT(portal != 0);
--	CDEBUG(D_INFO, "peer_id %s\n", libcfs_id2str(peer_id4));
-+	CDEBUG(D_INFO, "peer_id %s\n", libcfs_idstr(peer_id));
- 	md.start = base;
- 	md.length = len;
- 	md.threshold = (ack == LNET_ACK_REQ) ? 2 : 1;
-@@ -91,7 +89,7 @@ static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
- 	percpu_ref_get(&ptlrpc_pending);
- 
- 	rc = LNetPut(&self, *mdh, ack,
--		     &peer_id, portal, xid, offset, 0);
-+		     peer_id, portal, xid, offset, 0);
- 	if (unlikely(rc != 0)) {
- 		int rc2;
- 		/* We're going to get an UNLINK event when I unlink below,
-@@ -99,7 +97,7 @@ static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
- 		 * I fall through and return success here!
- 		 */
- 		CERROR("LNetPut(%s, %d, %lld) failed: %d\n",
--		       libcfs_id2str(peer_id4), portal, xid, rc);
-+		       libcfs_idstr(peer_id), portal, xid, rc);
- 		rc2 = LNetMDUnlink(*mdh);
- 		LASSERTF(rc2 == 0, "rc2 = %d\n", rc2);
- 	}
-@@ -437,7 +435,7 @@ int ptlrpc_send_reply(struct ptlrpc_request *req, int flags)
- 			  (rs->rs_difficult && !rs->rs_no_ack) ?
- 			  LNET_ACK_REQ : LNET_NOACK_REQ,
- 			  &rs->rs_cb_id, lnet_nid_to_nid4(&req->rq_self),
--			  req->rq_source,
-+			  &req->rq_source,
- 			  ptlrpc_req2svc(req)->srv_rep_portal,
- 			  req->rq_rep_mbits ? req->rq_rep_mbits : req->rq_xid,
- 			  req->rq_reply_off, NULL);
-@@ -729,7 +727,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- 			  request->rq_reqbuf, request->rq_reqdata_len,
- 			  LNET_NOACK_REQ, &request->rq_req_cbid,
- 			  LNET_NID_ANY,
--			  lnet_pid_to_pid4(&connection->c_peer),
-+			  &connection->c_peer,
- 			  request->rq_request_portal,
- 			  request->rq_xid, 0, &bulk_cookie);
- 	if (likely(rc == 0))
+ 		dist = LNetDist(&dst_nid, &src_nid, &order);
 -- 
 1.8.3.1
 
