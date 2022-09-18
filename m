@@ -4,31 +4,31 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 99FB0C6FA86
-	for <lustre-devel@archiver.kernel.org>; Sun, 18 Sep 2022 05:23:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id A1F19C32771
+	for <lustre-devel@archiver.kernel.org>; Sun, 18 Sep 2022 05:23:03 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MVbmk2grjz1y7W;
-	Sat, 17 Sep 2022 22:23:02 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4MVbml2qVbz1yFk;
+	Sat, 17 Sep 2022 22:23:03 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4MVbm762VQz1yDb
- for <lustre-devel@lists.lustre.org>; Sat, 17 Sep 2022 22:22:31 -0700 (PDT)
+ 4MVbm62nSDz1yD9
+ for <lustre-devel@lists.lustre.org>; Sat, 17 Sep 2022 22:22:30 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 0A7438F12;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 038A88F10;
  Sun, 18 Sep 2022 01:22:17 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 085C81C6DF; Sun, 18 Sep 2022 01:22:17 -0400 (EDT)
+ id 0247AE8BA9; Sun, 18 Sep 2022 01:22:17 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun, 18 Sep 2022 01:22:08 -0400
-Message-Id: <1663478534-19917-19-git-send-email-jsimmons@infradead.org>
+Date: Sun, 18 Sep 2022 01:22:06 -0400
+Message-Id: <1663478534-19917-17-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1663478534-19917-1-git-send-email-jsimmons@infradead.org>
 References: <1663478534-19917-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 18/24] lustre: osc: Remove submit time
+Subject: [lustre-devel] [PATCH 16/24] lustre: clio: remove cpl_obj
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -48,156 +48,150 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Patrick Farrell <pfarrell@whamcloud.com>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-The osc page submit time is an unused bit of debugging
-information, but it's allocated for every page.  Let's
-just remove it to save memory.
+Remove cpl_obj from struct cl_page_slice. This member is only used in
+the osc layer and struct osc_page already contains a pointer to the
+osc_object.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15619
-Lustre-commit: 28a7bbdb81cfd8359 ("LU-15619 osc: Remove submit time")
-Signed-off-by: Patrick Farrell <pfarrell@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/46712
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10994
+Lustre-commit: 10da530a2411f28988ab5 ("LU-10994 clio: remove cpl_obj")
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/47402
+Reviewed-by: Patrick Farrell <pfarrell@whamcloud.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_osc.h |  6 +-----
- fs/lustre/osc/osc_cache.c      |  9 +--------
- fs/lustre/osc/osc_io.c         |  3 +--
- fs/lustre/osc/osc_page.c       | 15 +++------------
- 4 files changed, 6 insertions(+), 27 deletions(-)
+ fs/lustre/include/cl_object.h  | 5 -----
+ fs/lustre/include/lustre_osc.h | 5 +++++
+ fs/lustre/obdclass/cl_page.c   | 1 -
+ fs/lustre/osc/osc_cache.c      | 7 +++----
+ fs/lustre/osc/osc_page.c       | 8 ++++----
+ 5 files changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
-index d630169..89f02c5 100644
---- a/fs/lustre/include/lustre_osc.h
-+++ b/fs/lustre/include/lustre_osc.h
-@@ -542,10 +542,6 @@ struct osc_page {
- 	 * lru page list. See osc_lru_{del|use}() in osc_page.c for usage.
- 	 */
- 	struct list_head	ops_lru;
--	/*
--	 * Submit time - the time when the page is starting RPC. For debugging.
+diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
+index c5adbda..41ce0b0 100644
+--- a/fs/lustre/include/cl_object.h
++++ b/fs/lustre/include/cl_object.h
+@@ -795,11 +795,6 @@ struct cl_page {
+  */
+ struct cl_page_slice {
+ 	struct cl_page			*cpl_page;
+-	/**
+-	 * Object slice corresponding to this page slice. Immutable after
+-	 * creation.
 -	 */
--	ktime_t			ops_submit_time;
+-	struct cl_object		*cpl_obj;
+ 	const struct cl_page_operations *cpl_ops;
  };
  
- struct osc_brw_async_args {
-@@ -582,7 +578,7 @@ void osc_index2policy(union ldlm_policy_data *policy,
- 		      pgoff_t start, pgoff_t end);
- void osc_lru_add_batch(struct client_obd *cli, struct list_head *list);
- void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
--		     enum cl_req_type crt, int brw_flags, ktime_t submit_time);
-+		     enum cl_req_type crt, int brw_flags);
- int lru_queue_work(const struct lu_env *env, void *data);
- long osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
- 		    long target, bool force);
+diff --git a/fs/lustre/include/lustre_osc.h b/fs/lustre/include/lustre_osc.h
+index 7551390..16d6a8e 100644
+--- a/fs/lustre/include/lustre_osc.h
++++ b/fs/lustre/include/lustre_osc.h
+@@ -858,6 +858,11 @@ static inline pgoff_t osc_index(struct osc_page *opg)
+ 	return opg->ops_oap.oap_obj_off >> PAGE_SHIFT;
+ }
+ 
++static inline struct osc_object *osc_page_object(struct osc_page *ops)
++{
++	return ops->ops_oap.oap_obj;
++}
++
+ static inline struct cl_page *oap2cl_page(struct osc_async_page *oap)
+ {
+ 	return oap2osc(oap)->ops_cl.cpl_page;
+diff --git a/fs/lustre/obdclass/cl_page.c b/fs/lustre/obdclass/cl_page.c
+index 7829b90d..7011235 100644
+--- a/fs/lustre/obdclass/cl_page.c
++++ b/fs/lustre/obdclass/cl_page.c
+@@ -1078,7 +1078,6 @@ void cl_page_slice_add(struct cl_page *cl_page, struct cl_page_slice *slice,
+ 	LASSERT(cl_page->cp_layer_count < CP_MAX_LAYER);
+ 	LASSERT(offset < (1 << sizeof(cl_page->cp_layer_offset[0]) * 8));
+ 	cl_page->cp_layer_offset[cl_page->cp_layer_count++] = offset;
+-	slice->cpl_obj = obj;
+ 	slice->cpl_ops = ops;
+ 	slice->cpl_page = cl_page;
+ }
 diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
-index 29d13f5..b6f0cdb 100644
+index 072cfac..e7b8372 100644
 --- a/fs/lustre/osc/osc_cache.c
 +++ b/fs/lustre/osc/osc_cache.c
-@@ -1310,17 +1310,11 @@ static inline int osc_is_ready(struct osc_object *osc)
- static int osc_make_ready(const struct lu_env *env, struct osc_async_page *oap,
- 			  int cmd)
+@@ -1328,14 +1328,13 @@ static int osc_refresh_count(const struct lu_env *env,
  {
--	struct osc_page *opg = oap2osc_page(oap);
- 	struct cl_page *page = oap2cl_page(oap);
--	int result;
+ 	struct osc_page *opg = oap2osc_page(oap);
+ 	pgoff_t index = osc_index(oap2osc(oap));
+-	struct cl_object *obj;
++	struct cl_object *obj = osc2cl(osc_page_object(opg));
+ 	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
+ 	int result;
+ 	loff_t kms;
  
- 	LASSERT(cmd == OBD_BRW_WRITE); /* no cached reads */
+ 	/* readpage queues with _COUNT_STABLE, shouldn't get here. */
+ 	LASSERT(!(cmd & OBD_BRW_READ));
+-	obj = opg->ops_cl.cpl_obj;
  
--	result = cl_page_make_ready(env, page, CRT_WRITE);
--	if (result == 0)
--		opg->ops_submit_time = ktime_get();
--
--	return result;
-+	return cl_page_make_ready(env, page, CRT_WRITE);
- }
- 
- static int osc_refresh_count(const struct lu_env *env,
-@@ -1372,7 +1366,6 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
- 	/* Clear opg->ops_transfer_pinned before VM lock is released. */
- 	opg->ops_transfer_pinned = 0;
- 
--	opg->ops_submit_time = ktime_set(0, 0);
- 	srvlock = oap->oap_brw_flags & OBD_BRW_SRVLOCK;
+ 	cl_object_attr_lock(obj);
+ 	result = cl_object_attr_get(env, obj, attr);
+@@ -1378,7 +1377,7 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
  
  	/* statistic */
-diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
-index 1361d7f..655c7c6 100644
---- a/fs/lustre/osc/osc_io.c
-+++ b/fs/lustre/osc/osc_io.c
-@@ -132,7 +132,6 @@ int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
- 	unsigned int max_pages;
- 	unsigned int ppc_bits; /* pages per chunk bits */
- 	unsigned int ppc;
--	ktime_t submit_time = ktime_get();
- 	bool sync_queue = false;
+ 	if (rc == 0 && srvlock) {
+-		struct lu_device *ld = opg->ops_cl.cpl_obj->co_lu.lo_dev;
++		struct lu_device *ld = osc_page_object(opg)->oo_cl.co_lu.lo_dev;
+ 		struct osc_stats *stats = &lu2osc_dev(ld)->od_stats;
+ 		size_t bytes = oap->oap_count;
  
- 	LASSERT(qin->pl_nr > 0);
-@@ -200,7 +199,7 @@ int osc_io_submit(const struct lu_env *env, const struct cl_io_slice *ios,
- 			spin_unlock(&oap->oap_lock);
- 		}
- 
--		osc_page_submit(env, opg, crt, brw_flags, submit_time);
-+		osc_page_submit(env, opg, crt, brw_flags);
- 		list_add_tail(&oap->oap_pending_item, &list);
- 
- 		if (page->cp_sync_io)
+@@ -2588,7 +2587,7 @@ int osc_flush_async_page(const struct lu_env *env, struct cl_io *io,
+ 			 struct osc_page *ops)
+ {
+ 	struct osc_extent *ext = NULL;
+-	struct osc_object *obj = cl2osc(ops->ops_cl.cpl_obj);
++	struct osc_object *obj = osc_page_object(ops);
+ 	struct cl_page *cp = ops->ops_cl.cpl_page;
+ 	pgoff_t index = osc_index(ops);
+ 	struct osc_async_page *oap = &ops->ops_oap;
 diff --git a/fs/lustre/osc/osc_page.c b/fs/lustre/osc/osc_page.c
-index 5300ac9..12ba108 100644
+index fd87698..7470dee 100644
 --- a/fs/lustre/osc/osc_page.c
 +++ b/fs/lustre/osc/osc_page.c
-@@ -115,14 +115,6 @@ void osc_index2policy(union ldlm_policy_data *policy,
- 	policy->l_extent.end = cl_offset(obj, end + 1) - 1;
- }
+@@ -86,7 +86,7 @@ static void osc_page_transfer_put(const struct lu_env *env,
+ static void osc_page_transfer_add(const struct lu_env *env,
+ 				  struct osc_page *opg, enum cl_req_type crt)
+ {
+-	struct osc_object *obj = cl2osc(opg->ops_cl.cpl_obj);
++	struct osc_object *obj = osc_page_object(opg);
  
--static inline s64 osc_submit_duration(struct osc_page *opg)
--{
--	if (ktime_to_ns(opg->ops_submit_time) == 0)
--		return 0;
--
--	return ktime_ms_delta(ktime_get(), opg->ops_submit_time);
--}
--
- static int osc_page_print(const struct lu_env *env,
- 			  const struct cl_page_slice *slice,
- 			  void *cookie, lu_printer_t printer)
-@@ -133,7 +125,7 @@ static int osc_page_print(const struct lu_env *env,
+ 	osc_lru_use(osc_cli(obj), opg);
+ }
+@@ -129,7 +129,7 @@ static int osc_page_print(const struct lu_env *env,
+ {
+ 	struct osc_page *opg = cl2osc_page(slice);
+ 	struct osc_async_page *oap = &opg->ops_oap;
+-	struct osc_object *obj = cl2osc(slice->cpl_obj);
++	struct osc_object *obj = osc_page_object(opg);
  	struct client_obd *cli = &osc_export(obj)->exp_obd->u.cli;
  
  	return (*printer)(env, cookie, LUSTRE_OSC_NAME
--			  "-page@%p %lu: 1< %#x %d %c %c > 2< %llu %u %u %#x %#x | %p %p %p > 3< %d %lld %d > 4< %d %d %d %lu %c | %c %c %c %c > 5< %c %c %c %c | %d %c | %d %c %c>\n",
-+			  "-page@%p %lu: 1< %#x %d %c %c > 2< %llu %u %u %#x %#x | %p %p %p > 3< %d %d > 4< %d %d %d %lu %c | %c %c %c %c > 5< %c %c %c %c | %d %c | %d %c %c>\n",
- 			  opg, osc_index(opg),
- 			  /* 1 */
- 			  oap->oap_magic, oap->oap_cmd,
-@@ -145,7 +137,7 @@ static int osc_page_print(const struct lu_env *env,
- 			  oap->oap_request, cli, obj,
- 			  /* 3 */
- 			  opg->ops_transfer_pinned,
--			  osc_submit_duration(opg), opg->ops_srvlock,
-+			  opg->ops_srvlock,
- 			  /* 4 */
- 			  cli->cl_r_in_flight, cli->cl_w_in_flight,
- 			  cli->cl_max_rpcs_in_flight,
-@@ -296,7 +288,7 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
-  * transfer (i.e., transferred synchronously).
-  */
- void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
--		     enum cl_req_type crt, int brw_flags, ktime_t submit_time)
-+		     enum cl_req_type crt, int brw_flags)
+@@ -171,7 +171,7 @@ static void osc_page_delete(const struct lu_env *env,
+ 			    const struct cl_page_slice *slice)
  {
- 	struct osc_io *oio = osc_env_io(env);
- 	struct osc_async_page *oap = &opg->ops_oap;
-@@ -317,7 +309,6 @@ void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
- 		oap->oap_cmd |= OBD_BRW_SYS_RESOURCE;
- 	}
+ 	struct osc_page *opg = cl2osc_page(slice);
+-	struct osc_object *obj = cl2osc(opg->ops_cl.cpl_obj);
++	struct osc_object *obj = osc_page_object(opg);
+ 	int rc;
  
--	opg->ops_submit_time = submit_time;
- 	osc_page_transfer_get(opg, "transfer\0imm");
- 	osc_page_transfer_add(env, opg, crt);
+ 	CDEBUG(D_TRACE, "%p\n", opg);
+@@ -235,7 +235,7 @@ static void osc_page_touch(const struct lu_env *env,
+ 			  const struct cl_page_slice *slice, size_t to)
+ {
+ 	struct osc_page *opg = cl2osc_page(slice);
+-	struct cl_object *obj = opg->ops_cl.cpl_obj;
++	struct cl_object *obj = osc2cl(osc_page_object(opg));
+ 
+ 	osc_page_touch_at(env, obj, osc_index(opg), to);
  }
 -- 
 1.8.3.1
