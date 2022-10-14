@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8A481C43217
-	for <lustre-devel@archiver.kernel.org>; Fri, 14 Oct 2022 21:38:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 19040C433FE
+	for <lustre-devel@archiver.kernel.org>; Fri, 14 Oct 2022 21:38:47 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Mq0BX16P7z1y2t;
-	Fri, 14 Oct 2022 14:38:44 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Mq0BZ5bVWz1y56;
+	Fri, 14 Oct 2022 14:38:46 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Mq0B83mtKz21H2
- for <lustre-devel@lists.lustre.org>; Fri, 14 Oct 2022 14:38:24 -0700 (PDT)
+ 4Mq0B75Vxtz21GQ
+ for <lustre-devel@lists.lustre.org>; Fri, 14 Oct 2022 14:38:23 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 18AE110084E1;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 1540210084DE;
  Fri, 14 Oct 2022 17:38:14 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 152E6DD53C; Fri, 14 Oct 2022 17:38:14 -0400 (EDT)
+ id 11F44DD6ED; Fri, 14 Oct 2022 17:38:14 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Fri, 14 Oct 2022 17:38:04 -0400
-Message-Id: <1665783491-13827-14-git-send-email-jsimmons@infradead.org>
+Date: Fri, 14 Oct 2022 17:38:03 -0400
+Message-Id: <1665783491-13827-13-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1665783491-13827-1-git-send-email-jsimmons@infradead.org>
 References: <1665783491-13827-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 13/20] lnet: use %pISc for formatting IP
- addresses
+Subject: [lustre-devel] [PATCH 12/20] lustre: obdclass: user netlink to
+ collect devices information
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -49,592 +49,438 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+Our utilities can report to users a device list with various bits
+of data using the debugfs file 'devices'. This debugfs file is
+only by default available to root which prevents regular users
+from collecting information. Enable non-root users to collect
+the same information for lctl dl using netlink. The advantage of
+using netlink is that it also removes the 8K ioctl limit. Add the
+ability to present this data in YAML format as well.
 
-The Linux kernel's printf functionality understands %pIS to means that
-a the address in a 'struct sockaddr' should be formated, either as
-IPv4 or IPv6.  For IPv6, the verbose format showing all 16 bytes
-whether zero or not is used.
-
-To get the more familiar "compressed" format where strings of :0000:
-are replaced with ::, we need to add the 'c' flag.  This is ignored
-for IPv4.
-
-When requesting the port as well ("%pISp), the 'c' and 'p' can appear
-in either order.
-
-So this patch changes all %pIS to %pISc as we always want the
-compressed format.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: ed6b125bab5f7e383 ("LU-10391 lnet: use %pISc for formatting IP addresses")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/48685
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9680
+Lustre-commit: 86ba46c24430f67bb ("LU-9680 obdclass: user netlink to collect devices information")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/31618
+Reviewed-by: Jian Yu <yujian@whamcloud.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 ---
- net/lnet/klnds/socklnd/socklnd.c       | 18 +++++------
- net/lnet/klnds/socklnd/socklnd_cb.c    | 44 +++++++++++++-------------
- net/lnet/klnds/socklnd/socklnd_proto.c | 30 +++++++++---------
- net/lnet/lnet/acceptor.c               | 34 ++++++++++----------
- net/lnet/lnet/lib-socket.c             |  2 +-
- 5 files changed, 64 insertions(+), 64 deletions(-)
+ fs/lustre/include/lustre_kernelcomm.h         |  37 ++-
+ fs/lustre/obdclass/class_obd.c                |  14 +-
+ fs/lustre/obdclass/kernelcomm.c               | 257 +++++++++++++++++-
+ include/uapi/linux/lustre/lustre_kernelcomm.h |  18 ++
+ 4 files changed, 315 insertions(+), 11 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd.c b/net/lnet/klnds/socklnd/socklnd.c
-index 89696977ac63..8999580b67b4 100644
---- a/net/lnet/klnds/socklnd/socklnd.c
-+++ b/net/lnet/klnds/socklnd/socklnd.c
-@@ -527,13 +527,13 @@ ksocknal_associate_cb_conn_locked(struct ksock_conn_cb *conn_cb,
- 			/* conn_cb wasn't bound locally yet (the initial
- 			 * conn_cb)
- 			 */
--			CDEBUG(D_NET, "Binding %s %pIS to interface %d\n",
-+			CDEBUG(D_NET, "Binding %s %pISc to interface %d\n",
- 			       libcfs_idstr(&peer_ni->ksnp_id),
- 			       &conn_cb->ksnr_addr,
- 			       conn_iface);
- 		} else {
- 			CDEBUG(D_NET,
--			       "Rebinding %s %pIS from interface %d to %d\n",
-+			       "Rebinding %s %pISc from interface %d to %d\n",
- 			       libcfs_idstr(&peer_ni->ksnp_id),
- 			       &conn_cb->ksnr_addr,
- 			       conn_cb->ksnr_myiface,
-@@ -835,7 +835,7 @@ ksocknal_accept(struct lnet_ni *ni, struct socket *sock)
- 	cr = kzalloc(sizeof(*cr), GFP_NOFS);
- 	if (!cr) {
- 		LCONSOLE_ERROR_MSG(0x12f,
--				   "Dropping connection request from %pIS: memory exhausted\n",
-+				   "Dropping connection request from %pISc: memory exhausted\n",
- 				   &peer);
- 		return -ENOMEM;
- 	}
-@@ -1113,7 +1113,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_conn_cb *conn_cb,
- 	if (active &&
- 	    !rpc_cmp_addr((struct sockaddr *)&conn_cb->ksnr_addr,
- 			  (struct sockaddr *)&conn->ksnc_peeraddr)) {
--		CERROR("Route %s %pIS connected to %pIS\n",
-+		CERROR("Route %s %pISc connected to %pISc\n",
- 		       libcfs_idstr(&peer_ni->ksnp_id),
- 		       &conn_cb->ksnr_addr,
- 		       &conn->ksnc_peeraddr);
-@@ -1183,7 +1183,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_conn_cb *conn_cb,
- 	 *	socket callbacks.
- 	 */
- 	CDEBUG(D_NET,
--	       "New conn %s p %d.x %pIS -> %pISp incarnation:%lld sched[%d]\n",
-+	       "New conn %s p %d.x %pISc -> %pIScp incarnation:%lld sched[%d]\n",
- 	       libcfs_idstr(&peerid), conn->ksnc_proto->pro_version,
- 	       &conn->ksnc_myaddr, &conn->ksnc_peeraddr,
- 	       incarnation, cpt);
-@@ -1552,7 +1552,7 @@ ksocknal_destroy_conn(struct ksock_conn *conn)
- 	case SOCKNAL_RX_LNET_PAYLOAD:
- 		last_rcv = conn->ksnc_rx_deadline -
- 			   ksocknal_timeout();
--		CERROR("Completing partial receive from %s[%d], ip %pISp, with error, wanted: %zd, left: %d, last alive is %lld secs ago\n",
-+		CERROR("Completing partial receive from %s[%d], ip %pIScp, with error, wanted: %zd, left: %d, last alive is %lld secs ago\n",
- 		       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 		       conn->ksnc_type,
- 		       &conn->ksnc_peeraddr,
-@@ -1565,21 +1565,21 @@ ksocknal_destroy_conn(struct ksock_conn *conn)
- 		break;
- 	case SOCKNAL_RX_LNET_HEADER:
- 		if (conn->ksnc_rx_started)
--			CERROR("Incomplete receive of lnet header from %s, ip %pISp, with error, protocol: %d.x.\n",
-+			CERROR("Incomplete receive of lnet header from %s, ip %pIScp, with error, protocol: %d.x.\n",
- 			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr,
- 			       conn->ksnc_proto->pro_version);
- 		break;
- 	case SOCKNAL_RX_KSM_HEADER:
- 		if (conn->ksnc_rx_started)
--			CERROR("Incomplete receive of ksock message from %s, ip %pISp, with error, protocol: %d.x.\n",
-+			CERROR("Incomplete receive of ksock message from %s, ip %pIScp, with error, protocol: %d.x.\n",
- 			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr,
- 			       conn->ksnc_proto->pro_version);
- 		break;
- 	case SOCKNAL_RX_SLOP:
- 		if (conn->ksnc_rx_started)
--			CERROR("Incomplete receive of slops from %s, ip %pISp, with error\n",
-+			CERROR("Incomplete receive of slops from %s, ip %pIScp, with error\n",
- 			       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 			       &conn->ksnc_peeraddr);
- 	       break;
-diff --git a/net/lnet/klnds/socklnd/socklnd_cb.c b/net/lnet/klnds/socklnd/socklnd_cb.c
-index 308d8b0d6366..b2da535fbfbe 100644
---- a/net/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/net/lnet/klnds/socklnd/socklnd_cb.c
-@@ -533,15 +533,15 @@ ksocknal_process_transmit(struct ksock_conn *conn, struct ksock_tx *tx)
- 	if (!conn->ksnc_closing) {
- 		switch (rc) {
- 		case -ECONNRESET:
--			LCONSOLE_WARN("Host %pIS reset our connection while we were sending data; it may have rebooted.\n",
-+			LCONSOLE_WARN("Host %pISc reset our connection while we were sending data; it may have rebooted.\n",
- 				      &conn->ksnc_peeraddr);
- 			break;
- 		default:
--			LCONSOLE_WARN("There was an unexpected network error while writing to %pIS: %d.\n",
-+			LCONSOLE_WARN("There was an unexpected network error while writing to %pISc: %d.\n",
- 				      &conn->ksnc_peeraddr, rc);
- 			break;
- 		}
--		CDEBUG(D_NET, "[%p] Error %d on write to %s ip %pISp\n",
-+		CDEBUG(D_NET, "[%p] Error %d on write to %s ip %pIScp\n",
- 		       conn, rc, libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 		       &conn->ksnc_peeraddr);
- 	}
-@@ -676,7 +676,7 @@ ksocknal_queue_tx_locked(struct ksock_tx *tx, struct ksock_conn *conn)
- 	 */
- 	LASSERT(!conn->ksnc_closing);
+diff --git a/fs/lustre/include/lustre_kernelcomm.h b/fs/lustre/include/lustre_kernelcomm.h
+index bd5376b2a672..db725ab8a0f9 100644
+--- a/fs/lustre/include/lustre_kernelcomm.h
++++ b/fs/lustre/include/lustre_kernelcomm.h
+@@ -41,11 +41,46 @@
+ /* For declarations shared with userspace */
+ #include <uapi/linux/lustre/lustre_kernelcomm.h>
  
--	CDEBUG(D_NET, "Sending to %s ip %pISp\n",
-+	CDEBUG(D_NET, "Sending to %s ip %pIScp\n",
- 	       libcfs_idstr(&conn->ksnc_peer->ksnp_id),
- 	       &conn->ksnc_peeraddr);
++/**
++ * enum lustre_device_attrs	      - Lustre general top-level netlink
++ *					attributes that describe lustre
++ *					'devices'. These values are used
++ *					to piece togther messages for
++ *					sending and receiving.
++ *
++ * @LUSTRE_DEVICE_ATTR_UNSPEC:		unspecified attribute to catch errors
++ *
++ * @LUSTRE_DEVICE_ATTR_HDR:		Netlink group this data is for
++ *					(NLA_NUL_STRING)
++ * @LUSTRE_DEVICE_ATTR_INDEX:		device number used as an index (NLA_U16)
++ * @LUSTRE_DEVICE_ATTR_STATUS:		status of the device (NLA_STRING)
++ * @LUSTRE_DEVICE_ATTR_CLASS:		class the device belongs to (NLA_STRING)
++ * @LUSTRE_DEVICE_ATTR_NAME:		name of the device (NLA_STRING)
++ * @LUSTRE_DEVICE_ATTR_UUID:		UUID of the device (NLA_STRING)
++ * @LUSTRE_DEVICE_ATTR_REFCOUNT:	refcount of the device (NLA_U32)
++ */
++enum lustre_device_attrs {
++	LUSTRE_DEVICE_ATTR_UNSPEC = 0,
++
++	LUSTRE_DEVICE_ATTR_HDR,
++	LUSTRE_DEVICE_ATTR_INDEX,
++	LUSTRE_DEVICE_ATTR_STATUS,
++	LUSTRE_DEVICE_ATTR_CLASS,
++	LUSTRE_DEVICE_ATTR_NAME,
++	LUSTRE_DEVICE_ATTR_UUID,
++	LUSTRE_DEVICE_ATTR_REFCOUNT,
++
++	__LUSTRE_DEVICE_ATTR_MAX_PLUS_ONE
++};
++
++#define LUSTRE_DEVICE_ATTR_MAX (__LUSTRE_DEVICE_ATTR_MAX_PLUS_ONE - 1)
++
+ /* prototype for callback function on kuc groups */
+ typedef int (*libcfs_kkuc_cb_t)(void *data, void *cb_arg);
  
-@@ -777,7 +777,7 @@ ksocknal_find_connectable_conn_cb_locked(struct ksock_peer_ni *peer_ni)
- 	if (!(conn_cb->ksnr_retry_interval == 0 || /* first attempt */
- 	      now >= conn_cb->ksnr_timeout)) {
- 		CDEBUG(D_NET,
--		       "Too soon to retry route %pIS (cnted %d, interval %lld, %lld secs later)\n",
-+		       "Too soon to retry route %pISc (cnted %d, interval %lld, %lld secs later)\n",
- 		       &conn_cb->ksnr_addr,
- 		       conn_cb->ksnr_connected,
- 		       conn_cb->ksnr_retry_interval,
-@@ -1095,11 +1095,11 @@ ksocknal_process_receive(struct ksock_conn *conn)
- 			LASSERT(rc != -EAGAIN);
+ /* Kernel methods */
+-void libcfs_kkuc_init(void);
++int libcfs_kkuc_init(void);
++void libcfs_kkuc_fini(void);
+ int libcfs_kkuc_group_put(const struct obd_uuid *uuid, int group, void *data);
+ int libcfs_kkuc_group_add(struct file *fp, const struct obd_uuid *uuid, int uid,
+ 			  int group, void *data, size_t data_len);
+diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
+index f455ed752c15..67a94222a664 100644
+--- a/fs/lustre/obdclass/class_obd.c
++++ b/fs/lustre/obdclass/class_obd.c
+@@ -671,15 +671,17 @@ static int __init obdclass_init(void)
+ 	if (err)
+ 		return err;
  
- 			if (!rc)
--				CDEBUG(D_NET, "[%p] EOF from %s ip %pISp\n",
-+				CDEBUG(D_NET, "[%p] EOF from %s ip %pIScp\n",
- 				       conn, libcfs_idstr(ksnp_id),
- 				       &conn->ksnc_peeraddr);
- 			else if (!conn->ksnc_closing)
--				CERROR("[%p] Error %d on read from %s ip %pISp\n",
-+				CERROR("[%p] Error %d on read from %s ip %pIScp\n",
- 				       conn, rc, libcfs_idstr(ksnp_id),
- 				       &conn->ksnc_peeraddr);
+-	libcfs_kkuc_init();
++	err = obd_init_checks();
++	if (err)
++		return err;
  
-@@ -1653,7 +1653,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	rc = lnet_sock_read(sock, &hello->kshm_magic,
- 			    sizeof(hello->kshm_magic), timeout);
- 	if (rc) {
--		CERROR("Error %d reading HELLO from %pIS\n",
-+		CERROR("Error %d reading HELLO from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0);
- 		return rc;
-@@ -1663,7 +1663,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	    hello->kshm_magic != __swab32(LNET_PROTO_MAGIC) &&
- 	    hello->kshm_magic != le32_to_cpu(LNET_PROTO_TCP_MAGIC)) {
- 		/* Unexpected magic! */
--		CERROR("Bad magic(1) %#08x (%#08x expected) from %pIS\n",
-+		CERROR("Bad magic(1) %#08x (%#08x expected) from %pISc\n",
- 		       __cpu_to_le32(hello->kshm_magic),
- 		       LNET_PROTO_TCP_MAGIC, &conn->ksnc_peeraddr);
- 		return -EPROTO;
-@@ -1672,7 +1672,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	rc = lnet_sock_read(sock, &hello->kshm_version,
- 			    sizeof(hello->kshm_version), timeout);
- 	if (rc) {
--		CERROR("Error %d reading HELLO from %pIS\n",
-+		CERROR("Error %d reading HELLO from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0);
- 		return rc;
-@@ -1696,7 +1696,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 					    hello);
- 		}
+-	err = obd_zombie_impexp_init();
++	err = libcfs_kkuc_init();
+ 	if (err)
+ 		return err;
  
--		CERROR("Unknown protocol version (%d.x expected) from %pIS\n",
-+		CERROR("Unknown protocol version (%d.x expected) from %pISc\n",
- 		       conn->ksnc_proto->pro_version,
- 		       &conn->ksnc_peeraddr);
+-	err = obd_init_checks();
++	err = obd_zombie_impexp_init();
+ 	if (err)
+-		goto cleanup_zombie_impexp;
++		goto cleanup_kkuc;
  
-@@ -1709,7 +1709,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	/* receive the rest of hello message anyway */
- 	rc = conn->ksnc_proto->pro_recv_hello(conn, hello, timeout);
- 	if (rc) {
--		CERROR("Error %d reading or checking hello from from %pIS\n",
-+		CERROR("Error %d reading or checking hello from from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0);
- 		return rc;
-@@ -1718,7 +1718,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	*incarnation = hello->kshm_src_incarnation;
+ 	err = class_handle_init();
+ 	if (err)
+@@ -754,6 +756,9 @@ static int __init obdclass_init(void)
+ cleanup_zombie_impexp:
+ 	obd_zombie_impexp_stop();
  
- 	if (LNET_NID_IS_ANY(&hello->kshm_src_nid)) {
--		CERROR("Expecting a HELLO hdr with a NID, but got LNET_NID_ANY from %pIS\n",
-+		CERROR("Expecting a HELLO hdr with a NID, but got LNET_NID_ANY from %pISc\n",
- 		       &conn->ksnc_peeraddr);
- 		return -EPROTO;
- 	}
-@@ -1746,7 +1746,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 		/* peer_ni determines type */
- 		conn->ksnc_type = ksocknal_invert_type(hello->kshm_ctype);
- 		if (conn->ksnc_type == SOCKLND_CONN_NONE) {
--			CERROR("Unexpected type %d from %s ip %pIS\n",
-+			CERROR("Unexpected type %d from %s ip %pISc\n",
- 			       hello->kshm_ctype, libcfs_idstr(peerid),
- 			       &conn->ksnc_peeraddr);
- 			return -EPROTO;
-@@ -1758,7 +1758,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	if (peerid->pid != recv_id.pid ||
- 	    !nid_same(&peerid->nid,  &recv_id.nid)) {
- 		LCONSOLE_ERROR_MSG(0x130,
--				   "Connected successfully to %s on host %pIS, but they claimed they were %s; please check your Lustre configuration.\n",
-+				   "Connected successfully to %s on host %pISc, but they claimed they were %s; please check your Lustre configuration.\n",
- 				   libcfs_idstr(peerid),
- 				   &conn->ksnc_peeraddr,
- 				   libcfs_idstr(&recv_id));
-@@ -1771,7 +1771,7 @@ ksocknal_recv_hello(struct lnet_ni *ni, struct ksock_conn *conn,
- 	}
- 
- 	if (ksocknal_invert_type(hello->kshm_ctype) != conn->ksnc_type) {
--		CERROR("Mismatched types: me %d, %s ip %pIS %d\n",
-+		CERROR("Mismatched types: me %d, %s ip %pISc %d\n",
- 		       conn->ksnc_type, libcfs_idstr(peerid),
- 		       &conn->ksnc_peeraddr, hello->kshm_ctype);
- 		return -EPROTO;
-@@ -2149,7 +2149,7 @@ ksocknal_connd(void *arg)
- 			if (ksocknal_connect(conn_cb)) {
- 				/* consecutive retry */
- 				if (cons_retry++ > SOCKNAL_INSANITY_RECONN) {
--					CWARN("massive consecutive re-connecting to %pIS\n",
-+					CWARN("massive consecutive re-connecting to %pISc\n",
- 					      &conn_cb->ksnr_addr);
- 					cons_retry = 0;
- 				}
-@@ -2211,17 +2211,17 @@ ksocknal_find_timed_out_conn(struct ksock_peer_ni *peer_ni)
- 
- 			switch (error) {
- 			case ECONNRESET:
--				CNETERR("A connection with %s (%pISp) was reset; it may have rebooted.\n",
-+				CNETERR("A connection with %s (%pIScp) was reset; it may have rebooted.\n",
- 					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
- 				break;
- 			case ETIMEDOUT:
--				CNETERR("A connection with %s (%pISp) timed out; the network or node may be down.\n",
-+				CNETERR("A connection with %s (%pIScp) timed out; the network or node may be down.\n",
- 					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
- 				break;
- 			default:
--				CNETERR("An unexpected network error %d occurred with %s (%pISp\n",
-+				CNETERR("An unexpected network error %d occurred with %s (%pIScp\n",
- 					error,
- 					libcfs_idstr(&peer_ni->ksnp_id),
- 					&conn->ksnc_peeraddr);
-@@ -2235,7 +2235,7 @@ ksocknal_find_timed_out_conn(struct ksock_peer_ni *peer_ni)
- 		    ktime_get_seconds() >= conn->ksnc_rx_deadline) {
- 			/* Timed out incomplete incoming message */
- 			ksocknal_conn_addref(conn);
--			CNETERR("Timeout receiving from %s (%pISp), state %d wanted %zd left %d\n",
-+			CNETERR("Timeout receiving from %s (%pIScp), state %d wanted %zd left %d\n",
- 				libcfs_idstr(&peer_ni->ksnp_id),
- 				&conn->ksnc_peeraddr,
- 				conn->ksnc_rx_state,
-@@ -2257,7 +2257,7 @@ ksocknal_find_timed_out_conn(struct ksock_peer_ni *peer_ni)
- 					    tx_list)
- 				tx->tx_hstatus =
- 					LNET_MSG_STATUS_LOCAL_TIMEOUT;
--			CNETERR("Timeout sending data to %s (%pISp) the network or that node may be down.\n",
-+			CNETERR("Timeout sending data to %s (%pIScp) the network or that node may be down.\n",
- 				libcfs_idstr(&peer_ni->ksnp_id),
- 				&conn->ksnc_peeraddr);
- 			spin_unlock_bh(&sched->kss_lock);
-diff --git a/net/lnet/klnds/socklnd/socklnd_proto.c b/net/lnet/klnds/socklnd/socklnd_proto.c
-index 0a93d572ea68..4d92a1c93aad 100644
---- a/net/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/net/lnet/klnds/socklnd/socklnd_proto.c
-@@ -548,7 +548,7 @@ ksocknal_send_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello)
- 
- 	rc = lnet_sock_write(sock, hdr, sizeof(*hdr), lnet_acceptor_timeout());
- 	if (rc) {
--		CNETERR("Error %d sending HELLO hdr to %pISp\n",
-+		CNETERR("Error %d sending HELLO hdr to %pIScp\n",
- 			rc, &conn->ksnc_peeraddr);
- 		goto out;
- 	}
-@@ -563,7 +563,7 @@ ksocknal_send_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello)
- 			     hello->kshm_nips * sizeof(u32),
- 			     lnet_acceptor_timeout());
- 	if (rc) {
--		CNETERR("Error %d sending HELLO payload (%d) to %pISp\n",
-+		CNETERR("Error %d sending HELLO payload (%d) to %pIScp\n",
- 			rc, hello->kshm_nips,
- 			&conn->ksnc_peeraddr);
- 	}
-@@ -621,7 +621,7 @@ ksocknal_send_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello)
- 			     lnet_acceptor_timeout());
- 	kfree(hello4);
- 	if (rc) {
--		CNETERR("Error %d sending HELLO hdr to %pISp\n",
-+		CNETERR("Error %d sending HELLO hdr to %pIScp\n",
- 			rc, &conn->ksnc_peeraddr);
- 		return rc;
- 	}
-@@ -633,7 +633,7 @@ ksocknal_send_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello)
- 			     hello->kshm_nips * sizeof(u32),
- 			     lnet_acceptor_timeout());
- 	if (rc) {
--		CNETERR("Error %d sending HELLO payload (%d) to %pISp\n",
-+		CNETERR("Error %d sending HELLO payload (%d) to %pIScp\n",
- 			rc, hello->kshm_nips,
- 			&conn->ksnc_peeraddr);
- 	}
-@@ -654,7 +654,7 @@ ksocknal_send_hello_v4(struct ksock_conn *conn, struct ksock_hello_msg *hello)
- 			     lnet_acceptor_timeout());
- 
- 	if (rc != 0)
--		CNETERR("Error %d sending HELLO hdr to %pISp\n",
-+		CNETERR("Error %d sending HELLO hdr to %pIScp\n",
- 			rc, &conn->ksnc_peeraddr);
- 	return rc;
++cleanup_kkuc:
++	libcfs_kkuc_fini();
++
+ 	return err;
  }
-@@ -679,7 +679,7 @@ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 						    src_nid),
- 			    timeout);
- 	if (rc) {
--		CERROR("Error %d reading rest of HELLO hdr from %pIS\n",
-+		CERROR("Error %d reading rest of HELLO hdr from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
- 		goto out;
-@@ -687,7 +687,7 @@ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
  
- 	/* ...and check we got what we expected */
- 	if (hdr->type != cpu_to_le32(LNET_MSG_HELLO)) {
--		CERROR("Expecting a HELLO hdr, but got type %d from %pIS\n",
-+		CERROR("Expecting a HELLO hdr, but got type %d from %pISc\n",
- 		       le32_to_cpu(hdr->type),
- 		       &conn->ksnc_peeraddr);
- 		rc = -EPROTO;
-@@ -701,7 +701,7 @@ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 	hello->kshm_nips = le32_to_cpu(hdr->payload_length) / sizeof(u32);
+@@ -771,6 +776,7 @@ static void obdclass_exit(void)
+ 	class_handle_cleanup();
+ 	class_del_uuid(NULL); /* Delete all UUIDs. */
+ 	obd_zombie_impexp_stop();
++	libcfs_kkuc_fini();
+ }
  
- 	if (hello->kshm_nips > LNET_INTERFACES_NUM) {
--		CERROR("Bad nips %d from ip %pIS\n",
-+		CERROR("Bad nips %d from ip %pISc\n",
- 		       hello->kshm_nips, &conn->ksnc_peeraddr);
- 		rc = -EPROTO;
- 		goto out;
-@@ -713,7 +713,7 @@ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 	rc = lnet_sock_read(sock, hello->kshm_ips,
- 			    hello->kshm_nips * sizeof(u32), timeout);
- 	if (rc) {
--		CERROR("Error %d reading IPs from ip %pIS\n",
-+		CERROR("Error %d reading IPs from ip %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
- 		goto out;
-@@ -723,7 +723,7 @@ ksocknal_recv_hello_v1(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 		hello->kshm_ips[i] = __le32_to_cpu(hello->kshm_ips[i]);
+ void obd_heat_clear(struct obd_heat_instance *instance, int count)
+diff --git a/fs/lustre/obdclass/kernelcomm.c b/fs/lustre/obdclass/kernelcomm.c
+index e59b6aadf097..5682d4e1ab53 100644
+--- a/fs/lustre/obdclass/kernelcomm.c
++++ b/fs/lustre/obdclass/kernelcomm.c
+@@ -38,16 +38,254 @@
+ #define DEBUG_SUBSYSTEM S_CLASS
  
- 		if (!hello->kshm_ips[i]) {
--			CERROR("Zero IP[%d] from ip %pIS\n",
-+			CERROR("Zero IP[%d] from ip %pISc\n",
- 			       i, &conn->ksnc_peeraddr);
- 			rc = -EPROTO;
- 			break;
-@@ -754,7 +754,7 @@ ksocknal_recv_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 			    offsetof(struct ksock_hello_msg_nid4, kshm_src_nid),
- 			    timeout);
- 	if (rc) {
--		CERROR("Error %d reading HELLO from %pIS\n",
-+		CERROR("Error %d reading HELLO from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
- 		return rc;
-@@ -783,7 +783,7 @@ ksocknal_recv_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 	}
+ #include <linux/file.h>
+-#include <linux/libcfs/libcfs.h>
++#include <linux/glob.h>
++#include <net/genetlink.h>
++#include <net/sock.h>
++
++#include <obd_class.h>
+ #include <obd_support.h>
+ #include <lustre_kernelcomm.h>
  
- 	if (hello->kshm_nips > LNET_INTERFACES_NUM) {
--		CERROR("Bad nips %d from ip %pIS\n",
-+		CERROR("Bad nips %d from ip %pISc\n",
- 		       hello->kshm_nips, &conn->ksnc_peeraddr);
- 		return -EPROTO;
- 	}
-@@ -794,7 +794,7 @@ ksocknal_recv_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 	rc = lnet_sock_read(sock, hello->kshm_ips,
- 			    hello->kshm_nips * sizeof(u32), timeout);
- 	if (rc) {
--		CERROR("Error %d reading IPs from ip %pIS\n",
-+		CERROR("Error %d reading IPs from ip %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
- 		return rc;
-@@ -805,7 +805,7 @@ ksocknal_recv_hello_v2(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 			__swab32s(&hello->kshm_ips[i]);
++static struct genl_family lustre_family;
++
++static struct ln_key_list device_list = {
++	.lkl_maxattr			= LUSTRE_DEVICE_ATTR_MAX,
++	.lkl_list			= {
++		[LUSTRE_DEVICE_ATTR_HDR]	= {
++			.lkp_value		= "devices",
++			.lkp_key_format		= LNKF_SEQUENCE | LNKF_MAPPING,
++			.lkp_data_type		= NLA_NUL_STRING,
++		},
++		[LUSTRE_DEVICE_ATTR_INDEX]	= {
++			.lkp_value		= "index",
++			.lkp_data_type		= NLA_U16
++		},
++		[LUSTRE_DEVICE_ATTR_STATUS]	= {
++			.lkp_value		= "status",
++			.lkp_data_type		= NLA_STRING
++		},
++		[LUSTRE_DEVICE_ATTR_CLASS]	= {
++			.lkp_value		= "type",
++			.lkp_data_type		= NLA_STRING
++		},
++		[LUSTRE_DEVICE_ATTR_NAME]	= {
++			.lkp_value		= "name",
++			.lkp_data_type		= NLA_STRING
++		},
++		[LUSTRE_DEVICE_ATTR_UUID]	= {
++			.lkp_value		= "uuid",
++			.lkp_data_type		= NLA_STRING
++		},
++		[LUSTRE_DEVICE_ATTR_REFCOUNT]	= {
++			.lkp_value		= "refcount",
++			.lkp_data_type		= NLA_U32
++		},
++	},
++};
++
++struct genl_dev_list {
++	struct obd_device	*gdl_target;
++	unsigned int		gdl_start;
++};
++
++static inline struct genl_dev_list *
++device_dump_ctx(struct netlink_callback *cb)
++{
++	return (struct genl_dev_list *)cb->args[0];
++}
++
++/* generic ->start() handler for GET requests */
++static int lustre_device_list_start(struct netlink_callback *cb)
++{
++	struct genlmsghdr *gnlh = nlmsg_data(cb->nlh);
++	struct netlink_ext_ack *extack = cb->extack;
++	struct genl_dev_list *glist;
++	int msg_len, rc = 0;
++
++	glist = kmalloc(sizeof(*glist), GFP_KERNEL);
++	if (!glist)
++		return -ENOMEM;
++
++	cb->args[0] = (long)glist;
++	glist->gdl_target = NULL;
++	glist->gdl_start = 0;
++
++	msg_len = genlmsg_len(gnlh);
++	if (msg_len > 0) {
++		struct nlattr *params = genlmsg_data(gnlh);
++		struct nlattr *dev;
++		int rem;
++
++		nla_for_each_attr(dev, params, msg_len, rem) {
++			struct nlattr *prop;
++			int rem2;
++
++			nla_for_each_nested(prop, dev, rem2) {
++				char name[MAX_OBD_NAME];
++				struct obd_device *obd;
++
++				if (nla_type(prop) != LN_SCALAR_ATTR_VALUE ||
++				    nla_strcmp(prop, "name") != 0)
++					continue;
++
++				prop = nla_next(prop, &rem2);
++				if (nla_type(prop) != LN_SCALAR_ATTR_VALUE) {
++					rc = -EINVAL;
++					goto report_err;
++				}
++
++				rc = nla_strlcpy(name, prop, sizeof(name));
++				if (rc < 0)
++					goto report_err;
++				rc = 0;
++
++				obd = class_name2obd(name);
++				if (obd)
++					glist->gdl_target = obd;
++			}
++		}
++		if (!glist->gdl_target) {
++			NL_SET_ERR_MSG(extack, "No devices found");
++			rc = -ENOENT;
++		}
++	}
++report_err:
++	if (rc < 0) {
++		kfree(glist);
++		cb->args[0] = 0;
++	}
++	return rc;
++}
++
++static int lustre_device_list_dump(struct sk_buff *msg,
++				   struct netlink_callback *cb)
++{
++	struct genl_dev_list *glist = device_dump_ctx(cb);
++	struct obd_device *filter = glist->gdl_target;
++	struct netlink_ext_ack *extack = cb->extack;
++	int portid = NETLINK_CB(cb->skb).portid;
++	int seq = cb->nlh->nlmsg_seq;
++	int idx, rc = 0;
++
++	if (glist->gdl_start == 0) {
++		const struct ln_key_list *all[] = {
++			&device_list, NULL
++		};
++
++		rc = lnet_genl_send_scalar_list(msg, portid, seq,
++						&lustre_family,
++						NLM_F_CREATE | NLM_F_MULTI,
++						LUSTRE_CMD_DEVICES, all);
++		if (rc < 0) {
++			NL_SET_ERR_MSG(extack, "failed to send key table");
++			return rc;
++		}
++	}
++
++	for (idx = glist->gdl_start; idx < class_devno_max(); idx++) {
++		struct obd_device *obd;
++		const char *status;
++		void *hdr;
++
++		obd = class_num2obd(idx);
++		if (!obd)
++			continue;
++
++		if (filter && filter != obd)
++			continue;
++
++		hdr = genlmsg_put(msg, portid, seq, &lustre_family,
++				  NLM_F_MULTI, LUSTRE_CMD_DEVICES);
++		if (!hdr) {
++			NL_SET_ERR_MSG(extack, "failed to send values");
++			genlmsg_cancel(msg, hdr);
++			rc = -EMSGSIZE;
++			break;
++		}
++
++		if (idx == 0)
++			nla_put_string(msg, LUSTRE_DEVICE_ATTR_HDR, "");
++
++		nla_put_u16(msg, LUSTRE_DEVICE_ATTR_INDEX, obd->obd_minor);
++
++		/* Collect only the index value for a single obd */
++		if (filter) {
++			genlmsg_end(msg, hdr);
++			idx++;
++			break;
++		}
++
++		if (obd->obd_stopping)
++			status = "ST";
++		else if (obd->obd_inactive)
++			status = "IN";
++		else if (obd->obd_set_up)
++			status = "UP";
++		else if (obd->obd_attached)
++			status = "AT";
++		else
++			status = "--";
++
++		nla_put_string(msg, LUSTRE_DEVICE_ATTR_STATUS, status);
++
++		nla_put_string(msg, LUSTRE_DEVICE_ATTR_CLASS,
++			       obd->obd_type->typ_name);
++
++		nla_put_string(msg, LUSTRE_DEVICE_ATTR_NAME,
++			       obd->obd_name);
++
++		nla_put_string(msg, LUSTRE_DEVICE_ATTR_UUID,
++			       obd->obd_uuid.uuid);
++
++		nla_put_u32(msg, LUSTRE_DEVICE_ATTR_REFCOUNT,
++			    atomic_read(&obd->obd_refcount));
++
++		genlmsg_end(msg, hdr);
++	}
++
++	glist->gdl_start = idx;
++	return rc < 0 ? rc : msg->len;
++}
++
++int lustre_device_done(struct netlink_callback *cb)
++{
++	struct genl_dev_list *glist;
++
++	glist = device_dump_ctx(cb);
++	kfree(glist);
++	cb->args[0] = 0;
++
++	return 0;
++}
++
++static const struct genl_multicast_group lustre_mcast_grps[] = {
++	{ .name		= "devices",		},
++};
++
++static const struct genl_ops lustre_genl_ops[] = {
++	{
++		.cmd		= LUSTRE_CMD_DEVICES,
++		.start		= lustre_device_list_start,
++		.dumpit		= lustre_device_list_dump,
++		.done		= lustre_device_done,
++	},
++};
++
++static struct genl_family lustre_family = {
++	.name		= LUSTRE_GENL_NAME,
++	.version	= LUSTRE_GENL_VERSION,
++	.module		= THIS_MODULE,
++	.ops		= lustre_genl_ops,
++	.n_ops		= ARRAY_SIZE(lustre_genl_ops),
++	.mcgrps		= lustre_mcast_grps,
++	.n_mcgrps	= ARRAY_SIZE(lustre_mcast_grps),
++};
++
+ /**
+  * libcfs_kkuc_msg_put - send an message from kernel to userspace
+- *
+- * @fp:		to send the message to
+- * @payload:	Payload data. First field of payload is always
+- *		struct kuc_hdr
++ * @param fp	to send the message to
++ * @param payload Payload data. First field of payload is always
++ *  struct kuc_hdr
+  */
+ static int libcfs_kkuc_msg_put(struct file *filp, void *payload)
+ {
+@@ -104,12 +342,19 @@ static inline bool libcfs_kkuc_group_is_valid(unsigned int group)
+ 	return group < ARRAY_SIZE(kkuc_groups);
+ }
  
- 		if (!hello->kshm_ips[i]) {
--			CERROR("Zero IP[%d] from ip %pIS\n",
-+			CERROR("Zero IP[%d] from ip %pISc\n",
- 			       i, &conn->ksnc_peeraddr);
- 			return -EPROTO;
- 		}
-@@ -831,7 +831,7 @@ ksocknal_recv_hello_v4(struct ksock_conn *conn, struct ksock_hello_msg *hello,
- 			    offsetof(struct ksock_hello_msg, kshm_src_nid),
- 			    timeout);
- 	if (rc) {
--		CERROR("Error %d reading HELLO from %pIS\n",
-+		CERROR("Error %d reading HELLO from %pISc\n",
- 		       rc, &conn->ksnc_peeraddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
- 		return rc;
-diff --git a/net/lnet/lnet/acceptor.c b/net/lnet/lnet/acceptor.c
-index 2306760210ae..6e219085cb53 100644
---- a/net/lnet/lnet/acceptor.c
-+++ b/net/lnet/lnet/acceptor.c
-@@ -91,37 +91,37 @@ lnet_connect_console_error(int rc, struct lnet_nid *peer_nid,
- 	switch (rc) {
- 	/* "normal" errors */
- 	case -ECONNREFUSED:
--		CNETERR("Connection to %s at host %pISp was refused: check that Lustre is running on that node.\n",
-+		CNETERR("Connection to %s at host %pIScp was refused: check that Lustre is running on that node.\n",
- 			libcfs_nidstr(peer_nid), sa);
- 		break;
- 	case -EHOSTUNREACH:
- 	case -ENETUNREACH:
--		CNETERR("Connection to %s at host %pIS was unreachable: the network or that node may be down, or Lustre may be misconfigured.\n",
-+		CNETERR("Connection to %s at host %pISc was unreachable: the network or that node may be down, or Lustre may be misconfigured.\n",
- 			libcfs_nidstr(peer_nid), sa);
- 		break;
- 	case -ETIMEDOUT:
--		CNETERR("Connection to %s at host %pISp took too long: that node may be hung or experiencing high load.\n",
-+		CNETERR("Connection to %s at host %pIScp took too long: that node may be hung or experiencing high load.\n",
- 			libcfs_nidstr(peer_nid), sa);
- 		break;
- 	case -ECONNRESET:
- 		LCONSOLE_ERROR_MSG(0x11b,
--				   "Connection to %s at host %pISp was reset: is it running a compatible version of Lustre and is %s one of its NIDs?\n",
-+				   "Connection to %s at host %pIScp was reset: is it running a compatible version of Lustre and is %s one of its NIDs?\n",
- 				   libcfs_nidstr(peer_nid), sa,
- 				   libcfs_nidstr(peer_nid));
- 		break;
- 	case -EPROTO:
- 		LCONSOLE_ERROR_MSG(0x11c,
--				   "Protocol error connecting to %s at host %pISp: is it running a compatible version of Lustre?\n",
-+				   "Protocol error connecting to %s at host %pIScp: is it running a compatible version of Lustre?\n",
- 				   libcfs_nidstr(peer_nid), sa);
- 		break;
- 	case -EADDRINUSE:
- 		LCONSOLE_ERROR_MSG(0x11d,
--				   "No privileged ports available to connect to %s at host %pISp\n",
-+				   "No privileged ports available to connect to %s at host %pIScp\n",
- 				   libcfs_nidstr(peer_nid), sa);
- 		break;
- 	default:
- 		LCONSOLE_ERROR_MSG(0x11e,
--				   "Unexpected error %d connecting to %s at host %pISp\n",
-+				   "Unexpected error %d connecting to %s at host %pIScp\n",
- 				   rc, libcfs_nidstr(peer_nid), sa);
- 		break;
- 	}
-@@ -237,7 +237,7 @@ lnet_accept(struct socket *sock, u32 magic)
- 					     accept_timeout);
+-void libcfs_kkuc_init(void)
++int libcfs_kkuc_init(void)
+ {
+ 	int group;
  
- 			if (rc)
--				CERROR("Error sending magic+version in response to LNET magic from %pIS: %d\n",
-+				CERROR("Error sending magic+version in response to LNET magic from %pISc: %d\n",
- 				       &peer, rc);
- 			return -EPROTO;
- 		}
-@@ -248,7 +248,7 @@ lnet_accept(struct socket *sock, u32 magic)
- 			str = "unrecognised";
+ 	for (group = 0; group < ARRAY_SIZE(kkuc_groups); group++)
+ 		INIT_LIST_HEAD(&kkuc_groups[group]);
++
++	return genl_register_family(&lustre_family);
++}
++
++void libcfs_kkuc_fini(void)
++{
++	genl_unregister_family(&lustre_family);
+ }
  
- 		LCONSOLE_ERROR_MSG(0x11f,
--				   "Refusing connection from %pIS magic %08x: %s acceptor protocol\n",
-+				   "Refusing connection from %pISc magic %08x: %s acceptor protocol\n",
- 				   &peer, magic, str);
- 		return -EPROTO;
- 	}
-@@ -258,7 +258,7 @@ lnet_accept(struct socket *sock, u32 magic)
- 	rc = lnet_sock_read(sock, &cr.acr_version, sizeof(cr.acr_version),
- 			    accept_timeout);
- 	if (rc) {
--		CERROR("Error %d reading connection request version from %pIS\n",
-+		CERROR("Error %d reading connection request version from %pISc\n",
- 		       rc, &peer);
- 		return -EIO;
- 	}
-@@ -281,7 +281,7 @@ lnet_accept(struct socket *sock, u32 magic)
+ /** Add a receiver to a broadcast group
+diff --git a/include/uapi/linux/lustre/lustre_kernelcomm.h b/include/uapi/linux/lustre/lustre_kernelcomm.h
+index 744eeb674f72..91bb686d33e9 100644
+--- a/include/uapi/linux/lustre/lustre_kernelcomm.h
++++ b/include/uapi/linux/lustre/lustre_kernelcomm.h
+@@ -39,6 +39,24 @@
  
- 		rc = lnet_sock_write(sock, &cr, sizeof(cr), accept_timeout);
- 		if (rc)
--			CERROR("Error sending magic+version in response to version %d from %pIS: %d\n",
-+			CERROR("Error sending magic+version in response to version %d from %pISc: %d\n",
- 			       peer_version, &peer, rc);
- 		return -EPROTO;
+ #include <linux/types.h>
  
-@@ -311,7 +311,7 @@ lnet_accept(struct socket *sock, u32 magic)
- 		break;
- 	}
- 	if (rc) {
--		CERROR("Error %d reading connection request from %pIS\n",
-+		CERROR("Error %d reading connection request from %pISc\n",
- 		       rc, &peer);
- 		return -EIO;
- 	}
-@@ -323,7 +323,7 @@ lnet_accept(struct socket *sock, u32 magic)
- 		if (ni)
- 			lnet_ni_decref(ni);
- 		LCONSOLE_ERROR_MSG(0x120,
--				   "Refusing connection from %pIS for %s: No matching NI\n",
-+				   "Refusing connection from %pISc for %s: No matching NI\n",
- 				   &peer, libcfs_nidstr(&nid));
- 		return -EPERM;
- 	}
-@@ -332,12 +332,12 @@ lnet_accept(struct socket *sock, u32 magic)
- 		/* This catches a request for the loopback LND */
- 		lnet_ni_decref(ni);
- 		LCONSOLE_ERROR_MSG(0x121,
--				   "Refusing connection from %pIS for %s: NI doesn not accept IP connections\n",
-+				   "Refusing connection from %pISc for %s: NI doesn not accept IP connections\n",
- 				   &peer, libcfs_nidstr(&nid));
- 		return -EPERM;
- 	}
- 
--	CDEBUG(D_NET, "Accept %s from %pIS\n", libcfs_nidstr(&nid), &peer);
-+	CDEBUG(D_NET, "Accept %s from %pISc\n", libcfs_nidstr(&nid), &peer);
- 
- 	rc = ni->ni_net->net_lnd->lnd_accept(ni, sock);
- 
-@@ -430,7 +430,7 @@ lnet_acceptor(void *arg)
- 		if (secure &&
- 		    rpc_get_port((struct sockaddr *)&peer) >
- 		    LNET_ACCEPTOR_MAX_RESERVED_PORT) {
--			CERROR("Refusing connection from %pISp: insecure port\n",
-+			CERROR("Refusing connection from %pIScp: insecure port\n",
- 			       &peer);
- 			goto failed;
- 		}
-@@ -438,7 +438,7 @@ lnet_acceptor(void *arg)
- 		rc = lnet_sock_read(newsock, &magic, sizeof(magic),
- 				    accept_timeout);
- 		if (rc) {
--			CERROR("Error %d reading connection request from %pIS\n",
-+			CERROR("Error %d reading connection request from %pISc\n",
- 			       rc, &peer);
- 			goto failed;
- 		}
-diff --git a/net/lnet/lnet/lib-socket.c b/net/lnet/lnet/lib-socket.c
-index 01f375ed96a3..e6236c98261d 100644
---- a/net/lnet/lnet/lib-socket.c
-+++ b/net/lnet/lnet/lib-socket.c
-@@ -401,7 +401,7 @@ lnet_sock_connect(int interface, int local_port,
- 	 * port...
- 	 */
- 	CDEBUG_LIMIT(rc == -EADDRNOTAVAIL ? D_NET : D_NETERROR,
--		     "Error %d connecting %d -> %pISp\n", rc,
-+		     "Error %d connecting %d -> %pIScp\n", rc,
- 		     local_port, peeraddr);
- 
- 	sock_release(sock);
++#define LUSTRE_GENL_NAME		"lustre"
++#define LUSTRE_GENL_VERSION		0x1
++
++/*
++ * enum lustre_commands		      - Supported Lustre Netlink commands
++ *
++ * @LUSTRE_CMD_UNSPEC:			unspecified command to catch errors
++ * @LUSTRE_CMD_DEVICES:			command to manage the Lustre devices
++ */
++enum lustre_commands {
++	LUSTRE_CMD_UNSPEC	= 0,
++	LUSTRE_CMD_DEVICES	= 1,
++
++	__LUSTRE_CMD_MAX_PLUS_ONE
++};
++
++#define LUSTRE_CMD_MAX	(__LUSTRE_CMD_MAX_PLUS_ONE - 1)
++
+ /* KUC message header.
+  * All current and future KUC messages should use this header.
+  * To avoid having to include Lustre headers from libcfs, define this here.
 -- 
 2.27.0
 
