@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 5FCFFFA3741
-	for <lustre-devel@archiver.kernel.org>; Thu, 27 Oct 2022 14:25:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id C82FCECAAA1
+	for <lustre-devel@archiver.kernel.org>; Thu, 27 Oct 2022 14:27:17 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Mynhs2lH8z219K;
-	Thu, 27 Oct 2022 07:13:33 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Mynjm5nGrz219y;
+	Thu, 27 Oct 2022 07:14:20 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Mynhf2r9Fz2169
- for <lustre-devel@lists.lustre.org>; Thu, 27 Oct 2022 07:13:22 -0700 (PDT)
+ 4Mynjh0q6xz1yCy
+ for <lustre-devel@lists.lustre.org>; Thu, 27 Oct 2022 07:14:15 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 8CC681009108;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 913051009109;
  Thu, 27 Oct 2022 10:05:44 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 8AE00FD4FB; Thu, 27 Oct 2022 10:05:44 -0400 (EDT)
+ id 8E9D6E8CAE; Thu, 27 Oct 2022 10:05:44 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 27 Oct 2022 10:05:39 -0400
-Message-Id: <1666879542-10737-13-git-send-email-jsimmons@infradead.org>
+Date: Thu, 27 Oct 2022 10:05:40 -0400
+Message-Id: <1666879542-10737-14-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1666879542-10737-1-git-send-email-jsimmons@infradead.org>
 References: <1666879542-10737-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 12/15] lnet: ksocklnd: fix irq lock inversion
- while calling sk_data_ready()
+Subject: [lustre-devel] [PATCH 13/15] lustre: obdclass: fix race in
+ class_del_profile
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,52 +42,95 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Li Dongyang <dongyangli@ddn.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-sk->sk_data_ready() of sctp socket can be called from both BH and non-BH
-contexts, but ksocklnd version of sk_data_ready, ksocknal_data_ready()
-does not handle the BH case. Change how ksnd_global_lock is taken in
-this case.
+From: Li Dongyang <dongyangli@ddn.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15807
-Lustre-commit: 1df5199097ef0d789 ("LU-15807 ksocklnd: fix irq lock inversion while calling sk_data_ready()")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/48715
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
-Reviewed-by: Frank Sehr <fsehr@whamcloud.com>
+Move profile lookup and remove from lustre_profile_list
+into the same critical section, otherwise we could race with
+class_del_profiles or another class_del_profile.
+
+Do not create duplicate mount opts in the client config,
+otherwise we will add duplicate lustre_profile to
+lustre_profile_list for a single mount.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15305
+Lustre-commit: 83d3f42118579d7fb ("LU-15305 obdclass: fix race in class_del_profile")
+Signed-off-by: Li Dongyang <dongyangli@ddn.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/48802
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- net/lnet/klnds/socklnd/socklnd_lib.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ fs/lustre/obdclass/obd_config.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/net/lnet/klnds/socklnd/socklnd_lib.c b/net/lnet/klnds/socklnd/socklnd_lib.c
-index 047e7a6..dd12945 100644
---- a/net/lnet/klnds/socklnd/socklnd_lib.c
-+++ b/net/lnet/klnds/socklnd/socklnd_lib.c
-@@ -374,7 +374,7 @@ static int lustre_csum(struct kvec *v, void *context)
+diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
+index 2b24276..75fc6a6 100644
+--- a/fs/lustre/obdclass/obd_config.c
++++ b/fs/lustre/obdclass/obd_config.c
+@@ -622,21 +622,28 @@ static int class_del_conn(struct obd_device *obd, struct lustre_cfg *lcfg)
+ static LIST_HEAD(lustre_profile_list);
+ static DEFINE_SPINLOCK(lustre_profile_list_lock);
  
- 	/* interleave correctly with closing sockets... */
- 	LASSERT(!in_irq());
--	read_lock(&ksocknal_data.ksnd_global_lock);
-+	read_lock_bh(&ksocknal_data.ksnd_global_lock);
+-struct lustre_profile *class_get_profile(const char *prof)
++static struct lustre_profile *class_get_profile_nolock(const char *prof)
+ {
+ 	struct lustre_profile *lprof;
  
- 	conn = sk->sk_user_data;
- 	wspace = sk_stream_wspace(sk);
-@@ -408,7 +408,7 @@ static int lustre_csum(struct kvec *v, void *context)
- 		clear_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+-	spin_lock(&lustre_profile_list_lock);
+ 	list_for_each_entry(lprof, &lustre_profile_list, lp_list) {
+-		if (!strcmp(lprof->lp_profile, prof)) {
++		if (strcmp(lprof->lp_profile, prof) == 0) {
+ 			lprof->lp_refs++;
+-			spin_unlock(&lustre_profile_list_lock);
+ 			return lprof;
+ 		}
  	}
- 
--	read_unlock(&ksocknal_data.ksnd_global_lock);
-+	read_unlock_bh(&ksocknal_data.ksnd_global_lock);
+-	spin_unlock(&lustre_profile_list_lock);
+ 	return NULL;
  }
++
++struct lustre_profile *class_get_profile(const char *prof)
++{
++	struct lustre_profile *lprof;
++
++	spin_lock(&lustre_profile_list_lock);
++	lprof = class_get_profile_nolock(prof);
++	spin_unlock(&lustre_profile_list_lock);
++	return lprof;
++}
+ EXPORT_SYMBOL(class_get_profile);
  
- void
+ /** Create a named "profile".
+@@ -701,9 +708,9 @@ void class_del_profile(const char *prof)
+ 
+ 	CDEBUG(D_CONFIG, "Del profile %s\n", prof);
+ 
+-	lprof = class_get_profile(prof);
++	spin_lock(&lustre_profile_list_lock);
++	lprof = class_get_profile_nolock(prof);
+ 	if (lprof) {
+-		spin_lock(&lustre_profile_list_lock);
+ 		/* because get profile increments the ref counter */
+ 		lprof->lp_refs--;
+ 		list_del(&lprof->lp_list);
+@@ -711,6 +718,8 @@ void class_del_profile(const char *prof)
+ 		spin_unlock(&lustre_profile_list_lock);
+ 
+ 		class_put_profile(lprof);
++	} else {
++		spin_unlock(&lustre_profile_list_lock);
+ 	}
+ }
+ EXPORT_SYMBOL(class_del_profile);
 -- 
 1.8.3.1
 
