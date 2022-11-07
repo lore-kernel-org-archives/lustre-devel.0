@@ -4,117 +4,31 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id BAC7CC4332F
-	for <lustre-devel@archiver.kernel.org>; Wed, 23 Nov 2022 17:25:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id B9B17C433FE
+	for <lustre-devel@archiver.kernel.org>; Wed, 30 Nov 2022 01:51:39 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4NHSgc5NZDz1y2G;
-	Wed, 23 Nov 2022 09:25:16 -0800 (PST)
-Received: from NAM12-DM6-obe.outbound.protection.outlook.com
- (mail-dm6nam12on2050.outbound.protection.outlook.com [40.107.243.50])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4NMHt24J7tz22Rb;
+	Tue, 29 Nov 2022 15:02:34 -0800 (PST)
+Received: from twcp1.phys.ntu.edu.tw (twcp1.phys.ntu.edu.tw [140.112.102.71])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256
+ bits)) (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4NHSgT5Bbdz1wNq
- for <lustre-devel@lists.lustre.org>; Wed, 23 Nov 2022 09:25:09 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=UFIrOjQ2NUx77pK2Vnnz+m/cuLu3JAeh6uHYWtopZ/G91Gu5fkOUqmUzwMhcqjlUIzNAR1EAetJ16bLBrm9r+BlOfgMN2WlVw/YFsFpBGNtbjTFykgb2cIfMEpz6jRLynXUHvs4u1X9IKkZvzVLwE7q1onwblZT4e2r5IWIChvu0+yMo7iKxHvDeC3qtXF/chj28vQmoqkIm/WrDB/uG7AGgcRhN1kvmyxS7zmYIo9rh8MYBC7EKqhPdpHibw/OuS/b6t/C5u4UjFBzyay0uA8vWFEU91Iq/kfRIhj0JucbZprSsno2IRPcOM+m+wZMBBYLA302AA85DcUeFdX3pKQ==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=qQHcfG6X8ArzEvZk5dpU9rXTbb1trSNE+NZcc5RHVy0=;
- b=ZLaD3HNMAOqg17PJVu54o4PtR2mHBDMV9LzCRQeWLxrVStyuvhsSC9yIhah+sv1FcrcEuIsGOAixQ4H4hM/SdeqcQu71VFZBTfL8T9gQaywmi9ey9gXYQ86Zsjl9jPsXGBHFUd8qgdH+xHQyZJzcc+CMPmmLPFTD6Qq04V40fpqUkMFs6ztDaR0SI8nhZgxjKpGQLD0g02z3f+HmF9pT3/55L6Nl5lFpqxeosrMiRVCQMnttsEyN+e9a1G52DHn6yCTNGjvmr1H9ylzg9Kp5DxlGvnrS0hKk5b4bOlL7WlMRYj0JRM3X4BJYFWkZrH2LBC/H36TyS9ilwkDmCZyw/g==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=qQHcfG6X8ArzEvZk5dpU9rXTbb1trSNE+NZcc5RHVy0=;
- b=t8Yl6i9s1RxwqWhBhh3KrQi3X+aQVJV2+42WuC21rkgEJP1PXfyGmfBl8AQLVnGi1Dvg00i4tnHFqrGbwnk/hvA96VWCKDfZG613pWGk432HCOYnzamweWhHTnWyzUSJU86GphqquIaoDVSrFdKNvL4p5J2D9iZtyoXNWghEi5A=
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
- by DM4PR19MB5691.namprd19.prod.outlook.com (2603:10b6:8:5e::5) with
- Microsoft
- SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.5857.18; Wed, 23 Nov 2022 17:25:06 +0000
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::5576:15e7:aec1:4e84]) by MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::5576:15e7:aec1:4e84%3]) with mapi id 15.20.5834.015; Wed, 23 Nov 2022
- 17:25:06 +0000
-To: Saisha Kamat <skamat1@uncc.edu>
-CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: [lustre-devel] Question about how online LFSCK works
-Thread-Index: AQHY/0DRKzT1IfWUV0yF4jMawqIonK5Mwoy6
-Date: Wed, 23 Nov 2022 17:25:05 +0000
-Message-ID: <217785FC-1D57-4137-A354-A560F976F703@whamcloud.com>
-References: <CACyzrcRce01W3_8C1TsOJEQrtSj7qnBTWW6TDpcz_1kEKgCvhw@mail.gmail.com>
-In-Reply-To: <CACyzrcRce01W3_8C1TsOJEQrtSj7qnBTWW6TDpcz_1kEKgCvhw@mail.gmail.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-Hashtags: #NewslettersPlus
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|DM4PR19MB5691:EE_
-x-ms-office365-filtering-correlation-id: 706f2d3f-31e0-4a61-e954-08dacd77a9cf
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: VNT4RKliDA6p0MDfXMJjQAjyPc9f9Pfwtrp0ZRcn9w92MGSk6eq5Nj/m0wpPgApzKdJN6Na4+JR5PjmEl/VMavbWTvZ4QXjGWkMvi07eXqqf8TtOUKJzi5ve35tqy7kB4b7tDeSyKkvykp7SKtHfMYt+0fW4uSCq+hV8Z9kUlLso1wDU40AYz5hnOcegvxIMgMGPoDKcZt204tFsMj0dHdfvg6BjlSSTOenO+lhmT8gJRQYL6HJWdeZFXthDiVxBcJJKSucYdyaqO79Nvpa2yfQ67K5ppqfHAshZ5WURUkqXYRd0ML4LVlBKa9/dchf5W5IFoNF3i+G0IZY2vEJ8LkoHz6T9YBwmzx/FBmmLF7eZ47HZLtjSb7Dm+ax7u7CKHfJS593d3ueeKlYpAkPvJ7bEnucCoNlZPCj4hrOWsOzIXcFEKATxkahFfTXRL6PnU7tO3b+9DGW9eazvm3OzSuvAocQJkvJY3ku/v5n/HV5Isv8VFSkM+U/bZH1YuSy9UDQzOUA2+C3naGtSeAkg6mKM5WBNADk+Nv1gjkyZ7E2tBloTVAPR1PjF9SU/2DbKkSOpJ7VRjmavN6NKoHVEC7ap5DFbL31EZL4Z1o5/whmzmyZdEwZqjWv+Ayi0GF3+xk5HyYCkg6gAD3IsbfLf7890DTDKsiHuHAfDwTVuJx1V8qGyZqUrbYF/7oZrX5yq0sb8IjnTTMN4cinvY5Heke0o0IabUQVro4dMUn23annDwi8MwbG0tCF/8DslH8ueSKchgpqWurLdu95lKIgNvw==
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230022)(4636009)(39850400004)(136003)(346002)(366004)(376002)(396003)(451199015)(2616005)(41300700001)(8936002)(186003)(53546011)(6506007)(6916009)(316002)(4326008)(8676002)(26005)(6512007)(66446008)(66476007)(76116006)(66946007)(66556008)(64756008)(36756003)(86362001)(122000001)(38100700002)(38070700005)(33656002)(5660300002)(2906002)(83380400001)(71200400001)(478600001)(966005)(6486002)(13693001)(45980500001);
- DIR:OUT; SFP:1101; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?ZUhkQlZyQjg2bUd5S0cwSUo0RmFYNjFrM0YxOE9LL01UdVhtcmUvcEliMEZ3?=
- =?utf-8?B?S2ZoSEwxcUY0YWp2eVlTUk04YkljMzdyMUNsdFJ0bEVXcGQ3TnRMY3J0Smw5?=
- =?utf-8?B?cnF6RzB5d05keXR4L1Eyb0t1eWo5YTJFUFZ2b1ZnZytRdnBVZUxER2llZm9J?=
- =?utf-8?B?Nm4zZDBTZjBmMm1QWW9xTEdmN3FsSUhIKzdjVzFLc25WYlN0c2haNTc4c0gy?=
- =?utf-8?B?ZmorN1hUVWZUNi9SWXo5bUp4OVY1bDRnRFBGaVVHTlU1Mzk4YUJkNmMraDVT?=
- =?utf-8?B?Zno0Zmk4Mmo2OUt5QUpQeVp2Ti8rVEwxUkh2Y3podlk5UVFuNWtpRVB5aEgz?=
- =?utf-8?B?L3h4MlZMZmdHSUh3U2Nmbkh6SUtWS0xEdjRjcGRPNjZqbHJxcWJ1bDdMWTZM?=
- =?utf-8?B?UEFheWFTb2gzTStlVVdnSE9vMWZKRS9RakJ2VmJ4SytqNm51L1Jta0h1Z2tU?=
- =?utf-8?B?a2VwclBsc2w1L3kzNW9COWppbVh1MjNKeC9QS24xaWpQbFRlLzJRWS9hNmtS?=
- =?utf-8?B?M29Bbm0vcDU0b3dIMlRxZXBOeHlucFRvU0dNT3JWL0pYR1dlcmt6QWdheXBG?=
- =?utf-8?B?WDdVelR2NzREMGI3SXlobytFMzZhY2tYdDZtUVJ2VmtqQUdMVDd0RkV0bFR2?=
- =?utf-8?B?WFdpWXN3OUo4NXN5c3RkUjIwU2VkWGk4NHF3MHdkOXBxdEx5NzhEWXB0NklY?=
- =?utf-8?B?Y1VqZms2cnNabm9TL1BzM2owb1FjZFJ3OEZhdnloV1U5ZitqK0RUSW16U3hk?=
- =?utf-8?B?ZkdiQjJWd05ZNGJZR25yanRnMEYzUmd4OCtzSjlDY2Via20xMEtMOHFRejJv?=
- =?utf-8?B?WUxuc2dpSGZZQUQxY0I1bVd1VkNXd25jSGxUeEpVdS8xOUNYNUo0Z2ZZU0Fy?=
- =?utf-8?B?RzdjR25YKzNqdWlTanAvUzAxL25sMGlCcldOZ1VnOGFqZUVxNmdPZVpLOXBL?=
- =?utf-8?B?S0M1RHpIT2Z0REloVHhsNHFiOE1aUEk2ZDRtTHZpMnUxckFZUUNXQ3N1ZEd1?=
- =?utf-8?B?anZGR2RxZmZRS1lYV1ZsV2NQU1ZHVk5vN2JCd2FFRjNZZlM3WHNjRnJhVXVX?=
- =?utf-8?B?UnoyS0p5bUZaS2NXQUw2RGh3OTUxd0tIMFRrdEVGYjJ6NmhhTDRHNjRWRDlH?=
- =?utf-8?B?MHQxSUEza3VPeW56S0hTalVnZk45TGZORnR4eThNWFZOUk52RWpsNDJCdERn?=
- =?utf-8?B?ell2YzdTZHlCMFgrTW9ENm5lSnByQXVQcmQyeldqcWdlYWRRZmhPcGgxMlcy?=
- =?utf-8?B?SzFYdlF6VGI1REZrT3FKV1JGd3Z2VHNhWFhBelRYSWcyQnJFZUw2YTVWN0Ns?=
- =?utf-8?B?bWN0eks2Z2tlWHlvR1Q2Wk42OFY3ZVBsYXQrdGRWeERjRWdZbmt3dDZPVTMz?=
- =?utf-8?B?Y1B5WVNMdE9rZmM1TXJ0UmY2WjVFanAwRTY4TDE2R29JaUh0VnkzVUFmNzdp?=
- =?utf-8?B?cU9WeSt1RWV3VXQ0OEI0bUQrREhaQkU5dWdldTZuei95S3plV3k0aXIwTi84?=
- =?utf-8?B?TUJZWDk3eFpTNkhMMHhBeGhTYzl5czRncThmN3lkOG1wMmplbGRGS0pRbkQv?=
- =?utf-8?B?OTVNTFlMQWRNbXY0NHd2akUxckd3RkFKSGlGczNWRzFEamhDRm5rak5Ub1B6?=
- =?utf-8?B?QnNvYWRHL1NpeTZXSmc4b3pnZXk2MFA1bUFDVVJVanI1cE54SzRJMU1ybThl?=
- =?utf-8?B?d2hhYm4xTHo3TTZBbVFxQzNjbjZ5QTIzcUIybzNjOHdLZGRES3lWckhYK2xJ?=
- =?utf-8?B?NXQrN3JJVjFyYjZod09LNE45QmNLVmhCV0xoMnJteG53bkFXeEEzSDdqSWRm?=
- =?utf-8?B?NUNzWTgxVzdlTGZTVjBvSVV6dVZaUlZzZVMraS9ZQVQ0ZGxJV2RyamVUeGFU?=
- =?utf-8?B?UlJtakFVNlNySWlVeEtSRzJQTHNyK0xoUHNwdkY5cWtuWmFxcnYxSDhmMUdB?=
- =?utf-8?B?VUpTeXhQZ01XM3k4b1BJUmpVbmg1OXR1OTIzQXRpMHFMd09JWEhwWG9uTDFQ?=
- =?utf-8?B?dUd6U2dxb2tCbVB5QlQ2V0t3S3QwcjJmZkdrc3ZBTGwyY0NOL1FwVU1VOVdB?=
- =?utf-8?B?dXUwbEc2TFA2S3YyekJHbjFpcTh1TW0xVDBjcVk0aEdSVzJJdHVXUk5OVXFo?=
- =?utf-8?Q?jFD4=3D?=
+ 4N5V0y1GtPz1wL2
+ for <lustre-devel@lists.lustre.org>; Mon,  7 Nov 2022 03:50:42 -0800 (PST)
+Received: from thhsieh by twcp1.phys.ntu.edu.tw with local (Exim 4.89)
+ (envelope-from <thhsieh@twcp1.phys.ntu.edu.tw>) id 1os0eD-0002V6-M0
+ for lustre-devel@lists.lustre.org; Mon, 07 Nov 2022 19:50:37 +0800
+Date: Mon, 7 Nov 2022 19:50:37 +0800
+From: Tung-Han Hsieh <thhsieh@twcp1.phys.ntu.edu.tw>
+To: lustre-devel@lists.lustre.org
+Message-ID: <20221107115037.6fhvrnt2v4oth2t6@twcp1.phys.ntu.edu.tw>
 MIME-Version: 1.0
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 706f2d3f-31e0-4a61-e954-08dacd77a9cf
-X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Nov 2022 17:25:05.9654 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: p9SxO+ta4YVpkgXuryJwlvc9UoqjXOThm3DiY/ePnVmwb77XjX+QLkyebU4DTaEt
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM4PR19MB5691
-Subject: Re: [lustre-devel] Question about how online LFSCK works
+Content-Type: multipart/mixed; boundary="quvdcnnkr66kll7y"
+Content-Disposition: inline
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-Mailman-Approved-At: Tue, 29 Nov 2022 15:02:26 -0800
+Subject: [lustre-devel] Request of Lustre with Linux kernel 5.10.X and
+ MLNX_OFED 5.3.X
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -127,140 +41,10668 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Andreas Dilger <adilger@whamcloud.com>
-Content-Type: multipart/mixed; boundary="===============2499426323955620875=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============2499426323955620875==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_217785FC1D574137A354A560F976F703whamcloudcom_"
 
---_000_217785FC1D574137A354A560F976F703whamcloudcom_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+--quvdcnnkr66kll7y
+Content-Type: text/plain; charset=big5
+Content-Disposition: inline
 
-VGhlIExGU0NLIGNoZWNraW5nIGlzIHJ1biBpbiBhIG11bHRpLXN0YWdlIGV4ZWN1dGlvbi4gQXQg
-dGhlIGxvd2VzdCBsZXZlbCwgdGhlIE9JIFNjcnViIHNjYW5zIHRoZSBsZGlza2ZzIG9yIFpGUyBp
-bm9kZXMgZnJvbSB0aGUgc3RvcmFnZSBhbmQgcGVyZm9ybXMgbG9jYWwgc2FuaXR5IGNoZWNrcyAo
-ZWcuIEZJRCBmcm9tIHhhdHRyIHZzLiBPSSBGSUQtPmlub2RlIG1hcHBpbmcpIGFuZCB0aGVuIExG
-U0NLIGNvbnN1bWVzIHRoZXNlIG9iamVjdHMgKHNlbWktYXN5bmNocm9ub3VzbHkpIHRvIHBlcmZv
-cm0gZGlzdHJpYnV0ZWQgY29uc2lzdGVuY3kgY2hlY2tzIChlZy4gbmFtZXNwYWNlIGNoZWNrcyBm
-b3IgcmVtb3RlL3N0cmlwZWQgZGlyZWN0b3JpZXMsIGxpbmsgRUEgY2hlY2tzIGZvciBjaGlsZC0+
-cGFyZW50IGRpcmVjdG9yeSBsb29rdXAsIGxheW91dCBjaGVja3MgZm9yIE1EVCBpbm9kZSB0byBP
-U1Qgb2JqZWN0IHJlZmVyZW5jZXMsIGV0YykuICBGb3IgY2VydGFpbiB0eXBlcyBvZiBjaGVja3Ms
-IGlmIGluY29uc2lzdGVuY2llcyBhcmUgZm91bmQgKGVnLiB1bnJlZmVyZW5jZWQgT1NUIG9iamVj
-dHMpIHRoZXkgbWF5IGJlIHB1dCBpbnRvIGEgbGlzdCBmb3Igc3VwcGxlbWVudGFyeSBjaGVja2lu
-ZyBhZnRlciB0aGUgc2NhbiBoYXMgY29tcGxldGVkLg0KDQpTaW5jZSB0aGUgc2NhbiBpcyBsaW5l
-YXIgYnkgdGhlIHVuZGVybHlpbmcgZmlsZXN5c3RlbSBpbm9kZSB0YWJsZSwgaXQgaXMgb2YgY291
-cnNlIHBvc3NpYmxlIHRvIG1pc3MgbmV3IGVudHJpZXMgYWRkZWQgYmVoaW5kIHRoZSBjdXJyZW50
-IGN1cnNvciwgb3Igc2VlIG5ldyBlbnRyaWVzIGFkZGVkIGluIGZyb250IG9mIHRoZSBjdXJzb3Iu
-ICBJbiBtb3N0IGNhc2VzIHRoZXNlIG9iamVjdHMgY2FuIGJlIGNoZWNrZWQgaW5kZXBlbmRlbnRs
-eSBhbmQgd2l0aG91dCBpc3N1ZSBzaW5jZSB0aGUgaW50ZXJzZWN0aW9uIG9mIHRoZSBzY2Fubmlu
-ZyBhbmQgY2hhbmdlcyBpcyB2ZXJ5IHJhcmUuDQoNClRvIGF2b2lkIGltcGFjdGluZyBwZXJmb3Jt
-YW5jZSwgdGhlIGNoZWNraW5nIGlzIGxhcmdlbHkgZG9uZSB3aXRob3V0IGxvY2tpbmcuIEhvd2V2
-ZXIsIGluIHRoZSByYXJlIGNhc2VzIHRoYXQgYW4gaW5jb25zaXN0ZW5jeSBpcyBmb3VuZCwgTEZT
-Q0sgd2lsbCBsb2NrIHRoZSBvYmplY3QocykgaW52b2x2ZWQgYW5kIHJlLWNoZWNrIHRoZSBjb25z
-aXN0ZW5jeSwgdG8gYXZvaWQgc3VjaCB0cmFuc2llbnQgZXJyb3JzLg0KDQpEdWUgdG8gdGhlIGR5
-bmFtaWMgbmF0dXJlIG9mIHRoZSBmaWxlc3lzdGVtLCBhbmQgdGhlIHNjYWxlIGF0IHdoaWNoIEx1
-c3RyZSBvcGVyYXRlcywgd2UgY2FuJ3Qga2VlcCB0aGUgc3lzdGVtIHN0YXRpYyBkdXJpbmcgYSBm
-dWxsIGNoZWNrLiBJbiBzb21lIGNhc2VzIHRyYW5zaWVudCBlcnJvcnMgb24gbW9kaWZpZWQgb2Jq
-ZWN0cyBtYXkgYmUgZGVmZXJyZWQgZm9yIGEgbGF0ZXIgc2Nhbi4NCg0KQWxsIG9iamVjdCB1cGRh
-dGVzIGFyZSBtYXJrZWQgd2l0aCBhIHRyYW5zYWN0aW9uIG51bWJlciB0aGF0IGlzIG1vbm90b25p
-Y2FsbHkgaW5jcmVhc2luZyAocGVyIHRhcmdldCksIHNvIGluIHNvbWUgY2FzZXMgTEZTQ0sgY2Fu
-IGlnbm9yZSBlcnJvcnMgdGhhdCBhcmUgZm91bmQgb24gb2JqZWN0cyBtb2RpZmllZCBzaW5jZSB0
-aGUgc3RhcnQgb2YgdGhlIHNjYW4sIGFuZCB0aGVpciBjb25zaXN0ZW5jeSBjb3VsZCBiZSByZS12
-ZXJpZmllZCBvbiBhIHN1YnNlcXVlbnQgTEZTQ0sgcnVuLg0KDQpDaGVlcnMsIEFuZHJlYXMNCg0K
-T24gTm92IDIzLCAyMDIyLCBhdCAwNjozOCwgU2Fpc2hhIEthbWF0IHZpYSBsdXN0cmUtZGV2ZWwg
-PGx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPiB3cm90ZToNCg0K77u/DQpIaSBhbGwsDQpJ
-IGFtIGEgUGguRCBzdHVkZW50IGF0IFVOQy1DaGFybG90dGUsIHdvcmtpbmcgb24gTHVzdHJlIEZp
-bGUgU3lzdGVtIENoZWNrZXIuDQoNCkkgaGFkIGEgcXVlc3Rpb24gcmVsYXRlZCB0byBob3cgb25s
-aW5lIExGU0NLIHdvcmtzLiBTcGVjaWZpY2FsbHksIGhvdyBkb2VzIExGU0NLIGRpZmZlcmVudGlh
-dGUgb2xkIG1ldGFkYXRhIGFuZCBuZXcgbWV0YWRhdGEgY3JlYXRlZCBkdXJpbmcgaXRzIGV4ZWN1
-dGlvbj8gV2lsbCB0aGUgbmV3IG1ldGFkYXRhIGJlIGNoZWNrZWQ/IGFuZCBpZiB5ZXMsIHdoZW4g
-d2lsbCB0aGV5IGJlIGNoZWNrZWQgYnkgTEZTQ0s/IENhbiB5b3UgcGxlYXNlIHBvaW50IG1lIHRv
-IHRoZSBzb3VyY2UgY29kZSB0byB1bmRlcnN0YW5kIG1vcmUgZGV0YWlscz8NCg0KVGhhbmtzIHZl
-cnkgbXVjaCENClNhaXNoYQ0KDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fXw0KbHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdA0KbHVzdHJlLWRldmVsQGxpc3Rz
-Lmx1c3RyZS5vcmcNCmh0dHA6Ly9saXN0cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUt
-ZGV2ZWwtbHVzdHJlLm9yZw0K
+Greetings,
 
---_000_217785FC1D574137A354A560F976F703whamcloudcom_
-Content-Type: text/html; charset="utf-8"
-Content-Transfer-Encoding: base64
+Recently we received new machines, which would join our existing cluster
+to be Lustre clients. However, due to its pretty new hardware specs
+(Intel 40G ethernet chip, Broadcom Megaraid RAID, ConnectX-5 Infiniband ....
+etc), we are force to install somewhat newer versions of system software:
 
-PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
-dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IGRpcj0iYXV0byI+DQpU
-aGUgTEZTQ0sgY2hlY2tpbmcgaXMgcnVuIGluIGEgbXVsdGktc3RhZ2UgZXhlY3V0aW9uLiBBdCB0
-aGUgbG93ZXN0IGxldmVsLCB0aGUgT0kgU2NydWIgc2NhbnMgdGhlIGxkaXNrZnMgb3IgWkZTIGlu
-b2RlcyBmcm9tIHRoZSBzdG9yYWdlIGFuZCBwZXJmb3JtcyBsb2NhbCBzYW5pdHkgY2hlY2tzIChl
-Zy4gRklEIGZyb20geGF0dHIgdnMuIE9JIEZJRC0mZ3Q7aW5vZGUgbWFwcGluZykgYW5kIHRoZW4g
-TEZTQ0sgY29uc3VtZXMgdGhlc2Ugb2JqZWN0cyAoc2VtaS1hc3luY2hyb25vdXNseSkNCiB0byBw
-ZXJmb3JtIGRpc3RyaWJ1dGVkIGNvbnNpc3RlbmN5IGNoZWNrcyAoZWcuIG5hbWVzcGFjZSBjaGVj
-a3MgZm9yIHJlbW90ZS9zdHJpcGVkIGRpcmVjdG9yaWVzLCBsaW5rIEVBIGNoZWNrcyBmb3IgY2hp
-bGQtJmd0O3BhcmVudCBkaXJlY3RvcnkgbG9va3VwLCBsYXlvdXQgY2hlY2tzIGZvciBNRFQgaW5v
-ZGUgdG8gT1NUIG9iamVjdCByZWZlcmVuY2VzLCBldGMpLiAmbmJzcDtGb3IgY2VydGFpbiB0eXBl
-cyBvZiBjaGVja3MsIGlmIGluY29uc2lzdGVuY2llcw0KIGFyZSBmb3VuZCAoZWcuIHVucmVmZXJl
-bmNlZCBPU1Qgb2JqZWN0cykgdGhleSBtYXkgYmUgcHV0IGludG8gYSBsaXN0IGZvciBzdXBwbGVt
-ZW50YXJ5IGNoZWNraW5nIGFmdGVyIHRoZSBzY2FuIGhhcyBjb21wbGV0ZWQuJm5ic3A7DQo8ZGl2
-Pjxicj4NCjwvZGl2Pg0KPGRpdj5TaW5jZSB0aGUgc2NhbiBpcyBsaW5lYXIgYnkgdGhlIHVuZGVy
-bHlpbmcgZmlsZXN5c3RlbSBpbm9kZSB0YWJsZSwgaXQgaXMgb2YgY291cnNlIHBvc3NpYmxlIHRv
-IG1pc3MgbmV3IGVudHJpZXMgYWRkZWQgYmVoaW5kIHRoZSBjdXJyZW50IGN1cnNvciwgb3Igc2Vl
-IG5ldyBlbnRyaWVzIGFkZGVkIGluIGZyb250IG9mIHRoZSBjdXJzb3IuICZuYnNwO0luIG1vc3Qg
-Y2FzZXMgdGhlc2Ugb2JqZWN0cyBjYW4gYmUgY2hlY2tlZCBpbmRlcGVuZGVudGx5DQogYW5kIHdp
-dGhvdXQgaXNzdWUgc2luY2UgdGhlIGludGVyc2VjdGlvbiBvZiB0aGUgc2Nhbm5pbmcgYW5kIGNo
-YW5nZXMgaXMgdmVyeSByYXJlLjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+VG8gYXZv
-aWQgaW1wYWN0aW5nIHBlcmZvcm1hbmNlLCB0aGUgY2hlY2tpbmcgaXMgbGFyZ2VseSBkb25lIHdp
-dGhvdXQgbG9ja2luZy4gSG93ZXZlciwgaW4gdGhlIHJhcmUgY2FzZXMgdGhhdCBhbiBpbmNvbnNp
-c3RlbmN5IGlzIGZvdW5kLCBMRlNDSyB3aWxsIGxvY2sgdGhlIG9iamVjdChzKSBpbnZvbHZlZCBh
-bmQgcmUtY2hlY2sgdGhlIGNvbnNpc3RlbmN5LCB0byBhdm9pZCBzdWNoIHRyYW5zaWVudCBlcnJv
-cnMuPC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj5EdWUgdG8gdGhlIGR5bmFtaWMgbmF0
-dXJlIG9mIHRoZSBmaWxlc3lzdGVtLCBhbmQgdGhlIHNjYWxlIGF0IHdoaWNoIEx1c3RyZSBvcGVy
-YXRlcywgd2UgY2FuJ3Qga2VlcCB0aGUgc3lzdGVtIHN0YXRpYyBkdXJpbmcgYSBmdWxsIGNoZWNr
-LiBJbiBzb21lIGNhc2VzIHRyYW5zaWVudCBlcnJvcnMgb24gbW9kaWZpZWQgb2JqZWN0cyBtYXkg
-YmUgZGVmZXJyZWQgZm9yIGEgbGF0ZXIgc2Nhbi4mbmJzcDs8L2Rpdj4NCjxkaXY+PGJyPg0KPC9k
-aXY+DQo8ZGl2PkFsbCBvYmplY3QgdXBkYXRlcyBhcmUgbWFya2VkIHdpdGggYSB0cmFuc2FjdGlv
-biBudW1iZXIgdGhhdCBpcyBtb25vdG9uaWNhbGx5IGluY3JlYXNpbmcgKHBlciB0YXJnZXQpLCBz
-byBpbiBzb21lIGNhc2VzIExGU0NLIGNhbiBpZ25vcmUgZXJyb3JzIHRoYXQgYXJlIGZvdW5kIG9u
-IG9iamVjdHMgbW9kaWZpZWQgc2luY2UgdGhlIHN0YXJ0IG9mIHRoZSBzY2FuLCBhbmQgdGhlaXIg
-Y29uc2lzdGVuY3kgY291bGQgYmUgcmUtdmVyaWZpZWQgb24NCiBhIHN1YnNlcXVlbnQgTEZTQ0sg
-cnVuLiZuYnNwOzwvZGl2Pg0KPGRpdj48YnI+DQo8ZGl2IGRpcj0ibHRyIj5DaGVlcnMsIEFuZHJl
-YXM8L2Rpdj4NCjxkaXYgZGlyPSJsdHIiPjxicj4NCjxibG9ja3F1b3RlIHR5cGU9ImNpdGUiPk9u
-IE5vdiAyMywgMjAyMiwgYXQgMDY6MzgsIFNhaXNoYSBLYW1hdCB2aWEgbHVzdHJlLWRldmVsICZs
-dDtsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZyZndDsgd3JvdGU6PGJyPg0KPGJyPg0KPC9i
-bG9ja3F1b3RlPg0KPC9kaXY+DQo8YmxvY2txdW90ZSB0eXBlPSJjaXRlIj4NCjxkaXYgZGlyPSJs
-dHIiPu+7vw0KPGRpdiBkaXI9Imx0ciI+DQo8dGFibGUgY2VsbHBhZGRpbmc9IjAiIGNsYXNzPSJn
-bWFpbC1hakMiIHN0eWxlPSJib3JkZXItc3BhY2luZzowcHg7bGluZS1oZWlnaHQ6MjBweDtmb250
-LWZhbWlseTomcXVvdDtHb29nbGUgU2FucyZxdW90OyxSb2JvdG8sUm9ib3RvRHJhZnQsSGVsdmV0
-aWNhLEFyaWFsLHNhbnMtc2VyaWY7Zm9udC1zaXplOjE0cHgiPg0KPHRib2R5Pg0KPHRyIGNsYXNz
-PSJnbWFpbC1hanYiPg0KPHRkIGNvbHNwYW49IjIiIHRhYmluZGV4PSIwIiBjbGFzcz0iZ21haWwt
-Z0wiIHN0eWxlPSJ2ZXJ0aWNhbC1hbGlnbjp0b3A7d2lkdGg6YXV0bztwYWRkaW5nOjJweCAwcHgi
-Pg0KPHNwYW4gY2xhc3M9ImdtYWlsLWdJIiBzdHlsZT0idmVydGljYWwtYWxpZ246dG9wIj5IaSBh
-bGwsPGJyPg0KSSBhbSBhIFBoLkQgc3R1ZGVudCBhdCBVTkMtQ2hhcmxvdHRlLCB3b3JraW5nIG9u
-IEx1c3RyZSBGaWxlIFN5c3RlbSBDaGVja2VyLjxicj4NCjxicj4NCkkgaGFkIGEgcXVlc3Rpb24g
-cmVsYXRlZCB0byBob3cgb25saW5lIExGU0NLIHdvcmtzLiBTcGVjaWZpY2FsbHksIGhvdyBkb2Vz
-IExGU0NLIGRpZmZlcmVudGlhdGUgb2xkIG1ldGFkYXRhIGFuZCBuZXcgbWV0YWRhdGEgY3JlYXRl
-ZCBkdXJpbmcmbmJzcDtpdHMmbmJzcDtleGVjdXRpb24/IFdpbGwgdGhlIG5ldyBtZXRhZGF0YSBi
-ZSBjaGVja2VkPyBhbmQgaWYgeWVzLCB3aGVuIHdpbGwgdGhleSBiZSBjaGVja2VkIGJ5IExGU0NL
-PyBDYW4geW91IHBsZWFzZSBwb2ludA0KIG1lJm5ic3A7dG8gdGhlIHNvdXJjZSBjb2RlIHRvIHVu
-ZGVyc3RhbmQgbW9yZSBkZXRhaWxzPzxicj4NCjxicj4NClRoYW5rcyB2ZXJ5IG11Y2ghPGJyPg0K
-PHNwYW4gYXJpYS1sYWJlbD0iIiBjbGFzcz0iZ21haWwtYy1tcmtkd25fX2JyIiBzdHlsZT0iYm94
-LXNpemluZzppbmhlcml0O2Rpc3BsYXk6YmxvY2s7aGVpZ2h0OjhweDtmb250LWZhbWlseTpTbGFj
-ay1MYXRvLFNsYWNrLUZyYWN0aW9ucyxhcHBsZUxvZ28sc2Fucy1zZXJpZjtmb250LXNpemU6MTVw
-eDtmb250LXZhcmlhbnQtbGlnYXR1cmVzOmNvbW1vbi1saWdhdHVyZXMiPjwvc3Bhbj5TYWlzaGE8
-YnI+DQo8YnI+DQo8L3NwYW4+PC90ZD4NCjwvdHI+DQo8L3Rib2R5Pg0KPC90YWJsZT4NCjwvZGl2
-Pg0KPHNwYW4+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX188
-L3NwYW4+PGJyPg0KPHNwYW4+bHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdDwvc3Bhbj48YnI+DQo8
-c3Bhbj5sdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZzwvc3Bhbj48YnI+DQo8c3Bhbj5odHRw
-Oi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmc8
-L3NwYW4+PGJyPg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8L2Rpdj4NCjwvYm9keT4NCjwvaHRt
-bD4NCg==
+- Linux vallina kernel 5.10.153
+  https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.153.tar.xz
 
---_000_217785FC1D574137A354A560F976F703whamcloudcom_--
+- MLNX_OFED_SRC-5.6-2.0.9.0
+  https://www.mellanox.com/downloads/ofed/MLNX_OFED-5.6-2.0.9.0/MLNX_OFED_SRC-debian-5.6-2.0.9.0.tgz
 
---===============2499426323955620875==
+- Debian/GNU Linux 10.13.
+
+The choice of Linux vallina kernel 5.10.153 is necessary to support the
+ethernet and RAID chips. The choice of MLNX_OFED_SRC-5.6-2.0.9.0 is to
+be successfully built together with Linux vallina kernel 5.10.153.
+
+However, we faced a problem of building Lustre-2.15.1. Without
+MLNX_OFED_SRC-5.6-2.0.9.0, Lustre-2.15.1 can be successfully built. But
+adding MLNX_OFED_SRC-5.6-2.0.9.0 there are errors.
+
+Here are our procedures:
+
+1. We build vanilla Linux kernel 5.10.153, with Linux kernel options
+   shown in the attachment (config-5.10.153).
+
+2. We compiled and installed the whole MLNX_OFED_SRC-5.6-2.0.9.0 packages
+   using the following command:
+
+        ./install.pl --hpc
+
+   After that, we confirmed that our Infiniband network was active.
+
+3. We manually extract:
+
+   MLNX_OFED_SRC-5.6-2.0.9.0/SOURCES/mlnx-ofed-kernel_5.6.orig.tar.gz
+
+   and configured it, compiled it, in order to provide the configured
+   source for Lustre-2.15.1 for building. The configure command is:
+
+   ./configure --kernel-version=5.10.153 \
+               --kernel-sources=/usr/src/linux-5.10.153 \
+               --with-core-mod --with-ipoib-mod --with-ipoib-cm \
+               --with-user_mad-mod --with-srp-mod --with-rxe-mod \
+               --with-user_access-mod --with-addr_trans-mod \
+               --with-mlx5-mod --with-mlx5_core-mod \
+               --with-mlx5-core-and-ib-and-en-mod \
+               --with-mlx5_inf-mod --with-madeye-mod
+   make
+
+   The whole process runs successfully.
+
+4. Finally we tried to compile Lustre-2.15.1. Our command is:
+
+   ./configure --prefix=/opt/lustre --with-linux=/usr/src/linux-5.10.153 \
+      --with-o2ib=/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel_5.6 \
+      --disable-server --enable-mpitests=no
+
+   However, the configure command failed with:
+   (please see the attached config.log for details)
+
+   configure:19909: error: can't compile with OpenIB gen2 headers under /usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5.6
+
+
+We think that currently Lustre does not support MLNX_OFED to such a new
+version (5.6-2.0.9.0). Unfortunately, for our new machines this is needed.
+So we would like to make a request to support MLNX_OFED at least up to
+version 5.6-2.0.9.0, for future releases of Lustre. We understand that
+this is not a trivial work. We would be highly appreciated if one day it
+could come true.
+
+
+Thank you very much.
+
+T.H.Hsieh
+
+--quvdcnnkr66kll7y
+Content-Type: text/plain; charset=big5
+Content-Disposition: attachment; filename="config-5.10.153"
+
+#
+# Automatically generated file; DO NOT EDIT.
+# Linux/x86 5.10.153 Kernel Configuration
+#
+CONFIG_CC_VERSION_TEXT="gcc (Debian 8.3.0-6) 8.3.0"
+CONFIG_CC_IS_GCC=y
+CONFIG_GCC_VERSION=80300
+CONFIG_LD_VERSION=231010000
+CONFIG_CLANG_VERSION=0
+CONFIG_LLD_VERSION=0
+CONFIG_CC_CAN_LINK=y
+CONFIG_CC_CAN_LINK_STATIC=y
+CONFIG_CC_HAS_ASM_GOTO=y
+CONFIG_CC_HAS_ASM_INLINE=y
+CONFIG_IRQ_WORK=y
+CONFIG_BUILDTIME_TABLE_SORT=y
+CONFIG_THREAD_INFO_IN_TASK=y
+
+#
+# General setup
+#
+CONFIG_INIT_ENV_ARG_LIMIT=32
+# CONFIG_COMPILE_TEST is not set
+CONFIG_LOCALVERSION=""
+CONFIG_LOCALVERSION_AUTO=y
+CONFIG_BUILD_SALT=""
+CONFIG_HAVE_KERNEL_GZIP=y
+CONFIG_HAVE_KERNEL_BZIP2=y
+CONFIG_HAVE_KERNEL_LZMA=y
+CONFIG_HAVE_KERNEL_XZ=y
+CONFIG_HAVE_KERNEL_LZO=y
+CONFIG_HAVE_KERNEL_LZ4=y
+CONFIG_HAVE_KERNEL_ZSTD=y
+CONFIG_KERNEL_GZIP=y
+# CONFIG_KERNEL_BZIP2 is not set
+# CONFIG_KERNEL_LZMA is not set
+# CONFIG_KERNEL_XZ is not set
+# CONFIG_KERNEL_LZO is not set
+# CONFIG_KERNEL_LZ4 is not set
+# CONFIG_KERNEL_ZSTD is not set
+CONFIG_DEFAULT_INIT=""
+CONFIG_DEFAULT_HOSTNAME="(none)"
+CONFIG_SWAP=y
+CONFIG_SYSVIPC=y
+CONFIG_SYSVIPC_SYSCTL=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_POSIX_MQUEUE_SYSCTL=y
+# CONFIG_WATCH_QUEUE is not set
+CONFIG_CROSS_MEMORY_ATTACH=y
+CONFIG_USELIB=y
+CONFIG_AUDIT=y
+CONFIG_HAVE_ARCH_AUDITSYSCALL=y
+CONFIG_AUDITSYSCALL=y
+
+#
+# IRQ subsystem
+#
+CONFIG_GENERIC_IRQ_PROBE=y
+CONFIG_GENERIC_IRQ_SHOW=y
+CONFIG_GENERIC_IRQ_EFFECTIVE_AFF_MASK=y
+CONFIG_GENERIC_PENDING_IRQ=y
+CONFIG_GENERIC_IRQ_MIGRATION=y
+CONFIG_GENERIC_IRQ_INJECTION=y
+CONFIG_HARDIRQS_SW_RESEND=y
+CONFIG_IRQ_DOMAIN=y
+CONFIG_IRQ_DOMAIN_HIERARCHY=y
+CONFIG_GENERIC_MSI_IRQ=y
+CONFIG_GENERIC_MSI_IRQ_DOMAIN=y
+CONFIG_GENERIC_IRQ_MATRIX_ALLOCATOR=y
+CONFIG_GENERIC_IRQ_RESERVATION_MODE=y
+CONFIG_IRQ_FORCED_THREADING=y
+CONFIG_SPARSE_IRQ=y
+# CONFIG_GENERIC_IRQ_DEBUGFS is not set
+# end of IRQ subsystem
+
+CONFIG_CLOCKSOURCE_WATCHDOG=y
+CONFIG_ARCH_CLOCKSOURCE_INIT=y
+CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE=y
+CONFIG_GENERIC_TIME_VSYSCALL=y
+CONFIG_GENERIC_CLOCKEVENTS=y
+CONFIG_GENERIC_CLOCKEVENTS_BROADCAST=y
+CONFIG_GENERIC_CLOCKEVENTS_MIN_ADJUST=y
+CONFIG_GENERIC_CMOS_UPDATE=y
+CONFIG_HAVE_POSIX_CPU_TIMERS_TASK_WORK=y
+CONFIG_POSIX_CPU_TIMERS_TASK_WORK=y
+
+#
+# Timers subsystem
+#
+CONFIG_TICK_ONESHOT=y
+CONFIG_NO_HZ_COMMON=y
+# CONFIG_HZ_PERIODIC is not set
+CONFIG_NO_HZ_IDLE=y
+# CONFIG_NO_HZ_FULL is not set
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+# end of Timers subsystem
+
+CONFIG_PREEMPT_NONE=y
+# CONFIG_PREEMPT_VOLUNTARY is not set
+# CONFIG_PREEMPT is not set
+
+#
+# CPU/Task time and stats accounting
+#
+CONFIG_TICK_CPU_ACCOUNTING=y
+# CONFIG_VIRT_CPU_ACCOUNTING_GEN is not set
+# CONFIG_IRQ_TIME_ACCOUNTING is not set
+CONFIG_BSD_PROCESS_ACCT=y
+CONFIG_BSD_PROCESS_ACCT_V3=y
+CONFIG_TASKSTATS=y
+CONFIG_TASK_DELAY_ACCT=y
+# CONFIG_TASK_XACCT is not set
+# CONFIG_PSI is not set
+# end of CPU/Task time and stats accounting
+
+CONFIG_CPU_ISOLATION=y
+
+#
+# RCU Subsystem
+#
+CONFIG_TREE_RCU=y
+# CONFIG_RCU_EXPERT is not set
+CONFIG_SRCU=y
+CONFIG_TREE_SRCU=y
+CONFIG_TASKS_RCU_GENERIC=y
+CONFIG_TASKS_TRACE_RCU=y
+CONFIG_RCU_STALL_COMMON=y
+CONFIG_RCU_NEED_SEGCBLIST=y
+# end of RCU Subsystem
+
+CONFIG_BUILD_BIN2C=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+# CONFIG_IKHEADERS is not set
+CONFIG_LOG_BUF_SHIFT=15
+CONFIG_LOG_CPU_MAX_BUF_SHIFT=12
+CONFIG_PRINTK_SAFE_LOG_BUF_SHIFT=13
+CONFIG_HAVE_UNSTABLE_SCHED_CLOCK=y
+
+#
+# Scheduler features
+#
+# CONFIG_UCLAMP_TASK is not set
+# end of Scheduler features
+
+CONFIG_ARCH_SUPPORTS_NUMA_BALANCING=y
+CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH=y
+CONFIG_CC_HAS_INT128=y
+CONFIG_ARCH_SUPPORTS_INT128=y
+CONFIG_NUMA_BALANCING=y
+CONFIG_NUMA_BALANCING_DEFAULT_ENABLED=y
+CONFIG_CGROUPS=y
+# CONFIG_MEMCG is not set
+CONFIG_BLK_CGROUP=y
+CONFIG_CGROUP_SCHED=y
+CONFIG_FAIR_GROUP_SCHED=y
+# CONFIG_CFS_BANDWIDTH is not set
+# CONFIG_RT_GROUP_SCHED is not set
+CONFIG_CGROUP_PIDS=y
+CONFIG_CGROUP_RDMA=y
+CONFIG_CGROUP_FREEZER=y
+# CONFIG_CGROUP_HUGETLB is not set
+CONFIG_CPUSETS=y
+CONFIG_PROC_PID_CPUSET=y
+CONFIG_CGROUP_DEVICE=y
+CONFIG_CGROUP_CPUACCT=y
+CONFIG_CGROUP_PERF=y
+# CONFIG_CGROUP_BPF is not set
+CONFIG_SOCK_CGROUP_DATA=y
+CONFIG_NAMESPACES=y
+CONFIG_UTS_NS=y
+CONFIG_TIME_NS=y
+CONFIG_IPC_NS=y
+CONFIG_USER_NS=y
+CONFIG_PID_NS=y
+CONFIG_NET_NS=y
+# CONFIG_CHECKPOINT_RESTORE is not set
+# CONFIG_SCHED_AUTOGROUP is not set
+# CONFIG_SYSFS_DEPRECATED is not set
+CONFIG_RELAY=y
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+CONFIG_RD_GZIP=y
+CONFIG_RD_BZIP2=y
+CONFIG_RD_LZMA=y
+CONFIG_RD_XZ=y
+CONFIG_RD_LZO=y
+CONFIG_RD_LZ4=y
+CONFIG_RD_ZSTD=y
+# CONFIG_BOOT_CONFIG is not set
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+CONFIG_LD_ORPHAN_WARN=y
+CONFIG_SYSCTL=y
+CONFIG_HAVE_UID16=y
+CONFIG_SYSCTL_EXCEPTION_TRACE=y
+CONFIG_HAVE_PCSPKR_PLATFORM=y
+CONFIG_BPF=y
+# CONFIG_EXPERT is not set
+CONFIG_UID16=y
+CONFIG_MULTIUSER=y
+CONFIG_SGETMASK_SYSCALL=y
+CONFIG_SYSFS_SYSCALL=y
+CONFIG_FHANDLE=y
+CONFIG_POSIX_TIMERS=y
+CONFIG_PRINTK=y
+CONFIG_PRINTK_NMI=y
+CONFIG_BUG=y
+CONFIG_ELF_CORE=y
+CONFIG_PCSPKR_PLATFORM=y
+CONFIG_BASE_FULL=y
+CONFIG_FUTEX=y
+CONFIG_FUTEX_PI=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y
+CONFIG_SHMEM=y
+CONFIG_AIO=y
+CONFIG_IO_URING=y
+CONFIG_ADVISE_SYSCALLS=y
+CONFIG_HAVE_ARCH_USERFAULTFD_WP=y
+CONFIG_MEMBARRIER=y
+CONFIG_KALLSYMS=y
+CONFIG_KALLSYMS_ABSOLUTE_PERCPU=y
+CONFIG_KALLSYMS_BASE_RELATIVE=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_ARCH_WANT_DEFAULT_BPF_JIT=y
+CONFIG_BPF_UNPRIV_DEFAULT_OFF=y
+CONFIG_USERMODE_DRIVER=y
+# CONFIG_BPF_PRELOAD is not set
+CONFIG_USERFAULTFD=y
+CONFIG_ARCH_HAS_MEMBARRIER_SYNC_CORE=y
+CONFIG_RSEQ=y
+# CONFIG_EMBEDDED is not set
+CONFIG_HAVE_PERF_EVENTS=y
+
+#
+# Kernel Performance Events And Counters
+#
+CONFIG_PERF_EVENTS=y
+# end of Kernel Performance Events And Counters
+
+CONFIG_VM_EVENT_COUNTERS=y
+CONFIG_COMPAT_BRK=y
+CONFIG_SLAB=y
+# CONFIG_SLUB is not set
+CONFIG_SLAB_MERGE_DEFAULT=y
+# CONFIG_SLAB_FREELIST_RANDOM is not set
+# CONFIG_SLAB_FREELIST_HARDENED is not set
+# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set
+# CONFIG_PROFILING is not set
+# end of General setup
+
+CONFIG_64BIT=y
+CONFIG_X86_64=y
+CONFIG_X86=y
+CONFIG_INSTRUCTION_DECODER=y
+CONFIG_OUTPUT_FORMAT="elf64-x86-64"
+CONFIG_LOCKDEP_SUPPORT=y
+CONFIG_STACKTRACE_SUPPORT=y
+CONFIG_MMU=y
+CONFIG_ARCH_MMAP_RND_BITS_MIN=28
+CONFIG_ARCH_MMAP_RND_BITS_MAX=32
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MIN=8
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MAX=16
+CONFIG_GENERIC_ISA_DMA=y
+CONFIG_GENERIC_BUG=y
+CONFIG_GENERIC_BUG_RELATIVE_POINTERS=y
+CONFIG_ARCH_MAY_HAVE_PC_FDC=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
+CONFIG_ARCH_HAS_CPU_RELAX=y
+CONFIG_ARCH_HAS_CACHE_LINE_SIZE=y
+CONFIG_ARCH_HAS_FILTER_PGPROT=y
+CONFIG_HAVE_SETUP_PER_CPU_AREA=y
+CONFIG_NEED_PER_CPU_EMBED_FIRST_CHUNK=y
+CONFIG_NEED_PER_CPU_PAGE_FIRST_CHUNK=y
+CONFIG_ARCH_HIBERNATION_POSSIBLE=y
+CONFIG_ARCH_SUSPEND_POSSIBLE=y
+CONFIG_ARCH_WANT_GENERAL_HUGETLB=y
+CONFIG_ZONE_DMA32=y
+CONFIG_AUDIT_ARCH=y
+CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC=y
+CONFIG_HAVE_INTEL_TXT=y
+CONFIG_X86_64_SMP=y
+CONFIG_ARCH_SUPPORTS_UPROBES=y
+CONFIG_FIX_EARLYCON_MEM=y
+CONFIG_PGTABLE_LEVELS=4
+CONFIG_CC_HAS_SANE_STACKPROTECTOR=y
+
+#
+# Processor type and features
+#
+CONFIG_ZONE_DMA=y
+CONFIG_SMP=y
+CONFIG_X86_FEATURE_NAMES=y
+CONFIG_X86_X2APIC=y
+# CONFIG_X86_MPPARSE is not set
+# CONFIG_GOLDFISH is not set
+# CONFIG_X86_CPU_RESCTRL is not set
+# CONFIG_X86_EXTENDED_PLATFORM is not set
+# CONFIG_X86_INTEL_LPSS is not set
+CONFIG_X86_AMD_PLATFORM_DEVICE=y
+# CONFIG_IOSF_MBI is not set
+CONFIG_X86_SUPPORTS_MEMORY_FAILURE=y
+CONFIG_SCHED_OMIT_FRAME_POINTER=y
+CONFIG_HYPERVISOR_GUEST=y
+# CONFIG_PARAVIRT is not set
+# CONFIG_ARCH_CPUIDLE_HALTPOLL is not set
+# CONFIG_PVH is not set
+# CONFIG_JAILHOUSE_GUEST is not set
+# CONFIG_ACRN_GUEST is not set
+# CONFIG_MK8 is not set
+# CONFIG_MPSC is not set
+# CONFIG_MCORE2 is not set
+# CONFIG_MATOM is not set
+CONFIG_GENERIC_CPU=y
+CONFIG_X86_INTERNODE_CACHE_SHIFT=6
+CONFIG_X86_L1_CACHE_SHIFT=6
+CONFIG_X86_TSC=y
+CONFIG_X86_CMPXCHG64=y
+CONFIG_X86_CMOV=y
+CONFIG_X86_MINIMUM_CPU_FAMILY=64
+CONFIG_X86_DEBUGCTLMSR=y
+CONFIG_IA32_FEAT_CTL=y
+CONFIG_X86_VMX_FEATURE_NAMES=y
+CONFIG_CPU_SUP_INTEL=y
+CONFIG_CPU_SUP_AMD=y
+CONFIG_CPU_SUP_HYGON=y
+CONFIG_CPU_SUP_CENTAUR=y
+CONFIG_CPU_SUP_ZHAOXIN=y
+CONFIG_HPET_TIMER=y
+CONFIG_HPET_EMULATE_RTC=y
+CONFIG_DMI=y
+# CONFIG_GART_IOMMU is not set
+CONFIG_NR_CPUS_RANGE_BEGIN=2
+CONFIG_NR_CPUS_RANGE_END=512
+CONFIG_NR_CPUS_DEFAULT=64
+CONFIG_NR_CPUS=64
+CONFIG_SCHED_SMT=y
+CONFIG_SCHED_MC=y
+CONFIG_SCHED_MC_PRIO=y
+CONFIG_X86_LOCAL_APIC=y
+CONFIG_X86_IO_APIC=y
+# CONFIG_X86_REROUTE_FOR_BROKEN_BOOT_IRQS is not set
+CONFIG_X86_MCE=y
+# CONFIG_X86_MCELOG_LEGACY is not set
+CONFIG_X86_MCE_INTEL=y
+CONFIG_X86_MCE_AMD=y
+CONFIG_X86_MCE_THRESHOLD=y
+# CONFIG_X86_MCE_INJECT is not set
+CONFIG_X86_THERMAL_VECTOR=y
+
+#
+# Performance monitoring
+#
+CONFIG_PERF_EVENTS_INTEL_UNCORE=y
+CONFIG_PERF_EVENTS_INTEL_RAPL=y
+CONFIG_PERF_EVENTS_INTEL_CSTATE=y
+# CONFIG_PERF_EVENTS_AMD_POWER is not set
+# end of Performance monitoring
+
+CONFIG_X86_16BIT=y
+CONFIG_X86_ESPFIX64=y
+CONFIG_X86_VSYSCALL_EMULATION=y
+CONFIG_X86_IOPL_IOPERM=y
+# CONFIG_I8K is not set
+CONFIG_MICROCODE=y
+CONFIG_MICROCODE_INTEL=y
+CONFIG_MICROCODE_AMD=y
+# CONFIG_MICROCODE_OLD_INTERFACE is not set
+CONFIG_X86_MSR=m
+CONFIG_X86_CPUID=m
+# CONFIG_X86_5LEVEL is not set
+CONFIG_X86_DIRECT_GBPAGES=y
+# CONFIG_X86_CPA_STATISTICS is not set
+# CONFIG_AMD_MEM_ENCRYPT is not set
+CONFIG_NUMA=y
+# CONFIG_AMD_NUMA is not set
+CONFIG_X86_64_ACPI_NUMA=y
+# CONFIG_NUMA_EMU is not set
+CONFIG_NODES_SHIFT=9
+CONFIG_ARCH_SPARSEMEM_ENABLE=y
+CONFIG_ARCH_SPARSEMEM_DEFAULT=y
+CONFIG_ARCH_SELECT_MEMORY_MODEL=y
+CONFIG_ARCH_PROC_KCORE_TEXT=y
+CONFIG_ILLEGAL_POINTER_VALUE=0xdead000000000000
+CONFIG_X86_PMEM_LEGACY_DEVICE=y
+CONFIG_X86_PMEM_LEGACY=m
+# CONFIG_X86_CHECK_BIOS_CORRUPTION is not set
+CONFIG_X86_RESERVE_LOW=64
+CONFIG_MTRR=y
+CONFIG_MTRR_SANITIZER=y
+CONFIG_MTRR_SANITIZER_ENABLE_DEFAULT=0
+CONFIG_MTRR_SANITIZER_SPARE_REG_NR_DEFAULT=1
+CONFIG_X86_PAT=y
+CONFIG_ARCH_USES_PG_UNCACHED=y
+CONFIG_ARCH_RANDOM=y
+CONFIG_X86_SMAP=y
+CONFIG_X86_UMIP=y
+CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS=y
+CONFIG_X86_INTEL_TSX_MODE_OFF=y
+# CONFIG_X86_INTEL_TSX_MODE_ON is not set
+# CONFIG_X86_INTEL_TSX_MODE_AUTO is not set
+CONFIG_EFI=y
+# CONFIG_EFI_STUB is not set
+# CONFIG_HZ_100 is not set
+CONFIG_HZ_250=y
+# CONFIG_HZ_300 is not set
+# CONFIG_HZ_1000 is not set
+CONFIG_HZ=250
+CONFIG_SCHED_HRTICK=y
+CONFIG_KEXEC=y
+CONFIG_KEXEC_FILE=y
+CONFIG_ARCH_HAS_KEXEC_PURGATORY=y
+# CONFIG_KEXEC_SIG is not set
+# CONFIG_CRASH_DUMP is not set
+CONFIG_PHYSICAL_START=0x1000000
+# CONFIG_RELOCATABLE is not set
+CONFIG_PHYSICAL_ALIGN=0x1000000
+CONFIG_HOTPLUG_CPU=y
+# CONFIG_BOOTPARAM_HOTPLUG_CPU0 is not set
+# CONFIG_DEBUG_HOTPLUG_CPU0 is not set
+CONFIG_COMPAT_VDSO=y
+# CONFIG_LEGACY_VSYSCALL_EMULATE is not set
+CONFIG_LEGACY_VSYSCALL_XONLY=y
+# CONFIG_LEGACY_VSYSCALL_NONE is not set
+# CONFIG_CMDLINE_BOOL is not set
+CONFIG_MODIFY_LDT_SYSCALL=y
+CONFIG_HAVE_LIVEPATCH=y
+# end of Processor type and features
+
+CONFIG_CC_HAS_RETURN_THUNK=y
+CONFIG_SPECULATION_MITIGATIONS=y
+CONFIG_PAGE_TABLE_ISOLATION=y
+CONFIG_RETPOLINE=y
+CONFIG_RETHUNK=y
+CONFIG_CPU_UNRET_ENTRY=y
+CONFIG_CPU_IBPB_ENTRY=y
+CONFIG_CPU_IBRS_ENTRY=y
+CONFIG_ARCH_HAS_ADD_PAGES=y
+CONFIG_ARCH_ENABLE_MEMORY_HOTPLUG=y
+CONFIG_USE_PERCPU_NUMA_NODE_ID=y
+CONFIG_ARCH_ENABLE_SPLIT_PMD_PTLOCK=y
+CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION=y
+CONFIG_ARCH_ENABLE_THP_MIGRATION=y
+
+#
+# Power management and ACPI options
+#
+CONFIG_SUSPEND=y
+CONFIG_SUSPEND_FREEZER=y
+# CONFIG_HIBERNATION is not set
+CONFIG_PM_SLEEP=y
+CONFIG_PM_SLEEP_SMP=y
+# CONFIG_PM_AUTOSLEEP is not set
+# CONFIG_PM_WAKELOCKS is not set
+CONFIG_PM=y
+# CONFIG_PM_DEBUG is not set
+CONFIG_PM_CLK=y
+# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
+# CONFIG_ENERGY_MODEL is not set
+CONFIG_ARCH_SUPPORTS_ACPI=y
+CONFIG_ACPI=y
+CONFIG_ACPI_LEGACY_TABLES_LOOKUP=y
+CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC=y
+CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT=y
+# CONFIG_ACPI_DEBUGGER is not set
+CONFIG_ACPI_SPCR_TABLE=y
+CONFIG_ACPI_LPIT=y
+CONFIG_ACPI_SLEEP=y
+CONFIG_ACPI_REV_OVERRIDE_POSSIBLE=y
+# CONFIG_ACPI_EC_DEBUGFS is not set
+CONFIG_ACPI_AC=m
+CONFIG_ACPI_BATTERY=m
+CONFIG_ACPI_BUTTON=m
+# CONFIG_ACPI_TINY_POWER_BUTTON is not set
+CONFIG_ACPI_FAN=m
+# CONFIG_ACPI_TAD is not set
+CONFIG_ACPI_DOCK=y
+CONFIG_ACPI_CPU_FREQ_PSS=y
+CONFIG_ACPI_PROCESSOR_CSTATE=y
+CONFIG_ACPI_PROCESSOR_IDLE=y
+CONFIG_ACPI_CPPC_LIB=y
+CONFIG_ACPI_PROCESSOR=y
+CONFIG_ACPI_IPMI=m
+CONFIG_ACPI_HOTPLUG_CPU=y
+# CONFIG_ACPI_PROCESSOR_AGGREGATOR is not set
+CONFIG_ACPI_THERMAL=m
+CONFIG_ARCH_HAS_ACPI_TABLE_UPGRADE=y
+CONFIG_ACPI_TABLE_UPGRADE=y
+# CONFIG_ACPI_DEBUG is not set
+# CONFIG_ACPI_PCI_SLOT is not set
+CONFIG_ACPI_CONTAINER=y
+CONFIG_ACPI_HOTPLUG_IOAPIC=y
+# CONFIG_ACPI_SBS is not set
+# CONFIG_ACPI_HED is not set
+# CONFIG_ACPI_CUSTOM_METHOD is not set
+# CONFIG_ACPI_BGRT is not set
+# CONFIG_ACPI_NFIT is not set
+CONFIG_ACPI_NUMA=y
+# CONFIG_ACPI_HMAT is not set
+CONFIG_HAVE_ACPI_APEI=y
+CONFIG_HAVE_ACPI_APEI_NMI=y
+# CONFIG_ACPI_APEI is not set
+# CONFIG_ACPI_DPTF is not set
+# CONFIG_ACPI_CONFIGFS is not set
+# CONFIG_PMIC_OPREGION is not set
+CONFIG_X86_PM_TIMER=y
+# CONFIG_SFI is not set
+
+#
+# CPU Frequency scaling
+#
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_GOV_ATTR_SET=y
+# CONFIG_CPU_FREQ_STAT is not set
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
+# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
+# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
+# CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL is not set
+CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
+# CONFIG_CPU_FREQ_GOV_USERSPACE is not set
+# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
+# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+
+#
+# CPU frequency scaling drivers
+#
+CONFIG_X86_INTEL_PSTATE=y
+# CONFIG_X86_PCC_CPUFREQ is not set
+# CONFIG_X86_ACPI_CPUFREQ is not set
+# CONFIG_X86_SPEEDSTEP_CENTRINO is not set
+# CONFIG_X86_P4_CLOCKMOD is not set
+
+#
+# shared options
+#
+# end of CPU Frequency scaling
+
+#
+# CPU Idle
+#
+CONFIG_CPU_IDLE=y
+CONFIG_CPU_IDLE_GOV_LADDER=y
+CONFIG_CPU_IDLE_GOV_MENU=y
+# CONFIG_CPU_IDLE_GOV_TEO is not set
+# end of CPU Idle
+
+# CONFIG_INTEL_IDLE is not set
+# end of Power management and ACPI options
+
+#
+# Bus options (PCI etc.)
+#
+CONFIG_PCI_DIRECT=y
+CONFIG_PCI_MMCONFIG=y
+CONFIG_MMCONF_FAM10H=y
+CONFIG_ISA_DMA_API=y
+CONFIG_AMD_NB=y
+CONFIG_X86_SYSFB=y
+# end of Bus options (PCI etc.)
+
+#
+# Binary Emulations
+#
+CONFIG_IA32_EMULATION=y
+CONFIG_X86_X32=y
+CONFIG_COMPAT_32=y
+CONFIG_COMPAT=y
+CONFIG_COMPAT_FOR_U64_ALIGNMENT=y
+CONFIG_SYSVIPC_COMPAT=y
+# end of Binary Emulations
+
+#
+# Firmware Drivers
+#
+CONFIG_EDD=m
+# CONFIG_EDD_OFF is not set
+CONFIG_FIRMWARE_MEMMAP=y
+CONFIG_DMIID=y
+CONFIG_DMI_SYSFS=m
+CONFIG_DMI_SCAN_MACHINE_NON_EFI_FALLBACK=y
+CONFIG_ISCSI_IBFT_FIND=y
+CONFIG_ISCSI_IBFT=m
+CONFIG_FW_CFG_SYSFS=m
+CONFIG_FW_CFG_SYSFS_CMDLINE=y
+CONFIG_GOOGLE_FIRMWARE=y
+CONFIG_GOOGLE_SMI=m
+CONFIG_GOOGLE_COREBOOT_TABLE=m
+CONFIG_GOOGLE_MEMCONSOLE=m
+CONFIG_GOOGLE_MEMCONSOLE_X86_LEGACY=m
+CONFIG_GOOGLE_MEMCONSOLE_COREBOOT=m
+CONFIG_GOOGLE_VPD=m
+
+#
+# EFI (Extensible Firmware Interface) Support
+#
+CONFIG_EFI_VARS=m
+CONFIG_EFI_ESRT=y
+CONFIG_EFI_RUNTIME_MAP=y
+# CONFIG_EFI_FAKE_MEMMAP is not set
+CONFIG_EFI_RUNTIME_WRAPPERS=y
+CONFIG_EFI_BOOTLOADER_CONTROL=m
+CONFIG_EFI_CAPSULE_LOADER=m
+CONFIG_EFI_TEST=m
+CONFIG_EFI_RCI2_TABLE=y
+# CONFIG_EFI_DISABLE_PCI_DMA is not set
+# end of EFI (Extensible Firmware Interface) Support
+
+CONFIG_EFI_CUSTOM_SSDT_OVERLAYS=y
+
+#
+# Tegra firmware driver
+#
+# end of Tegra firmware driver
+# end of Firmware Drivers
+
+CONFIG_HAVE_KVM=y
+CONFIG_HAVE_KVM_IRQCHIP=y
+CONFIG_HAVE_KVM_IRQFD=y
+CONFIG_HAVE_KVM_IRQ_ROUTING=y
+CONFIG_HAVE_KVM_EVENTFD=y
+CONFIG_KVM_MMIO=y
+CONFIG_KVM_ASYNC_PF=y
+CONFIG_HAVE_KVM_MSI=y
+CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT=y
+CONFIG_KVM_VFIO=y
+CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT=y
+CONFIG_KVM_COMPAT=y
+CONFIG_HAVE_KVM_IRQ_BYPASS=y
+CONFIG_HAVE_KVM_NO_POLL=y
+CONFIG_KVM_XFER_TO_GUEST_WORK=y
+CONFIG_VIRTUALIZATION=y
+CONFIG_KVM=m
+CONFIG_KVM_INTEL=m
+CONFIG_KVM_AMD=m
+# CONFIG_KVM_AMD_SEV is not set
+CONFIG_AS_AVX512=y
+CONFIG_AS_SHA1_NI=y
+CONFIG_AS_SHA256_NI=y
+CONFIG_AS_TPAUSE=y
+
+#
+# General architecture-dependent options
+#
+CONFIG_CRASH_CORE=y
+CONFIG_KEXEC_CORE=y
+CONFIG_HOTPLUG_SMT=y
+CONFIG_GENERIC_ENTRY=y
+CONFIG_HAVE_OPROFILE=y
+CONFIG_OPROFILE_NMI_TIMER=y
+# CONFIG_KPROBES is not set
+# CONFIG_JUMP_LABEL is not set
+# CONFIG_STATIC_CALL_SELFTEST is not set
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y
+CONFIG_ARCH_USE_BUILTIN_BSWAP=y
+CONFIG_USER_RETURN_NOTIFIER=y
+CONFIG_HAVE_IOREMAP_PROT=y
+CONFIG_HAVE_KPROBES=y
+CONFIG_HAVE_KRETPROBES=y
+CONFIG_HAVE_OPTPROBES=y
+CONFIG_HAVE_KPROBES_ON_FTRACE=y
+CONFIG_HAVE_FUNCTION_ERROR_INJECTION=y
+CONFIG_HAVE_NMI=y
+CONFIG_HAVE_ARCH_TRACEHOOK=y
+CONFIG_HAVE_DMA_CONTIGUOUS=y
+CONFIG_GENERIC_SMP_IDLE_THREAD=y
+CONFIG_ARCH_HAS_FORTIFY_SOURCE=y
+CONFIG_ARCH_HAS_SET_MEMORY=y
+CONFIG_ARCH_HAS_SET_DIRECT_MAP=y
+CONFIG_HAVE_ARCH_THREAD_STRUCT_WHITELIST=y
+CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT=y
+CONFIG_HAVE_ASM_MODVERSIONS=y
+CONFIG_HAVE_REGS_AND_STACK_ACCESS_API=y
+CONFIG_HAVE_RSEQ=y
+CONFIG_HAVE_FUNCTION_ARG_ACCESS_API=y
+CONFIG_HAVE_HW_BREAKPOINT=y
+CONFIG_HAVE_MIXED_BREAKPOINTS_REGS=y
+CONFIG_HAVE_USER_RETURN_NOTIFIER=y
+CONFIG_HAVE_PERF_EVENTS_NMI=y
+CONFIG_HAVE_HARDLOCKUP_DETECTOR_PERF=y
+CONFIG_HAVE_PERF_REGS=y
+CONFIG_HAVE_PERF_USER_STACK_DUMP=y
+CONFIG_HAVE_ARCH_JUMP_LABEL=y
+CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE=y
+CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG=y
+CONFIG_HAVE_CMPXCHG_LOCAL=y
+CONFIG_HAVE_CMPXCHG_DOUBLE=y
+CONFIG_ARCH_WANT_COMPAT_IPC_PARSE_VERSION=y
+CONFIG_ARCH_WANT_OLD_COMPAT_IPC=y
+CONFIG_HAVE_ARCH_SECCOMP=y
+CONFIG_HAVE_ARCH_SECCOMP_FILTER=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_HAVE_ARCH_STACKLEAK=y
+CONFIG_HAVE_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES=y
+CONFIG_HAVE_CONTEXT_TRACKING=y
+CONFIG_HAVE_VIRT_CPU_ACCOUNTING_GEN=y
+CONFIG_HAVE_IRQ_TIME_ACCOUNTING=y
+CONFIG_HAVE_MOVE_PMD=y
+CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE=y
+CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD=y
+CONFIG_HAVE_ARCH_HUGE_VMAP=y
+CONFIG_ARCH_WANT_HUGE_PMD_SHARE=y
+CONFIG_HAVE_ARCH_SOFT_DIRTY=y
+CONFIG_HAVE_MOD_ARCH_SPECIFIC=y
+CONFIG_MODULES_USE_ELF_RELA=y
+CONFIG_ARCH_HAS_ELF_RANDOMIZE=y
+CONFIG_HAVE_ARCH_MMAP_RND_BITS=y
+CONFIG_HAVE_EXIT_THREAD=y
+CONFIG_ARCH_MMAP_RND_BITS=28
+CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS=y
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS=8
+CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES=y
+CONFIG_HAVE_STACK_VALIDATION=y
+CONFIG_HAVE_RELIABLE_STACKTRACE=y
+CONFIG_OLD_SIGSUSPEND3=y
+CONFIG_COMPAT_OLD_SIGACTION=y
+CONFIG_COMPAT_32BIT_TIME=y
+CONFIG_HAVE_ARCH_VMAP_STACK=y
+CONFIG_VMAP_STACK=y
+CONFIG_ARCH_HAS_STRICT_KERNEL_RWX=y
+CONFIG_STRICT_KERNEL_RWX=y
+CONFIG_ARCH_HAS_STRICT_MODULE_RWX=y
+CONFIG_STRICT_MODULE_RWX=y
+CONFIG_HAVE_ARCH_PREL32_RELOCATIONS=y
+CONFIG_ARCH_USE_MEMREMAP_PROT=y
+# CONFIG_LOCK_EVENT_COUNTS is not set
+CONFIG_ARCH_HAS_MEM_ENCRYPT=y
+CONFIG_HAVE_STATIC_CALL=y
+CONFIG_HAVE_STATIC_CALL_INLINE=y
+CONFIG_ARCH_WANT_LD_ORPHAN_WARN=y
+
+#
+# GCOV-based kernel profiling
+#
+# CONFIG_GCOV_KERNEL is not set
+CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
+# end of GCOV-based kernel profiling
+
+CONFIG_HAVE_GCC_PLUGINS=y
+# end of General architecture-dependent options
+
+CONFIG_RT_MUTEXES=y
+CONFIG_BASE_SMALL=0
+CONFIG_MODULES=y
+# CONFIG_MODULE_FORCE_LOAD is not set
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_MODULE_FORCE_UNLOAD is not set
+# CONFIG_MODVERSIONS is not set
+# CONFIG_MODULE_SRCVERSION_ALL is not set
+# CONFIG_MODULE_SIG is not set
+# CONFIG_MODULE_COMPRESS is not set
+# CONFIG_MODULE_ALLOW_MISSING_NAMESPACE_IMPORTS is not set
+CONFIG_UNUSED_SYMBOLS=y
+CONFIG_MODULES_TREE_LOOKUP=y
+CONFIG_BLOCK=y
+CONFIG_BLK_SCSI_REQUEST=y
+CONFIG_BLK_CGROUP_RWSTAT=y
+CONFIG_BLK_DEV_BSG=y
+CONFIG_BLK_DEV_BSGLIB=y
+CONFIG_BLK_DEV_INTEGRITY=y
+CONFIG_BLK_DEV_INTEGRITY_T10=y
+# CONFIG_BLK_DEV_ZONED is not set
+# CONFIG_BLK_DEV_THROTTLING is not set
+# CONFIG_BLK_CMDLINE_PARSER is not set
+CONFIG_BLK_WBT=y
+# CONFIG_BLK_CGROUP_IOLATENCY is not set
+# CONFIG_BLK_CGROUP_IOCOST is not set
+CONFIG_BLK_WBT_MQ=y
+CONFIG_BLK_DEBUG_FS=y
+# CONFIG_BLK_SED_OPAL is not set
+# CONFIG_BLK_INLINE_ENCRYPTION is not set
+
+#
+# Partition Types
+#
+CONFIG_PARTITION_ADVANCED=y
+# CONFIG_ACORN_PARTITION is not set
+# CONFIG_AIX_PARTITION is not set
+# CONFIG_OSF_PARTITION is not set
+# CONFIG_AMIGA_PARTITION is not set
+# CONFIG_ATARI_PARTITION is not set
+# CONFIG_MAC_PARTITION is not set
+CONFIG_MSDOS_PARTITION=y
+CONFIG_BSD_DISKLABEL=y
+CONFIG_MINIX_SUBPARTITION=y
+CONFIG_SOLARIS_X86_PARTITION=y
+CONFIG_UNIXWARE_DISKLABEL=y
+CONFIG_LDM_PARTITION=y
+CONFIG_LDM_DEBUG=y
+# CONFIG_SGI_PARTITION is not set
+# CONFIG_ULTRIX_PARTITION is not set
+# CONFIG_SUN_PARTITION is not set
+# CONFIG_KARMA_PARTITION is not set
+CONFIG_EFI_PARTITION=y
+# CONFIG_SYSV68_PARTITION is not set
+# CONFIG_CMDLINE_PARTITION is not set
+# end of Partition Types
+
+CONFIG_BLOCK_COMPAT=y
+CONFIG_BLK_MQ_PCI=y
+CONFIG_BLK_MQ_VIRTIO=y
+CONFIG_BLK_PM=y
+
+#
+# IO Schedulers
+#
+CONFIG_MQ_IOSCHED_DEADLINE=y
+CONFIG_MQ_IOSCHED_KYBER=y
+CONFIG_IOSCHED_BFQ=m
+CONFIG_BFQ_GROUP_IOSCHED=y
+# CONFIG_BFQ_CGROUP_DEBUG is not set
+# end of IO Schedulers
+
+CONFIG_PREEMPT_NOTIFIERS=y
+CONFIG_PADATA=y
+CONFIG_ASN1=m
+CONFIG_INLINE_SPIN_UNLOCK_IRQ=y
+CONFIG_INLINE_READ_UNLOCK=y
+CONFIG_INLINE_READ_UNLOCK_IRQ=y
+CONFIG_INLINE_WRITE_UNLOCK=y
+CONFIG_INLINE_WRITE_UNLOCK_IRQ=y
+CONFIG_ARCH_SUPPORTS_ATOMIC_RMW=y
+CONFIG_MUTEX_SPIN_ON_OWNER=y
+CONFIG_RWSEM_SPIN_ON_OWNER=y
+CONFIG_LOCK_SPIN_ON_OWNER=y
+CONFIG_ARCH_USE_QUEUED_SPINLOCKS=y
+CONFIG_QUEUED_SPINLOCKS=y
+CONFIG_ARCH_USE_QUEUED_RWLOCKS=y
+CONFIG_QUEUED_RWLOCKS=y
+CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE=y
+CONFIG_ARCH_HAS_SYNC_CORE_BEFORE_USERMODE=y
+CONFIG_ARCH_HAS_SYSCALL_WRAPPER=y
+CONFIG_FREEZER=y
+
+#
+# Executable file formats
+#
+CONFIG_BINFMT_ELF=y
+CONFIG_COMPAT_BINFMT_ELF=y
+CONFIG_ELFCORE=y
+CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS=y
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_BINFMT_MISC=m
+CONFIG_COREDUMP=y
+# end of Executable file formats
+
+#
+# Memory Management options
+#
+CONFIG_SELECT_MEMORY_MODEL=y
+CONFIG_SPARSEMEM_MANUAL=y
+CONFIG_SPARSEMEM=y
+CONFIG_NEED_MULTIPLE_NODES=y
+CONFIG_SPARSEMEM_EXTREME=y
+CONFIG_SPARSEMEM_VMEMMAP_ENABLE=y
+CONFIG_SPARSEMEM_VMEMMAP=y
+CONFIG_HAVE_FAST_GUP=y
+CONFIG_NUMA_KEEP_MEMINFO=y
+CONFIG_MEMORY_ISOLATION=y
+# CONFIG_MEMORY_HOTPLUG is not set
+CONFIG_SPLIT_PTLOCK_CPUS=4
+CONFIG_MEMORY_BALLOON=y
+# CONFIG_BALLOON_COMPACTION is not set
+CONFIG_COMPACTION=y
+CONFIG_PAGE_REPORTING=y
+CONFIG_MIGRATION=y
+CONFIG_CONTIG_ALLOC=y
+CONFIG_PHYS_ADDR_T_64BIT=y
+CONFIG_BOUNCE=y
+CONFIG_VIRT_TO_BUS=y
+CONFIG_MMU_NOTIFIER=y
+CONFIG_KSM=y
+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
+CONFIG_ARCH_SUPPORTS_MEMORY_FAILURE=y
+CONFIG_MEMORY_FAILURE=y
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+# CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
+CONFIG_ARCH_WANTS_THP_SWAP=y
+CONFIG_THP_SWAP=y
+CONFIG_CLEANCACHE=y
+CONFIG_FRONTSWAP=y
+# CONFIG_CMA is not set
+# CONFIG_ZSWAP is not set
+# CONFIG_ZPOOL is not set
+# CONFIG_ZBUD is not set
+# CONFIG_ZSMALLOC is not set
+CONFIG_GENERIC_EARLY_IOREMAP=y
+# CONFIG_DEFERRED_STRUCT_PAGE_INIT is not set
+# CONFIG_IDLE_PAGE_TRACKING is not set
+CONFIG_ARCH_HAS_PTE_DEVMAP=y
+CONFIG_ARCH_USES_HIGH_VMA_FLAGS=y
+CONFIG_ARCH_HAS_PKEYS=y
+# CONFIG_PERCPU_STATS is not set
+# CONFIG_GUP_BENCHMARK is not set
+# CONFIG_READ_ONLY_THP_FOR_FS is not set
+CONFIG_ARCH_HAS_PTE_SPECIAL=y
+# end of Memory Management options
+
+CONFIG_NET=y
+CONFIG_NET_INGRESS=y
+CONFIG_NET_EGRESS=y
+CONFIG_SKB_EXTENSIONS=y
+
+#
+# Networking options
+#
+CONFIG_PACKET=y
+# CONFIG_PACKET_DIAG is not set
+CONFIG_UNIX=y
+CONFIG_UNIX_SCM=y
+CONFIG_UNIX_DIAG=m
+# CONFIG_TLS is not set
+CONFIG_XFRM=y
+CONFIG_XFRM_OFFLOAD=y
+CONFIG_XFRM_ALGO=y
+CONFIG_XFRM_USER=y
+# CONFIG_XFRM_USER_COMPAT is not set
+# CONFIG_XFRM_INTERFACE is not set
+CONFIG_XFRM_SUB_POLICY=y
+CONFIG_XFRM_MIGRATE=y
+CONFIG_XFRM_STATISTICS=y
+CONFIG_XFRM_AH=m
+CONFIG_XFRM_ESP=m
+CONFIG_XFRM_IPCOMP=m
+CONFIG_NET_KEY=y
+# CONFIG_NET_KEY_MIGRATE is not set
+CONFIG_XDP_SOCKETS=y
+CONFIG_XDP_SOCKETS_DIAG=m
+CONFIG_INET=y
+CONFIG_IP_MULTICAST=y
+# CONFIG_IP_ADVANCED_ROUTER is not set
+CONFIG_IP_ROUTE_CLASSID=y
+# CONFIG_IP_PNP is not set
+CONFIG_NET_IPIP=m
+CONFIG_NET_IPGRE_DEMUX=m
+CONFIG_NET_IP_TUNNEL=m
+CONFIG_NET_IPGRE=m
+CONFIG_NET_IPGRE_BROADCAST=y
+CONFIG_IP_MROUTE_COMMON=y
+CONFIG_IP_MROUTE=y
+CONFIG_IP_PIMSM_V1=y
+CONFIG_IP_PIMSM_V2=y
+CONFIG_SYN_COOKIES=y
+CONFIG_NET_IPVTI=m
+CONFIG_NET_UDP_TUNNEL=m
+CONFIG_NET_FOU=m
+# CONFIG_NET_FOU_IP_TUNNELS is not set
+CONFIG_INET_AH=m
+CONFIG_INET_ESP=m
+CONFIG_INET_ESP_OFFLOAD=m
+# CONFIG_INET_ESPINTCP is not set
+CONFIG_INET_IPCOMP=m
+CONFIG_INET_XFRM_TUNNEL=m
+CONFIG_INET_TUNNEL=m
+CONFIG_INET_DIAG=y
+CONFIG_INET_TCP_DIAG=y
+CONFIG_INET_UDP_DIAG=m
+CONFIG_INET_RAW_DIAG=m
+# CONFIG_INET_DIAG_DESTROY is not set
+# CONFIG_TCP_CONG_ADVANCED is not set
+CONFIG_TCP_CONG_CUBIC=y
+CONFIG_DEFAULT_TCP_CONG="cubic"
+# CONFIG_TCP_MD5SIG is not set
+CONFIG_IPV6=m
+CONFIG_IPV6_ROUTER_PREF=y
+CONFIG_IPV6_ROUTE_INFO=y
+CONFIG_IPV6_OPTIMISTIC_DAD=y
+CONFIG_INET6_AH=m
+CONFIG_INET6_ESP=m
+CONFIG_INET6_ESP_OFFLOAD=m
+# CONFIG_INET6_ESPINTCP is not set
+CONFIG_INET6_IPCOMP=m
+CONFIG_IPV6_MIP6=m
+CONFIG_IPV6_ILA=m
+CONFIG_INET6_XFRM_TUNNEL=m
+CONFIG_INET6_TUNNEL=m
+CONFIG_IPV6_VTI=m
+CONFIG_IPV6_SIT=m
+CONFIG_IPV6_SIT_6RD=y
+CONFIG_IPV6_NDISC_NODETYPE=y
+CONFIG_IPV6_TUNNEL=m
+CONFIG_IPV6_GRE=m
+CONFIG_IPV6_FOU=m
+CONFIG_IPV6_MULTIPLE_TABLES=y
+CONFIG_IPV6_SUBTREES=y
+CONFIG_IPV6_MROUTE=y
+CONFIG_IPV6_MROUTE_MULTIPLE_TABLES=y
+CONFIG_IPV6_PIMSM_V2=y
+CONFIG_IPV6_SEG6_LWTUNNEL=y
+CONFIG_IPV6_SEG6_HMAC=y
+# CONFIG_IPV6_RPL_LWTUNNEL is not set
+# CONFIG_MPTCP is not set
+# CONFIG_NETWORK_SECMARK is not set
+CONFIG_NET_PTP_CLASSIFY=y
+# CONFIG_NETWORK_PHY_TIMESTAMPING is not set
+CONFIG_NETFILTER=y
+CONFIG_NETFILTER_ADVANCED=y
+CONFIG_BRIDGE_NETFILTER=m
+
+#
+# Core Netfilter Configuration
+#
+CONFIG_NETFILTER_INGRESS=y
+CONFIG_NETFILTER_NETLINK=m
+CONFIG_NETFILTER_FAMILY_BRIDGE=y
+CONFIG_NETFILTER_FAMILY_ARP=y
+CONFIG_NETFILTER_NETLINK_ACCT=m
+CONFIG_NETFILTER_NETLINK_QUEUE=m
+CONFIG_NETFILTER_NETLINK_LOG=m
+CONFIG_NETFILTER_NETLINK_OSF=m
+CONFIG_NF_CONNTRACK=m
+CONFIG_NF_LOG_COMMON=m
+# CONFIG_NF_LOG_NETDEV is not set
+CONFIG_NETFILTER_CONNCOUNT=m
+CONFIG_NF_CONNTRACK_MARK=y
+CONFIG_NF_CONNTRACK_ZONES=y
+CONFIG_NF_CONNTRACK_PROCFS=y
+CONFIG_NF_CONNTRACK_EVENTS=y
+CONFIG_NF_CONNTRACK_TIMEOUT=y
+CONFIG_NF_CONNTRACK_TIMESTAMP=y
+CONFIG_NF_CONNTRACK_LABELS=y
+CONFIG_NF_CT_PROTO_DCCP=y
+CONFIG_NF_CT_PROTO_GRE=y
+CONFIG_NF_CT_PROTO_SCTP=y
+CONFIG_NF_CT_PROTO_UDPLITE=y
+CONFIG_NF_CONNTRACK_AMANDA=m
+CONFIG_NF_CONNTRACK_FTP=m
+CONFIG_NF_CONNTRACK_H323=m
+CONFIG_NF_CONNTRACK_IRC=m
+CONFIG_NF_CONNTRACK_BROADCAST=m
+CONFIG_NF_CONNTRACK_NETBIOS_NS=m
+CONFIG_NF_CONNTRACK_SNMP=m
+CONFIG_NF_CONNTRACK_PPTP=m
+CONFIG_NF_CONNTRACK_SANE=m
+CONFIG_NF_CONNTRACK_SIP=m
+CONFIG_NF_CONNTRACK_TFTP=m
+CONFIG_NF_CT_NETLINK=m
+CONFIG_NF_CT_NETLINK_TIMEOUT=m
+CONFIG_NF_CT_NETLINK_HELPER=m
+CONFIG_NETFILTER_NETLINK_GLUE_CT=y
+CONFIG_NF_NAT=m
+CONFIG_NF_NAT_AMANDA=m
+CONFIG_NF_NAT_FTP=m
+CONFIG_NF_NAT_IRC=m
+CONFIG_NF_NAT_SIP=m
+CONFIG_NF_NAT_TFTP=m
+CONFIG_NF_NAT_REDIRECT=y
+CONFIG_NF_NAT_MASQUERADE=y
+CONFIG_NETFILTER_SYNPROXY=m
+CONFIG_NF_TABLES=m
+CONFIG_NF_TABLES_INET=y
+CONFIG_NF_TABLES_NETDEV=y
+CONFIG_NFT_NUMGEN=m
+CONFIG_NFT_CT=m
+CONFIG_NFT_FLOW_OFFLOAD=m
+CONFIG_NFT_COUNTER=m
+CONFIG_NFT_CONNLIMIT=m
+CONFIG_NFT_LOG=m
+CONFIG_NFT_LIMIT=m
+CONFIG_NFT_MASQ=m
+CONFIG_NFT_REDIR=m
+CONFIG_NFT_NAT=m
+CONFIG_NFT_TUNNEL=m
+CONFIG_NFT_OBJREF=m
+CONFIG_NFT_QUEUE=m
+CONFIG_NFT_QUOTA=m
+CONFIG_NFT_REJECT=m
+CONFIG_NFT_REJECT_INET=m
+CONFIG_NFT_COMPAT=m
+CONFIG_NFT_HASH=m
+CONFIG_NFT_FIB=m
+CONFIG_NFT_FIB_INET=m
+CONFIG_NFT_XFRM=m
+CONFIG_NFT_SOCKET=m
+CONFIG_NFT_OSF=m
+CONFIG_NFT_TPROXY=m
+CONFIG_NFT_SYNPROXY=m
+CONFIG_NF_DUP_NETDEV=m
+CONFIG_NFT_DUP_NETDEV=m
+CONFIG_NFT_FWD_NETDEV=m
+CONFIG_NFT_FIB_NETDEV=m
+CONFIG_NF_FLOW_TABLE_INET=m
+CONFIG_NF_FLOW_TABLE=m
+CONFIG_NETFILTER_XTABLES=m
+
+#
+# Xtables combined modules
+#
+CONFIG_NETFILTER_XT_MARK=m
+CONFIG_NETFILTER_XT_CONNMARK=m
+CONFIG_NETFILTER_XT_SET=m
+
+#
+# Xtables targets
+#
+CONFIG_NETFILTER_XT_TARGET_AUDIT=m
+CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
+CONFIG_NETFILTER_XT_TARGET_CLASSIFY=m
+CONFIG_NETFILTER_XT_TARGET_CONNMARK=m
+CONFIG_NETFILTER_XT_TARGET_CT=m
+CONFIG_NETFILTER_XT_TARGET_DSCP=m
+CONFIG_NETFILTER_XT_TARGET_HL=m
+CONFIG_NETFILTER_XT_TARGET_HMARK=m
+CONFIG_NETFILTER_XT_TARGET_IDLETIMER=m
+CONFIG_NETFILTER_XT_TARGET_LED=m
+CONFIG_NETFILTER_XT_TARGET_LOG=m
+CONFIG_NETFILTER_XT_TARGET_MARK=m
+CONFIG_NETFILTER_XT_NAT=m
+CONFIG_NETFILTER_XT_TARGET_NETMAP=m
+CONFIG_NETFILTER_XT_TARGET_NFLOG=m
+CONFIG_NETFILTER_XT_TARGET_NFQUEUE=m
+CONFIG_NETFILTER_XT_TARGET_NOTRACK=m
+CONFIG_NETFILTER_XT_TARGET_RATEEST=m
+CONFIG_NETFILTER_XT_TARGET_REDIRECT=m
+CONFIG_NETFILTER_XT_TARGET_MASQUERADE=m
+CONFIG_NETFILTER_XT_TARGET_TEE=m
+CONFIG_NETFILTER_XT_TARGET_TPROXY=m
+CONFIG_NETFILTER_XT_TARGET_TRACE=m
+CONFIG_NETFILTER_XT_TARGET_TCPMSS=m
+CONFIG_NETFILTER_XT_TARGET_TCPOPTSTRIP=m
+
+#
+# Xtables matches
+#
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
+CONFIG_NETFILTER_XT_MATCH_BPF=m
+CONFIG_NETFILTER_XT_MATCH_CGROUP=m
+CONFIG_NETFILTER_XT_MATCH_CLUSTER=m
+CONFIG_NETFILTER_XT_MATCH_COMMENT=m
+CONFIG_NETFILTER_XT_MATCH_CONNBYTES=m
+CONFIG_NETFILTER_XT_MATCH_CONNLABEL=m
+CONFIG_NETFILTER_XT_MATCH_CONNLIMIT=m
+CONFIG_NETFILTER_XT_MATCH_CONNMARK=m
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
+CONFIG_NETFILTER_XT_MATCH_CPU=m
+CONFIG_NETFILTER_XT_MATCH_DCCP=m
+CONFIG_NETFILTER_XT_MATCH_DEVGROUP=m
+CONFIG_NETFILTER_XT_MATCH_DSCP=m
+CONFIG_NETFILTER_XT_MATCH_ECN=m
+CONFIG_NETFILTER_XT_MATCH_ESP=m
+CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=m
+CONFIG_NETFILTER_XT_MATCH_HELPER=m
+CONFIG_NETFILTER_XT_MATCH_HL=m
+CONFIG_NETFILTER_XT_MATCH_IPCOMP=m
+CONFIG_NETFILTER_XT_MATCH_IPRANGE=m
+CONFIG_NETFILTER_XT_MATCH_IPVS=m
+CONFIG_NETFILTER_XT_MATCH_L2TP=m
+CONFIG_NETFILTER_XT_MATCH_LENGTH=m
+CONFIG_NETFILTER_XT_MATCH_LIMIT=m
+CONFIG_NETFILTER_XT_MATCH_MAC=m
+CONFIG_NETFILTER_XT_MATCH_MARK=m
+CONFIG_NETFILTER_XT_MATCH_MULTIPORT=m
+CONFIG_NETFILTER_XT_MATCH_NFACCT=m
+CONFIG_NETFILTER_XT_MATCH_OSF=m
+CONFIG_NETFILTER_XT_MATCH_OWNER=m
+CONFIG_NETFILTER_XT_MATCH_POLICY=m
+CONFIG_NETFILTER_XT_MATCH_PHYSDEV=m
+CONFIG_NETFILTER_XT_MATCH_PKTTYPE=m
+CONFIG_NETFILTER_XT_MATCH_QUOTA=m
+CONFIG_NETFILTER_XT_MATCH_RATEEST=m
+CONFIG_NETFILTER_XT_MATCH_REALM=m
+CONFIG_NETFILTER_XT_MATCH_RECENT=m
+CONFIG_NETFILTER_XT_MATCH_SCTP=m
+CONFIG_NETFILTER_XT_MATCH_SOCKET=m
+CONFIG_NETFILTER_XT_MATCH_STATE=m
+CONFIG_NETFILTER_XT_MATCH_STATISTIC=m
+CONFIG_NETFILTER_XT_MATCH_STRING=m
+CONFIG_NETFILTER_XT_MATCH_TCPMSS=m
+CONFIG_NETFILTER_XT_MATCH_TIME=m
+CONFIG_NETFILTER_XT_MATCH_U32=m
+# end of Core Netfilter Configuration
+
+CONFIG_IP_SET=m
+CONFIG_IP_SET_MAX=256
+CONFIG_IP_SET_BITMAP_IP=m
+CONFIG_IP_SET_BITMAP_IPMAC=m
+CONFIG_IP_SET_BITMAP_PORT=m
+CONFIG_IP_SET_HASH_IP=m
+CONFIG_IP_SET_HASH_IPMARK=m
+CONFIG_IP_SET_HASH_IPPORT=m
+CONFIG_IP_SET_HASH_IPPORTIP=m
+CONFIG_IP_SET_HASH_IPPORTNET=m
+CONFIG_IP_SET_HASH_IPMAC=m
+CONFIG_IP_SET_HASH_MAC=m
+CONFIG_IP_SET_HASH_NETPORTNET=m
+CONFIG_IP_SET_HASH_NET=m
+CONFIG_IP_SET_HASH_NETNET=m
+CONFIG_IP_SET_HASH_NETPORT=m
+CONFIG_IP_SET_HASH_NETIFACE=m
+CONFIG_IP_SET_LIST_SET=m
+CONFIG_IP_VS=m
+CONFIG_IP_VS_IPV6=y
+CONFIG_IP_VS_DEBUG=y
+CONFIG_IP_VS_TAB_BITS=12
+
+#
+# IPVS transport protocol load balancing support
+#
+CONFIG_IP_VS_PROTO_TCP=y
+CONFIG_IP_VS_PROTO_UDP=y
+CONFIG_IP_VS_PROTO_AH_ESP=y
+CONFIG_IP_VS_PROTO_ESP=y
+CONFIG_IP_VS_PROTO_AH=y
+CONFIG_IP_VS_PROTO_SCTP=y
+
+#
+# IPVS scheduler
+#
+CONFIG_IP_VS_RR=m
+CONFIG_IP_VS_WRR=m
+CONFIG_IP_VS_LC=m
+CONFIG_IP_VS_WLC=m
+CONFIG_IP_VS_FO=m
+CONFIG_IP_VS_OVF=m
+CONFIG_IP_VS_LBLC=m
+CONFIG_IP_VS_LBLCR=m
+CONFIG_IP_VS_DH=m
+CONFIG_IP_VS_SH=m
+CONFIG_IP_VS_MH=m
+CONFIG_IP_VS_SED=m
+CONFIG_IP_VS_NQ=m
+
+#
+# IPVS SH scheduler
+#
+CONFIG_IP_VS_SH_TAB_BITS=8
+
+#
+# IPVS MH scheduler
+#
+CONFIG_IP_VS_MH_TAB_INDEX=12
+
+#
+# IPVS application helper
+#
+CONFIG_IP_VS_FTP=m
+CONFIG_IP_VS_NFCT=y
+CONFIG_IP_VS_PE_SIP=m
+
+#
+# IP: Netfilter Configuration
+#
+CONFIG_NF_DEFRAG_IPV4=m
+CONFIG_NF_SOCKET_IPV4=m
+CONFIG_NF_TPROXY_IPV4=m
+CONFIG_NF_TABLES_IPV4=y
+CONFIG_NFT_REJECT_IPV4=m
+CONFIG_NFT_DUP_IPV4=m
+CONFIG_NFT_FIB_IPV4=m
+CONFIG_NF_TABLES_ARP=y
+CONFIG_NF_FLOW_TABLE_IPV4=m
+CONFIG_NF_DUP_IPV4=m
+CONFIG_NF_LOG_ARP=m
+CONFIG_NF_LOG_IPV4=m
+CONFIG_NF_REJECT_IPV4=m
+CONFIG_NF_NAT_SNMP_BASIC=m
+CONFIG_NF_NAT_PPTP=m
+CONFIG_NF_NAT_H323=m
+CONFIG_IP_NF_IPTABLES=m
+CONFIG_IP_NF_MATCH_AH=m
+CONFIG_IP_NF_MATCH_ECN=m
+CONFIG_IP_NF_MATCH_RPFILTER=m
+CONFIG_IP_NF_MATCH_TTL=m
+CONFIG_IP_NF_FILTER=m
+CONFIG_IP_NF_TARGET_REJECT=m
+CONFIG_IP_NF_TARGET_SYNPROXY=m
+CONFIG_IP_NF_NAT=m
+CONFIG_IP_NF_TARGET_MASQUERADE=m
+CONFIG_IP_NF_TARGET_NETMAP=m
+CONFIG_IP_NF_TARGET_REDIRECT=m
+CONFIG_IP_NF_MANGLE=m
+CONFIG_IP_NF_TARGET_CLUSTERIP=m
+CONFIG_IP_NF_TARGET_ECN=m
+CONFIG_IP_NF_TARGET_TTL=m
+CONFIG_IP_NF_RAW=m
+CONFIG_IP_NF_ARPTABLES=m
+CONFIG_IP_NF_ARPFILTER=m
+CONFIG_IP_NF_ARP_MANGLE=m
+# end of IP: Netfilter Configuration
+
+#
+# IPv6: Netfilter Configuration
+#
+CONFIG_NF_SOCKET_IPV6=m
+CONFIG_NF_TPROXY_IPV6=m
+CONFIG_NF_TABLES_IPV6=y
+CONFIG_NFT_REJECT_IPV6=m
+CONFIG_NFT_DUP_IPV6=m
+CONFIG_NFT_FIB_IPV6=m
+CONFIG_NF_FLOW_TABLE_IPV6=m
+CONFIG_NF_DUP_IPV6=m
+CONFIG_NF_REJECT_IPV6=m
+CONFIG_NF_LOG_IPV6=m
+CONFIG_IP6_NF_IPTABLES=m
+CONFIG_IP6_NF_MATCH_AH=m
+CONFIG_IP6_NF_MATCH_EUI64=m
+CONFIG_IP6_NF_MATCH_FRAG=m
+CONFIG_IP6_NF_MATCH_OPTS=m
+CONFIG_IP6_NF_MATCH_HL=m
+CONFIG_IP6_NF_MATCH_IPV6HEADER=m
+CONFIG_IP6_NF_MATCH_MH=m
+CONFIG_IP6_NF_MATCH_RPFILTER=m
+CONFIG_IP6_NF_MATCH_RT=m
+CONFIG_IP6_NF_MATCH_SRH=m
+CONFIG_IP6_NF_TARGET_HL=m
+CONFIG_IP6_NF_FILTER=m
+CONFIG_IP6_NF_TARGET_REJECT=m
+CONFIG_IP6_NF_TARGET_SYNPROXY=m
+CONFIG_IP6_NF_MANGLE=m
+CONFIG_IP6_NF_RAW=m
+CONFIG_IP6_NF_NAT=m
+CONFIG_IP6_NF_TARGET_MASQUERADE=m
+CONFIG_IP6_NF_TARGET_NPT=m
+# end of IPv6: Netfilter Configuration
+
+CONFIG_NF_DEFRAG_IPV6=m
+CONFIG_NF_TABLES_BRIDGE=m
+CONFIG_NFT_BRIDGE_META=m
+CONFIG_NFT_BRIDGE_REJECT=m
+# CONFIG_NF_LOG_BRIDGE is not set
+CONFIG_NF_CONNTRACK_BRIDGE=m
+CONFIG_BRIDGE_NF_EBTABLES=m
+CONFIG_BRIDGE_EBT_BROUTE=m
+CONFIG_BRIDGE_EBT_T_FILTER=m
+CONFIG_BRIDGE_EBT_T_NAT=m
+CONFIG_BRIDGE_EBT_802_3=m
+CONFIG_BRIDGE_EBT_AMONG=m
+CONFIG_BRIDGE_EBT_ARP=m
+CONFIG_BRIDGE_EBT_IP=m
+CONFIG_BRIDGE_EBT_IP6=m
+CONFIG_BRIDGE_EBT_LIMIT=m
+CONFIG_BRIDGE_EBT_MARK=m
+CONFIG_BRIDGE_EBT_PKTTYPE=m
+CONFIG_BRIDGE_EBT_STP=m
+CONFIG_BRIDGE_EBT_VLAN=m
+CONFIG_BRIDGE_EBT_ARPREPLY=m
+CONFIG_BRIDGE_EBT_DNAT=m
+CONFIG_BRIDGE_EBT_MARK_T=m
+CONFIG_BRIDGE_EBT_REDIRECT=m
+CONFIG_BRIDGE_EBT_SNAT=m
+CONFIG_BRIDGE_EBT_LOG=m
+CONFIG_BRIDGE_EBT_NFLOG=m
+CONFIG_BPFILTER=y
+CONFIG_BPFILTER_UMH=m
+# CONFIG_IP_DCCP is not set
+CONFIG_IP_SCTP=m
+# CONFIG_SCTP_DBG_OBJCNT is not set
+CONFIG_SCTP_DEFAULT_COOKIE_HMAC_MD5=y
+# CONFIG_SCTP_DEFAULT_COOKIE_HMAC_SHA1 is not set
+# CONFIG_SCTP_DEFAULT_COOKIE_HMAC_NONE is not set
+CONFIG_SCTP_COOKIE_HMAC_MD5=y
+# CONFIG_SCTP_COOKIE_HMAC_SHA1 is not set
+CONFIG_INET_SCTP_DIAG=m
+# CONFIG_RDS is not set
+# CONFIG_TIPC is not set
+# CONFIG_ATM is not set
+CONFIG_L2TP=m
+# CONFIG_L2TP_DEBUGFS is not set
+CONFIG_L2TP_V3=y
+CONFIG_L2TP_IP=m
+CONFIG_L2TP_ETH=m
+CONFIG_STP=m
+CONFIG_GARP=m
+CONFIG_MRP=m
+CONFIG_BRIDGE=m
+CONFIG_BRIDGE_IGMP_SNOOPING=y
+CONFIG_BRIDGE_VLAN_FILTERING=y
+# CONFIG_BRIDGE_MRP is not set
+CONFIG_HAVE_NET_DSA=y
+# CONFIG_NET_DSA is not set
+CONFIG_VLAN_8021Q=m
+CONFIG_VLAN_8021Q_GVRP=y
+CONFIG_VLAN_8021Q_MVRP=y
+# CONFIG_DECNET is not set
+CONFIG_LLC=m
+# CONFIG_LLC2 is not set
+# CONFIG_ATALK is not set
+# CONFIG_X25 is not set
+# CONFIG_LAPB is not set
+# CONFIG_PHONET is not set
+# CONFIG_6LOWPAN is not set
+# CONFIG_IEEE802154 is not set
+CONFIG_NET_SCHED=y
+
+#
+# Queueing/Scheduling
+#
+CONFIG_NET_SCH_CBQ=m
+CONFIG_NET_SCH_HTB=m
+CONFIG_NET_SCH_HFSC=m
+CONFIG_NET_SCH_PRIO=m
+CONFIG_NET_SCH_MULTIQ=m
+CONFIG_NET_SCH_RED=m
+CONFIG_NET_SCH_SFB=m
+CONFIG_NET_SCH_SFQ=m
+CONFIG_NET_SCH_TEQL=m
+CONFIG_NET_SCH_TBF=m
+CONFIG_NET_SCH_CBS=m
+CONFIG_NET_SCH_ETF=m
+CONFIG_NET_SCH_TAPRIO=m
+CONFIG_NET_SCH_GRED=m
+CONFIG_NET_SCH_DSMARK=m
+CONFIG_NET_SCH_NETEM=m
+CONFIG_NET_SCH_DRR=m
+CONFIG_NET_SCH_MQPRIO=m
+CONFIG_NET_SCH_SKBPRIO=m
+CONFIG_NET_SCH_CHOKE=m
+CONFIG_NET_SCH_QFQ=m
+CONFIG_NET_SCH_CODEL=m
+CONFIG_NET_SCH_FQ_CODEL=m
+CONFIG_NET_SCH_CAKE=m
+CONFIG_NET_SCH_FQ=m
+CONFIG_NET_SCH_HHF=m
+CONFIG_NET_SCH_PIE=m
+# CONFIG_NET_SCH_FQ_PIE is not set
+CONFIG_NET_SCH_INGRESS=m
+CONFIG_NET_SCH_PLUG=m
+# CONFIG_NET_SCH_ETS is not set
+# CONFIG_NET_SCH_DEFAULT is not set
+
+#
+# Classification
+#
+CONFIG_NET_CLS=y
+CONFIG_NET_CLS_BASIC=m
+CONFIG_NET_CLS_TCINDEX=m
+CONFIG_NET_CLS_ROUTE4=m
+CONFIG_NET_CLS_FW=m
+CONFIG_NET_CLS_U32=m
+CONFIG_CLS_U32_PERF=y
+CONFIG_CLS_U32_MARK=y
+CONFIG_NET_CLS_RSVP=m
+CONFIG_NET_CLS_RSVP6=m
+CONFIG_NET_CLS_FLOW=m
+CONFIG_NET_CLS_CGROUP=m
+CONFIG_NET_CLS_BPF=m
+CONFIG_NET_CLS_FLOWER=m
+CONFIG_NET_CLS_MATCHALL=m
+CONFIG_NET_EMATCH=y
+CONFIG_NET_EMATCH_STACK=32
+CONFIG_NET_EMATCH_CMP=m
+CONFIG_NET_EMATCH_NBYTE=m
+CONFIG_NET_EMATCH_U32=m
+CONFIG_NET_EMATCH_META=m
+CONFIG_NET_EMATCH_TEXT=m
+CONFIG_NET_EMATCH_IPSET=m
+CONFIG_NET_EMATCH_IPT=m
+CONFIG_NET_CLS_ACT=y
+CONFIG_NET_ACT_POLICE=m
+CONFIG_NET_ACT_GACT=m
+CONFIG_GACT_PROB=y
+CONFIG_NET_ACT_MIRRED=m
+CONFIG_NET_ACT_SAMPLE=m
+CONFIG_NET_ACT_IPT=m
+CONFIG_NET_ACT_NAT=m
+CONFIG_NET_ACT_PEDIT=m
+CONFIG_NET_ACT_SIMP=m
+CONFIG_NET_ACT_SKBEDIT=m
+CONFIG_NET_ACT_CSUM=m
+# CONFIG_NET_ACT_MPLS is not set
+CONFIG_NET_ACT_VLAN=m
+CONFIG_NET_ACT_BPF=m
+CONFIG_NET_ACT_CONNMARK=m
+# CONFIG_NET_ACT_CTINFO is not set
+CONFIG_NET_ACT_SKBMOD=m
+CONFIG_NET_ACT_IFE=m
+CONFIG_NET_ACT_TUNNEL_KEY=m
+CONFIG_NET_ACT_CT=m
+# CONFIG_NET_ACT_GATE is not set
+CONFIG_NET_IFE_SKBMARK=m
+CONFIG_NET_IFE_SKBPRIO=m
+CONFIG_NET_IFE_SKBTCINDEX=m
+# CONFIG_NET_TC_SKB_EXT is not set
+CONFIG_NET_SCH_FIFO=y
+# CONFIG_DCB is not set
+CONFIG_DNS_RESOLVER=y
+# CONFIG_BATMAN_ADV is not set
+# CONFIG_OPENVSWITCH is not set
+# CONFIG_VSOCKETS is not set
+CONFIG_NETLINK_DIAG=m
+# CONFIG_MPLS is not set
+# CONFIG_NET_NSH is not set
+# CONFIG_HSR is not set
+# CONFIG_NET_SWITCHDEV is not set
+CONFIG_NET_L3_MASTER_DEV=y
+# CONFIG_QRTR is not set
+# CONFIG_NET_NCSI is not set
+CONFIG_RPS=y
+CONFIG_RFS_ACCEL=y
+CONFIG_XPS=y
+# CONFIG_CGROUP_NET_PRIO is not set
+CONFIG_CGROUP_NET_CLASSID=y
+CONFIG_NET_RX_BUSY_POLL=y
+CONFIG_BQL=y
+# CONFIG_BPF_JIT is not set
+CONFIG_NET_FLOW_LIMIT=y
+
+#
+# Network testing
+#
+# CONFIG_NET_PKTGEN is not set
+# end of Network testing
+# end of Networking options
+
+# CONFIG_HAMRADIO is not set
+# CONFIG_CAN is not set
+CONFIG_BT=m
+CONFIG_BT_BREDR=y
+CONFIG_BT_RFCOMM=m
+CONFIG_BT_RFCOMM_TTY=y
+CONFIG_BT_BNEP=m
+CONFIG_BT_BNEP_MC_FILTER=y
+CONFIG_BT_BNEP_PROTO_FILTER=y
+CONFIG_BT_HIDP=m
+CONFIG_BT_HS=y
+CONFIG_BT_LE=y
+CONFIG_BT_LEDS=y
+# CONFIG_BT_MSFTEXT is not set
+CONFIG_BT_DEBUGFS=y
+# CONFIG_BT_FEATURE_DEBUG is not set
+
+#
+# Bluetooth device drivers
+#
+CONFIG_BT_INTEL=m
+CONFIG_BT_BCM=m
+CONFIG_BT_RTL=m
+CONFIG_BT_HCIBTUSB=m
+CONFIG_BT_HCIBTUSB_AUTOSUSPEND=y
+CONFIG_BT_HCIBTUSB_BCM=y
+CONFIG_BT_HCIBTUSB_MTK=y
+CONFIG_BT_HCIBTUSB_RTL=y
+CONFIG_BT_HCIUART=m
+CONFIG_BT_HCIUART_H4=y
+CONFIG_BT_HCIUART_BCSP=y
+CONFIG_BT_HCIUART_ATH3K=y
+CONFIG_BT_HCIUART_AG6XX=y
+CONFIG_BT_HCIBCM203X=m
+CONFIG_BT_HCIBPA10X=m
+CONFIG_BT_HCIBFUSB=m
+CONFIG_BT_HCIVHCI=m
+CONFIG_BT_MRVL=m
+CONFIG_BT_ATH3K=m
+# end of Bluetooth device drivers
+
+CONFIG_AF_RXRPC=m
+# CONFIG_AF_RXRPC_IPV6 is not set
+# CONFIG_AF_RXRPC_INJECT_LOSS is not set
+# CONFIG_AF_RXRPC_DEBUG is not set
+# CONFIG_RXKAD is not set
+# CONFIG_AF_KCM is not set
+CONFIG_FIB_RULES=y
+# CONFIG_WIRELESS is not set
+# CONFIG_WIMAX is not set
+# CONFIG_RFKILL is not set
+# CONFIG_NET_9P is not set
+# CONFIG_CAIF is not set
+CONFIG_CEPH_LIB=m
+# CONFIG_CEPH_LIB_PRETTYDEBUG is not set
+# CONFIG_CEPH_LIB_USE_DNS_RESOLVER is not set
+# CONFIG_NFC is not set
+CONFIG_PSAMPLE=m
+CONFIG_NET_IFE=m
+CONFIG_LWTUNNEL=y
+CONFIG_LWTUNNEL_BPF=y
+CONFIG_DST_CACHE=y
+CONFIG_GRO_CELLS=y
+CONFIG_NET_DEVLINK=y
+CONFIG_PAGE_POOL=y
+# CONFIG_FAILOVER is not set
+CONFIG_ETHTOOL_NETLINK=y
+CONFIG_HAVE_EBPF_JIT=y
+
+#
+# Device Drivers
+#
+CONFIG_HAVE_EISA=y
+# CONFIG_EISA is not set
+CONFIG_HAVE_PCI=y
+CONFIG_PCI=y
+CONFIG_PCI_DOMAINS=y
+CONFIG_PCIEPORTBUS=y
+CONFIG_PCIEAER=y
+CONFIG_PCIEAER_INJECT=m
+CONFIG_PCIE_ECRC=y
+CONFIG_PCIEASPM=y
+CONFIG_PCIEASPM_DEFAULT=y
+# CONFIG_PCIEASPM_POWERSAVE is not set
+# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set
+# CONFIG_PCIEASPM_PERFORMANCE is not set
+CONFIG_PCIE_PME=y
+# CONFIG_PCIE_DPC is not set
+CONFIG_PCIE_PTM=y
+CONFIG_PCI_MSI=y
+CONFIG_PCI_MSI_IRQ_DOMAIN=y
+CONFIG_PCI_QUIRKS=y
+# CONFIG_PCI_REALLOC_ENABLE_AUTO is not set
+# CONFIG_PCI_STUB is not set
+# CONFIG_PCI_PF_STUB is not set
+CONFIG_PCI_ATS=y
+CONFIG_PCI_LOCKLESS_CONFIG=y
+CONFIG_PCI_IOV=y
+CONFIG_PCI_PRI=y
+CONFIG_PCI_PASID=y
+CONFIG_PCI_LABEL=y
+# CONFIG_HOTPLUG_PCI is not set
+
+#
+# PCI controller drivers
+#
+# CONFIG_VMD is not set
+
+#
+# DesignWare PCI Core Support
+#
+# CONFIG_PCIE_DW_PLAT_HOST is not set
+# CONFIG_PCI_MESON is not set
+# end of DesignWare PCI Core Support
+
+#
+# Mobiveil PCIe Core Support
+#
+# end of Mobiveil PCIe Core Support
+
+#
+# Cadence PCIe controllers support
+#
+# end of Cadence PCIe controllers support
+# end of PCI controller drivers
+
+#
+# PCI Endpoint
+#
+# CONFIG_PCI_ENDPOINT is not set
+# end of PCI Endpoint
+
+#
+# PCI switch controller drivers
+#
+# CONFIG_PCI_SW_SWITCHTEC is not set
+# end of PCI switch controller drivers
+
+# CONFIG_PCCARD is not set
+CONFIG_RAPIDIO=m
+CONFIG_RAPIDIO_TSI721=m
+CONFIG_RAPIDIO_DISC_TIMEOUT=30
+CONFIG_RAPIDIO_ENABLE_RX_TX_PORTS=y
+CONFIG_RAPIDIO_DMA_ENGINE=y
+CONFIG_RAPIDIO_DEBUG=y
+CONFIG_RAPIDIO_ENUM_BASIC=m
+CONFIG_RAPIDIO_CHMAN=m
+CONFIG_RAPIDIO_MPORT_CDEV=m
+
+#
+# RapidIO Switch drivers
+#
+CONFIG_RAPIDIO_TSI57X=m
+CONFIG_RAPIDIO_CPS_XX=m
+CONFIG_RAPIDIO_TSI568=m
+CONFIG_RAPIDIO_CPS_GEN2=m
+CONFIG_RAPIDIO_RXS_GEN3=m
+# end of RapidIO Switch drivers
+
+#
+# Generic Driver Options
+#
+CONFIG_UEVENT_HELPER=y
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+
+#
+# Firmware loader
+#
+CONFIG_FW_LOADER=y
+CONFIG_FW_LOADER_PAGED_BUF=y
+CONFIG_EXTRA_FIRMWARE=""
+CONFIG_FW_LOADER_USER_HELPER=y
+# CONFIG_FW_LOADER_USER_HELPER_FALLBACK is not set
+CONFIG_FW_LOADER_COMPRESS=y
+CONFIG_FW_CACHE=y
+# end of Firmware loader
+
+CONFIG_ALLOW_DEV_COREDUMP=y
+# CONFIG_TEST_ASYNC_DRIVER_PROBE is not set
+CONFIG_GENERIC_CPU_AUTOPROBE=y
+CONFIG_GENERIC_CPU_VULNERABILITIES=y
+CONFIG_REGMAP=y
+CONFIG_REGMAP_I2C=m
+CONFIG_REGMAP_MMIO=y
+CONFIG_DMA_SHARED_BUFFER=y
+# CONFIG_DMA_FENCE_TRACE is not set
+# end of Generic Driver Options
+
+#
+# Bus devices
+#
+# CONFIG_MHI_BUS is not set
+# end of Bus devices
+
+CONFIG_CONNECTOR=m
+# CONFIG_GNSS is not set
+# CONFIG_MTD is not set
+# CONFIG_OF is not set
+CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
+CONFIG_PARPORT=m
+CONFIG_PARPORT_PC=m
+CONFIG_PARPORT_SERIAL=m
+CONFIG_PARPORT_PC_FIFO=y
+CONFIG_PARPORT_PC_SUPERIO=y
+# CONFIG_PARPORT_AX88796 is not set
+CONFIG_PARPORT_1284=y
+CONFIG_PNP=y
+CONFIG_PNP_DEBUG_MESSAGES=y
+
+#
+# Protocols
+#
+CONFIG_PNPACPI=y
+CONFIG_BLK_DEV=y
+# CONFIG_BLK_DEV_NULL_BLK is not set
+CONFIG_BLK_DEV_FD=m
+# CONFIG_BLK_DEV_FD_RAWCMD is not set
+CONFIG_CDROM=m
+# CONFIG_PARIDE is not set
+# CONFIG_BLK_DEV_PCIESSD_MTIP32XX is not set
+# CONFIG_BLK_DEV_UMEM is not set
+CONFIG_BLK_DEV_LOOP=m
+CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
+CONFIG_BLK_DEV_CRYPTOLOOP=m
+# CONFIG_BLK_DEV_DRBD is not set
+CONFIG_BLK_DEV_NBD=m
+# CONFIG_BLK_DEV_SKD is not set
+# CONFIG_BLK_DEV_SX8 is not set
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
+CONFIG_BLK_DEV_RAM_SIZE=4096
+CONFIG_CDROM_PKTCDVD=m
+CONFIG_CDROM_PKTCDVD_BUFFERS=8
+# CONFIG_CDROM_PKTCDVD_WCACHE is not set
+# CONFIG_ATA_OVER_ETH is not set
+# CONFIG_VIRTIO_BLK is not set
+# CONFIG_BLK_DEV_RBD is not set
+# CONFIG_BLK_DEV_RSXX is not set
+
+#
+# NVME Support
+#
+CONFIG_NVME_CORE=y
+CONFIG_BLK_DEV_NVME=y
+CONFIG_NVME_MULTIPATH=y
+CONFIG_NVME_FABRICS=m
+CONFIG_NVME_FC=m
+# CONFIG_NVME_TCP is not set
+CONFIG_NVME_TARGET=m
+# CONFIG_NVME_TARGET_PASSTHRU is not set
+CONFIG_NVME_TARGET_LOOP=m
+CONFIG_NVME_TARGET_FC=m
+CONFIG_NVME_TARGET_FCLOOP=m
+# CONFIG_NVME_TARGET_TCP is not set
+# end of NVME Support
+
+#
+# Misc devices
+#
+# CONFIG_AD525X_DPOT is not set
+# CONFIG_DUMMY_IRQ is not set
+# CONFIG_IBM_ASM is not set
+# CONFIG_PHANTOM is not set
+# CONFIG_TIFM_CORE is not set
+# CONFIG_ICS932S401 is not set
+# CONFIG_ENCLOSURE_SERVICES is not set
+# CONFIG_HP_ILO is not set
+# CONFIG_APDS9802ALS is not set
+# CONFIG_ISL29003 is not set
+# CONFIG_ISL29020 is not set
+CONFIG_SENSORS_TSL2550=m
+# CONFIG_SENSORS_BH1770 is not set
+# CONFIG_SENSORS_APDS990X is not set
+# CONFIG_HMC6352 is not set
+CONFIG_DS1682=m
+# CONFIG_SRAM is not set
+# CONFIG_PCI_ENDPOINT_TEST is not set
+# CONFIG_XILINX_SDFEC is not set
+# CONFIG_PVPANIC is not set
+# CONFIG_C2PORT is not set
+
+#
+# EEPROM support
+#
+# CONFIG_EEPROM_AT24 is not set
+# CONFIG_EEPROM_LEGACY is not set
+# CONFIG_EEPROM_MAX6875 is not set
+CONFIG_EEPROM_93CX6=m
+# CONFIG_EEPROM_IDT_89HPESX is not set
+# CONFIG_EEPROM_EE1004 is not set
+# end of EEPROM support
+
+# CONFIG_CB710_CORE is not set
+
+#
+# Texas Instruments shared transport line discipline
+#
+# end of Texas Instruments shared transport line discipline
+
+# CONFIG_SENSORS_LIS3_I2C is not set
+
+#
+# Altera FPGA firmware download module (requires I2C)
+#
+# CONFIG_ALTERA_STAPL is not set
+# CONFIG_INTEL_MEI is not set
+# CONFIG_INTEL_MEI_ME is not set
+# CONFIG_INTEL_MEI_TXE is not set
+# CONFIG_VMWARE_VMCI is not set
+# CONFIG_GENWQE is not set
+# CONFIG_ECHO is not set
+# CONFIG_MISC_ALCOR_PCI is not set
+# CONFIG_MISC_RTSX_PCI is not set
+# CONFIG_MISC_RTSX_USB is not set
+# CONFIG_HABANA_AI is not set
+# CONFIG_UACCE is not set
+# end of Misc devices
+
+CONFIG_HAVE_IDE=y
+# CONFIG_IDE is not set
+
+#
+# SCSI device support
+#
+CONFIG_SCSI_MOD=y
+CONFIG_RAID_ATTRS=y
+CONFIG_SCSI=y
+CONFIG_SCSI_DMA=y
+CONFIG_SCSI_NETLINK=y
+CONFIG_SCSI_PROC_FS=y
+
+#
+# SCSI support type (disk, tape, CD-ROM)
+#
+CONFIG_BLK_DEV_SD=y
+CONFIG_CHR_DEV_ST=m
+CONFIG_BLK_DEV_SR=m
+CONFIG_CHR_DEV_SG=m
+# CONFIG_CHR_DEV_SCH is not set
+# CONFIG_SCSI_CONSTANTS is not set
+CONFIG_SCSI_LOGGING=y
+# CONFIG_SCSI_SCAN_ASYNC is not set
+
+#
+# SCSI Transports
+#
+CONFIG_SCSI_SPI_ATTRS=m
+CONFIG_SCSI_FC_ATTRS=m
+CONFIG_SCSI_ISCSI_ATTRS=m
+CONFIG_SCSI_SAS_ATTRS=y
+CONFIG_SCSI_SAS_LIBSAS=m
+CONFIG_SCSI_SAS_ATA=y
+CONFIG_SCSI_SAS_HOST_SMP=y
+CONFIG_SCSI_SRP_ATTRS=m
+# end of SCSI Transports
+
+CONFIG_SCSI_LOWLEVEL=y
+CONFIG_ISCSI_TCP=m
+CONFIG_ISCSI_BOOT_SYSFS=m
+# CONFIG_SCSI_CXGB3_ISCSI is not set
+# CONFIG_SCSI_CXGB4_ISCSI is not set
+CONFIG_SCSI_BNX2_ISCSI=m
+CONFIG_SCSI_BNX2X_FCOE=m
+CONFIG_BE2ISCSI=m
+CONFIG_BLK_DEV_3W_XXXX_RAID=m
+CONFIG_SCSI_HPSA=m
+CONFIG_SCSI_3W_9XXX=m
+CONFIG_SCSI_3W_SAS=m
+CONFIG_SCSI_ACARD=m
+CONFIG_SCSI_AACRAID=m
+CONFIG_SCSI_AIC7XXX=m
+CONFIG_AIC7XXX_CMDS_PER_DEVICE=32
+CONFIG_AIC7XXX_RESET_DELAY_MS=5000
+CONFIG_AIC7XXX_DEBUG_ENABLE=y
+CONFIG_AIC7XXX_DEBUG_MASK=0
+CONFIG_AIC7XXX_REG_PRETTY_PRINT=y
+CONFIG_SCSI_AIC79XX=m
+CONFIG_AIC79XX_CMDS_PER_DEVICE=32
+CONFIG_AIC79XX_RESET_DELAY_MS=5000
+CONFIG_AIC79XX_DEBUG_ENABLE=y
+CONFIG_AIC79XX_DEBUG_MASK=0
+CONFIG_AIC79XX_REG_PRETTY_PRINT=y
+CONFIG_SCSI_AIC94XX=m
+CONFIG_AIC94XX_DEBUG=y
+# CONFIG_SCSI_MVSAS is not set
+# CONFIG_SCSI_MVUMI is not set
+CONFIG_SCSI_DPT_I2O=m
+# CONFIG_SCSI_ADVANSYS is not set
+CONFIG_SCSI_ARCMSR=m
+# CONFIG_SCSI_ESAS2R is not set
+CONFIG_MEGARAID_NEWGEN=y
+CONFIG_MEGARAID_MM=m
+CONFIG_MEGARAID_MAILBOX=m
+CONFIG_MEGARAID_LEGACY=y
+CONFIG_MEGARAID_SAS=y
+CONFIG_SCSI_MPT3SAS=y
+CONFIG_SCSI_MPT2SAS_MAX_SGE=128
+CONFIG_SCSI_MPT3SAS_MAX_SGE=128
+CONFIG_SCSI_MPT2SAS=y
+# CONFIG_SCSI_SMARTPQI is not set
+# CONFIG_SCSI_UFSHCD is not set
+# CONFIG_SCSI_HPTIOP is not set
+# CONFIG_SCSI_BUSLOGIC is not set
+# CONFIG_SCSI_MYRB is not set
+# CONFIG_SCSI_MYRS is not set
+# CONFIG_VMWARE_PVSCSI is not set
+CONFIG_LIBFC=m
+CONFIG_LIBFCOE=m
+CONFIG_FCOE=m
+CONFIG_FCOE_FNIC=m
+# CONFIG_SCSI_SNIC is not set
+# CONFIG_SCSI_DMX3191D is not set
+# CONFIG_SCSI_FDOMAIN_PCI is not set
+# CONFIG_SCSI_GDTH is not set
+# CONFIG_SCSI_ISCI is not set
+# CONFIG_SCSI_IPS is not set
+# CONFIG_SCSI_INITIO is not set
+# CONFIG_SCSI_INIA100 is not set
+# CONFIG_SCSI_PPA is not set
+# CONFIG_SCSI_IMM is not set
+CONFIG_SCSI_STEX=m
+# CONFIG_SCSI_SYM53C8XX_2 is not set
+# CONFIG_SCSI_IPR is not set
+CONFIG_SCSI_QLOGIC_1280=m
+CONFIG_SCSI_QLA_FC=m
+CONFIG_SCSI_QLA_ISCSI=m
+CONFIG_QEDI=m
+CONFIG_QEDF=m
+CONFIG_SCSI_LPFC=m
+# CONFIG_SCSI_LPFC_DEBUG_FS is not set
+# CONFIG_SCSI_DC395x is not set
+# CONFIG_SCSI_AM53C974 is not set
+# CONFIG_SCSI_WD719X is not set
+# CONFIG_SCSI_DEBUG is not set
+# CONFIG_SCSI_PMCRAID is not set
+# CONFIG_SCSI_PM8001 is not set
+# CONFIG_SCSI_BFA_FC is not set
+# CONFIG_SCSI_VIRTIO is not set
+# CONFIG_SCSI_CHELSIO_FCOE is not set
+CONFIG_SCSI_DH=y
+CONFIG_SCSI_DH_RDAC=m
+CONFIG_SCSI_DH_HP_SW=m
+CONFIG_SCSI_DH_EMC=m
+CONFIG_SCSI_DH_ALUA=m
+# end of SCSI device support
+
+CONFIG_ATA=y
+CONFIG_SATA_HOST=y
+CONFIG_PATA_TIMINGS=y
+CONFIG_ATA_VERBOSE_ERROR=y
+CONFIG_ATA_FORCE=y
+CONFIG_ATA_ACPI=y
+# CONFIG_SATA_ZPODD is not set
+CONFIG_SATA_PMP=y
+
+#
+# Controllers with non-SFF native interface
+#
+CONFIG_SATA_AHCI=y
+CONFIG_SATA_MOBILE_LPM_POLICY=0
+CONFIG_SATA_AHCI_PLATFORM=y
+# CONFIG_SATA_INIC162X is not set
+# CONFIG_SATA_ACARD_AHCI is not set
+# CONFIG_SATA_SIL24 is not set
+CONFIG_ATA_SFF=y
+
+#
+# SFF controllers with custom DMA interface
+#
+# CONFIG_PDC_ADMA is not set
+# CONFIG_SATA_QSTOR is not set
+# CONFIG_SATA_SX4 is not set
+CONFIG_ATA_BMDMA=y
+
+#
+# SATA SFF controllers with BMDMA
+#
+CONFIG_ATA_PIIX=y
+# CONFIG_SATA_DWC is not set
+CONFIG_SATA_MV=m
+CONFIG_SATA_NV=m
+CONFIG_SATA_PROMISE=m
+CONFIG_SATA_SIL=m
+CONFIG_SATA_SIS=m
+# CONFIG_SATA_SVW is not set
+# CONFIG_SATA_ULI is not set
+CONFIG_SATA_VIA=m
+# CONFIG_SATA_VITESSE is not set
+
+#
+# PATA SFF controllers with BMDMA
+#
+# CONFIG_PATA_ALI is not set
+CONFIG_PATA_AMD=m
+# CONFIG_PATA_ARTOP is not set
+CONFIG_PATA_ATIIXP=m
+# CONFIG_PATA_ATP867X is not set
+# CONFIG_PATA_CMD64X is not set
+# CONFIG_PATA_CYPRESS is not set
+# CONFIG_PATA_EFAR is not set
+# CONFIG_PATA_HPT366 is not set
+# CONFIG_PATA_HPT37X is not set
+# CONFIG_PATA_HPT3X2N is not set
+# CONFIG_PATA_HPT3X3 is not set
+# CONFIG_PATA_IT8213 is not set
+# CONFIG_PATA_IT821X is not set
+CONFIG_PATA_JMICRON=m
+# CONFIG_PATA_MARVELL is not set
+# CONFIG_PATA_NETCELL is not set
+# CONFIG_PATA_NINJA32 is not set
+# CONFIG_PATA_NS87415 is not set
+CONFIG_PATA_OLDPIIX=m
+# CONFIG_PATA_OPTIDMA is not set
+# CONFIG_PATA_PDC2027X is not set
+# CONFIG_PATA_PDC_OLD is not set
+# CONFIG_PATA_RADISYS is not set
+# CONFIG_PATA_RDC is not set
+CONFIG_PATA_SCH=m
+# CONFIG_PATA_SERVERWORKS is not set
+# CONFIG_PATA_SIL680 is not set
+CONFIG_PATA_SIS=m
+# CONFIG_PATA_TOSHIBA is not set
+# CONFIG_PATA_TRIFLEX is not set
+# CONFIG_PATA_VIA is not set
+# CONFIG_PATA_WINBOND is not set
+
+#
+# PIO-only SFF controllers
+#
+# CONFIG_PATA_CMD640_PCI is not set
+CONFIG_PATA_MPIIX=y
+# CONFIG_PATA_NS87410 is not set
+# CONFIG_PATA_OPTI is not set
+# CONFIG_PATA_RZ1000 is not set
+
+#
+# Generic fallback / legacy drivers
+#
+CONFIG_PATA_ACPI=m
+CONFIG_ATA_GENERIC=m
+# CONFIG_PATA_LEGACY is not set
+CONFIG_MD=y
+CONFIG_BLK_DEV_MD=m
+CONFIG_MD_LINEAR=m
+CONFIG_MD_RAID0=m
+CONFIG_MD_RAID1=m
+CONFIG_MD_RAID10=m
+CONFIG_MD_RAID456=m
+CONFIG_MD_MULTIPATH=m
+CONFIG_MD_FAULTY=m
+CONFIG_MD_CLUSTER=m
+# CONFIG_BCACHE is not set
+CONFIG_BLK_DEV_DM_BUILTIN=y
+CONFIG_BLK_DEV_DM=m
+# CONFIG_DM_DEBUG is not set
+CONFIG_DM_BUFIO=m
+# CONFIG_DM_DEBUG_BLOCK_MANAGER_LOCKING is not set
+CONFIG_DM_BIO_PRISON=m
+CONFIG_DM_PERSISTENT_DATA=m
+CONFIG_DM_UNSTRIPED=m
+CONFIG_DM_CRYPT=m
+CONFIG_DM_SNAPSHOT=m
+CONFIG_DM_THIN_PROVISIONING=m
+# CONFIG_DM_CACHE is not set
+CONFIG_DM_WRITECACHE=m
+# CONFIG_DM_EBS is not set
+# CONFIG_DM_ERA is not set
+# CONFIG_DM_CLONE is not set
+CONFIG_DM_MIRROR=m
+# CONFIG_DM_LOG_USERSPACE is not set
+CONFIG_DM_RAID=m
+CONFIG_DM_ZERO=m
+CONFIG_DM_MULTIPATH=m
+CONFIG_DM_MULTIPATH_QL=m
+CONFIG_DM_MULTIPATH_ST=m
+# CONFIG_DM_MULTIPATH_HST is not set
+CONFIG_DM_DELAY=m
+# CONFIG_DM_DUST is not set
+CONFIG_DM_UEVENT=y
+# CONFIG_DM_FLAKEY is not set
+# CONFIG_DM_VERITY is not set
+# CONFIG_DM_SWITCH is not set
+# CONFIG_DM_LOG_WRITES is not set
+# CONFIG_DM_INTEGRITY is not set
+# CONFIG_TARGET_CORE is not set
+CONFIG_FUSION=y
+CONFIG_FUSION_SPI=m
+CONFIG_FUSION_FC=m
+CONFIG_FUSION_SAS=y
+CONFIG_FUSION_MAX_SGE=128
+CONFIG_FUSION_CTL=m
+CONFIG_FUSION_LAN=m
+CONFIG_FUSION_LOGGING=y
+
+#
+# IEEE 1394 (FireWire) support
+#
+# CONFIG_FIREWIRE is not set
+# CONFIG_FIREWIRE_NOSY is not set
+# end of IEEE 1394 (FireWire) support
+
+# CONFIG_MACINTOSH_DRIVERS is not set
+CONFIG_NETDEVICES=y
+CONFIG_MII=m
+CONFIG_NET_CORE=y
+CONFIG_BONDING=m
+CONFIG_DUMMY=m
+CONFIG_WIREGUARD=m
+# CONFIG_WIREGUARD_DEBUG is not set
+CONFIG_EQUALIZER=m
+CONFIG_NET_FC=y
+# CONFIG_IFB is not set
+CONFIG_NET_TEAM=m
+CONFIG_NET_TEAM_MODE_BROADCAST=m
+CONFIG_NET_TEAM_MODE_ROUNDROBIN=m
+CONFIG_NET_TEAM_MODE_RANDOM=m
+CONFIG_NET_TEAM_MODE_ACTIVEBACKUP=m
+CONFIG_NET_TEAM_MODE_LOADBALANCE=m
+CONFIG_MACVLAN=m
+# CONFIG_MACVTAP is not set
+CONFIG_IPVLAN_L3S=y
+CONFIG_IPVLAN=m
+# CONFIG_IPVTAP is not set
+CONFIG_VXLAN=m
+CONFIG_GENEVE=m
+CONFIG_BAREUDP=m
+CONFIG_GTP=m
+CONFIG_MACSEC=m
+# CONFIG_NETCONSOLE is not set
+CONFIG_RIONET=m
+CONFIG_RIONET_TX_SIZE=128
+CONFIG_RIONET_RX_SIZE=128
+CONFIG_TUN=m
+# CONFIG_TUN_VNET_CROSS_LE is not set
+# CONFIG_VETH is not set
+# CONFIG_VIRTIO_NET is not set
+# CONFIG_NLMON is not set
+CONFIG_SUNGEM_PHY=m
+# CONFIG_ARCNET is not set
+
+#
+# Distributed Switch Architecture drivers
+#
+# end of Distributed Switch Architecture drivers
+
+CONFIG_ETHERNET=y
+CONFIG_MDIO=m
+CONFIG_NET_VENDOR_3COM=y
+CONFIG_VORTEX=m
+CONFIG_TYPHOON=m
+CONFIG_NET_VENDOR_ADAPTEC=y
+CONFIG_ADAPTEC_STARFIRE=m
+CONFIG_NET_VENDOR_AGERE=y
+CONFIG_ET131X=m
+CONFIG_NET_VENDOR_ALACRITECH=y
+CONFIG_SLICOSS=m
+CONFIG_NET_VENDOR_ALTEON=y
+CONFIG_ACENIC=m
+CONFIG_ACENIC_OMIT_TIGON_I=y
+CONFIG_ALTERA_TSE=m
+CONFIG_NET_VENDOR_AMAZON=y
+CONFIG_ENA_ETHERNET=m
+CONFIG_NET_VENDOR_AMD=y
+CONFIG_AMD8111_ETH=m
+CONFIG_PCNET32=m
+CONFIG_AMD_XGBE=m
+CONFIG_AMD_XGBE_HAVE_ECC=y
+CONFIG_NET_VENDOR_AQUANTIA=y
+CONFIG_AQTION=m
+CONFIG_NET_VENDOR_ARC=y
+CONFIG_NET_VENDOR_ATHEROS=y
+CONFIG_ATL2=m
+CONFIG_ATL1=m
+CONFIG_ATL1E=m
+CONFIG_ATL1C=m
+CONFIG_ALX=m
+CONFIG_NET_VENDOR_AURORA=y
+# CONFIG_AURORA_NB8800 is not set
+CONFIG_NET_VENDOR_BROADCOM=y
+CONFIG_B44=m
+CONFIG_B44_PCI_AUTOSELECT=y
+CONFIG_B44_PCICORE_AUTOSELECT=y
+CONFIG_B44_PCI=y
+CONFIG_BCMGENET=m
+CONFIG_BNX2=m
+CONFIG_CNIC=m
+CONFIG_TIGON3=m
+CONFIG_TIGON3_HWMON=y
+CONFIG_BNX2X=m
+CONFIG_BNX2X_SRIOV=y
+CONFIG_SYSTEMPORT=m
+CONFIG_BNXT=m
+CONFIG_BNXT_SRIOV=y
+CONFIG_BNXT_FLOWER_OFFLOAD=y
+CONFIG_BNXT_HWMON=y
+CONFIG_NET_VENDOR_BROCADE=y
+CONFIG_BNA=m
+CONFIG_NET_VENDOR_CADENCE=y
+CONFIG_MACB=m
+CONFIG_MACB_USE_HWSTAMP=y
+CONFIG_MACB_PCI=m
+CONFIG_NET_VENDOR_CAVIUM=y
+CONFIG_THUNDER_NIC_PF=m
+CONFIG_THUNDER_NIC_VF=m
+CONFIG_THUNDER_NIC_BGX=m
+CONFIG_THUNDER_NIC_RGX=m
+CONFIG_CAVIUM_PTP=m
+CONFIG_LIQUIDIO=m
+CONFIG_LIQUIDIO_VF=m
+CONFIG_NET_VENDOR_CHELSIO=y
+CONFIG_CHELSIO_T1=m
+CONFIG_CHELSIO_T1_1G=y
+CONFIG_CHELSIO_T3=m
+CONFIG_CHELSIO_T4=m
+CONFIG_CHELSIO_T4VF=m
+CONFIG_CHELSIO_INLINE_CRYPTO=y
+CONFIG_CHELSIO_IPSEC_INLINE=m
+CONFIG_NET_VENDOR_CISCO=y
+CONFIG_ENIC=m
+CONFIG_NET_VENDOR_CORTINA=y
+CONFIG_CX_ECAT=m
+CONFIG_DNET=m
+CONFIG_NET_VENDOR_DEC=y
+CONFIG_NET_TULIP=y
+CONFIG_DE2104X=m
+CONFIG_DE2104X_DSL=0
+CONFIG_TULIP=m
+CONFIG_TULIP_MWI=y
+CONFIG_TULIP_MMIO=y
+CONFIG_TULIP_NAPI=y
+CONFIG_TULIP_NAPI_HW_MITIGATION=y
+CONFIG_DE4X5=m
+CONFIG_WINBOND_840=m
+CONFIG_DM9102=m
+CONFIG_ULI526X=m
+CONFIG_NET_VENDOR_DLINK=y
+CONFIG_DL2K=m
+CONFIG_SUNDANCE=m
+CONFIG_SUNDANCE_MMIO=y
+CONFIG_NET_VENDOR_EMULEX=y
+CONFIG_BE2NET=m
+CONFIG_BE2NET_HWMON=y
+CONFIG_BE2NET_BE2=y
+CONFIG_BE2NET_BE3=y
+CONFIG_BE2NET_LANCER=y
+CONFIG_BE2NET_SKYHAWK=y
+CONFIG_NET_VENDOR_EZCHIP=y
+CONFIG_NET_VENDOR_GOOGLE=y
+CONFIG_GVE=m
+CONFIG_NET_VENDOR_HUAWEI=y
+CONFIG_HINIC=m
+CONFIG_NET_VENDOR_I825XX=y
+CONFIG_NET_VENDOR_INTEL=y
+CONFIG_E100=m
+CONFIG_E1000=m
+CONFIG_E1000E=m
+CONFIG_E1000E_HWTS=y
+CONFIG_IGB=m
+CONFIG_IGB_HWMON=y
+CONFIG_IGB_DCA=y
+CONFIG_IGBVF=m
+CONFIG_IXGB=m
+CONFIG_IXGBE=m
+CONFIG_IXGBE_HWMON=y
+CONFIG_IXGBE_DCA=y
+CONFIG_IXGBE_IPSEC=y
+CONFIG_IXGBEVF=m
+CONFIG_IXGBEVF_IPSEC=y
+CONFIG_I40E=m
+CONFIG_IAVF=m
+CONFIG_I40EVF=m
+CONFIG_ICE=m
+CONFIG_FM10K=m
+CONFIG_IGC=m
+CONFIG_JME=m
+CONFIG_NET_VENDOR_MARVELL=y
+CONFIG_MVMDIO=m
+CONFIG_SKGE=m
+# CONFIG_SKGE_DEBUG is not set
+CONFIG_SKGE_GENESIS=y
+CONFIG_SKY2=m
+# CONFIG_SKY2_DEBUG is not set
+CONFIG_NET_VENDOR_MELLANOX=y
+CONFIG_MLX4_EN=m
+CONFIG_MLX4_CORE=m
+CONFIG_MLX4_DEBUG=y
+CONFIG_MLX4_CORE_GEN2=y
+CONFIG_MLX5_CORE=m
+CONFIG_MLX5_ACCEL=y
+CONFIG_MLX5_FPGA=y
+CONFIG_MLX5_CORE_EN=y
+CONFIG_MLX5_EN_ARFS=y
+CONFIG_MLX5_EN_RXNFC=y
+CONFIG_MLX5_MPFS=y
+CONFIG_MLX5_CORE_IPOIB=y
+CONFIG_MLX5_FPGA_IPSEC=y
+# CONFIG_MLX5_IPSEC is not set
+CONFIG_MLX5_EN_IPSEC=y
+CONFIG_MLXSW_CORE=m
+CONFIG_MLXSW_CORE_HWMON=y
+CONFIG_MLXSW_CORE_THERMAL=y
+CONFIG_MLXSW_PCI=m
+CONFIG_MLXSW_I2C=m
+CONFIG_MLXSW_MINIMAL=m
+CONFIG_MLXFW=m
+CONFIG_NET_VENDOR_MICREL=y
+CONFIG_KS8842=m
+CONFIG_KS8851_MLL=m
+CONFIG_KSZ884X_PCI=m
+CONFIG_NET_VENDOR_MICROCHIP=y
+# CONFIG_LAN743X is not set
+CONFIG_NET_VENDOR_MICROSEMI=y
+CONFIG_NET_VENDOR_MYRI=y
+CONFIG_MYRI10GE=m
+CONFIG_MYRI10GE_DCA=y
+CONFIG_FEALNX=m
+CONFIG_NET_VENDOR_NATSEMI=y
+CONFIG_NATSEMI=m
+CONFIG_NS83820=m
+CONFIG_NET_VENDOR_NETERION=y
+CONFIG_S2IO=m
+CONFIG_VXGE=m
+CONFIG_VXGE_DEBUG_TRACE_ALL=y
+CONFIG_NET_VENDOR_NETRONOME=y
+CONFIG_NFP=m
+# CONFIG_NFP_DEBUG is not set
+CONFIG_NET_VENDOR_NI=y
+# CONFIG_NI_XGE_MANAGEMENT_ENET is not set
+CONFIG_NET_VENDOR_8390=y
+CONFIG_NE2K_PCI=m
+CONFIG_NET_VENDOR_NVIDIA=y
+CONFIG_FORCEDETH=m
+CONFIG_NET_VENDOR_OKI=y
+CONFIG_ETHOC=m
+CONFIG_NET_VENDOR_PACKET_ENGINES=y
+CONFIG_HAMACHI=m
+CONFIG_YELLOWFIN=m
+CONFIG_NET_VENDOR_PENSANDO=y
+# CONFIG_IONIC is not set
+CONFIG_NET_VENDOR_QLOGIC=y
+CONFIG_QLA3XXX=m
+CONFIG_QLCNIC=m
+CONFIG_QLCNIC_SRIOV=y
+CONFIG_QLCNIC_HWMON=y
+CONFIG_NETXEN_NIC=m
+CONFIG_QED=m
+CONFIG_QED_LL2=y
+CONFIG_QED_SRIOV=y
+CONFIG_QEDE=m
+CONFIG_QED_ISCSI=y
+CONFIG_QED_FCOE=y
+CONFIG_QED_OOO=y
+CONFIG_NET_VENDOR_QUALCOMM=y
+CONFIG_QCOM_EMAC=m
+CONFIG_RMNET=m
+CONFIG_NET_VENDOR_RDC=y
+CONFIG_R6040=m
+CONFIG_NET_VENDOR_REALTEK=y
+CONFIG_ATP=m
+CONFIG_8139CP=m
+CONFIG_8139TOO=m
+CONFIG_8139TOO_PIO=y
+CONFIG_8139TOO_TUNE_TWISTER=y
+CONFIG_8139TOO_8129=y
+CONFIG_8139_OLD_RX_RESET=y
+CONFIG_R8169=m
+CONFIG_NET_VENDOR_RENESAS=y
+CONFIG_NET_VENDOR_ROCKER=y
+CONFIG_NET_VENDOR_SAMSUNG=y
+CONFIG_SXGBE_ETH=m
+CONFIG_NET_VENDOR_SEEQ=y
+CONFIG_NET_VENDOR_SOLARFLARE=y
+CONFIG_SFC=m
+CONFIG_SFC_MCDI_MON=y
+CONFIG_SFC_SRIOV=y
+CONFIG_SFC_MCDI_LOGGING=y
+CONFIG_SFC_FALCON=m
+CONFIG_NET_VENDOR_SILAN=y
+CONFIG_SC92031=m
+CONFIG_NET_VENDOR_SIS=y
+CONFIG_SIS900=m
+CONFIG_SIS190=m
+CONFIG_NET_VENDOR_SMSC=y
+CONFIG_EPIC100=m
+CONFIG_SMSC911X=m
+CONFIG_SMSC9420=m
+CONFIG_NET_VENDOR_SOCIONEXT=y
+CONFIG_NET_VENDOR_STMICRO=y
+CONFIG_STMMAC_ETH=m
+CONFIG_STMMAC_SELFTESTS=y
+CONFIG_STMMAC_PLATFORM=m
+CONFIG_DWMAC_GENERIC=m
+CONFIG_DWMAC_INTEL=m
+CONFIG_STMMAC_PCI=m
+CONFIG_NET_VENDOR_SUN=y
+CONFIG_HAPPYMEAL=m
+CONFIG_SUNGEM=m
+CONFIG_CASSINI=m
+CONFIG_NIU=m
+CONFIG_NET_VENDOR_SYNOPSYS=y
+CONFIG_DWC_XLGMAC=m
+CONFIG_DWC_XLGMAC_PCI=m
+CONFIG_NET_VENDOR_TEHUTI=y
+CONFIG_TEHUTI=m
+CONFIG_NET_VENDOR_TI=y
+# CONFIG_TI_CPSW_PHY_SEL is not set
+CONFIG_TLAN=m
+CONFIG_NET_VENDOR_VIA=y
+CONFIG_VIA_RHINE=m
+CONFIG_VIA_RHINE_MMIO=y
+CONFIG_VIA_VELOCITY=m
+CONFIG_NET_VENDOR_WIZNET=y
+CONFIG_WIZNET_W5100=m
+CONFIG_WIZNET_W5300=m
+# CONFIG_WIZNET_BUS_DIRECT is not set
+# CONFIG_WIZNET_BUS_INDIRECT is not set
+CONFIG_WIZNET_BUS_ANY=y
+CONFIG_NET_VENDOR_XILINX=y
+CONFIG_XILINX_AXI_EMAC=m
+CONFIG_XILINX_LL_TEMAC=m
+# CONFIG_FDDI is not set
+# CONFIG_HIPPI is not set
+# CONFIG_NET_SB1000 is not set
+CONFIG_PHYLINK=m
+CONFIG_PHYLIB=m
+CONFIG_SWPHY=y
+# CONFIG_LED_TRIGGER_PHY is not set
+CONFIG_FIXED_PHY=m
+# CONFIG_SFP is not set
+
+#
+# MII PHY device drivers
+#
+# CONFIG_AMD_PHY is not set
+# CONFIG_ADIN_PHY is not set
+# CONFIG_AQUANTIA_PHY is not set
+# CONFIG_AX88796B_PHY is not set
+CONFIG_BROADCOM_PHY=m
+# CONFIG_BCM54140_PHY is not set
+CONFIG_BCM7XXX_PHY=m
+# CONFIG_BCM84881_PHY is not set
+# CONFIG_BCM87XX_PHY is not set
+CONFIG_BCM_NET_PHYLIB=m
+# CONFIG_CICADA_PHY is not set
+# CONFIG_CORTINA_PHY is not set
+# CONFIG_DAVICOM_PHY is not set
+# CONFIG_ICPLUS_PHY is not set
+# CONFIG_LXT_PHY is not set
+# CONFIG_INTEL_XWAY_PHY is not set
+# CONFIG_LSI_ET1011C_PHY is not set
+# CONFIG_MARVELL_PHY is not set
+# CONFIG_MARVELL_10G_PHY is not set
+CONFIG_MICREL_PHY=m
+# CONFIG_MICROCHIP_PHY is not set
+# CONFIG_MICROCHIP_T1_PHY is not set
+# CONFIG_MICROSEMI_PHY is not set
+# CONFIG_NATIONAL_PHY is not set
+# CONFIG_NXP_TJA11XX_PHY is not set
+# CONFIG_QSEMI_PHY is not set
+CONFIG_REALTEK_PHY=m
+# CONFIG_RENESAS_PHY is not set
+# CONFIG_ROCKCHIP_PHY is not set
+CONFIG_SMSC_PHY=m
+# CONFIG_STE10XP is not set
+# CONFIG_TERANETICS_PHY is not set
+# CONFIG_DP83822_PHY is not set
+# CONFIG_DP83TC811_PHY is not set
+# CONFIG_DP83848_PHY is not set
+# CONFIG_DP83867_PHY is not set
+# CONFIG_DP83869_PHY is not set
+# CONFIG_VITESSE_PHY is not set
+# CONFIG_XILINX_GMII2RGMII is not set
+CONFIG_MDIO_DEVICE=m
+CONFIG_MDIO_BUS=m
+CONFIG_MDIO_DEVRES=m
+CONFIG_MDIO_BITBANG=m
+CONFIG_MDIO_BCM_UNIMAC=m
+CONFIG_MDIO_CAVIUM=m
+# CONFIG_MDIO_MVUSB is not set
+# CONFIG_MDIO_MSCC_MIIM is not set
+CONFIG_MDIO_THUNDER=m
+
+#
+# MDIO Multiplexers
+#
+
+#
+# PCS device drivers
+#
+CONFIG_PCS_XPCS=m
+# end of PCS device drivers
+
+# CONFIG_PLIP is not set
+CONFIG_PPP=m
+CONFIG_PPP_BSDCOMP=m
+CONFIG_PPP_DEFLATE=m
+CONFIG_PPP_FILTER=y
+CONFIG_PPP_MPPE=m
+CONFIG_PPP_MULTILINK=y
+CONFIG_PPPOE=m
+CONFIG_PPTP=m
+CONFIG_PPPOL2TP=m
+CONFIG_PPP_ASYNC=m
+CONFIG_PPP_SYNC_TTY=m
+# CONFIG_SLIP is not set
+CONFIG_SLHC=m
+# CONFIG_USB_NET_DRIVERS is not set
+# CONFIG_WLAN is not set
+
+#
+# Enable WiMAX (Networking options) to see the WiMAX drivers
+#
+# CONFIG_WAN is not set
+# CONFIG_VMXNET3 is not set
+# CONFIG_FUJITSU_ES is not set
+# CONFIG_NETDEVSIM is not set
+# CONFIG_NET_FAILOVER is not set
+# CONFIG_ISDN is not set
+
+#
+# Input device support
+#
+CONFIG_INPUT=y
+CONFIG_INPUT_LEDS=y
+CONFIG_INPUT_FF_MEMLESS=y
+CONFIG_INPUT_POLLDEV=m
+CONFIG_INPUT_SPARSEKMAP=m
+CONFIG_INPUT_MATRIXKMAP=m
+
+#
+# Userland interfaces
+#
+CONFIG_INPUT_MOUSEDEV=m
+CONFIG_INPUT_MOUSEDEV_PSAUX=y
+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
+# CONFIG_INPUT_JOYDEV is not set
+CONFIG_INPUT_EVDEV=m
+# CONFIG_INPUT_EVBUG is not set
+
+#
+# Input Device Drivers
+#
+CONFIG_INPUT_KEYBOARD=y
+# CONFIG_KEYBOARD_ADP5588 is not set
+# CONFIG_KEYBOARD_ADP5589 is not set
+CONFIG_KEYBOARD_ATKBD=y
+# CONFIG_KEYBOARD_QT1050 is not set
+# CONFIG_KEYBOARD_QT1070 is not set
+# CONFIG_KEYBOARD_QT2160 is not set
+# CONFIG_KEYBOARD_DLINK_DIR685 is not set
+# CONFIG_KEYBOARD_LKKBD is not set
+# CONFIG_KEYBOARD_TCA6416 is not set
+# CONFIG_KEYBOARD_TCA8418 is not set
+# CONFIG_KEYBOARD_LM8323 is not set
+# CONFIG_KEYBOARD_LM8333 is not set
+# CONFIG_KEYBOARD_MAX7359 is not set
+# CONFIG_KEYBOARD_MCS is not set
+# CONFIG_KEYBOARD_MPR121 is not set
+# CONFIG_KEYBOARD_NEWTON is not set
+# CONFIG_KEYBOARD_OPENCORES is not set
+# CONFIG_KEYBOARD_SAMSUNG is not set
+# CONFIG_KEYBOARD_STOWAWAY is not set
+# CONFIG_KEYBOARD_SUNKBD is not set
+# CONFIG_KEYBOARD_TM2_TOUCHKEY is not set
+CONFIG_KEYBOARD_XTKBD=y
+CONFIG_INPUT_MOUSE=y
+CONFIG_MOUSE_PS2=m
+CONFIG_MOUSE_PS2_ALPS=y
+CONFIG_MOUSE_PS2_BYD=y
+CONFIG_MOUSE_PS2_LOGIPS2PP=y
+CONFIG_MOUSE_PS2_SYNAPTICS=y
+CONFIG_MOUSE_PS2_SYNAPTICS_SMBUS=y
+CONFIG_MOUSE_PS2_CYPRESS=y
+CONFIG_MOUSE_PS2_LIFEBOOK=y
+CONFIG_MOUSE_PS2_TRACKPOINT=y
+CONFIG_MOUSE_PS2_ELANTECH=y
+CONFIG_MOUSE_PS2_ELANTECH_SMBUS=y
+CONFIG_MOUSE_PS2_SENTELIC=y
+CONFIG_MOUSE_PS2_TOUCHKIT=y
+CONFIG_MOUSE_PS2_FOCALTECH=y
+# CONFIG_MOUSE_PS2_VMMOUSE is not set
+CONFIG_MOUSE_PS2_SMBUS=y
+CONFIG_MOUSE_SERIAL=m
+CONFIG_MOUSE_APPLETOUCH=m
+CONFIG_MOUSE_BCM5974=m
+# CONFIG_MOUSE_CYAPA is not set
+# CONFIG_MOUSE_ELAN_I2C is not set
+# CONFIG_MOUSE_VSXXXAA is not set
+# CONFIG_MOUSE_SYNAPTICS_I2C is not set
+# CONFIG_MOUSE_SYNAPTICS_USB is not set
+# CONFIG_INPUT_JOYSTICK is not set
+# CONFIG_INPUT_TABLET is not set
+# CONFIG_INPUT_TOUCHSCREEN is not set
+CONFIG_INPUT_MISC=y
+# CONFIG_INPUT_AD714X is not set
+# CONFIG_INPUT_BMA150 is not set
+# CONFIG_INPUT_E3X0_BUTTON is not set
+CONFIG_INPUT_PCSPKR=y
+# CONFIG_INPUT_MMA8450 is not set
+# CONFIG_INPUT_APANEL is not set
+# CONFIG_INPUT_ATLAS_BTNS is not set
+# CONFIG_INPUT_ATI_REMOTE2 is not set
+# CONFIG_INPUT_KEYSPAN_REMOTE is not set
+# CONFIG_INPUT_KXTJ9 is not set
+# CONFIG_INPUT_POWERMATE is not set
+# CONFIG_INPUT_YEALINK is not set
+# CONFIG_INPUT_CM109 is not set
+CONFIG_INPUT_UINPUT=m
+# CONFIG_INPUT_PCF8574 is not set
+# CONFIG_INPUT_ADXL34X is not set
+# CONFIG_INPUT_IMS_PCU is not set
+# CONFIG_INPUT_IQS269A is not set
+# CONFIG_INPUT_CMA3000 is not set
+# CONFIG_INPUT_IDEAPAD_SLIDEBAR is not set
+# CONFIG_INPUT_DRV2665_HAPTICS is not set
+# CONFIG_INPUT_DRV2667_HAPTICS is not set
+# CONFIG_RMI4_CORE is not set
+
+#
+# Hardware I/O ports
+#
+CONFIG_SERIO=y
+CONFIG_ARCH_MIGHT_HAVE_PC_SERIO=y
+CONFIG_SERIO_I8042=y
+CONFIG_SERIO_SERPORT=m
+# CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_PARKBD is not set
+CONFIG_SERIO_PCIPS2=m
+CONFIG_SERIO_LIBPS2=y
+# CONFIG_SERIO_RAW is not set
+# CONFIG_SERIO_ALTERA_PS2 is not set
+# CONFIG_SERIO_PS2MULT is not set
+# CONFIG_SERIO_ARC_PS2 is not set
+# CONFIG_USERIO is not set
+# CONFIG_GAMEPORT is not set
+# end of Hardware I/O ports
+# end of Input device support
+
+#
+# Character devices
+#
+CONFIG_TTY=y
+CONFIG_VT=y
+CONFIG_CONSOLE_TRANSLATIONS=y
+CONFIG_VT_CONSOLE=y
+CONFIG_VT_CONSOLE_SLEEP=y
+CONFIG_HW_CONSOLE=y
+# CONFIG_VT_HW_CONSOLE_BINDING is not set
+CONFIG_UNIX98_PTYS=y
+CONFIG_LEGACY_PTYS=y
+CONFIG_LEGACY_PTY_COUNT=256
+CONFIG_LDISC_AUTOLOAD=y
+
+#
+# Serial drivers
+#
+CONFIG_SERIAL_8250=m
+CONFIG_SERIAL_8250_DEPRECATED_OPTIONS=y
+CONFIG_SERIAL_8250_PNP=y
+# CONFIG_SERIAL_8250_16550A_VARIANTS is not set
+# CONFIG_SERIAL_8250_FINTEK is not set
+CONFIG_SERIAL_8250_DMA=y
+CONFIG_SERIAL_8250_PCI=m
+CONFIG_SERIAL_8250_EXAR=m
+CONFIG_SERIAL_8250_NR_UARTS=4
+CONFIG_SERIAL_8250_RUNTIME_UARTS=4
+CONFIG_SERIAL_8250_EXTENDED=y
+CONFIG_SERIAL_8250_MANY_PORTS=y
+# CONFIG_SERIAL_8250_SHARE_IRQ is not set
+# CONFIG_SERIAL_8250_DETECT_IRQ is not set
+# CONFIG_SERIAL_8250_RSA is not set
+CONFIG_SERIAL_8250_DWLIB=y
+# CONFIG_SERIAL_8250_DW is not set
+# CONFIG_SERIAL_8250_RT288X is not set
+CONFIG_SERIAL_8250_LPSS=m
+CONFIG_SERIAL_8250_MID=m
+
+#
+# Non-8250 serial port support
+#
+# CONFIG_SERIAL_UARTLITE is not set
+CONFIG_SERIAL_CORE=m
+# CONFIG_SERIAL_JSM is not set
+# CONFIG_SERIAL_LANTIQ is not set
+# CONFIG_SERIAL_SCCNXP is not set
+# CONFIG_SERIAL_SC16IS7XX is not set
+# CONFIG_SERIAL_ALTERA_JTAGUART is not set
+# CONFIG_SERIAL_ALTERA_UART is not set
+# CONFIG_SERIAL_ARC is not set
+# CONFIG_SERIAL_RP2 is not set
+# CONFIG_SERIAL_FSL_LPUART is not set
+# CONFIG_SERIAL_FSL_LINFLEXUART is not set
+# CONFIG_SERIAL_SPRD is not set
+# end of Serial drivers
+
+# CONFIG_SERIAL_NONSTANDARD is not set
+# CONFIG_N_GSM is not set
+# CONFIG_NOZOMI is not set
+# CONFIG_NULL_TTY is not set
+# CONFIG_TRACE_SINK is not set
+# CONFIG_SERIAL_DEV_BUS is not set
+CONFIG_PRINTER=m
+# CONFIG_LP_CONSOLE is not set
+# CONFIG_PPDEV is not set
+# CONFIG_VIRTIO_CONSOLE is not set
+CONFIG_IPMI_HANDLER=m
+CONFIG_IPMI_DMI_DECODE=y
+CONFIG_IPMI_PLAT_DATA=y
+CONFIG_IPMI_PANIC_EVENT=y
+CONFIG_IPMI_PANIC_STRING=y
+CONFIG_IPMI_DEVICE_INTERFACE=m
+CONFIG_IPMI_SI=m
+CONFIG_IPMI_SSIF=m
+CONFIG_IPMI_WATCHDOG=m
+CONFIG_IPMI_POWEROFF=m
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_TIMERIOMEM=y
+CONFIG_HW_RANDOM_INTEL=y
+CONFIG_HW_RANDOM_AMD=m
+# CONFIG_HW_RANDOM_BA431 is not set
+CONFIG_HW_RANDOM_VIA=m
+CONFIG_HW_RANDOM_VIRTIO=m
+# CONFIG_HW_RANDOM_XIPHERA is not set
+# CONFIG_APPLICOM is not set
+# CONFIG_MWAVE is not set
+CONFIG_DEVMEM=y
+# CONFIG_DEVKMEM is not set
+CONFIG_NVRAM=m
+# CONFIG_RAW_DRIVER is not set
+CONFIG_DEVPORT=y
+CONFIG_HPET=y
+CONFIG_HPET_MMAP=y
+CONFIG_HPET_MMAP_DEFAULT=y
+# CONFIG_HANGCHECK_TIMER is not set
+# CONFIG_TCG_TPM is not set
+# CONFIG_TELCLOCK is not set
+# CONFIG_XILLYBUS is not set
+# CONFIG_RANDOM_TRUST_CPU is not set
+# CONFIG_RANDOM_TRUST_BOOTLOADER is not set
+# end of Character devices
+
+#
+# I2C support
+#
+CONFIG_I2C=m
+CONFIG_I2C_BOARDINFO=y
+CONFIG_I2C_COMPAT=y
+CONFIG_I2C_CHARDEV=m
+# CONFIG_I2C_MUX is not set
+CONFIG_I2C_HELPER_AUTO=y
+CONFIG_I2C_SMBUS=m
+CONFIG_I2C_ALGOBIT=m
+CONFIG_I2C_ALGOPCA=m
+
+#
+# I2C Hardware Bus support
+#
+
+#
+# PC SMBus host controller drivers
+#
+CONFIG_I2C_ALI1535=m
+CONFIG_I2C_ALI1563=m
+CONFIG_I2C_ALI15X3=m
+CONFIG_I2C_AMD756=m
+CONFIG_I2C_AMD756_S4882=m
+CONFIG_I2C_AMD8111=m
+# CONFIG_I2C_AMD_MP2 is not set
+CONFIG_I2C_I801=m
+CONFIG_I2C_ISCH=m
+CONFIG_I2C_ISMT=m
+CONFIG_I2C_PIIX4=m
+CONFIG_I2C_NFORCE2=m
+CONFIG_I2C_NFORCE2_S4985=m
+# CONFIG_I2C_NVIDIA_GPU is not set
+CONFIG_I2C_SIS5595=m
+CONFIG_I2C_SIS630=m
+CONFIG_I2C_SIS96X=m
+CONFIG_I2C_VIA=m
+CONFIG_I2C_VIAPRO=m
+
+#
+# ACPI drivers
+#
+CONFIG_I2C_SCMI=m
+
+#
+# I2C system bus drivers (mostly embedded / system-on-chip)
+#
+# CONFIG_I2C_DESIGNWARE_PLATFORM is not set
+# CONFIG_I2C_DESIGNWARE_PCI is not set
+# CONFIG_I2C_EMEV2 is not set
+CONFIG_I2C_OCORES=m
+CONFIG_I2C_PCA_PLATFORM=m
+CONFIG_I2C_SIMTEC=m
+CONFIG_I2C_XILINX=m
+
+#
+# External I2C/SMBus adapter drivers
+#
+CONFIG_I2C_DIOLAN_U2C=m
+CONFIG_I2C_PARPORT=m
+# CONFIG_I2C_ROBOTFUZZ_OSIF is not set
+CONFIG_I2C_TAOS_EVM=m
+CONFIG_I2C_TINY_USB=m
+
+#
+# Other I2C/SMBus bus drivers
+#
+# CONFIG_I2C_MLXCPLD is not set
+# end of I2C Hardware Bus support
+
+CONFIG_I2C_STUB=m
+# CONFIG_I2C_SLAVE is not set
+# CONFIG_I2C_DEBUG_CORE is not set
+# CONFIG_I2C_DEBUG_ALGO is not set
+# CONFIG_I2C_DEBUG_BUS is not set
+# end of I2C support
+
+# CONFIG_I3C is not set
+# CONFIG_SPI is not set
+# CONFIG_SPMI is not set
+# CONFIG_HSI is not set
+CONFIG_PPS=y
+# CONFIG_PPS_DEBUG is not set
+
+#
+# PPS clients support
+#
+# CONFIG_PPS_CLIENT_KTIMER is not set
+# CONFIG_PPS_CLIENT_LDISC is not set
+# CONFIG_PPS_CLIENT_PARPORT is not set
+# CONFIG_PPS_CLIENT_GPIO is not set
+
+#
+# PPS generators support
+#
+
+#
+# PTP clock support
+#
+CONFIG_PTP_1588_CLOCK=y
+
+#
+# Enable PHYLIB and NETWORK_PHY_TIMESTAMPING to see the additional clocks.
+#
+# CONFIG_PTP_1588_CLOCK_IDT82P33 is not set
+# CONFIG_PTP_1588_CLOCK_IDTCM is not set
+# CONFIG_PTP_1588_CLOCK_VMW is not set
+# end of PTP clock support
+
+CONFIG_PINCTRL=y
+# CONFIG_PINCTRL_AMD is not set
+# CONFIG_PINCTRL_MCP23S08 is not set
+# CONFIG_PINCTRL_BAYTRAIL is not set
+# CONFIG_PINCTRL_CHERRYVIEW is not set
+# CONFIG_PINCTRL_LYNXPOINT is not set
+# CONFIG_PINCTRL_BROXTON is not set
+# CONFIG_PINCTRL_CANNONLAKE is not set
+# CONFIG_PINCTRL_CEDARFORK is not set
+# CONFIG_PINCTRL_DENVERTON is not set
+# CONFIG_PINCTRL_EMMITSBURG is not set
+# CONFIG_PINCTRL_GEMINILAKE is not set
+# CONFIG_PINCTRL_ICELAKE is not set
+# CONFIG_PINCTRL_JASPERLAKE is not set
+# CONFIG_PINCTRL_LEWISBURG is not set
+# CONFIG_PINCTRL_SUNRISEPOINT is not set
+# CONFIG_PINCTRL_TIGERLAKE is not set
+
+#
+# Renesas pinctrl drivers
+#
+# end of Renesas pinctrl drivers
+
+# CONFIG_GPIOLIB is not set
+# CONFIG_W1 is not set
+# CONFIG_POWER_RESET is not set
+CONFIG_POWER_SUPPLY=y
+# CONFIG_POWER_SUPPLY_DEBUG is not set
+# CONFIG_PDA_POWER is not set
+# CONFIG_TEST_POWER is not set
+# CONFIG_CHARGER_ADP5061 is not set
+# CONFIG_BATTERY_CW2015 is not set
+# CONFIG_BATTERY_DS2780 is not set
+# CONFIG_BATTERY_DS2781 is not set
+# CONFIG_BATTERY_DS2782 is not set
+# CONFIG_BATTERY_SBS is not set
+# CONFIG_CHARGER_SBS is not set
+# CONFIG_BATTERY_BQ27XXX is not set
+# CONFIG_BATTERY_MAX17040 is not set
+# CONFIG_BATTERY_MAX17042 is not set
+# CONFIG_CHARGER_MAX8903 is not set
+# CONFIG_CHARGER_LP8727 is not set
+# CONFIG_CHARGER_BQ2415X is not set
+# CONFIG_CHARGER_SMB347 is not set
+# CONFIG_BATTERY_GAUGE_LTC2941 is not set
+# CONFIG_BATTERY_RT5033 is not set
+# CONFIG_CHARGER_BD99954 is not set
+CONFIG_HWMON=m
+CONFIG_HWMON_VID=m
+# CONFIG_HWMON_DEBUG_CHIP is not set
+
+#
+# Native drivers
+#
+CONFIG_SENSORS_ABITUGURU=m
+CONFIG_SENSORS_ABITUGURU3=m
+CONFIG_SENSORS_AD7414=m
+CONFIG_SENSORS_AD7418=m
+CONFIG_SENSORS_ADM1021=m
+CONFIG_SENSORS_ADM1025=m
+CONFIG_SENSORS_ADM1026=m
+CONFIG_SENSORS_ADM1029=m
+CONFIG_SENSORS_ADM1031=m
+# CONFIG_SENSORS_ADM1177 is not set
+CONFIG_SENSORS_ADM9240=m
+# CONFIG_SENSORS_ADT7410 is not set
+CONFIG_SENSORS_ADT7411=m
+CONFIG_SENSORS_ADT7462=m
+CONFIG_SENSORS_ADT7470=m
+CONFIG_SENSORS_ADT7475=m
+# CONFIG_SENSORS_AS370 is not set
+CONFIG_SENSORS_ASC7621=m
+# CONFIG_SENSORS_AXI_FAN_CONTROL is not set
+CONFIG_SENSORS_K8TEMP=m
+CONFIG_SENSORS_K10TEMP=m
+CONFIG_SENSORS_FAM15H_POWER=m
+# CONFIG_SENSORS_AMD_ENERGY is not set
+CONFIG_SENSORS_APPLESMC=m
+CONFIG_SENSORS_ASB100=m
+# CONFIG_SENSORS_ASPEED is not set
+CONFIG_SENSORS_ATXP1=m
+# CONFIG_SENSORS_CORSAIR_CPRO is not set
+# CONFIG_SENSORS_DRIVETEMP is not set
+CONFIG_SENSORS_DS620=m
+CONFIG_SENSORS_DS1621=m
+CONFIG_SENSORS_DELL_SMM=m
+CONFIG_SENSORS_I5K_AMB=m
+CONFIG_SENSORS_F71805F=m
+CONFIG_SENSORS_F71882FG=m
+CONFIG_SENSORS_F75375S=m
+CONFIG_SENSORS_FSCHMD=m
+# CONFIG_SENSORS_FTSTEUTATES is not set
+CONFIG_SENSORS_GL518SM=m
+CONFIG_SENSORS_GL520SM=m
+CONFIG_SENSORS_G760A=m
+# CONFIG_SENSORS_G762 is not set
+# CONFIG_SENSORS_HIH6130 is not set
+CONFIG_SENSORS_IBMAEM=m
+CONFIG_SENSORS_IBMPEX=m
+# CONFIG_SENSORS_I5500 is not set
+CONFIG_SENSORS_CORETEMP=m
+CONFIG_SENSORS_IT87=m
+CONFIG_SENSORS_JC42=m
+# CONFIG_SENSORS_POWR1220 is not set
+CONFIG_SENSORS_LINEAGE=m
+# CONFIG_SENSORS_LTC2945 is not set
+# CONFIG_SENSORS_LTC2947_I2C is not set
+# CONFIG_SENSORS_LTC2990 is not set
+CONFIG_SENSORS_LTC4151=m
+CONFIG_SENSORS_LTC4215=m
+# CONFIG_SENSORS_LTC4222 is not set
+CONFIG_SENSORS_LTC4245=m
+# CONFIG_SENSORS_LTC4260 is not set
+CONFIG_SENSORS_LTC4261=m
+CONFIG_SENSORS_MAX16065=m
+CONFIG_SENSORS_MAX1619=m
+# CONFIG_SENSORS_MAX1668 is not set
+# CONFIG_SENSORS_MAX197 is not set
+# CONFIG_SENSORS_MAX31730 is not set
+# CONFIG_SENSORS_MAX6621 is not set
+CONFIG_SENSORS_MAX6639=m
+CONFIG_SENSORS_MAX6642=m
+CONFIG_SENSORS_MAX6650=m
+# CONFIG_SENSORS_MAX6697 is not set
+# CONFIG_SENSORS_MAX31790 is not set
+# CONFIG_SENSORS_MCP3021 is not set
+# CONFIG_SENSORS_TC654 is not set
+# CONFIG_SENSORS_MR75203 is not set
+CONFIG_SENSORS_LM63=m
+CONFIG_SENSORS_LM73=m
+CONFIG_SENSORS_LM75=m
+CONFIG_SENSORS_LM77=m
+CONFIG_SENSORS_LM78=m
+CONFIG_SENSORS_LM80=m
+CONFIG_SENSORS_LM83=m
+CONFIG_SENSORS_LM85=m
+CONFIG_SENSORS_LM87=m
+CONFIG_SENSORS_LM90=m
+CONFIG_SENSORS_LM92=m
+CONFIG_SENSORS_LM93=m
+# CONFIG_SENSORS_LM95234 is not set
+CONFIG_SENSORS_LM95241=m
+# CONFIG_SENSORS_LM95245 is not set
+CONFIG_SENSORS_PC87360=m
+CONFIG_SENSORS_PC87427=m
+# CONFIG_SENSORS_NTC_THERMISTOR is not set
+# CONFIG_SENSORS_NCT6683 is not set
+# CONFIG_SENSORS_NCT6775 is not set
+# CONFIG_SENSORS_NCT7802 is not set
+# CONFIG_SENSORS_NCT7904 is not set
+# CONFIG_SENSORS_NPCM7XX is not set
+CONFIG_SENSORS_PCF8591=m
+CONFIG_PMBUS=m
+CONFIG_SENSORS_PMBUS=m
+CONFIG_SENSORS_ADM1275=m
+# CONFIG_SENSORS_BEL_PFE is not set
+# CONFIG_SENSORS_IBM_CFFPS is not set
+# CONFIG_SENSORS_INSPUR_IPSPS is not set
+# CONFIG_SENSORS_IR35221 is not set
+# CONFIG_SENSORS_IR38064 is not set
+# CONFIG_SENSORS_IRPS5401 is not set
+# CONFIG_SENSORS_ISL68137 is not set
+# CONFIG_SENSORS_LM25066 is not set
+# CONFIG_SENSORS_LTC2978 is not set
+# CONFIG_SENSORS_LTC3815 is not set
+CONFIG_SENSORS_MAX16064=m
+# CONFIG_SENSORS_MAX16601 is not set
+# CONFIG_SENSORS_MAX20730 is not set
+# CONFIG_SENSORS_MAX20751 is not set
+# CONFIG_SENSORS_MAX31785 is not set
+CONFIG_SENSORS_MAX34440=m
+CONFIG_SENSORS_MAX8688=m
+# CONFIG_SENSORS_MP2975 is not set
+# CONFIG_SENSORS_PXE1610 is not set
+# CONFIG_SENSORS_TPS40422 is not set
+# CONFIG_SENSORS_TPS53679 is not set
+CONFIG_SENSORS_UCD9000=m
+CONFIG_SENSORS_UCD9200=m
+# CONFIG_SENSORS_XDPE122 is not set
+# CONFIG_SENSORS_ZL6100 is not set
+CONFIG_SENSORS_SHT21=m
+# CONFIG_SENSORS_SHT3x is not set
+# CONFIG_SENSORS_SHTC1 is not set
+CONFIG_SENSORS_SIS5595=m
+CONFIG_SENSORS_DME1737=m
+CONFIG_SENSORS_EMC1403=m
+CONFIG_SENSORS_EMC2103=m
+CONFIG_SENSORS_EMC6W201=m
+CONFIG_SENSORS_SMSC47M1=m
+CONFIG_SENSORS_SMSC47M192=m
+CONFIG_SENSORS_SMSC47B397=m
+CONFIG_SENSORS_SCH56XX_COMMON=m
+CONFIG_SENSORS_SCH5627=m
+# CONFIG_SENSORS_SCH5636 is not set
+# CONFIG_SENSORS_STTS751 is not set
+CONFIG_SENSORS_SMM665=m
+# CONFIG_SENSORS_ADC128D818 is not set
+CONFIG_SENSORS_ADS7828=m
+CONFIG_SENSORS_AMC6821=m
+# CONFIG_SENSORS_INA209 is not set
+# CONFIG_SENSORS_INA2XX is not set
+# CONFIG_SENSORS_INA3221 is not set
+# CONFIG_SENSORS_TC74 is not set
+CONFIG_SENSORS_THMC50=m
+CONFIG_SENSORS_TMP102=m
+# CONFIG_SENSORS_TMP103 is not set
+# CONFIG_SENSORS_TMP108 is not set
+CONFIG_SENSORS_TMP401=m
+CONFIG_SENSORS_TMP421=m
+# CONFIG_SENSORS_TMP513 is not set
+CONFIG_SENSORS_VIA_CPUTEMP=m
+CONFIG_SENSORS_VIA686A=m
+CONFIG_SENSORS_VT1211=m
+CONFIG_SENSORS_VT8231=m
+# CONFIG_SENSORS_W83773G is not set
+CONFIG_SENSORS_W83781D=m
+CONFIG_SENSORS_W83791D=m
+CONFIG_SENSORS_W83792D=m
+CONFIG_SENSORS_W83793=m
+CONFIG_SENSORS_W83795=m
+# CONFIG_SENSORS_W83795_FANCTRL is not set
+CONFIG_SENSORS_W83L785TS=m
+CONFIG_SENSORS_W83L786NG=m
+CONFIG_SENSORS_W83627HF=m
+CONFIG_SENSORS_W83627EHF=m
+# CONFIG_SENSORS_XGENE is not set
+
+#
+# ACPI drivers
+#
+CONFIG_SENSORS_ACPI_POWER=m
+CONFIG_SENSORS_ATK0110=m
+CONFIG_THERMAL=y
+# CONFIG_THERMAL_NETLINK is not set
+# CONFIG_THERMAL_STATISTICS is not set
+CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=0
+CONFIG_THERMAL_WRITABLE_TRIPS=y
+CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
+# CONFIG_THERMAL_DEFAULT_GOV_FAIR_SHARE is not set
+# CONFIG_THERMAL_DEFAULT_GOV_USER_SPACE is not set
+# CONFIG_THERMAL_GOV_FAIR_SHARE is not set
+CONFIG_THERMAL_GOV_STEP_WISE=y
+# CONFIG_THERMAL_GOV_BANG_BANG is not set
+CONFIG_THERMAL_GOV_USER_SPACE=y
+# CONFIG_THERMAL_EMULATION is not set
+
+#
+# Intel thermal drivers
+#
+# CONFIG_INTEL_POWERCLAMP is not set
+CONFIG_X86_PKG_TEMP_THERMAL=m
+# CONFIG_INTEL_SOC_DTS_THERMAL is not set
+
+#
+# ACPI INT340X thermal drivers
+#
+# CONFIG_INT340X_THERMAL is not set
+# end of ACPI INT340X thermal drivers
+
+# CONFIG_INTEL_PCH_THERMAL is not set
+# end of Intel thermal drivers
+
+CONFIG_WATCHDOG=y
+CONFIG_WATCHDOG_CORE=y
+CONFIG_WATCHDOG_NOWAYOUT=y
+CONFIG_WATCHDOG_HANDLE_BOOT_ENABLED=y
+CONFIG_WATCHDOG_OPEN_TIMEOUT=0
+# CONFIG_WATCHDOG_SYSFS is not set
+
+#
+# Watchdog Pretimeout Governors
+#
+# CONFIG_WATCHDOG_PRETIMEOUT_GOV is not set
+
+#
+# Watchdog Device Drivers
+#
+CONFIG_SOFT_WATCHDOG=m
+# CONFIG_WDAT_WDT is not set
+# CONFIG_XILINX_WATCHDOG is not set
+# CONFIG_ZIIRAVE_WATCHDOG is not set
+# CONFIG_CADENCE_WATCHDOG is not set
+# CONFIG_DW_WATCHDOG is not set
+# CONFIG_MAX63XX_WATCHDOG is not set
+CONFIG_ACQUIRE_WDT=m
+CONFIG_ADVANTECH_WDT=m
+CONFIG_ALIM1535_WDT=m
+CONFIG_ALIM7101_WDT=m
+# CONFIG_EBC_C384_WDT is not set
+CONFIG_F71808E_WDT=m
+CONFIG_SP5100_TCO=m
+CONFIG_SBC_FITPC2_WATCHDOG=m
+CONFIG_EUROTECH_WDT=m
+CONFIG_IB700_WDT=m
+CONFIG_IBMASR=m
+CONFIG_WAFER_WDT=m
+CONFIG_I6300ESB_WDT=m
+# CONFIG_IE6XX_WDT is not set
+CONFIG_ITCO_WDT=m
+CONFIG_ITCO_VENDOR_SUPPORT=y
+CONFIG_IT8712F_WDT=m
+CONFIG_IT87_WDT=m
+CONFIG_HP_WATCHDOG=m
+CONFIG_HPWDT_NMI_DECODING=y
+CONFIG_SC1200_WDT=m
+CONFIG_PC87413_WDT=m
+CONFIG_NV_TCO=m
+CONFIG_60XX_WDT=m
+CONFIG_CPU5_WDT=m
+CONFIG_SMSC_SCH311X_WDT=m
+CONFIG_SMSC37B787_WDT=m
+# CONFIG_TQMX86_WDT is not set
+# CONFIG_VIA_WDT is not set
+CONFIG_W83627HF_WDT=m
+CONFIG_W83877F_WDT=m
+CONFIG_W83977F_WDT=m
+CONFIG_MACHZ_WDT=m
+CONFIG_SBC_EPX_C3_WATCHDOG=m
+# CONFIG_NI903X_WDT is not set
+# CONFIG_NIC7018_WDT is not set
+
+#
+# PCI-based Watchdog Cards
+#
+CONFIG_PCIPCWATCHDOG=m
+CONFIG_WDTPCI=m
+
+#
+# USB-based Watchdog Cards
+#
+CONFIG_USBPCWATCHDOG=m
+CONFIG_SSB_POSSIBLE=y
+CONFIG_SSB=m
+CONFIG_SSB_SPROM=y
+CONFIG_SSB_PCIHOST_POSSIBLE=y
+CONFIG_SSB_PCIHOST=y
+CONFIG_SSB_DRIVER_PCICORE_POSSIBLE=y
+CONFIG_SSB_DRIVER_PCICORE=y
+CONFIG_BCMA_POSSIBLE=y
+# CONFIG_BCMA is not set
+
+#
+# Multifunction device drivers
+#
+CONFIG_MFD_CORE=m
+# CONFIG_MFD_BCM590XX is not set
+# CONFIG_MFD_BD9571MWV is not set
+# CONFIG_MFD_AXP20X_I2C is not set
+# CONFIG_MFD_MADERA is not set
+# CONFIG_MFD_DA9062 is not set
+# CONFIG_MFD_DA9063 is not set
+# CONFIG_MFD_DA9150 is not set
+# CONFIG_MFD_DLN2 is not set
+# CONFIG_MFD_MC13XXX_I2C is not set
+# CONFIG_MFD_MP2629 is not set
+# CONFIG_HTC_PASIC3 is not set
+# CONFIG_MFD_INTEL_QUARK_I2C_GPIO is not set
+CONFIG_LPC_ICH=m
+CONFIG_LPC_SCH=m
+# CONFIG_MFD_INTEL_LPSS_ACPI is not set
+# CONFIG_MFD_INTEL_LPSS_PCI is not set
+# CONFIG_MFD_IQS62X is not set
+# CONFIG_MFD_JANZ_CMODIO is not set
+# CONFIG_MFD_KEMPLD is not set
+# CONFIG_MFD_88PM800 is not set
+# CONFIG_MFD_88PM805 is not set
+# CONFIG_MFD_MAX14577 is not set
+# CONFIG_MFD_MAX77693 is not set
+# CONFIG_MFD_MAX8907 is not set
+# CONFIG_MFD_MT6360 is not set
+# CONFIG_MFD_MT6397 is not set
+# CONFIG_MFD_MENF21BMC is not set
+# CONFIG_MFD_VIPERBOARD is not set
+# CONFIG_MFD_RETU is not set
+# CONFIG_MFD_PCF50633 is not set
+# CONFIG_MFD_RDC321X is not set
+# CONFIG_MFD_RT5033 is not set
+# CONFIG_MFD_SI476X_CORE is not set
+# CONFIG_MFD_SM501 is not set
+# CONFIG_MFD_SKY81452 is not set
+# CONFIG_ABX500_CORE is not set
+CONFIG_MFD_SYSCON=y
+# CONFIG_MFD_TI_AM335X_TSCADC is not set
+# CONFIG_MFD_LP3943 is not set
+# CONFIG_MFD_TI_LMU is not set
+# CONFIG_TPS6105X is not set
+# CONFIG_TPS6507X is not set
+# CONFIG_MFD_TPS65086 is not set
+# CONFIG_MFD_TI_LP873X is not set
+# CONFIG_MFD_TPS65912_I2C is not set
+# CONFIG_MFD_WL1273_CORE is not set
+# CONFIG_MFD_LM3533 is not set
+# CONFIG_MFD_TQMX86 is not set
+# CONFIG_MFD_VX855 is not set
+# CONFIG_MFD_ARIZONA_I2C is not set
+# CONFIG_MFD_WM8994 is not set
+# end of Multifunction device drivers
+
+# CONFIG_REGULATOR is not set
+# CONFIG_RC_CORE is not set
+# CONFIG_MEDIA_CEC_SUPPORT is not set
+# CONFIG_MEDIA_SUPPORT is not set
+
+#
+# Graphics support
+#
+CONFIG_AGP=y
+CONFIG_AGP_AMD64=y
+CONFIG_AGP_INTEL=m
+CONFIG_AGP_SIS=m
+CONFIG_AGP_VIA=m
+CONFIG_INTEL_GTT=m
+CONFIG_VGA_ARB=y
+CONFIG_VGA_ARB_MAX_GPUS=16
+# CONFIG_VGA_SWITCHEROO is not set
+# CONFIG_DRM is not set
+
+#
+# ARM devices
+#
+# end of ARM devices
+
+#
+# Frame buffer Devices
+#
+# CONFIG_FB is not set
+# end of Frame buffer Devices
+
+#
+# Backlight & LCD device support
+#
+# CONFIG_LCD_CLASS_DEVICE is not set
+# CONFIG_BACKLIGHT_CLASS_DEVICE is not set
+# end of Backlight & LCD device support
+
+#
+# Console display driver support
+#
+CONFIG_VGA_CONSOLE=y
+CONFIG_DUMMY_CONSOLE=y
+CONFIG_DUMMY_CONSOLE_COLUMNS=80
+CONFIG_DUMMY_CONSOLE_ROWS=25
+# end of Console display driver support
+# end of Graphics support
+
+# CONFIG_SOUND is not set
+
+#
+# HID support
+#
+CONFIG_HID=y
+CONFIG_HID_BATTERY_STRENGTH=y
+CONFIG_HIDRAW=y
+CONFIG_UHID=m
+CONFIG_HID_GENERIC=y
+
+#
+# Special HID drivers
+#
+# CONFIG_HID_A4TECH is not set
+# CONFIG_HID_ACCUTOUCH is not set
+# CONFIG_HID_ACRUX is not set
+CONFIG_HID_APPLE=y
+# CONFIG_HID_APPLEIR is not set
+# CONFIG_HID_ASUS is not set
+# CONFIG_HID_AUREAL is not set
+CONFIG_HID_BELKIN=y
+# CONFIG_HID_BETOP_FF is not set
+# CONFIG_HID_BIGBEN_FF is not set
+# CONFIG_HID_CHERRY is not set
+# CONFIG_HID_CHICONY is not set
+# CONFIG_HID_CORSAIR is not set
+# CONFIG_HID_COUGAR is not set
+# CONFIG_HID_MACALLY is not set
+# CONFIG_HID_CMEDIA is not set
+# CONFIG_HID_CREATIVE_SB0540 is not set
+# CONFIG_HID_CYPRESS is not set
+# CONFIG_HID_DRAGONRISE is not set
+# CONFIG_HID_EMS_FF is not set
+# CONFIG_HID_ELAN is not set
+# CONFIG_HID_ELECOM is not set
+# CONFIG_HID_ELO is not set
+CONFIG_HID_EZKEY=y
+# CONFIG_HID_GEMBIRD is not set
+# CONFIG_HID_GFRM is not set
+# CONFIG_HID_GLORIOUS is not set
+# CONFIG_HID_HOLTEK is not set
+# CONFIG_HID_VIVALDI is not set
+# CONFIG_HID_GT683R is not set
+# CONFIG_HID_KEYTOUCH is not set
+# CONFIG_HID_KYE is not set
+# CONFIG_HID_UCLOGIC is not set
+# CONFIG_HID_WALTOP is not set
+# CONFIG_HID_VIEWSONIC is not set
+# CONFIG_HID_GYRATION is not set
+# CONFIG_HID_ICADE is not set
+CONFIG_HID_ITE=y
+# CONFIG_HID_JABRA is not set
+# CONFIG_HID_TWINHAN is not set
+# CONFIG_HID_KENSINGTON is not set
+# CONFIG_HID_LCPOWER is not set
+# CONFIG_HID_LED is not set
+# CONFIG_HID_LENOVO is not set
+CONFIG_HID_LOGITECH=y
+CONFIG_HID_LOGITECH_DJ=m
+CONFIG_HID_LOGITECH_HIDPP=m
+# CONFIG_LOGITECH_FF is not set
+# CONFIG_LOGIRUMBLEPAD2_FF is not set
+# CONFIG_LOGIG940_FF is not set
+# CONFIG_LOGIWHEELS_FF is not set
+# CONFIG_HID_MAGICMOUSE is not set
+# CONFIG_HID_MALTRON is not set
+# CONFIG_HID_MAYFLASH is not set
+# CONFIG_HID_REDRAGON is not set
+CONFIG_HID_MICROSOFT=y
+# CONFIG_HID_MONTEREY is not set
+# CONFIG_HID_MULTITOUCH is not set
+# CONFIG_HID_NTI is not set
+# CONFIG_HID_NTRIG is not set
+# CONFIG_HID_ORTEK is not set
+# CONFIG_HID_PANTHERLORD is not set
+# CONFIG_HID_PENMOUNT is not set
+# CONFIG_HID_PETALYNX is not set
+# CONFIG_HID_PICOLCD is not set
+# CONFIG_HID_PLANTRONICS is not set
+# CONFIG_HID_PRIMAX is not set
+# CONFIG_HID_RETRODE is not set
+# CONFIG_HID_ROCCAT is not set
+# CONFIG_HID_SAITEK is not set
+# CONFIG_HID_SAMSUNG is not set
+# CONFIG_HID_SONY is not set
+# CONFIG_HID_SPEEDLINK is not set
+# CONFIG_HID_STEAM is not set
+# CONFIG_HID_STEELSERIES is not set
+# CONFIG_HID_SUNPLUS is not set
+# CONFIG_HID_RMI is not set
+# CONFIG_HID_GREENASIA is not set
+# CONFIG_HID_SMARTJOYPLUS is not set
+# CONFIG_HID_TIVO is not set
+# CONFIG_HID_TOPSEED is not set
+# CONFIG_HID_THINGM is not set
+# CONFIG_HID_THRUSTMASTER is not set
+# CONFIG_HID_UDRAW_PS3 is not set
+# CONFIG_HID_U2FZERO is not set
+# CONFIG_HID_WACOM is not set
+# CONFIG_HID_WIIMOTE is not set
+# CONFIG_HID_XINMO is not set
+# CONFIG_HID_ZEROPLUS is not set
+# CONFIG_HID_ZYDACRON is not set
+# CONFIG_HID_SENSOR_HUB is not set
+# CONFIG_HID_ALPS is not set
+# end of Special HID drivers
+
+#
+# USB HID support
+#
+CONFIG_USB_HID=y
+CONFIG_HID_PID=y
+CONFIG_USB_HIDDEV=y
+# end of USB HID support
+
+#
+# I2C HID support
+#
+# CONFIG_I2C_HID is not set
+# end of I2C HID support
+
+#
+# Intel ISH HID support
+#
+CONFIG_INTEL_ISH_HID=m
+# CONFIG_INTEL_ISH_FIRMWARE_DOWNLOADER is not set
+# end of Intel ISH HID support
+# end of HID support
+
+CONFIG_USB_OHCI_LITTLE_ENDIAN=y
+CONFIG_USB_SUPPORT=y
+CONFIG_USB_COMMON=y
+# CONFIG_USB_LED_TRIG is not set
+# CONFIG_USB_ULPI_BUS is not set
+CONFIG_USB_ARCH_HAS_HCD=y
+CONFIG_USB=y
+CONFIG_USB_PCI=y
+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+
+#
+# Miscellaneous USB options
+#
+CONFIG_USB_DEFAULT_PERSIST=y
+# CONFIG_USB_FEW_INIT_RETRIES is not set
+CONFIG_USB_DYNAMIC_MINORS=y
+# CONFIG_USB_OTG is not set
+# CONFIG_USB_OTG_PRODUCTLIST is not set
+# CONFIG_USB_LEDS_TRIGGER_USBPORT is not set
+CONFIG_USB_AUTOSUSPEND_DELAY=2
+CONFIG_USB_MON=y
+
+#
+# USB Host Controller Drivers
+#
+# CONFIG_USB_C67X00_HCD is not set
+CONFIG_USB_XHCI_HCD=y
+# CONFIG_USB_XHCI_DBGCAP is not set
+CONFIG_USB_XHCI_PCI=y
+# CONFIG_USB_XHCI_PCI_RENESAS is not set
+CONFIG_USB_XHCI_PLATFORM=m
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_ROOT_HUB_TT=y
+CONFIG_USB_EHCI_TT_NEWSCHED=y
+CONFIG_USB_EHCI_PCI=y
+# CONFIG_USB_EHCI_FSL is not set
+# CONFIG_USB_EHCI_HCD_PLATFORM is not set
+CONFIG_USB_OXU210HP_HCD=m
+CONFIG_USB_ISP116X_HCD=m
+# CONFIG_USB_FOTG210_HCD is not set
+CONFIG_USB_OHCI_HCD=m
+CONFIG_USB_OHCI_HCD_PCI=m
+# CONFIG_USB_OHCI_HCD_SSB is not set
+CONFIG_USB_OHCI_HCD_PLATFORM=m
+CONFIG_USB_UHCI_HCD=y
+CONFIG_USB_SL811_HCD=m
+# CONFIG_USB_SL811_HCD_ISO is not set
+CONFIG_USB_R8A66597_HCD=m
+# CONFIG_USB_HCD_SSB is not set
+# CONFIG_USB_HCD_TEST_MODE is not set
+
+#
+# USB Device Class drivers
+#
+# CONFIG_USB_ACM is not set
+CONFIG_USB_PRINTER=m
+# CONFIG_USB_WDM is not set
+# CONFIG_USB_TMC is not set
+
+#
+# NOTE: USB_STORAGE depends on SCSI but BLK_DEV_SD may
+#
+
+#
+# also be needed; see USB_STORAGE Help for more info
+#
+CONFIG_USB_STORAGE=m
+# CONFIG_USB_STORAGE_DEBUG is not set
+CONFIG_USB_STORAGE_REALTEK=m
+CONFIG_REALTEK_AUTOPM=y
+CONFIG_USB_STORAGE_DATAFAB=m
+CONFIG_USB_STORAGE_FREECOM=m
+CONFIG_USB_STORAGE_ISD200=m
+CONFIG_USB_STORAGE_USBAT=m
+CONFIG_USB_STORAGE_SDDR09=m
+CONFIG_USB_STORAGE_SDDR55=m
+CONFIG_USB_STORAGE_JUMPSHOT=m
+CONFIG_USB_STORAGE_ALAUDA=m
+CONFIG_USB_STORAGE_ONETOUCH=m
+CONFIG_USB_STORAGE_KARMA=m
+CONFIG_USB_STORAGE_CYPRESS_ATACB=m
+CONFIG_USB_STORAGE_ENE_UB6250=m
+CONFIG_USB_UAS=m
+
+#
+# USB Imaging devices
+#
+# CONFIG_USB_MDC800 is not set
+# CONFIG_USB_MICROTEK is not set
+# CONFIG_USBIP_CORE is not set
+# CONFIG_USB_CDNS3 is not set
+# CONFIG_USB_MUSB_HDRC is not set
+# CONFIG_USB_DWC3 is not set
+# CONFIG_USB_DWC2 is not set
+# CONFIG_USB_CHIPIDEA is not set
+# CONFIG_USB_ISP1760 is not set
+
+#
+# USB port drivers
+#
+# CONFIG_USB_USS720 is not set
+# CONFIG_USB_SERIAL is not set
+
+#
+# USB Miscellaneous drivers
+#
+# CONFIG_USB_EMI62 is not set
+# CONFIG_USB_EMI26 is not set
+# CONFIG_USB_ADUTUX is not set
+# CONFIG_USB_SEVSEG is not set
+# CONFIG_USB_LEGOTOWER is not set
+# CONFIG_USB_LCD is not set
+# CONFIG_USB_CYPRESS_CY7C63 is not set
+# CONFIG_USB_CYTHERM is not set
+# CONFIG_USB_IDMOUSE is not set
+# CONFIG_USB_FTDI_ELAN is not set
+# CONFIG_USB_APPLEDISPLAY is not set
+# CONFIG_APPLE_MFI_FASTCHARGE is not set
+# CONFIG_USB_SISUSBVGA is not set
+# CONFIG_USB_LD is not set
+# CONFIG_USB_TRANCEVIBRATOR is not set
+# CONFIG_USB_IOWARRIOR is not set
+# CONFIG_USB_TEST is not set
+# CONFIG_USB_EHSET_TEST_FIXTURE is not set
+# CONFIG_USB_ISIGHTFW is not set
+# CONFIG_USB_YUREX is not set
+# CONFIG_USB_EZUSB_FX2 is not set
+# CONFIG_USB_HUB_USB251XB is not set
+# CONFIG_USB_HSIC_USB3503 is not set
+# CONFIG_USB_HSIC_USB4604 is not set
+# CONFIG_USB_LINK_LAYER_TEST is not set
+# CONFIG_USB_CHAOSKEY is not set
+
+#
+# USB Physical Layer drivers
+#
+# CONFIG_NOP_USB_XCEIV is not set
+# CONFIG_USB_ISP1301 is not set
+# end of USB Physical Layer drivers
+
+# CONFIG_USB_GADGET is not set
+# CONFIG_TYPEC is not set
+# CONFIG_USB_ROLE_SWITCH is not set
+# CONFIG_MMC is not set
+# CONFIG_MEMSTICK is not set
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+# CONFIG_LEDS_CLASS_FLASH is not set
+# CONFIG_LEDS_CLASS_MULTICOLOR is not set
+# CONFIG_LEDS_BRIGHTNESS_HW_CHANGED is not set
+
+#
+# LED drivers
+#
+# CONFIG_LEDS_APU is not set
+CONFIG_LEDS_LM3530=m
+# CONFIG_LEDS_LM3532 is not set
+# CONFIG_LEDS_LM3642 is not set
+CONFIG_LEDS_PCA9532=m
+CONFIG_LEDS_LP3944=m
+# CONFIG_LEDS_LP50XX is not set
+CONFIG_LEDS_CLEVO_MAIL=m
+CONFIG_LEDS_PCA955X=m
+# CONFIG_LEDS_PCA963X is not set
+CONFIG_LEDS_BD2802=m
+CONFIG_LEDS_INTEL_SS4200=m
+# CONFIG_LEDS_TCA6507 is not set
+# CONFIG_LEDS_TLC591XX is not set
+# CONFIG_LEDS_LM355x is not set
+
+#
+# LED driver for blink(1) USB RGB LED is under Special HID drivers (HID_THINGM)
+#
+# CONFIG_LEDS_BLINKM is not set
+# CONFIG_LEDS_MLXCPLD is not set
+# CONFIG_LEDS_MLXREG is not set
+# CONFIG_LEDS_USER is not set
+# CONFIG_LEDS_NIC78BX is not set
+# CONFIG_LEDS_TI_LMU_COMMON is not set
+
+#
+# LED Triggers
+#
+CONFIG_LEDS_TRIGGERS=y
+CONFIG_LEDS_TRIGGER_TIMER=m
+# CONFIG_LEDS_TRIGGER_ONESHOT is not set
+# CONFIG_LEDS_TRIGGER_DISK is not set
+CONFIG_LEDS_TRIGGER_HEARTBEAT=m
+CONFIG_LEDS_TRIGGER_BACKLIGHT=m
+# CONFIG_LEDS_TRIGGER_CPU is not set
+# CONFIG_LEDS_TRIGGER_ACTIVITY is not set
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
+
+#
+# iptables trigger is under Netfilter config (LED target)
+#
+# CONFIG_LEDS_TRIGGER_TRANSIENT is not set
+# CONFIG_LEDS_TRIGGER_CAMERA is not set
+# CONFIG_LEDS_TRIGGER_PANIC is not set
+# CONFIG_LEDS_TRIGGER_NETDEV is not set
+# CONFIG_LEDS_TRIGGER_PATTERN is not set
+# CONFIG_LEDS_TRIGGER_AUDIO is not set
+# CONFIG_ACCESSIBILITY is not set
+# CONFIG_INFINIBAND is not set
+CONFIG_EDAC_ATOMIC_SCRUB=y
+CONFIG_EDAC_SUPPORT=y
+# CONFIG_EDAC is not set
+CONFIG_RTC_LIB=y
+CONFIG_RTC_MC146818_LIB=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_HCTOSYS=y
+CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
+CONFIG_RTC_SYSTOHC=y
+CONFIG_RTC_SYSTOHC_DEVICE="rtc0"
+# CONFIG_RTC_DEBUG is not set
+CONFIG_RTC_NVMEM=y
+
+#
+# RTC interfaces
+#
+CONFIG_RTC_INTF_SYSFS=y
+CONFIG_RTC_INTF_PROC=y
+CONFIG_RTC_INTF_DEV=y
+# CONFIG_RTC_INTF_DEV_UIE_EMUL is not set
+# CONFIG_RTC_DRV_TEST is not set
+
+#
+# I2C RTC drivers
+#
+# CONFIG_RTC_DRV_ABB5ZES3 is not set
+# CONFIG_RTC_DRV_ABEOZ9 is not set
+# CONFIG_RTC_DRV_ABX80X is not set
+# CONFIG_RTC_DRV_DS1307 is not set
+# CONFIG_RTC_DRV_DS1374 is not set
+# CONFIG_RTC_DRV_DS1672 is not set
+# CONFIG_RTC_DRV_MAX6900 is not set
+# CONFIG_RTC_DRV_RS5C372 is not set
+# CONFIG_RTC_DRV_ISL1208 is not set
+# CONFIG_RTC_DRV_ISL12022 is not set
+# CONFIG_RTC_DRV_X1205 is not set
+# CONFIG_RTC_DRV_PCF8523 is not set
+# CONFIG_RTC_DRV_PCF85063 is not set
+# CONFIG_RTC_DRV_PCF85363 is not set
+# CONFIG_RTC_DRV_PCF8563 is not set
+# CONFIG_RTC_DRV_PCF8583 is not set
+# CONFIG_RTC_DRV_M41T80 is not set
+# CONFIG_RTC_DRV_BQ32K is not set
+# CONFIG_RTC_DRV_S35390A is not set
+# CONFIG_RTC_DRV_FM3130 is not set
+# CONFIG_RTC_DRV_RX8010 is not set
+# CONFIG_RTC_DRV_RX8581 is not set
+# CONFIG_RTC_DRV_RX8025 is not set
+# CONFIG_RTC_DRV_EM3027 is not set
+# CONFIG_RTC_DRV_RV3028 is not set
+# CONFIG_RTC_DRV_RV3032 is not set
+# CONFIG_RTC_DRV_RV8803 is not set
+# CONFIG_RTC_DRV_SD3078 is not set
+
+#
+# SPI RTC drivers
+#
+CONFIG_RTC_I2C_AND_SPI=m
+
+#
+# SPI and I2C RTC drivers
+#
+# CONFIG_RTC_DRV_DS3232 is not set
+# CONFIG_RTC_DRV_PCF2127 is not set
+# CONFIG_RTC_DRV_RV3029C2 is not set
+
+#
+# Platform RTC drivers
+#
+CONFIG_RTC_DRV_CMOS=y
+# CONFIG_RTC_DRV_DS1286 is not set
+# CONFIG_RTC_DRV_DS1511 is not set
+# CONFIG_RTC_DRV_DS1553 is not set
+# CONFIG_RTC_DRV_DS1685_FAMILY is not set
+# CONFIG_RTC_DRV_DS1742 is not set
+# CONFIG_RTC_DRV_DS2404 is not set
+# CONFIG_RTC_DRV_STK17TA8 is not set
+# CONFIG_RTC_DRV_M48T86 is not set
+# CONFIG_RTC_DRV_M48T35 is not set
+# CONFIG_RTC_DRV_M48T59 is not set
+# CONFIG_RTC_DRV_MSM6242 is not set
+# CONFIG_RTC_DRV_BQ4802 is not set
+# CONFIG_RTC_DRV_RP5C01 is not set
+# CONFIG_RTC_DRV_V3020 is not set
+
+#
+# on-CPU RTC drivers
+#
+# CONFIG_RTC_DRV_FTRTC010 is not set
+
+#
+# HID Sensor RTC drivers
+#
+CONFIG_DMADEVICES=y
+# CONFIG_DMADEVICES_DEBUG is not set
+
+#
+# DMA Devices
+#
+CONFIG_DMA_ENGINE=y
+CONFIG_DMA_VIRTUAL_CHANNELS=m
+CONFIG_DMA_ACPI=y
+CONFIG_ALTERA_MSGDMA=m
+CONFIG_INTEL_IDMA64=m
+CONFIG_INTEL_IDXD=m
+CONFIG_INTEL_IOATDMA=m
+CONFIG_PLX_DMA=m
+CONFIG_QCOM_HIDMA_MGMT=m
+CONFIG_QCOM_HIDMA=m
+CONFIG_DW_DMAC_CORE=m
+CONFIG_DW_DMAC=m
+CONFIG_DW_DMAC_PCI=m
+CONFIG_DW_EDMA=m
+CONFIG_DW_EDMA_PCIE=m
+CONFIG_HSU_DMA=m
+CONFIG_SF_PDMA=m
+
+#
+# DMA Clients
+#
+CONFIG_ASYNC_TX_DMA=y
+CONFIG_DMATEST=m
+CONFIG_DMA_ENGINE_RAID=y
+
+#
+# DMABUF options
+#
+CONFIG_SYNC_FILE=y
+CONFIG_SW_SYNC=y
+CONFIG_UDMABUF=y
+# CONFIG_DMABUF_MOVE_NOTIFY is not set
+CONFIG_DMABUF_SELFTESTS=m
+CONFIG_DMABUF_HEAPS=y
+CONFIG_DMABUF_HEAPS_SYSTEM=y
+# end of DMABUF options
+
+CONFIG_DCA=m
+# CONFIG_AUXDISPLAY is not set
+# CONFIG_PANEL is not set
+CONFIG_UIO=m
+# CONFIG_UIO_CIF is not set
+# CONFIG_UIO_PDRV_GENIRQ is not set
+# CONFIG_UIO_DMEM_GENIRQ is not set
+# CONFIG_UIO_AEC is not set
+# CONFIG_UIO_SERCOS3 is not set
+# CONFIG_UIO_PCI_GENERIC is not set
+# CONFIG_UIO_NETX is not set
+# CONFIG_UIO_PRUSS is not set
+# CONFIG_UIO_MF624 is not set
+# CONFIG_VFIO is not set
+CONFIG_IRQ_BYPASS_MANAGER=m
+# CONFIG_VIRT_DRIVERS is not set
+CONFIG_VIRTIO=m
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO_PCI=m
+CONFIG_VIRTIO_PCI_LEGACY=y
+# CONFIG_VIRTIO_PMEM is not set
+CONFIG_VIRTIO_BALLOON=m
+# CONFIG_VIRTIO_INPUT is not set
+# CONFIG_VIRTIO_MMIO is not set
+# CONFIG_VDPA is not set
+CONFIG_VHOST_IOTLB=m
+CONFIG_VHOST=m
+CONFIG_VHOST_MENU=y
+CONFIG_VHOST_NET=m
+# CONFIG_VHOST_CROSS_ENDIAN_LEGACY is not set
+
+#
+# Microsoft Hyper-V guest support
+#
+# CONFIG_HYPERV is not set
+# end of Microsoft Hyper-V guest support
+
+# CONFIG_GREYBUS is not set
+# CONFIG_STAGING is not set
+# CONFIG_X86_PLATFORM_DEVICES is not set
+CONFIG_PMC_ATOM=y
+# CONFIG_CHROME_PLATFORMS is not set
+# CONFIG_MELLANOX_PLATFORM is not set
+CONFIG_HAVE_CLK=y
+CONFIG_CLKDEV_LOOKUP=y
+CONFIG_HAVE_CLK_PREPARE=y
+CONFIG_COMMON_CLK=y
+# CONFIG_COMMON_CLK_MAX9485 is not set
+# CONFIG_COMMON_CLK_SI5341 is not set
+# CONFIG_COMMON_CLK_SI5351 is not set
+# CONFIG_COMMON_CLK_SI544 is not set
+# CONFIG_COMMON_CLK_CDCE706 is not set
+# CONFIG_COMMON_CLK_CS2000_CP is not set
+# CONFIG_HWSPINLOCK is not set
+
+#
+# Clock Source drivers
+#
+CONFIG_CLKEVT_I8253=y
+CONFIG_I8253_LOCK=y
+CONFIG_CLKBLD_I8253=y
+# end of Clock Source drivers
+
+CONFIG_MAILBOX=y
+CONFIG_PCC=y
+# CONFIG_ALTERA_MBOX is not set
+CONFIG_IOMMU_IOVA=y
+CONFIG_IOASID=y
+CONFIG_IOMMU_API=y
+CONFIG_IOMMU_SUPPORT=y
+
+#
+# Generic IOMMU Pagetable Support
+#
+# end of Generic IOMMU Pagetable Support
+
+CONFIG_IOMMU_DEBUGFS=y
+# CONFIG_IOMMU_DEFAULT_PASSTHROUGH is not set
+# CONFIG_AMD_IOMMU is not set
+CONFIG_DMAR_TABLE=y
+CONFIG_INTEL_IOMMU=y
+CONFIG_INTEL_IOMMU_DEBUGFS=y
+CONFIG_INTEL_IOMMU_SVM=y
+CONFIG_INTEL_IOMMU_DEFAULT_ON=y
+CONFIG_INTEL_IOMMU_FLOPPY_WA=y
+# CONFIG_INTEL_IOMMU_SCALABLE_MODE_DEFAULT_ON is not set
+# CONFIG_IRQ_REMAP is not set
+
+#
+# Remoteproc drivers
+#
+# CONFIG_REMOTEPROC is not set
+# end of Remoteproc drivers
+
+#
+# Rpmsg drivers
+#
+# CONFIG_RPMSG_QCOM_GLINK_RPM is not set
+# CONFIG_RPMSG_VIRTIO is not set
+# end of Rpmsg drivers
+
+# CONFIG_SOUNDWIRE is not set
+
+#
+# SOC (System On Chip) specific Drivers
+#
+
+#
+# Amlogic SoC drivers
+#
+# end of Amlogic SoC drivers
+
+#
+# Aspeed SoC drivers
+#
+# end of Aspeed SoC drivers
+
+#
+# Broadcom SoC drivers
+#
+# end of Broadcom SoC drivers
+
+#
+# NXP/Freescale QorIQ SoC drivers
+#
+# end of NXP/Freescale QorIQ SoC drivers
+
+#
+# i.MX SoC drivers
+#
+# end of i.MX SoC drivers
+
+#
+# Qualcomm SoC drivers
+#
+# end of Qualcomm SoC drivers
+
+# CONFIG_SOC_TI is not set
+
+#
+# Xilinx SoC drivers
+#
+# CONFIG_XILINX_VCU is not set
+# end of Xilinx SoC drivers
+# end of SOC (System On Chip) specific Drivers
+
+# CONFIG_PM_DEVFREQ is not set
+# CONFIG_EXTCON is not set
+# CONFIG_MEMORY is not set
+# CONFIG_IIO is not set
+# CONFIG_NTB is not set
+# CONFIG_VME_BUS is not set
+# CONFIG_PWM is not set
+
+#
+# IRQ chip support
+#
+# end of IRQ chip support
+
+# CONFIG_IPACK_BUS is not set
+CONFIG_RESET_CONTROLLER=y
+# CONFIG_RESET_TI_SYSCON is not set
+
+#
+# PHY Subsystem
+#
+CONFIG_GENERIC_PHY=y
+# CONFIG_USB_LGM_PHY is not set
+# CONFIG_BCM_KONA_USB2_PHY is not set
+# CONFIG_PHY_PXA_28NM_HSIC is not set
+# CONFIG_PHY_PXA_28NM_USB2 is not set
+# CONFIG_PHY_INTEL_LGM_EMMC is not set
+# end of PHY Subsystem
+
+# CONFIG_POWERCAP is not set
+# CONFIG_MCB is not set
+
+#
+# Performance monitor support
+#
+# end of Performance monitor support
+
+CONFIG_RAS=y
+# CONFIG_RAS_CEC is not set
+# CONFIG_USB4 is not set
+
+#
+# Android
+#
+# CONFIG_ANDROID is not set
+# end of Android
+
+CONFIG_LIBNVDIMM=m
+CONFIG_BLK_DEV_PMEM=m
+CONFIG_ND_BLK=m
+CONFIG_ND_CLAIM=y
+CONFIG_ND_BTT=m
+CONFIG_BTT=y
+CONFIG_DAX_DRIVER=y
+CONFIG_DAX=y
+# CONFIG_DEV_DAX is not set
+CONFIG_NVMEM=y
+CONFIG_NVMEM_SYSFS=y
+
+#
+# HW tracing support
+#
+# CONFIG_STM is not set
+# CONFIG_INTEL_TH is not set
+# end of HW tracing support
+
+# CONFIG_FPGA is not set
+# CONFIG_TEE is not set
+# CONFIG_UNISYS_VISORBUS is not set
+# CONFIG_SIOX is not set
+# CONFIG_SLIMBUS is not set
+# CONFIG_INTERCONNECT is not set
+# CONFIG_COUNTER is not set
+# CONFIG_MOST is not set
+# end of Device Drivers
+
+#
+# File systems
+#
+CONFIG_DCACHE_WORD_ACCESS=y
+# CONFIG_VALIDATE_FS_PARSER is not set
+CONFIG_FS_IOMAP=y
+CONFIG_EXT2_FS=y
+CONFIG_EXT2_FS_XATTR=y
+CONFIG_EXT2_FS_POSIX_ACL=y
+CONFIG_EXT2_FS_SECURITY=y
+CONFIG_EXT3_FS=y
+CONFIG_EXT3_FS_POSIX_ACL=y
+CONFIG_EXT3_FS_SECURITY=y
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_EXT4_FS_SECURITY=y
+# CONFIG_EXT4_DEBUG is not set
+CONFIG_JBD2=y
+CONFIG_JBD2_DEBUG=y
+CONFIG_FS_MBCACHE=y
+CONFIG_REISERFS_FS=m
+# CONFIG_REISERFS_CHECK is not set
+CONFIG_REISERFS_PROC_INFO=y
+CONFIG_REISERFS_FS_XATTR=y
+CONFIG_REISERFS_FS_POSIX_ACL=y
+CONFIG_REISERFS_FS_SECURITY=y
+CONFIG_JFS_FS=m
+CONFIG_JFS_POSIX_ACL=y
+CONFIG_JFS_SECURITY=y
+# CONFIG_JFS_DEBUG is not set
+CONFIG_JFS_STATISTICS=y
+CONFIG_XFS_FS=m
+CONFIG_XFS_SUPPORT_V4=y
+CONFIG_XFS_QUOTA=y
+CONFIG_XFS_POSIX_ACL=y
+CONFIG_XFS_RT=y
+# CONFIG_XFS_ONLINE_SCRUB is not set
+CONFIG_XFS_DEBUG=y
+CONFIG_XFS_ASSERT_FATAL=y
+# CONFIG_GFS2_FS is not set
+# CONFIG_OCFS2_FS is not set
+# CONFIG_BTRFS_FS is not set
+# CONFIG_NILFS2_FS is not set
+# CONFIG_F2FS_FS is not set
+# CONFIG_FS_DAX is not set
+CONFIG_FS_POSIX_ACL=y
+CONFIG_EXPORTFS=y
+CONFIG_EXPORTFS_BLOCK_OPS=y
+CONFIG_FILE_LOCKING=y
+CONFIG_MANDATORY_FILE_LOCKING=y
+# CONFIG_FS_ENCRYPTION is not set
+# CONFIG_FS_VERITY is not set
+CONFIG_FSNOTIFY=y
+CONFIG_DNOTIFY=y
+CONFIG_INOTIFY_USER=y
+CONFIG_FANOTIFY=y
+CONFIG_QUOTA=y
+CONFIG_QUOTA_NETLINK_INTERFACE=y
+# CONFIG_PRINT_QUOTA_WARNING is not set
+# CONFIG_QUOTA_DEBUG is not set
+CONFIG_QUOTA_TREE=m
+# CONFIG_QFMT_V1 is not set
+CONFIG_QFMT_V2=m
+CONFIG_QUOTACTL=y
+CONFIG_AUTOFS4_FS=m
+CONFIG_AUTOFS_FS=m
+CONFIG_FUSE_FS=m
+CONFIG_CUSE=m
+CONFIG_VIRTIO_FS=m
+# CONFIG_OVERLAY_FS is not set
+
+#
+# Caches
+#
+CONFIG_FSCACHE=m
+CONFIG_FSCACHE_STATS=y
+# CONFIG_FSCACHE_HISTOGRAM is not set
+# CONFIG_FSCACHE_DEBUG is not set
+# CONFIG_FSCACHE_OBJECT_LIST is not set
+CONFIG_CACHEFILES=m
+# CONFIG_CACHEFILES_DEBUG is not set
+# CONFIG_CACHEFILES_HISTOGRAM is not set
+# end of Caches
+
+#
+# CD-ROM/DVD Filesystems
+#
+CONFIG_ISO9660_FS=m
+CONFIG_JOLIET=y
+CONFIG_ZISOFS=y
+CONFIG_UDF_FS=m
+# end of CD-ROM/DVD Filesystems
+
+#
+# DOS/FAT/EXFAT/NT Filesystems
+#
+CONFIG_FAT_FS=m
+CONFIG_MSDOS_FS=m
+CONFIG_VFAT_FS=m
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+CONFIG_FAT_DEFAULT_UTF8=y
+# CONFIG_EXFAT_FS is not set
+CONFIG_NTFS_FS=m
+# CONFIG_NTFS_DEBUG is not set
+CONFIG_NTFS_RW=y
+# end of DOS/FAT/EXFAT/NT Filesystems
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+CONFIG_PROC_KCORE=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_PROC_PAGE_MONITOR=y
+# CONFIG_PROC_CHILDREN is not set
+CONFIG_PROC_PID_ARCH_STATUS=y
+CONFIG_KERNFS=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_TMPFS_XATTR=y
+# CONFIG_TMPFS_INODE64 is not set
+CONFIG_HUGETLBFS=y
+CONFIG_HUGETLB_PAGE=y
+CONFIG_MEMFD_CREATE=y
+CONFIG_ARCH_HAS_GIGANTIC_PAGE=y
+CONFIG_CONFIGFS_FS=m
+CONFIG_EFIVAR_FS=m
+# end of Pseudo filesystems
+
+CONFIG_MISC_FILESYSTEMS=y
+# CONFIG_ORANGEFS_FS is not set
+# CONFIG_ADFS_FS is not set
+# CONFIG_AFFS_FS is not set
+# CONFIG_ECRYPT_FS is not set
+CONFIG_HFS_FS=m
+CONFIG_HFSPLUS_FS=m
+# CONFIG_BEFS_FS is not set
+# CONFIG_BFS_FS is not set
+# CONFIG_EFS_FS is not set
+# CONFIG_CRAMFS is not set
+# CONFIG_SQUASHFS is not set
+# CONFIG_VXFS_FS is not set
+CONFIG_MINIX_FS=m
+# CONFIG_OMFS_FS is not set
+# CONFIG_HPFS_FS is not set
+CONFIG_QNX4FS_FS=m
+CONFIG_QNX6FS_FS=m
+# CONFIG_QNX6FS_DEBUG is not set
+CONFIG_ROMFS_FS=m
+CONFIG_ROMFS_BACKED_BY_BLOCK=y
+CONFIG_ROMFS_ON_BLOCK=y
+# CONFIG_PSTORE is not set
+CONFIG_SYSV_FS=m
+CONFIG_UFS_FS=m
+# CONFIG_UFS_FS_WRITE is not set
+# CONFIG_UFS_DEBUG is not set
+# CONFIG_EROFS_FS is not set
+CONFIG_NETWORK_FILESYSTEMS=y
+CONFIG_NFS_FS=y
+CONFIG_NFS_V2=y
+CONFIG_NFS_V3=y
+CONFIG_NFS_V3_ACL=y
+CONFIG_NFS_V4=y
+# CONFIG_NFS_SWAP is not set
+CONFIG_NFS_V4_1=y
+CONFIG_NFS_V4_2=y
+CONFIG_PNFS_FILE_LAYOUT=y
+CONFIG_PNFS_BLOCK=m
+CONFIG_PNFS_FLEXFILE_LAYOUT=y
+CONFIG_NFS_V4_1_IMPLEMENTATION_ID_DOMAIN="kernel.org"
+CONFIG_NFS_V4_1_MIGRATION=y
+CONFIG_NFS_USE_LEGACY_DNS=y
+CONFIG_NFS_DEBUG=y
+CONFIG_NFS_DISABLE_UDP_SUPPORT=y
+# CONFIG_NFS_V4_2_READ_PLUS is not set
+CONFIG_NFSD=m
+CONFIG_NFSD_V2_ACL=y
+CONFIG_NFSD_V3=y
+CONFIG_NFSD_V3_ACL=y
+CONFIG_NFSD_V4=y
+CONFIG_NFSD_PNFS=y
+CONFIG_NFSD_BLOCKLAYOUT=y
+CONFIG_NFSD_SCSILAYOUT=y
+CONFIG_NFSD_FLEXFILELAYOUT=y
+# CONFIG_NFSD_V4_2_INTER_SSC is not set
+CONFIG_GRACE_PERIOD=y
+CONFIG_LOCKD=y
+CONFIG_LOCKD_V4=y
+CONFIG_NFS_ACL_SUPPORT=y
+CONFIG_NFS_COMMON=y
+CONFIG_SUNRPC=y
+CONFIG_SUNRPC_GSS=y
+CONFIG_SUNRPC_BACKCHANNEL=y
+CONFIG_RPCSEC_GSS_KRB5=m
+# CONFIG_SUNRPC_DISABLE_INSECURE_ENCTYPES is not set
+CONFIG_SUNRPC_DEBUG=y
+CONFIG_CEPH_FS=m
+CONFIG_CEPH_FSCACHE=y
+CONFIG_CEPH_FS_POSIX_ACL=y
+CONFIG_CIFS=m
+CONFIG_CIFS_STATS2=y
+CONFIG_CIFS_ALLOW_INSECURE_LEGACY=y
+# CONFIG_CIFS_WEAK_PW_HASH is not set
+CONFIG_CIFS_UPCALL=y
+CONFIG_CIFS_XATTR=y
+CONFIG_CIFS_POSIX=y
+CONFIG_CIFS_DEBUG=y
+CONFIG_CIFS_DEBUG2=y
+# CONFIG_CIFS_DEBUG_DUMP_KEYS is not set
+CONFIG_CIFS_DFS_UPCALL=y
+CONFIG_CIFS_FSCACHE=y
+CONFIG_CODA_FS=m
+CONFIG_AFS_FS=m
+# CONFIG_AFS_DEBUG is not set
+CONFIG_AFS_FSCACHE=y
+# CONFIG_AFS_DEBUG_CURSOR is not set
+CONFIG_NLS=y
+CONFIG_NLS_DEFAULT="iso8859-1"
+CONFIG_NLS_CODEPAGE_437=m
+CONFIG_NLS_CODEPAGE_737=m
+# CONFIG_NLS_CODEPAGE_775 is not set
+CONFIG_NLS_CODEPAGE_850=m
+# CONFIG_NLS_CODEPAGE_852 is not set
+# CONFIG_NLS_CODEPAGE_855 is not set
+# CONFIG_NLS_CODEPAGE_857 is not set
+# CONFIG_NLS_CODEPAGE_860 is not set
+# CONFIG_NLS_CODEPAGE_861 is not set
+# CONFIG_NLS_CODEPAGE_862 is not set
+# CONFIG_NLS_CODEPAGE_863 is not set
+# CONFIG_NLS_CODEPAGE_864 is not set
+# CONFIG_NLS_CODEPAGE_865 is not set
+# CONFIG_NLS_CODEPAGE_866 is not set
+# CONFIG_NLS_CODEPAGE_869 is not set
+CONFIG_NLS_CODEPAGE_936=m
+CONFIG_NLS_CODEPAGE_950=m
+CONFIG_NLS_CODEPAGE_932=m
+CONFIG_NLS_CODEPAGE_949=m
+# CONFIG_NLS_CODEPAGE_874 is not set
+# CONFIG_NLS_ISO8859_8 is not set
+# CONFIG_NLS_CODEPAGE_1250 is not set
+# CONFIG_NLS_CODEPAGE_1251 is not set
+CONFIG_NLS_ASCII=m
+CONFIG_NLS_ISO8859_1=m
+# CONFIG_NLS_ISO8859_2 is not set
+# CONFIG_NLS_ISO8859_3 is not set
+# CONFIG_NLS_ISO8859_4 is not set
+# CONFIG_NLS_ISO8859_5 is not set
+# CONFIG_NLS_ISO8859_6 is not set
+# CONFIG_NLS_ISO8859_7 is not set
+# CONFIG_NLS_ISO8859_9 is not set
+# CONFIG_NLS_ISO8859_13 is not set
+# CONFIG_NLS_ISO8859_14 is not set
+# CONFIG_NLS_ISO8859_15 is not set
+CONFIG_NLS_KOI8_R=m
+# CONFIG_NLS_KOI8_U is not set
+# CONFIG_NLS_MAC_ROMAN is not set
+# CONFIG_NLS_MAC_CELTIC is not set
+# CONFIG_NLS_MAC_CENTEURO is not set
+# CONFIG_NLS_MAC_CROATIAN is not set
+# CONFIG_NLS_MAC_CYRILLIC is not set
+# CONFIG_NLS_MAC_GAELIC is not set
+# CONFIG_NLS_MAC_GREEK is not set
+# CONFIG_NLS_MAC_ICELAND is not set
+# CONFIG_NLS_MAC_INUIT is not set
+# CONFIG_NLS_MAC_ROMANIAN is not set
+# CONFIG_NLS_MAC_TURKISH is not set
+CONFIG_NLS_UTF8=m
+CONFIG_DLM=m
+# CONFIG_DLM_DEBUG is not set
+# CONFIG_UNICODE is not set
+CONFIG_IO_WQ=y
+# end of File systems
+
+#
+# Security options
+#
+CONFIG_KEYS=y
+# CONFIG_KEYS_REQUEST_CACHE is not set
+# CONFIG_PERSISTENT_KEYRINGS is not set
+# CONFIG_ENCRYPTED_KEYS is not set
+# CONFIG_KEY_DH_OPERATIONS is not set
+# CONFIG_SECURITY_DMESG_RESTRICT is not set
+# CONFIG_SECURITY is not set
+# CONFIG_SECURITYFS is not set
+# CONFIG_INTEL_TXT is not set
+CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR=y
+# CONFIG_HARDENED_USERCOPY is not set
+# CONFIG_FORTIFY_SOURCE is not set
+# CONFIG_STATIC_USERMODEHELPER is not set
+# CONFIG_IMA_SECURE_AND_OR_TRUSTED_BOOT is not set
+CONFIG_DEFAULT_SECURITY_DAC=y
+CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,integrity,bpf"
+
+#
+# Kernel hardening options
+#
+
+#
+# Memory initialization
+#
+CONFIG_INIT_STACK_NONE=y
+# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
+# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
+# end of Memory initialization
+# end of Kernel hardening options
+# end of Security options
+
+CONFIG_XOR_BLOCKS=m
+CONFIG_ASYNC_CORE=m
+CONFIG_ASYNC_MEMCPY=m
+CONFIG_ASYNC_XOR=m
+CONFIG_ASYNC_PQ=m
+CONFIG_ASYNC_RAID6_RECOV=m
+CONFIG_CRYPTO=y
+
+#
+# Crypto core or helper
+#
+CONFIG_CRYPTO_ALGAPI=y
+CONFIG_CRYPTO_ALGAPI2=y
+CONFIG_CRYPTO_AEAD=m
+CONFIG_CRYPTO_AEAD2=y
+CONFIG_CRYPTO_SKCIPHER=y
+CONFIG_CRYPTO_SKCIPHER2=y
+CONFIG_CRYPTO_HASH=y
+CONFIG_CRYPTO_HASH2=y
+CONFIG_CRYPTO_RNG=m
+CONFIG_CRYPTO_RNG2=y
+CONFIG_CRYPTO_RNG_DEFAULT=m
+CONFIG_CRYPTO_AKCIPHER2=y
+CONFIG_CRYPTO_AKCIPHER=m
+CONFIG_CRYPTO_KPP2=y
+CONFIG_CRYPTO_KPP=m
+CONFIG_CRYPTO_ACOMP2=y
+CONFIG_CRYPTO_MANAGER=y
+CONFIG_CRYPTO_MANAGER2=y
+CONFIG_CRYPTO_USER=m
+CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+CONFIG_CRYPTO_GF128MUL=m
+CONFIG_CRYPTO_NULL=m
+CONFIG_CRYPTO_NULL2=y
+CONFIG_CRYPTO_PCRYPT=m
+CONFIG_CRYPTO_CRYPTD=m
+CONFIG_CRYPTO_AUTHENC=m
+CONFIG_CRYPTO_TEST=m
+CONFIG_CRYPTO_SIMD=m
+CONFIG_CRYPTO_GLUE_HELPER_X86=m
+CONFIG_CRYPTO_ENGINE=m
+
+#
+# Public-key cryptography
+#
+CONFIG_CRYPTO_RSA=m
+CONFIG_CRYPTO_DH=m
+CONFIG_CRYPTO_ECC=m
+CONFIG_CRYPTO_ECDH=m
+CONFIG_CRYPTO_ECRDSA=m
+CONFIG_CRYPTO_SM2=m
+CONFIG_CRYPTO_CURVE25519=m
+CONFIG_CRYPTO_CURVE25519_X86=m
+
+#
+# Authenticated Encryption with Associated Data
+#
+CONFIG_CRYPTO_CCM=m
+CONFIG_CRYPTO_GCM=m
+CONFIG_CRYPTO_CHACHA20POLY1305=m
+CONFIG_CRYPTO_AEGIS128=m
+CONFIG_CRYPTO_AEGIS128_AESNI_SSE2=m
+CONFIG_CRYPTO_SEQIV=m
+CONFIG_CRYPTO_ECHAINIV=m
+
+#
+# Block modes
+#
+CONFIG_CRYPTO_CBC=m
+CONFIG_CRYPTO_CFB=m
+CONFIG_CRYPTO_CTR=m
+CONFIG_CRYPTO_CTS=m
+CONFIG_CRYPTO_ECB=m
+CONFIG_CRYPTO_LRW=m
+CONFIG_CRYPTO_OFB=m
+CONFIG_CRYPTO_PCBC=m
+CONFIG_CRYPTO_XTS=m
+CONFIG_CRYPTO_KEYWRAP=m
+CONFIG_CRYPTO_NHPOLY1305=m
+CONFIG_CRYPTO_NHPOLY1305_SSE2=m
+CONFIG_CRYPTO_NHPOLY1305_AVX2=m
+CONFIG_CRYPTO_ADIANTUM=m
+CONFIG_CRYPTO_ESSIV=m
+
+#
+# Hash modes
+#
+CONFIG_CRYPTO_CMAC=m
+CONFIG_CRYPTO_HMAC=m
+CONFIG_CRYPTO_XCBC=m
+CONFIG_CRYPTO_VMAC=m
+
+#
+# Digest
+#
+CONFIG_CRYPTO_CRC32C=y
+CONFIG_CRYPTO_CRC32C_INTEL=m
+CONFIG_CRYPTO_CRC32=m
+CONFIG_CRYPTO_CRC32_PCLMUL=m
+CONFIG_CRYPTO_XXHASH=m
+CONFIG_CRYPTO_BLAKE2B=m
+CONFIG_CRYPTO_BLAKE2S=m
+CONFIG_CRYPTO_BLAKE2S_X86=m
+CONFIG_CRYPTO_CRCT10DIF=y
+CONFIG_CRYPTO_CRCT10DIF_PCLMUL=m
+CONFIG_CRYPTO_GHASH=m
+CONFIG_CRYPTO_POLY1305=m
+CONFIG_CRYPTO_POLY1305_X86_64=m
+CONFIG_CRYPTO_MD4=m
+CONFIG_CRYPTO_MD5=m
+CONFIG_CRYPTO_MICHAEL_MIC=m
+CONFIG_CRYPTO_RMD128=m
+CONFIG_CRYPTO_RMD160=m
+CONFIG_CRYPTO_RMD256=m
+CONFIG_CRYPTO_RMD320=m
+CONFIG_CRYPTO_SHA1=y
+CONFIG_CRYPTO_SHA1_SSSE3=m
+CONFIG_CRYPTO_SHA256_SSSE3=m
+CONFIG_CRYPTO_SHA512_SSSE3=m
+CONFIG_CRYPTO_SHA256=y
+CONFIG_CRYPTO_SHA512=m
+CONFIG_CRYPTO_SHA3=m
+CONFIG_CRYPTO_SM3=m
+CONFIG_CRYPTO_STREEBOG=m
+CONFIG_CRYPTO_TGR192=m
+CONFIG_CRYPTO_WP512=m
+CONFIG_CRYPTO_GHASH_CLMUL_NI_INTEL=m
+
+#
+# Ciphers
+#
+CONFIG_CRYPTO_AES=y
+CONFIG_CRYPTO_AES_TI=m
+CONFIG_CRYPTO_AES_NI_INTEL=m
+CONFIG_CRYPTO_ANUBIS=m
+CONFIG_CRYPTO_ARC4=m
+CONFIG_CRYPTO_BLOWFISH=m
+CONFIG_CRYPTO_BLOWFISH_COMMON=m
+CONFIG_CRYPTO_BLOWFISH_X86_64=m
+CONFIG_CRYPTO_CAMELLIA=m
+CONFIG_CRYPTO_CAMELLIA_X86_64=m
+CONFIG_CRYPTO_CAMELLIA_AESNI_AVX_X86_64=m
+CONFIG_CRYPTO_CAMELLIA_AESNI_AVX2_X86_64=m
+CONFIG_CRYPTO_CAST_COMMON=m
+CONFIG_CRYPTO_CAST5=m
+CONFIG_CRYPTO_CAST5_AVX_X86_64=m
+CONFIG_CRYPTO_CAST6=m
+CONFIG_CRYPTO_CAST6_AVX_X86_64=m
+CONFIG_CRYPTO_DES=y
+CONFIG_CRYPTO_DES3_EDE_X86_64=m
+CONFIG_CRYPTO_FCRYPT=m
+CONFIG_CRYPTO_KHAZAD=m
+CONFIG_CRYPTO_SALSA20=m
+CONFIG_CRYPTO_CHACHA20=m
+CONFIG_CRYPTO_CHACHA20_X86_64=m
+CONFIG_CRYPTO_SEED=m
+CONFIG_CRYPTO_SERPENT=m
+CONFIG_CRYPTO_SERPENT_SSE2_X86_64=m
+CONFIG_CRYPTO_SERPENT_AVX_X86_64=m
+CONFIG_CRYPTO_SERPENT_AVX2_X86_64=m
+CONFIG_CRYPTO_SM4=m
+CONFIG_CRYPTO_TEA=m
+CONFIG_CRYPTO_TWOFISH=m
+CONFIG_CRYPTO_TWOFISH_COMMON=m
+CONFIG_CRYPTO_TWOFISH_X86_64=m
+CONFIG_CRYPTO_TWOFISH_X86_64_3WAY=m
+CONFIG_CRYPTO_TWOFISH_AVX_X86_64=m
+
+#
+# Compression
+#
+CONFIG_CRYPTO_DEFLATE=m
+CONFIG_CRYPTO_LZO=m
+CONFIG_CRYPTO_842=m
+CONFIG_CRYPTO_LZ4=m
+CONFIG_CRYPTO_LZ4HC=m
+CONFIG_CRYPTO_ZSTD=m
+
+#
+# Random Number Generation
+#
+CONFIG_CRYPTO_ANSI_CPRNG=m
+CONFIG_CRYPTO_DRBG_MENU=m
+CONFIG_CRYPTO_DRBG_HMAC=y
+CONFIG_CRYPTO_DRBG_HASH=y
+CONFIG_CRYPTO_DRBG_CTR=y
+CONFIG_CRYPTO_DRBG=m
+CONFIG_CRYPTO_JITTERENTROPY=m
+CONFIG_CRYPTO_USER_API=m
+CONFIG_CRYPTO_USER_API_HASH=m
+CONFIG_CRYPTO_USER_API_SKCIPHER=m
+CONFIG_CRYPTO_USER_API_RNG=m
+# CONFIG_CRYPTO_USER_API_RNG_CAVP is not set
+CONFIG_CRYPTO_USER_API_AEAD=m
+CONFIG_CRYPTO_USER_API_ENABLE_OBSOLETE=y
+CONFIG_CRYPTO_STATS=y
+CONFIG_CRYPTO_HASH_INFO=y
+CONFIG_CRYPTO_HW=y
+CONFIG_CRYPTO_DEV_PADLOCK=m
+CONFIG_CRYPTO_DEV_PADLOCK_AES=m
+CONFIG_CRYPTO_DEV_PADLOCK_SHA=m
+CONFIG_CRYPTO_DEV_ATMEL_I2C=m
+CONFIG_CRYPTO_DEV_ATMEL_ECC=m
+CONFIG_CRYPTO_DEV_ATMEL_SHA204A=m
+CONFIG_CRYPTO_DEV_CCP=y
+CONFIG_CRYPTO_DEV_CCP_DD=y
+CONFIG_CRYPTO_DEV_SP_CCP=y
+CONFIG_CRYPTO_DEV_CCP_CRYPTO=m
+CONFIG_CRYPTO_DEV_SP_PSP=y
+# CONFIG_CRYPTO_DEV_CCP_DEBUGFS is not set
+CONFIG_CRYPTO_DEV_QAT=m
+CONFIG_CRYPTO_DEV_QAT_DH895xCC=m
+CONFIG_CRYPTO_DEV_QAT_C3XXX=m
+CONFIG_CRYPTO_DEV_QAT_C62X=m
+CONFIG_CRYPTO_DEV_QAT_DH895xCCVF=m
+CONFIG_CRYPTO_DEV_QAT_C3XXXVF=m
+CONFIG_CRYPTO_DEV_QAT_C62XVF=m
+CONFIG_CRYPTO_DEV_NITROX=m
+CONFIG_CRYPTO_DEV_NITROX_CNN55XX=m
+CONFIG_CRYPTO_DEV_CHELSIO=m
+CONFIG_CRYPTO_DEV_VIRTIO=m
+CONFIG_CRYPTO_DEV_SAFEXCEL=m
+# CONFIG_CRYPTO_DEV_AMLOGIC_GXL is not set
+CONFIG_ASYMMETRIC_KEY_TYPE=y
+CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE=m
+CONFIG_X509_CERTIFICATE_PARSER=m
+CONFIG_PKCS8_PRIVATE_KEY_PARSER=m
+CONFIG_PKCS7_MESSAGE_PARSER=m
+
+#
+# Certificates for signature checking
+#
+CONFIG_SYSTEM_TRUSTED_KEYRING=y
+CONFIG_SYSTEM_TRUSTED_KEYS=""
+CONFIG_SYSTEM_EXTRA_CERTIFICATE=y
+CONFIG_SYSTEM_EXTRA_CERTIFICATE_SIZE=4096
+CONFIG_SECONDARY_TRUSTED_KEYRING=y
+CONFIG_SYSTEM_BLACKLIST_KEYRING=y
+CONFIG_SYSTEM_BLACKLIST_HASH_LIST=""
+# end of Certificates for signature checking
+
+#
+# Library routines
+#
+CONFIG_RAID6_PQ=m
+CONFIG_RAID6_PQ_BENCHMARK=y
+# CONFIG_PACKING is not set
+CONFIG_BITREVERSE=y
+CONFIG_GENERIC_STRNCPY_FROM_USER=y
+CONFIG_GENERIC_STRNLEN_USER=y
+CONFIG_GENERIC_NET_UTILS=y
+CONFIG_GENERIC_FIND_FIRST_BIT=y
+CONFIG_CORDIC=m
+# CONFIG_PRIME_NUMBERS is not set
+CONFIG_RATIONAL=y
+CONFIG_GENERIC_PCI_IOMAP=y
+CONFIG_GENERIC_IOMAP=y
+CONFIG_ARCH_USE_CMPXCHG_LOCKREF=y
+CONFIG_ARCH_HAS_FAST_MULTIPLIER=y
+CONFIG_ARCH_USE_SYM_ANNOTATIONS=y
+
+#
+# Crypto library routines
+#
+CONFIG_CRYPTO_LIB_AES=y
+CONFIG_CRYPTO_LIB_ARC4=m
+CONFIG_CRYPTO_ARCH_HAVE_LIB_BLAKE2S=y
+CONFIG_CRYPTO_LIB_BLAKE2S_GENERIC=y
+CONFIG_CRYPTO_ARCH_HAVE_LIB_CHACHA=m
+CONFIG_CRYPTO_LIB_CHACHA_GENERIC=m
+CONFIG_CRYPTO_LIB_CHACHA=m
+CONFIG_CRYPTO_ARCH_HAVE_LIB_CURVE25519=m
+CONFIG_CRYPTO_LIB_CURVE25519_GENERIC=m
+CONFIG_CRYPTO_LIB_CURVE25519=m
+CONFIG_CRYPTO_LIB_DES=y
+CONFIG_CRYPTO_LIB_POLY1305_RSIZE=11
+CONFIG_CRYPTO_ARCH_HAVE_LIB_POLY1305=m
+CONFIG_CRYPTO_LIB_POLY1305_GENERIC=m
+CONFIG_CRYPTO_LIB_POLY1305=m
+CONFIG_CRYPTO_LIB_CHACHA20POLY1305=m
+CONFIG_CRYPTO_LIB_SHA256=y
+# end of Crypto library routines
+
+CONFIG_LIB_MEMNEQ=y
+CONFIG_CRC_CCITT=m
+CONFIG_CRC16=y
+CONFIG_CRC_T10DIF=y
+CONFIG_CRC_ITU_T=m
+CONFIG_CRC32=y
+CONFIG_CRC32_SELFTEST=y
+CONFIG_CRC32_SLICEBY8=y
+# CONFIG_CRC32_SLICEBY4 is not set
+# CONFIG_CRC32_SARWATE is not set
+# CONFIG_CRC32_BIT is not set
+CONFIG_CRC64=m
+CONFIG_CRC4=m
+CONFIG_CRC7=m
+CONFIG_LIBCRC32C=m
+CONFIG_CRC8=m
+CONFIG_XXHASH=y
+CONFIG_RANDOM32_SELFTEST=y
+CONFIG_842_COMPRESS=m
+CONFIG_842_DECOMPRESS=m
+CONFIG_ZLIB_INFLATE=y
+CONFIG_ZLIB_DEFLATE=m
+CONFIG_LZO_COMPRESS=m
+CONFIG_LZO_DECOMPRESS=y
+CONFIG_LZ4_COMPRESS=m
+CONFIG_LZ4HC_COMPRESS=m
+CONFIG_LZ4_DECOMPRESS=y
+CONFIG_ZSTD_COMPRESS=m
+CONFIG_ZSTD_DECOMPRESS=y
+CONFIG_XZ_DEC=y
+CONFIG_XZ_DEC_X86=y
+CONFIG_XZ_DEC_POWERPC=y
+CONFIG_XZ_DEC_IA64=y
+CONFIG_XZ_DEC_ARM=y
+CONFIG_XZ_DEC_ARMTHUMB=y
+CONFIG_XZ_DEC_SPARC=y
+CONFIG_XZ_DEC_BCJ=y
+CONFIG_XZ_DEC_TEST=m
+CONFIG_DECOMPRESS_GZIP=y
+CONFIG_DECOMPRESS_BZIP2=y
+CONFIG_DECOMPRESS_LZMA=y
+CONFIG_DECOMPRESS_XZ=y
+CONFIG_DECOMPRESS_LZO=y
+CONFIG_DECOMPRESS_LZ4=y
+CONFIG_DECOMPRESS_ZSTD=y
+CONFIG_GENERIC_ALLOCATOR=y
+CONFIG_TEXTSEARCH=y
+CONFIG_TEXTSEARCH_KMP=m
+CONFIG_TEXTSEARCH_BM=m
+CONFIG_TEXTSEARCH_FSM=m
+CONFIG_BTREE=y
+CONFIG_INTERVAL_TREE=y
+CONFIG_XARRAY_MULTI=y
+CONFIG_ASSOCIATIVE_ARRAY=y
+CONFIG_HAS_IOMEM=y
+CONFIG_HAS_IOPORT_MAP=y
+CONFIG_HAS_DMA=y
+CONFIG_DMA_OPS=y
+CONFIG_NEED_SG_DMA_LENGTH=y
+CONFIG_NEED_DMA_MAP_STATE=y
+CONFIG_ARCH_DMA_ADDR_T_64BIT=y
+CONFIG_SWIOTLB=y
+# CONFIG_DMA_API_DEBUG is not set
+CONFIG_SGL_ALLOC=y
+CONFIG_CHECK_SIGNATURE=y
+CONFIG_CPU_RMAP=y
+CONFIG_DQL=y
+CONFIG_GLOB=y
+CONFIG_GLOB_SELFTEST=m
+CONFIG_NLATTR=y
+CONFIG_CLZ_TAB=y
+CONFIG_IRQ_POLL=y
+CONFIG_MPILIB=m
+CONFIG_DIMLIB=y
+CONFIG_OID_REGISTRY=y
+CONFIG_UCS2_STRING=y
+CONFIG_HAVE_GENERIC_VDSO=y
+CONFIG_GENERIC_GETTIMEOFDAY=y
+CONFIG_GENERIC_VDSO_TIME_NS=y
+CONFIG_SG_POOL=y
+CONFIG_ARCH_HAS_PMEM_API=y
+CONFIG_MEMREGION=y
+CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE=y
+CONFIG_ARCH_HAS_COPY_MC=y
+CONFIG_ARCH_STACKWALK=y
+CONFIG_SBITMAP=y
+CONFIG_STRING_SELFTEST=m
+# end of Library routines
+
+CONFIG_PLDMFW=y
+
+#
+# Kernel hacking
+#
+
+#
+# printk and dmesg options
+#
+CONFIG_PRINTK_TIME=y
+# CONFIG_PRINTK_CALLER is not set
+CONFIG_CONSOLE_LOGLEVEL_DEFAULT=7
+CONFIG_CONSOLE_LOGLEVEL_QUIET=4
+CONFIG_MESSAGE_LOGLEVEL_DEFAULT=4
+# CONFIG_DYNAMIC_DEBUG is not set
+# CONFIG_DYNAMIC_DEBUG_CORE is not set
+CONFIG_SYMBOLIC_ERRNAME=y
+CONFIG_DEBUG_BUGVERBOSE=y
+# end of printk and dmesg options
+
+#
+# Compile-time checks and compiler options
+#
+CONFIG_ENABLE_MUST_CHECK=y
+CONFIG_FRAME_WARN=2048
+# CONFIG_STRIP_ASM_SYMS is not set
+# CONFIG_HEADERS_INSTALL is not set
+# CONFIG_DEBUG_SECTION_MISMATCH is not set
+CONFIG_SECTION_MISMATCH_WARN_ONLY=y
+CONFIG_STACK_VALIDATION=y
+# end of Compile-time checks and compiler options
+
+#
+# Generic Kernel Debugging Instruments
+#
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE=0x1
+CONFIG_MAGIC_SYSRQ_SERIAL=y
+CONFIG_MAGIC_SYSRQ_SERIAL_SEQUENCE=""
+CONFIG_DEBUG_FS=y
+CONFIG_DEBUG_FS_ALLOW_ALL=y
+# CONFIG_DEBUG_FS_DISALLOW_MOUNT is not set
+# CONFIG_DEBUG_FS_ALLOW_NONE is not set
+CONFIG_HAVE_ARCH_KGDB=y
+CONFIG_ARCH_HAS_UBSAN_SANITIZE_ALL=y
+# CONFIG_UBSAN is not set
+CONFIG_HAVE_ARCH_KCSAN=y
+# end of Generic Kernel Debugging Instruments
+
+# CONFIG_DEBUG_KERNEL is not set
+
+#
+# Memory Debugging
+#
+# CONFIG_PAGE_EXTENSION is not set
+# CONFIG_PAGE_POISONING is not set
+# CONFIG_DEBUG_RODATA_TEST is not set
+CONFIG_ARCH_HAS_DEBUG_WX=y
+# CONFIG_DEBUG_WX is not set
+CONFIG_GENERIC_PTDUMP=y
+CONFIG_HAVE_DEBUG_KMEMLEAK=y
+CONFIG_ARCH_HAS_DEBUG_VM_PGTABLE=y
+# CONFIG_DEBUG_VM_PGTABLE is not set
+CONFIG_ARCH_HAS_DEBUG_VIRTUAL=y
+CONFIG_DEBUG_MEMORY_INIT=y
+CONFIG_HAVE_ARCH_KASAN=y
+CONFIG_HAVE_ARCH_KASAN_VMALLOC=y
+CONFIG_CC_HAS_KASAN_GENERIC=y
+CONFIG_CC_HAS_WORKING_NOSANITIZE_ADDRESS=y
+# CONFIG_KASAN is not set
+# end of Memory Debugging
+
+#
+# Debug Oops, Lockups and Hangs
+#
+# CONFIG_PANIC_ON_OOPS is not set
+CONFIG_PANIC_ON_OOPS_VALUE=0
+CONFIG_PANIC_TIMEOUT=0
+CONFIG_HARDLOCKUP_CHECK_TIMESTAMP=y
+# CONFIG_TEST_LOCKUP is not set
+# end of Debug Oops, Lockups and Hangs
+
+#
+# Scheduler Debugging
+#
+CONFIG_SCHED_INFO=y
+# end of Scheduler Debugging
+
+# CONFIG_DEBUG_TIMEKEEPING is not set
+
+#
+# Lock Debugging (spinlocks, mutexes, etc...)
+#
+CONFIG_LOCK_DEBUGGING_SUPPORT=y
+# CONFIG_WW_MUTEX_SELFTEST is not set
+# end of Lock Debugging (spinlocks, mutexes, etc...)
+
+CONFIG_STACKTRACE=y
+# CONFIG_WARN_ALL_UNSEEDED_RANDOM is not set
+
+#
+# Debug kernel data structures
+#
+# CONFIG_BUG_ON_DATA_CORRUPTION is not set
+# end of Debug kernel data structures
+
+#
+# RCU Debugging
+#
+CONFIG_RCU_CPU_STALL_TIMEOUT=60
+# end of RCU Debugging
+
+CONFIG_USER_STACKTRACE_SUPPORT=y
+CONFIG_HAVE_FUNCTION_TRACER=y
+CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
+CONFIG_HAVE_DYNAMIC_FTRACE=y
+CONFIG_HAVE_DYNAMIC_FTRACE_WITH_REGS=y
+CONFIG_HAVE_DYNAMIC_FTRACE_WITH_DIRECT_CALLS=y
+CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
+CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
+CONFIG_HAVE_FENTRY=y
+CONFIG_HAVE_C_RECORDMCOUNT=y
+CONFIG_TRACING_SUPPORT=y
+# CONFIG_FTRACE is not set
+# CONFIG_PROVIDE_OHCI1394_DMA_INIT is not set
+# CONFIG_SAMPLES is not set
+CONFIG_ARCH_HAS_DEVMEM_IS_ALLOWED=y
+# CONFIG_STRICT_DEVMEM is not set
+
+#
+# x86 Debugging
+#
+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+CONFIG_TRACE_IRQFLAGS_NMI_SUPPORT=y
+CONFIG_X86_VERBOSE_BOOTUP=y
+CONFIG_EARLY_PRINTK=y
+# CONFIG_EARLY_PRINTK_DBGP is not set
+# CONFIG_EARLY_PRINTK_USB_XDBC is not set
+# CONFIG_EFI_PGT_DUMP is not set
+CONFIG_HAVE_MMIOTRACE_SUPPORT=y
+CONFIG_IO_DELAY_0X80=y
+# CONFIG_IO_DELAY_0XED is not set
+# CONFIG_IO_DELAY_UDELAY is not set
+# CONFIG_IO_DELAY_NONE is not set
+# CONFIG_PUNIT_ATOM_DEBUG is not set
+CONFIG_UNWINDER_ORC=y
+# CONFIG_UNWINDER_FRAME_POINTER is not set
+# end of x86 Debugging
+
+#
+# Kernel Testing and Coverage
+#
+# CONFIG_KUNIT is not set
+CONFIG_ARCH_HAS_KCOV=y
+CONFIG_CC_HAS_SANCOV_TRACE_PC=y
+# CONFIG_KCOV is not set
+CONFIG_RUNTIME_TESTING_MENU=y
+# CONFIG_LKDTM is not set
+# CONFIG_TEST_LIST_SORT is not set
+# CONFIG_TEST_MIN_HEAP is not set
+# CONFIG_TEST_SORT is not set
+# CONFIG_REED_SOLOMON_TEST is not set
+# CONFIG_ATOMIC64_SELFTEST is not set
+# CONFIG_ASYNC_RAID6_TEST is not set
+# CONFIG_TEST_HEXDUMP is not set
+# CONFIG_TEST_STRING_HELPERS is not set
+# CONFIG_TEST_STRSCPY is not set
+# CONFIG_TEST_KSTRTOX is not set
+# CONFIG_TEST_PRINTF is not set
+# CONFIG_TEST_BITMAP is not set
+# CONFIG_TEST_UUID is not set
+# CONFIG_TEST_XARRAY is not set
+# CONFIG_TEST_OVERFLOW is not set
+# CONFIG_TEST_RHASHTABLE is not set
+# CONFIG_TEST_HASH is not set
+# CONFIG_TEST_IDA is not set
+# CONFIG_TEST_LKM is not set
+# CONFIG_TEST_BITOPS is not set
+# CONFIG_TEST_VMALLOC is not set
+# CONFIG_TEST_USER_COPY is not set
+# CONFIG_TEST_BPF is not set
+# CONFIG_TEST_BLACKHOLE_DEV is not set
+# CONFIG_FIND_BIT_BENCHMARK is not set
+# CONFIG_TEST_FIRMWARE is not set
+# CONFIG_TEST_SYSCTL is not set
+# CONFIG_TEST_UDELAY is not set
+# CONFIG_TEST_STATIC_KEYS is not set
+# CONFIG_TEST_KMOD is not set
+# CONFIG_TEST_MEMCAT_P is not set
+# CONFIG_TEST_STACKINIT is not set
+# CONFIG_TEST_MEMINIT is not set
+# CONFIG_TEST_FREE_PAGES is not set
+# CONFIG_TEST_FPU is not set
+# CONFIG_MEMTEST is not set
+# end of Kernel Testing and Coverage
+# end of Kernel hacking
+
+--quvdcnnkr66kll7y
+Content-Type: text/plain; charset=big5
+Content-Disposition: attachment; filename="config.log"
+Content-Transfer-Encoding: quoted-printable
+
+This file contains any messages produced by compilers while
+running configure, to aid debugging if configure makes a mistake.
+
+It was created by Lustre configure 2.15.1, which was
+generated by GNU Autoconf 2.69.  Invocation command line was
+
+  $ ./configure --prefix=3D/opt/lustre --with-linux=3D/usr/src/linux-5.10.1=
+53 --with-o2ib=3D/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5=
+=2E6 --disable-server --enable-mpitests=3Dno
+
+## --------- ##
+## Platform. ##
+## --------- ##
+
+hostname =3D c31
+uname -m =3D x86_64
+uname -r =3D 5.10.153
+uname -s =3D Linux
+uname -v =3D #3 SMP Sun Nov 6 18:05:56 CST 2022
+
+/usr/bin/uname -p =3D unknown
+/bin/uname -X     =3D unknown
+
+/bin/arch              =3D unknown
+/usr/bin/arch -k       =3D unknown
+/usr/convex/getsysinfo =3D unknown
+/usr/bin/hostinfo      =3D unknown
+/bin/machine           =3D unknown
+/usr/bin/oslevel       =3D unknown
+/bin/universe          =3D unknown
+
+PATH: /opt/intel/compilers_and_libraries_2017.4.196/linux/mpi/intel64/bin
+PATH: /opt/intel/compilers_and_libraries_2017.4.196/linux/bin/intel64
+PATH: /opt/intel/compilers_and_libraries_2017.4.196/linux/mpi/intel64/bin
+PATH: /opt/intel/debugger_2017/gdb/intel64_mic/bin
+PATH: /opt/intel/compilers_and_libraries_2017.4.196/linux/bin/intel64
+PATH: /opt/intel/compilers_and_libraries_2017.4.196/linux/mpi/intel64/bin
+PATH: /opt/intel/debugger_2017/gdb/intel64_mic/bin
+PATH: /opt/bin
+PATH: /usr/local/bin
+PATH: /usr/sbin
+PATH: /usr/bin
+PATH: /sbin
+PATH: /bin
+PATH: /opt/torque/sbin
+PATH: /opt/torque/bin
+
+
+## ----------- ##
+## Core tests. ##
+## ----------- ##
+
+configure:2834: checking build system type
+configure:2848: result: x86_64-pc-linux-gnu
+configure:2868: checking host system type
+configure:2881: result: x86_64-pc-linux-gnu
+configure:2901: checking target system type
+configure:2914: result: x86_64-pc-linux-gnu
+configure:2957: checking for a BSD-compatible install
+configure:3025: result: /usr/bin/install -c
+configure:3036: checking whether build environment is sane
+configure:3091: result: yes
+configure:3240: checking for a thread-safe mkdir -p
+configure:3279: result: /bin/mkdir -p
+configure:3286: checking for gawk
+configure:3302: found /usr/bin/gawk
+configure:3313: result: gawk
+configure:3324: checking whether make sets $(MAKE)
+configure:3346: result: yes
+configure:3375: checking whether make supports nested variables
+configure:3392: result: yes
+configure:3471: checking how to create a pax tar archive
+configure:3482: tar --version
+tar (GNU tar) 1.30
+Copyright (C) 2017 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.ht=
+ml>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by John Gilmore and Jay Fenlason.
+configure:3485: $? =3D 0
+configure:3525: tardir=3Dconftest.dir && eval tar --format=3Dposix -chf - "=
+$tardir" >conftest.tar
+configure:3528: $? =3D 0
+configure:3532: tar -xf - <conftest.tar
+configure:3535: $? =3D 0
+configure:3537: cat conftest.dir/file
+GrepMe
+configure:3540: $? =3D 0
+configure:3553: result: gnutar
+configure:3604: checking whether to enable maintainer-specific portions of =
+Makefiles
+configure:3613: result: yes
+configure:3675: checking for gcc
+configure:3691: found /usr/bin/gcc
+configure:3702: result: gcc
+configure:3931: checking for C compiler version
+configure:3940: gcc --version >&5
+gcc (Debian 8.3.0-6) 8.3.0
+Copyright (C) 2018 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+configure:3951: $? =3D 0
+configure:3940: gcc -v >&5
+Using built-in specs.
+COLLECT_GCC=3Dgcc
+COLLECT_LTO_WRAPPER=3D/usr/lib/gcc/x86_64-linux-gnu/8/lto-wrapper
+OFFLOAD_TARGET_NAMES=3Dnvptx-none
+OFFLOAD_TARGET_DEFAULT=3D1
+Target: x86_64-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion=3D'Debian 8.3.0-6' -=
+-with-bugurl=3Dfile:///usr/share/doc/gcc-8/README.Bugs --enable-languages=
+=3Dc,ada,c++,go,brig,d,fortran,objc,obj-c++ --prefix=3D/usr --with-gcc-majo=
+r-version-only --program-suffix=3D-8 --program-prefix=3Dx86_64-linux-gnu- -=
+-enable-shared --enable-linker-build-id --libexecdir=3D/usr/lib --without-i=
+ncluded-gettext --enable-threads=3Dposix --libdir=3D/usr/lib --enable-nls -=
+-enable-bootstrap --enable-clocale=3Dgnu --enable-libstdcxx-debug --enable-=
+libstdcxx-time=3Dyes --with-default-libstdcxx-abi=3Dnew --enable-gnu-unique=
+-object --disable-vtable-verify --enable-libmpx --enable-plugin --enable-de=
+fault-pie --with-system-zlib --with-target-system-zlib --enable-objc-gc=3Da=
+uto --enable-multiarch --disable-werror --with-arch-32=3Di686 --with-abi=3D=
+m64 --with-multilib-list=3Dm32,m64,mx32 --enable-multilib --with-tune=3Dgen=
+eric --enable-offload-targets=3Dnvptx-none --without-cuda-driver --enable-c=
+hecking=3Drelease --build=3Dx86_64-linux-gnu --host=3Dx86_64-linux-gnu --ta=
+rget=3Dx86_64-linux-gnu
+Thread model: posix
+gcc version 8.3.0 (Debian 8.3.0-6)=20
+configure:3951: $? =3D 0
+configure:3940: gcc -V >&5
+gcc: error: unrecognized command line option '-V'
+gcc: fatal error: no input files
+compilation terminated.
+configure:3951: $? =3D 1
+configure:3940: gcc -qversion >&5
+gcc: error: unrecognized command line option '-qversion'; did you mean '--v=
+ersion'?
+gcc: fatal error: no input files
+compilation terminated.
+configure:3951: $? =3D 1
+configure:3971: checking whether the C compiler works
+configure:3993: gcc    conftest.c  >&5
+configure:3997: $? =3D 0
+configure:4045: result: yes
+configure:4048: checking for C compiler default output file name
+configure:4050: result: a.out
+configure:4056: checking for suffix of executables
+configure:4063: gcc -o conftest    conftest.c  >&5
+configure:4067: $? =3D 0
+configure:4089: result:=20
+configure:4111: checking whether we are cross compiling
+configure:4119: gcc -o conftest    conftest.c  >&5
+configure:4123: $? =3D 0
+configure:4130: ./conftest
+configure:4134: $? =3D 0
+configure:4122: result: no
+configure:4127: checking for suffix of object files
+configure:4149: gcc -c   conftest.c >&5
+configure:4153: $? =3D 0
+configure:4174: result: o
+configure:4178: checking whether we are using the GNU C compiler
+configure:4197: gcc -c   conftest.c >&5
+configure:4197: $? =3D 0
+configure:4206: result: yes
+configure:4215: checking whether gcc accepts -g
+configure:4235: gcc -c -g  conftest.c >&5
+configure:4235: $? =3D 0
+configure:4276: result: yes
+configure:4293: checking for gcc option to accept ISO C89
+configure:4356: gcc  -c -g -O2  conftest.c >&5
+configure:4356: $? =3D 0
+configure:4369: result: none needed
+configure:4394: checking whether gcc understands -c and -o together
+configure:4416: gcc -c conftest.c -o conftest2.o
+configure:4419: $? =3D 0
+configure:4416: gcc -c conftest.c -o conftest2.o
+configure:4419: $? =3D 0
+configure:4431: result: yes
+configure:4459: checking for style of include used by make
+configure:4487: result: GNU
+configure:4513: checking dependency style of gcc
+configure:4624: result: gcc3
+configure:4685: checking how to print strings
+configure:4712: result: printf
+configure:4733: checking for a sed that does not truncate output
+configure:4797: result: /bin/sed
+configure:4815: checking for grep that handles long lines and -e
+configure:4873: result: /bin/grep
+configure:4878: checking for egrep
+configure:4940: result: /bin/grep -E
+configure:4945: checking for fgrep
+configure:5007: result: /bin/grep -F
+configure:5042: checking for ld used by gcc
+configure:5109: result: /usr/bin/ld
+configure:5116: checking if the linker (/usr/bin/ld) is GNU ld
+configure:5131: result: yes
+configure:5143: checking for BSD- or MS-compatible name lister (nm)
+configure:5197: result: /usr/bin/nm -B
+configure:5327: checking the name lister (/usr/bin/nm -B) interface
+configure:5334: gcc -c -g -O2  conftest.c >&5
+configure:5337: /usr/bin/nm -B "conftest.o"
+configure:5340: output
+0000000000000000 B some_variable
+configure:5341: result: BSD nm
+configure:5344: checking whether ln -s works
+configure:5348: result: yes
+configure:5356: checking the maximum length of command line arguments
+configure:5487: result: 1572864
+configure:5535: checking how to convert x86_64-pc-linux-gnu file names to x=
+86_64-pc-linux-gnu format
+configure:5575: result: func_convert_file_noop
+configure:5582: checking how to convert x86_64-pc-linux-gnu file names to t=
+oolchain format
+configure:5602: result: func_convert_file_noop
+configure:5609: checking for /usr/bin/ld option to reload object files
+configure:5616: result: -r
+configure:5690: checking for objdump
+configure:5706: found /usr/bin/objdump
+configure:5717: result: objdump
+configure:5749: checking how to recognize dependent libraries
+configure:5949: result: pass_all
+configure:6034: checking for dlltool
+configure:6064: result: no
+configure:6094: checking how to associate runtime and link libraries
+configure:6121: result: printf %s\n
+configure:6182: checking for ar
+configure:6198: found /usr/bin/ar
+configure:6209: result: ar
+configure:6246: checking for archiver @FILE support
+configure:6263: gcc -c -g -O2  conftest.c >&5
+configure:6263: $? =3D 0
+configure:6266: ar cru libconftest.a @conftest.lst >&5
+ar: `u' modifier ignored since `D' is the default (see `U')
+configure:6269: $? =3D 0
+configure:6274: ar cru libconftest.a @conftest.lst >&5
+ar: `u' modifier ignored since `D' is the default (see `U')
+ar: conftest.o: No such file or directory
+configure:6277: $? =3D 1
+configure:6276: result: @
+configure:6334: checking for strip
+configure:6350: found /usr/bin/strip
+configure:6361: result: strip
+configure:6433: checking for ranlib
+configure:6449: found /usr/bin/ranlib
+configure:6460: result: ranlib
+configure:6562: checking command to parse /usr/bin/nm -B output from gcc ob=
+ject
+configure:6715: gcc -c -g -O2  conftest.c >&5
+configure:6718: $? =3D 0
+configure:6722: /usr/bin/nm -B conftest.o \| sed -n -e 's/^.*[ ]\([ABCDGIRS=
+TW][ABCDGIRSTW]*\)[ ][ ]*\([_A-Za-z][_A-Za-z0-9]*\)$/\1 \2 \2/p' | sed '/ _=
+_gnu_lto/d' \> conftest.nm
+configure:6725: $? =3D 0
+configure:6791: gcc -o conftest -g -O2   conftest.c conftstm.o >&5
+configure:6794: $? =3D 0
+configure:6832: result: ok
+configure:6879: checking for sysroot
+configure:6909: result: no
+configure:6916: checking for a working dd
+configure:6954: result: /bin/dd
+configure:6958: checking how to truncate binary pipes
+configure:6973: result: /bin/dd bs=3D4096 count=3D1
+configure:7109: gcc -c -g -O2  conftest.c >&5
+configure:7112: $? =3D 0
+configure:7302: checking for mt
+configure:7318: found /bin/mt
+configure:7329: result: mt
+configure:7352: checking if mt is a manifest tool
+configure:7358: mt '-?'
+configure:7366: result: no
+configure:8043: checking how to run the C preprocessor
+configure:8074: gcc -E  conftest.c
+configure:8074: $? =3D 0
+configure:8088: gcc -E  conftest.c
+conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
+ #include <ac_nonexistent.h>
+          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+configure:8088: $? =3D 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| /* end confdefs.h.  */
+| #include <ac_nonexistent.h>
+configure:8113: result: gcc -E
+configure:8133: gcc -E  conftest.c
+configure:8133: $? =3D 0
+configure:8147: gcc -E  conftest.c
+conftest.c:11:10: fatal error: ac_nonexistent.h: No such file or directory
+ #include <ac_nonexistent.h>
+          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+configure:8147: $? =3D 1
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| /* end confdefs.h.  */
+| #include <ac_nonexistent.h>
+configure:8176: checking for ANSI C header files
+configure:8196: gcc -c -g -O2  conftest.c >&5
+configure:8196: $? =3D 0
+configure:8269: gcc -o conftest -g -O2   conftest.c  >&5
+configure:8269: $? =3D 0
+configure:8269: ./conftest
+configure:8269: $? =3D 0
+configure:8280: result: yes
+configure:8293: checking for sys/types.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for sys/stat.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for stdlib.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for string.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for memory.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for strings.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for inttypes.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for stdint.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8293: checking for unistd.h
+configure:8293: gcc -c -g -O2  conftest.c >&5
+configure:8293: $? =3D 0
+configure:8293: result: yes
+configure:8307: checking for dlfcn.h
+configure:8307: gcc -c -g -O2  conftest.c >&5
+configure:8307: $? =3D 0
+configure:8307: result: yes
+configure:8563: checking for objdir
+configure:8578: result: .libs
+configure:8838: checking if gcc supports -fno-rtti -fno-exceptions
+configure:8856: gcc -c -g -O2  -fno-rtti -fno-exceptions conftest.c >&5
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but n=
+ot for C
+configure:8860: $? =3D 0
+configure:8873: result: no
+configure:9231: checking for gcc option to produce PIC
+configure:9238: result: -fPIC -DPIC
+configure:9246: checking if gcc PIC flag -fPIC -DPIC works
+configure:9264: gcc -c -g -O2  -fPIC -DPIC -DPIC conftest.c >&5
+configure:9268: $? =3D 0
+configure:9281: result: yes
+configure:9310: checking if gcc static flag -static works
+configure:9338: result: yes
+configure:9353: checking if gcc supports -c -o file.o
+configure:9374: gcc -c -g -O2  -o out/conftest2.o conftest.c >&5
+configure:9378: $? =3D 0
+configure:9400: result: yes
+configure:9408: checking if gcc supports -c -o file.o
+configure:9455: result: yes
+configure:9488: checking whether the gcc linker (/usr/bin/ld -m elf_x86_64)=
+ supports shared libraries
+configure:10747: result: yes
+configure:10784: checking whether -lc should be explicitly linked in
+configure:10792: gcc -c -g -O2  conftest.c >&5
+configure:10795: $? =3D 0
+configure:10810: gcc -shared  -fPIC -DPIC conftest.o  -v -Wl,-soname -Wl,co=
+nftest -o conftest 2\>\&1 \| /bin/grep  -lc  \>/dev/null 2\>\&1
+configure:10813: $? =3D 0
+configure:10827: result: no
+configure:10987: checking dynamic linker characteristics
+configure:11568: gcc -o conftest -g -O2   -Wl,-rpath -Wl,/foo conftest.c  >=
+&5
+configure:11568: $? =3D 0
+configure:11805: result: GNU/Linux ld.so
+configure:11927: checking how to hardcode library paths into programs
+configure:11952: result: immediate
+configure:12500: checking whether stripping libraries is possible
+configure:12505: result: yes
+configure:12540: checking if libtool supports shared libraries
+configure:12542: result: yes
+configure:12545: checking whether to build shared libraries
+configure:12570: result: yes
+configure:12573: checking whether to build static libraries
+configure:12577: result: yes
+configure:9416: checking dependency style of gcc
+configure:9525: result: gcc3
+configure:9543: checking for flex
+configure:9561: found /usr/bin/flex
+configure:9573: result: /usr/bin/flex
+configure:9583: checking for bison
+configure:9601: found /usr/bin/bison
+configure:9613: result: /usr/bin/bison
+configure:9623: checking for rpmbuild
+configure:9641: found /usr/bin/rpmbuild
+configure:9653: result: /usr/bin/rpmbuild
+configure:9855: checking for pkg-config
+configure:9873: found /usr/bin/pkg-config
+configure:9885: result: /usr/bin/pkg-config
+configure:9910: checking pkg-config is at least version 0.9.0
+configure:9913: result: yes
+configure:9923: Lustre base checks
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D
+configure:9936: checking whether to configure just enough for make dist
+configure:9945: result: no
+configure:9965: checking if this distro uses dpkg
+configure:9980: result: yes
+configure:10066: checking for ranlib
+configure:10093: result: ranlib
+configure:10158: checking for ld
+configure:10185: result: /usr/bin/ld -m elf_x86_64
+configure:10250: checking for objdump
+configure:10277: result: objdump
+configure:10342: checking for strip
+configure:10369: result: strip
+configure:10397: checking size of unsigned long long
+configure:10402: gcc -o conftest -g -O2   conftest.c  >&5
+configure:10402: $? =3D 0
+configure:10402: ./conftest
+configure:10402: $? =3D 0
+configure:10416: result: 8
+configure:10452: checking for -Wno-format-truncation support
+configure:10469: gcc -c -g -O2 -Wno-format-truncation -I/usr/src/lustre-2.1=
+5.1/libcfs/include -I/usr/src/lustre-2.15.1/lnet/utils/ -I/usr/src/lustre-2=
+=2E15.1/lustre/include  conftest.c >&5
+configure:10469: $? =3D 0
+configure:10473: result: yes
+configure:10487: checking for -Wno-stringop-truncation support
+configure:10504: gcc -c -g -O2 -Werror -Wno-stringop-truncation -I/usr/src/=
+lustre-2.15.1/libcfs/include -I/usr/src/lustre-2.15.1/lnet/utils/ -I/usr/sr=
+c/lustre-2.15.1/lustre/include  conftest.c >&5
+configure:10504: $? =3D 0
+configure:10508: result: yes
+configure:10522: checking for -Wno-stringop-overflow support
+configure:10539: gcc -c -g -O2 -Wno-stringop-overflow -I/usr/src/lustre-2.1=
+5.1/libcfs/include -I/usr/src/lustre-2.15.1/lnet/utils/ -I/usr/src/lustre-2=
+=2E15.1/lustre/include  conftest.c >&5
+configure:10539: $? =3D 0
+configure:10543: result: yes
+configure:10558: checking whether to use OSD addon
+configure:10582: result: no
+configure:10614: checking whether to build Lustre docs
+configure:10623: result: no
+configure:10633: checking whether to build Lustre manpages
+configure:10642: result: yes
+configure:10646: checking whether to build Lustre utilities
+configure:10655: result: yes
+configure:10659: checking whether to build Lustre tests
+configure:10685: checking for python3
+configure:10703: found /usr/bin/python3
+configure:10715: result: /usr/bin/python3
+configure:10740: checking for a version of Python >=3D '3.6.0'
+configure:10774: result: yes
+configure:10813: checking for the distutils Python package
+configure:10817: result: yes
+configure:10836: checking for Python include path
+configure:10852: result: -I/usr/include/python3.7m
+configure:10859: checking for Python library path
+configure:10942: result: -L/usr/lib -lpython3.7m
+configure:10949: checking for Python site-packages path
+configure:10955: result: /usr/lib/python3/dist-packages
+configure:10962: checking python extra libraries
+configure:10969: result: -lcrypt -lpthread -ldl  -lutil -lm
+configure:10976: checking python extra linking flags
+configure:10983: result: -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-fu=
+nctions
+configure:10990: checking consistency of all components of python developme=
+nt environment
+configure:11018: gcc -o conftest -g -O2 -I/usr/src/lustre-2.15.1/libcfs/inc=
+lude -I/usr/src/lustre-2.15.1/lnet/utils/ -I/usr/src/lustre-2.15.1/lustre/i=
+nclude  -I/usr/include/python3.7m  -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bs=
+ymbolic-functions conftest.c  -L/usr/lib -lpython3.7m -lcrypt -lpthread -ld=
+l  -lutil -lm -lcrypt -lpthread -ldl  -lutil -lm >&5
+configure:11018: $? =3D 0
+configure:11036: result: yes
+configure:11083: checking for swig
+configure:11101: found /usr/bin/swig
+configure:11113: result: /usr/bin/swig
+configure:11127: checking SWIG version
+configure:11130: result: 3.0.12
+configure:11179: checking for SWIG library
+configure:11182: result: /usr/share/swig3.0
+configure:11198: result: yes
+configure:11202: checking whether to build Lustre client support
+configure:11211: result: yes
+configure:11309: checking whether to build Linux kernel modules
+configure:11331: result: yes (linux-gnu)
+configure:11365: checking for Linux sources
+configure:11394: result: /usr/src/linux-5.10.153
+configure:11400: checking for /usr/src/linux-5.10.153
+configure:11414: result: yes
+configure:11423: checking for Linux objects
+configure:11451: result: /usr/src/linux-5.10.153
+configure:11505: checking for /usr/src/linux-5.10.153/.config
+configure:11519: result: yes
+configure:11533: checking for /boot/kernel.h
+configure:11546: result: no
+configure:11552: checking for /var/adm/running-kernel.h
+configure:11565: result: no
+configure:11603: checking for /usr/src/linux-5.10.153/include/generated/aut=
+oconf.h
+configure:11617: result: yes
+configure:11650: checking for /usr/src/linux-5.10.153/include/linux/version=
+=2Eh
+configure:11664: result: no
+configure:11671: checking for /usr/src/linux-5.10.153/include/generated/uap=
+i/linux/version.h
+configure:11685: result: yes
+configure:11701: checking for /usr/src/linux-5.10.153/include/linux/kconfig=
+=2Eh
+configure:11715: result: yes
+configure:11791: checking for external module build target
+configure:11829: cp conftest.c build && make -d /usr/src/lustre-2.15.1/buil=
+d LUSTRE_KERNEL_TEST=3Dconftest.i LDFLAGS=3D LD=3D/usr/bin/ld -m elf_x86_64=
+ CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LUSTRE_LINUX_CONFIG=3D/u=
+sr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/src/linux-5.10.153/arc=
+h/x86/include -Iinclude -Iarch/x86/include/generated -I/usr/src/linux-5.10.=
+153/include -Iinclude2 -I/usr/src/linux-5.10.153/include/uapi -Iinclude/gen=
+erated -I/usr/src/linux-5.10.153/arch/x86/include/uapi -Iarch/x86/include/g=
+enerated/uapi -I/usr/src/linux-5.10.153/include/uapi -Iinclude/generated/ua=
+pi -include /usr/src/linux-5.10.153/include/linux/kconfig.h KBUILD_EXTRA_SY=
+MBOLS=3D  -o tmp_include_depends -o scripts -o include/config/MARKER -C /us=
+r/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-function-declaration -=
+g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/lustre-2.15.1/libcfs/i=
+nclude/libcfs -I/usr/src/lustre-2.15.1/lnet/include/uapi -I/usr/src/lustre-=
+2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/include/uapi -I/usr/src=
+/lustre-2.15.1/lustre/include -Wno-format-truncation -Wno-stringop-truncati=
+on -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/build
+configure:11832: $? =3D 0
+configure:11834: test -s build/conftest.i
+configure:11837: $? =3D 0
+configure:11950: result: M54
+configure:11969: checking that modules can be built at all
+configure:12003: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12006: $? =3D 0
+configure:12008: test -s build/conftest.o
+configure:12011: $? =3D 0
+configure:12024: result: yes
+configure:12042: checking for Linux kernel utsrelease
+configure:12072: result: 5.10.153
+configure:12089: checking for RedHat kernel release number
+configure:12106: result:=20
+configure:12121: checking if Linux kernel was built with CONFIG_SUSE_KERNEL
+configure:12161: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:47:3: error: #error CONFIG_SUSE_KER=
+NEL not #defined
+  #error CONFIG_SUSE_KERNEL not #defined
+   ^~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:12164: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <generated/autoconf.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	#ifndef CONFIG_SUSE_KERNEL
+| 	#error CONFIG_SUSE_KERNEL not #defined
+| 	#endif
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:12182: result: no
+configure:12197: checking for Ubuntu kernel signature
+configure:12211: result: no
+configure:12225: checking for ELRepo -ml kernel signature on CentOS
+configure:12244: result: no
+configure:12258: WARNING: Kernel Distro seems to be neither RedHat, SuSE no=
+r Ubuntu
+configure:12263: checking for Linux kernel module package directory
+configure:12279: WARNING: Kernel Distro seems to be neither RedHat, SuSE no=
+r Ubuntu
+configure:12286: result:=20
+configure:12301: checking for the name of module symbol version file
+configure:12314: result: Module.symvers
+configure:12322: checking if Linux kernel was built with CONFIG_MODULES
+configure:12362: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12365: $? =3D 0
+configure:12367: test -s build/conftest.o
+configure:12370: $? =3D 0
+configure:12383: result: yes
+configure:12399: checking if Linux kernel was built with CONFIG_MODVERSIONS
+configure:12439: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:47:3: error: #error CONFIG_MODVERSI=
+ONS not #defined
+  #error CONFIG_MODVERSIONS not #defined
+   ^~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:12442: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <generated/autoconf.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	#ifndef CONFIG_MODVERSIONS
+| 	#error CONFIG_MODVERSIONS not #defined
+| 	#endif
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:12460: result: no
+configure:12469: checking if Linux kernel module loading is possible
+configure:12510: cp conftest.c build && make -d
+	/usr/src/lustre-2.15.1/build LUSTRE_KERNEL_TEST=3Dconftest.i
+ LDFLAGS=3D LD=3D/usr/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15=
+=2E1/build/Makefile LUSTRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config L=
+INUXINCLUDE=3D -I/usr/src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/=
+x86/include/generated -I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/s=
+rc/linux-5.10.153/include/uapi -Iinclude/generated -I/usr/src/linux-5.10.15=
+3/arch/x86/include/uapi -Iarch/x86/include/generated/uapi -I/usr/src/linux-=
+5.10.153/include/uapi -Iinclude/generated/uapi -include /usr/src/linux-5.10=
+=2E153/include/linux/kconfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depe=
+nds -o scripts -o include/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CF=
+LAGS=3D-Werror-implicit-function-declaration -g -I/usr/src/lustre-2.15.1/li=
+bcfs/include -I/usr/src/lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lust=
+re-2.15.1/lnet/include/uapi -I/usr/src/lustre-2.15.1/lnet/include -I/usr/sr=
+c/lustre-2.15.1/lustre/include/uapi -I/usr/src/lustre-2.15.1/lustre/include=
+ -Wno-format-truncation -Wno-stringop-truncation -Wno-stringop-overflow M=
+=3D/usr/src/lustre-2.15.1/build
+configure:12513: $? =3D 0
+configure:12515: 	grep request_module build/conftest.i |		grep -v 38		>/dev=
+/null=20
+configure:12518: $? =3D 0
+configure:12531: result: yes
+configure:12554: LibCFS kernel checks
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D
+configure:12558: checking whether to use tunable 'panic_dumplog' support
+configure:12567: result: no
+configure:12579: checking does function 'ktime_get_ts64' exist
+configure:12620: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12623: $? =3D 0
+configure:12625: test -s build/conftest.o
+configure:12628: $? =3D 0
+configure:12641: result: yes
+configure:12654: checking does function 'prepare_to_wait_event' exist
+configure:12692: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12695: $? =3D 0
+configure:12697: test -s build/conftest.o
+configure:12700: $? =3D 0
+configure:12713: result: yes
+configure:12725: checking does 'struct kernel_param_ops' exist
+configure:12765: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12768: $? =3D 0
+configure:12770: test -s build/conftest.o
+configure:12773: $? =3D 0
+configure:12786: result: yes
+configure:12798: checking does function 'ktime_add' exist
+configure:12841: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12844: $? =3D 0
+configure:12846: test -s build/conftest.o
+configure:12849: $? =3D 0
+configure:12862: result: yes
+configure:12874: checking does function 'ktime_after' exist
+configure:12916: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12919: $? =3D 0
+configure:12921: test -s build/conftest.o
+configure:12924: $? =3D 0
+configure:12937: result: yes
+configure:12949: checking does function 'ktime_before' exist
+configure:12991: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:12994: $? =3D 0
+configure:12996: test -s build/conftest.o
+configure:12999: $? =3D 0
+configure:13012: result: yes
+configure:13024: checking does function 'ktime_compare' exist
+configure:13066: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13069: $? =3D 0
+configure:13071: test -s build/conftest.o
+configure:13074: $? =3D 0
+configure:13087: result: yes
+configure:13099: checking shrinker has 'count_objects'
+configure:13140: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13143: $? =3D 0
+configure:13145: test -s build/conftest.o
+configure:13148: $? =3D 0
+configure:13161: result: yes
+configure:13174: checking does function 'match_wildcard' exist
+configure:13214: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13217: $? =3D 0
+configure:13219: test -s build/conftest.o
+configure:13222: $? =3D 0
+configure:13235: result: yes
+configure:13251: checking if enum mapping_flags has AS_EXITING flag
+configure:13290: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:13293: $? =3D 0
+configure:13295: test -s build/conftest.o
+configure:13298: $? =3D 0
+configure:13311: result: yes
+configure:13327: checking if iov_iter has member type
+configure:13366: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:13369: $? =3D 0
+configure:13371: test -s build/conftest.o
+configure:13374: $? =3D 0
+configure:13387: result: yes
+configure:13477: checking does 'glob_match()' exist
+configure:13515: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:13518: $? =3D 0
+configure:13520: test -s build/conftest.o
+configure:13523: $? =3D 0
+configure:13536: result: yes
+configure:13549: checking does 'ns_to_timespec64()' exist
+configure:13589: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13592: $? =3D 0
+configure:13594: test -s build/conftest.o
+configure:13597: $? =3D 0
+configure:13610: result: yes
+configure:13623: checking does function 'hlist_add_after' exist
+configure:13661: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:60:2: error: implicit declaration o=
+f function =E2=80=98hlist_add_after=E2=80=99; did you mean =E2=80=98hlist_a=
+dd_fake=E2=80=99? [-Werror=3Dimplicit-function-declaration]
+  hlist_add_after(NULL, NULL);
+  ^~~~~~~~~~~~~~~
+  hlist_add_fake
+cc1: some warnings being treated as errors
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:13664: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/list.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	hlist_add_after(NULL, NULL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:13682: result: no
+configure:13694: checking does 'struct timespec64' exist
+configure:13735: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13738: $? =3D 0
+configure:13740: test -s build/conftest.o
+configure:13743: $? =3D 0
+configure:13756: result: yes
+configure:13768: checking does function 'ktime_get_ns' exist
+configure:13809: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13812: $? =3D 0
+configure:13814: test -s build/conftest.o
+configure:13817: $? =3D 0
+configure:13830: result: yes
+configure:13844: checking does function 'ktime_get_real_ts64' exist
+configure:13884: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13887: $? =3D 0
+configure:13889: test -s build/conftest.o
+configure:13892: $? =3D 0
+configure:13905: result: yes
+configure:13917: checking does function 'ktime_get_real_seconds' exist
+configure:13958: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:13961: $? =3D 0
+configure:13963: test -s build/conftest.o
+configure:13966: $? =3D 0
+configure:13979: result: yes
+configure:13991: checking does function 'ktime_get_real_ns' exist
+configure:14032: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14035: $? =3D 0
+configure:14037: test -s build/conftest.o
+configure:14040: $? =3D 0
+configure:14053: result: yes
+configure:14067: checking does function 'ktime_to_timespec64' exist
+configure:14109: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14112: $? =3D 0
+configure:14114: test -s build/conftest.o
+configure:14117: $? =3D 0
+configure:14130: result: yes
+configure:14142: checking does function 'timespec64_sub' exist
+configure:14182: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14185: $? =3D 0
+configure:14187: test -s build/conftest.o
+configure:14190: $? =3D 0
+configure:14203: result: yes
+configure:14215: checking does function 'timespec64_to_ktime' exist
+configure:14256: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14259: $? =3D 0
+configure:14261: test -s build/conftest.o
+configure:14264: $? =3D 0
+configure:14277: result: yes
+configure:14290: checking does function 'ktime_get_seconds' exist
+configure:14330: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14333: $? =3D 0
+configure:14335: test -s build/conftest.o
+configure:14338: $? =3D 0
+configure:14351: result: yes
+configure:14363: checking does function 'wait_woken' exist
+configure:14401: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14404: $? =3D 0
+configure:14406: test -s build/conftest.o
+configure:14409: $? =3D 0
+configure:14422: result: yes
+configure:14435: checking does function 'ktime_ms_delta' exist
+configure:14476: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14479: $? =3D 0
+configure:14481: test -s build/conftest.o
+configure:14484: $? =3D 0
+configure:14497: result: yes
+configure:14510: checking does function 'kernel_param_unlock' exist
+configure:14549: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14552: $? =3D 0
+configure:14554: test -s build/conftest.o
+configure:14557: $? =3D 0
+configure:14570: result: yes
+configure:14583: checking does function 'topology_sibling_cpumask' exist
+configure:14623: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14626: $? =3D 0
+configure:14628: test -s build/conftest.o
+configure:14631: $? =3D 0
+configure:14644: result: yes
+configure:14657: checking if Linux kernel has 'kstrtobool_from_user'
+configure:14696: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14699: $? =3D 0
+configure:14701: test -s build/conftest.o
+configure:14704: $? =3D 0
+configure:14717: result: yes
+configure:14729: checking if struct genl_ops has start callback
+configure:14769: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14772: $? =3D 0
+configure:14774: test -s build/conftest.o
+configure:14777: $? =3D 0
+configure:14790: result: yes
+configure:14803: checking does crypto hash helper functions exist
+configure:14842: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14845: $? =3D 0
+configure:14847: test -s build/conftest.o
+configure:14850: $? =3D 0
+configure:14863: result: yes
+configure:14875: checking if Linux kernel exports 'kset_find_obj'
+configure:14896: result: yes
+configure:14906: checking if 'rhashtable_replace_fast' exists
+configure:14946: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:14949: $? =3D 0
+configure:14951: test -s build/conftest.o
+configure:14954: $? =3D 0
+configure:14967: result: yes
+configure:14980: checking kernel has fixed hash_64()
+configure:15018: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:76:12: error: =E2=80=98GOLDEN_RATIO=
+_PRIME_64=E2=80=99 undeclared (first use in this function); did you mean =
+=E2=80=98GOLDEN_RATIO_PRIME=E2=80=99?
+  int tmp =3D GOLDEN_RATIO_PRIME_64;
+            ^~~~~~~~~~~~~~~~~~~~~
+            GOLDEN_RATIO_PRIME
+/usr/src/lustre-2.15.1/build/conftest.c:76:12: note: each undeclared identi=
+fier is reported only once for each function it appears in
+/usr/src/lustre-2.15.1/build/conftest.c:76:6: warning: unused variable =E2=
+=80=98tmp=E2=80=99 [-Wunused-variable]
+  int tmp =3D GOLDEN_RATIO_PRIME_64;
+      ^~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15021: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/hash.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	int tmp =3D GOLDEN_RATIO_PRIME_64;
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15039: result: no
+configure:15051: checking if 'struct stacktrace_ops' address function retur=
+ns an int
+configure:15091: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:78:35: error: dereferencing pointer=
+ to incomplete type =E2=80=98struct stacktrace_ops=E2=80=99
+  rc =3D ((struct stacktrace_ops *)0)->address(NULL, 0, 0);
+                                   ^~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15094: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <asm/stacktrace.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	int rc;
+|=20
+| 	rc =3D ((struct stacktrace_ops *)0)->address(NULL, 0, 0);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15112: result: no
+configure:15124: checking if 'get_user_pages()' takes 6 arguments
+configure:15164: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:78:7: error: too many arguments to =
+function =E2=80=98get_user_pages=E2=80=99
+  rc =3D get_user_pages(0, 0, 0, 0, NULL, NULL);
+       ^~~~~~~~~~~~~~
+In file included from /usr/src/lustre-2.15.1/build/conftest.c:70:
+include/linux/mm.h:1750:6: note: declared here
+ long get_user_pages(unsigned long start, unsigned long nr_pages,
+      ^~~~~~~~~~~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15167: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/mm.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	int rc;
+|=20
+| 	rc =3D get_user_pages(0, 0, 0, 0, NULL, NULL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15185: result: no
+configure:15197: checking for linux/stringhash.h
+configure:15230: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15233: $? =3D 0
+configure:15235: test -s build/conftest.o
+configure:15238: $? =3D 0
+configure:15250: result: yes
+configure:15264: checking if internal '__rhashtable_insert_fast()' returns =
+int
+configure:15305: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:80:7: error: too few arguments to f=
+unction =E2=80=98__rhashtable_insert_fast=E2=80=99
+  rc =3D __rhashtable_insert_fast(NULL, NULL, NULL, params);
+       ^~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/src/lustre-2.15.1/build/conftest.c:71:
+include/linux/rhashtable.h:697:21: note: declared here
+ static inline void *__rhashtable_insert_fast(
+                     ^~~~~~~~~~~~~~~~~~~~~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15308: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/rhashtable.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	const struct rhashtable_params params =3D { 0 };
+| 	int rc;
+|=20
+| 	rc =3D __rhashtable_insert_fast(NULL, NULL, NULL, params);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15326: result: no
+configure:15339: checking if 'rhashtable_walk_init' has 3 args
+configure:15378: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:78:2: error: implicit declaration o=
+f function =E2=80=98rhashtable_walk_init=E2=80=99; did you mean =E2=80=98rh=
+ashtable_walk_exit=E2=80=99? [-Werror=3Dimplicit-function-declaration]
+  rhashtable_walk_init(NULL, NULL, GFP_KERNEL);
+  ^~~~~~~~~~~~~~~~~~~~
+  rhashtable_walk_exit
+cc1: some warnings being treated as errors
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15381: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/gfp.h>
+| 	#include <linux/rhashtable.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	rhashtable_walk_init(NULL, NULL, GFP_KERNEL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15399: result: no
+configure:15412: checking if 'rhashtable_lookup' exist
+configure:15453: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15456: $? =3D 0
+configure:15458: test -s build/conftest.o
+configure:15461: $? =3D 0
+configure:15474: result: yes
+configure:15486: checking does 'struct rhltable' exist
+configure:15526: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:80:2: warning: =E2=80=98hlt=E2=80=
+=99 is used uninitialized in this function [-Wuninitialized]
+  rhltable_destroy(hlt);
+  ^~~~~~~~~~~~~~~~~~~~~
+configure:15529: $? =3D 0
+configure:15531: test -s build/conftest.o
+configure:15534: $? =3D 0
+configure:15547: result: yes
+configure:15559: checking if 'struct stacktrace_ops' exists
+configure:15600: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:81:24: error: storage size of =E2=
+=80=98ops=E2=80=99 isn=E2=80=99t known
+  struct stacktrace_ops ops;
+                        ^~~
+/usr/src/lustre-2.15.1/build/conftest.c:81:24: warning: unused variable =E2=
+=80=98ops=E2=80=99 [-Wunused-variable]
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:15603: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	struct task_struct;
+| 	struct pt_regs;
+| 	#include <asm/stacktrace.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	struct stacktrace_ops ops;
+| 	ops.stack =3D NULL;
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:15621: result: no
+configure:15634: checking if 'get_user_pages()' takes gup_flags in arguments
+configure:15673: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15676: $? =3D 0
+configure:15678: test -s build/conftest.o
+configure:15681: $? =3D 0
+configure:15694: result: yes
+configure:15706: checking if 'rhashtable_walk_enter' exists
+configure:15744: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15747: $? =3D 0
+configure:15749: test -s build/conftest.o
+configure:15752: $? =3D 0
+configure:15765: result: yes
+configure:15778: checking if libcfs supports CPU hotplug state machine
+configure:15816: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15819: $? =3D 0
+configure:15821: test -s build/conftest.o
+configure:15824: $? =3D 0
+configure:15837: result: yes
+configure:15851: checking for linux/refcount.h
+configure:15884: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:15887: $? =3D 0
+configure:15889: test -s build/conftest.o
+configure:15892: $? =3D 0
+configure:15904: result: yes
+configure:15918: checking if 'rhashtable_lookup_get_insert_fast' exist
+configure:15959: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:15962: $? =3D 0
+configure:15964: test -s build/conftest.o
+configure:15967: $? =3D 0
+configure:15980: result: yes
+configure:15992: checking for linux/sched/signal.h
+configure:16025: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16028: $? =3D 0
+configure:16030: test -s build/conftest.o
+configure:16033: $? =3D 0
+configure:16045: result: yes
+configure:16056: checking if 'kref_read' exists
+configure:16094: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16097: $? =3D 0
+configure:16099: test -s build/conftest.o
+configure:16102: $? =3D 0
+configure:16115: result: yes
+configure:16127: checking if 'rht_bucket_var' exists
+configure:16166: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16169: $? =3D 0
+configure:16171: test -s build/conftest.o
+configure:16174: $? =3D 0
+configure:16187: result: yes
+configure:16202: checking for linux/processor.h
+configure:16235: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:16238: $? =3D 0
+configure:16240: test -s build/conftest.o
+configure:16243: $? =3D 0
+configure:16255: result: yes
+configure:16268: checking for linux/wait_bit.h
+configure:16301: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16304: $? =3D 0
+configure:16306: test -s build/conftest.o
+configure:16309: $? =3D 0
+configure:16321: result: yes
+configure:16332: checking if memalloc_noreclaim_{save,restore} exist
+configure:16371: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16374: $? =3D 0
+configure:16376: test -s build/conftest.o
+configure:16379: $? =3D 0
+configure:16392: result: yes
+configure:16404: checking if Netlink supports netlink_ext_ack
+configure:16444: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16447: $? =3D 0
+configure:16449: test -s build/conftest.o
+configure:16452: $? =3D 0
+configure:16465: result: yes
+configure:16477: checking if linux wait_queue_head list_head is named head
+configure:16517: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16520: $? =3D 0
+configure:16522: test -s build/conftest.o
+configure:16525: $? =3D 0
+configure:16538: result: yes
+configure:16550: checking if 'cpus_read_unlock' exist
+configure:16589: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16592: $? =3D 0
+configure:16594: test -s build/conftest.o
+configure:16597: $? =3D 0
+configure:16610: result: yes
+configure:16622: checking if 'uuid_t' exist
+configure:16662: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16665: $? =3D 0
+configure:16667: test -s build/conftest.o
+configure:16670: $? =3D 0
+configure:16683: result: yes
+configure:16696: checking if 'nla_strdup()' exists
+configure:16734: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:94:8: warning: unused variable =E2=
+=80=98tmp=E2=80=99 [-Wunused-variable]
+  char *tmp =3D nla_strdup(NULL, GFP_KERNEL);
+        ^~~
+configure:16737: $? =3D 0
+configure:16739: test -s build/conftest.o
+configure:16742: $? =3D 0
+configure:16755: result: yes
+configure:16767: checking if 'wait_queue_entry_t' exists
+configure:16807: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16810: $? =3D 0
+configure:16812: test -s build/conftest.o
+configure:16815: $? =3D 0
+configure:16828: result: yes
+configure:16840: checking if struct wait_bit_queue_entry exists
+configure:16882: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:16885: $? =3D 0
+configure:16887: test -s build/conftest.o
+configure:16890: $? =3D 0
+configure:16903: result: yes
+configure:16916: checking if DEFINE_TIMER takes only 2 arguments
+configure:16954: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+In file included from include/linux/workqueue.h:9,
+                 from include/linux/mm_types.h:16,
+                 from include/linux/mmzone.h:21,
+                 from include/linux/gfp.h:6,
+                 from include/linux/umh.h:4,
+                 from include/linux/kmod.h:9,
+                 from include/linux/module.h:16,
+                 from /usr/src/lustre-2.15.1/build/conftest.c:83:
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:97:22: warning: unused variable =E2=
+=80=98my_timer=E2=80=99 [-Wunused-variable]
+  static DEFINE_TIMER(my_timer, NULL);
+                      ^~~~~~~~
+include/linux/timer.h:85:20: note: in definition of macro =E2=80=98DEFINE_T=
+IMER=E2=80=99
+  struct timer_list _name =3D    \
+                    ^~~~~
+At top level:
+/usr/src/lustre-2.15.1/build/conftest.c:97:22: warning: =E2=80=98my_timer=
+=E2=80=99 defined but not used [-Wunused-variable]
+  static DEFINE_TIMER(my_timer, NULL);
+                      ^~~~~~~~
+include/linux/timer.h:85:20: note: in definition of macro =E2=80=98DEFINE_T=
+IMER=E2=80=99
+  struct timer_list _name =3D    \
+                    ^~~~~
+configure:16957: $? =3D 0
+configure:16959: test -s build/conftest.o
+configure:16962: $? =3D 0
+configure:16975: result: yes
+configure:16989: checking if 'kernel_write' matches other read/write helpers
+configure:17029: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17032: $? =3D 0
+configure:17034: test -s build/conftest.o
+configure:17037: $? =3D 0
+configure:17050: result: yes
+configure:17065: checking if 'kernel_read()' has loff_t *pos as last parame=
+ter
+configure:17104: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17107: $? =3D 0
+configure:17109: test -s build/conftest.o
+configure:17112: $? =3D 0
+configure:17125: result: yes
+configure:17138: checking if Linux kernel exports 'save_stack_trace_tsk'
+configure:17159: result: no
+configure:17172: checking if 'lockdep_is_held()' uses const argument
+configure:17214: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17217: $? =3D 0
+configure:17219: test -s build/conftest.o
+configure:17222: $? =3D 0
+configure:17235: result: yes
+configure:17250: checking if setup_timer has been replaced with timer_setup
+configure:17288: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:17291: $? =3D 0
+configure:17293: test -s build/conftest.o
+configure:17296: $? =3D 0
+configure:17309: result: yes
+configure:17322: checking if 'wait_var_event' exist
+configure:17363: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:17366: $? =3D 0
+configure:17368: test -s build/conftest.o
+configure:17371: $? =3D 0
+configure:17384: result: yes
+configure:17397: checking if Linux bitmap memory management exist
+configure:17435: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:102:17: warning: unused variable =
+=E2=80=98map=E2=80=99 [-Wunused-variable]
+  unsigned long *map =3D bitmap_alloc(1, GFP_KERNEL);
+                 ^~~
+configure:17438: $? =3D 0
+configure:17440: test -s build/conftest.o
+configure:17443: $? =3D 0
+configure:17456: result: yes
+configure:17468: checking if 'clear_and_wake_up_bit' exist
+configure:17509: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:17512: $? =3D 0
+configure:17514: test -s build/conftest.o
+configure:17517: $? =3D 0
+configure:17530: result: yes
+configure:17545: checking if 'tcp_sock_set_nodelay()' exists
+configure:17583: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17586: $? =3D 0
+configure:17588: test -s build/conftest.o
+configure:17591: $? =3D 0
+configure:17604: result: yes
+configure:17619: checking if 'tcp_sock_set_keepidle()' exists
+configure:17657: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17660: $? =3D 0
+configure:17662: test -s build/conftest.o
+configure:17665: $? =3D 0
+configure:17678: result: yes
+configure:17694: checking if page cache uses Xarray
+configure:17732: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17735: $? =3D 0
+configure:17737: test -s build/conftest.o
+configure:17740: $? =3D 0
+configure:17753: result: yes
+configure:17766: checking if Netlink dump handlers support ext_ack
+configure:17805: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:17808: $? =3D 0
+configure:17810: test -s build/conftest.o
+configure:17813: $? =3D 0
+configure:17826: result: yes
+configure:17841: checking if iov_iter_type exists
+configure:17881: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17884: $? =3D 0
+configure:17886: test -s build/conftest.o
+configure:17889: $? =3D 0
+configure:17902: result: yes
+configure:17918: checking if totalram_pages is a function
+configure:17956: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:17959: $? =3D 0
+configure:17961: test -s build/conftest.o
+configure:17964: $? =3D 0
+configure:17977: result: yes
+configure:17992: checking if get_request_key_auth() is available
+configure:18036: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18039: $? =3D 0
+configure:18041: test -s build/conftest.o
+configure:18044: $? =3D 0
+configure:18057: result: yes
+configure:18073: checking if lookup_user_key() is available
+configure:18112: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18115: $? =3D 0
+configure:18117: test -s build/conftest.o
+configure:18120: $? =3D 0
+configure:18133: result: yes
+configure:18148: checking if force_sig has task parameter
+configure:18186: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:112:2: error: too many arguments to=
+ function =E2=80=98force_sig=E2=80=99
+  force_sig(SIGINT, NULL);
+  ^~~~~~~~~
+In file included from /usr/src/lustre-2.15.1/build/conftest.c:106:
+include/linux/sched/signal.h:343:13: note: declared here
+ extern void force_sig(int);
+             ^~~~~~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:18189: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/sched/signal.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	force_sig(SIGINT, NULL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:18207: result: no
+configure:18222: checking if struct cache_detail has writers
+configure:18262: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18265: $? =3D 0
+configure:18267: test -s build/conftest.o
+configure:18270: $? =3D 0
+configure:18283: result: yes
+configure:18299: checking if struct genl_dumpit_info has family field
+configure:18339: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18342: $? =3D 0
+configure:18344: test -s build/conftest.o
+configure:18347: $? =3D 0
+configure:18360: result: yes
+configure:18374: checking if Linux kernel exports 'kallsyms_lookup_name'
+configure:18395: result: no
+configure:18407: checking if 'tcp_sock_set_quickack()' exists
+configure:18445: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18448: $? =3D 0
+configure:18450: test -s build/conftest.o
+configure:18453: $? =3D 0
+configure:18466: result: yes
+configure:18481: checking if 'tcp_sock_set_keepintvl()' exists
+configure:18519: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18522: $? =3D 0
+configure:18524: test -s build/conftest.o
+configure:18527: $? =3D 0
+configure:18540: result: yes
+configure:18555: checking if 'tcp_sock_set_keepcnt()' exists
+configure:18593: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+configure:18596: $? =3D 0
+configure:18598: test -s build/conftest.o
+configure:18601: $? =3D 0
+configure:18614: result: yes
+configure:18628: checking if mmap_lock API is available
+configure:18666: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:18669: $? =3D 0
+configure:18671: test -s build/conftest.o
+configure:18674: $? =3D 0
+configure:18687: result: yes
+configure:18701: checking if kernel_setsockopt still in use
+configure:18739: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:118:2: error: implicit declaration =
+of function =E2=80=98kernel_setsockopt=E2=80=99; did you mean =E2=80=98kern=
+el_getsockname=E2=80=99? [-Werror=3Dimplicit-function-declaration]
+  kernel_setsockopt(NULL, 0, 0, NULL, 0);
+  ^~~~~~~~~~~~~~~~~
+  kernel_getsockname
+cc1: all warnings being treated as errors
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:18742: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/net.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	kernel_setsockopt(NULL, 0, 0, NULL, 0);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:18760: result: no
+configure:18773: checking if __vmalloc has 2 args
+configure:18811: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:18814: $? =3D 0
+configure:18816: test -s build/conftest.o
+configure:18819: $? =3D 0
+configure:18832: result: yes
+configure:18846: checking if NR_UNSTABLE_NFS still in use
+configure:18886: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:121:6: error: =E2=80=98NR_UNSTABLE_=
+NFS=E2=80=99 undeclared (first use in this function); did you mean =E2=80=
+=98MMF_UNSTABLE=E2=80=99?
+  i =3D NR_UNSTABLE_NFS;
+      ^~~~~~~~~~~~~~~
+      MMF_UNSTABLE
+/usr/src/lustre-2.15.1/build/conftest.c:121:6: note: each undeclared identi=
+fier is reported only once for each function it appears in
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:18889: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/mm.h>
+|=20
+| 	int i;
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	i =3D NR_UNSTABLE_NFS;
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:18907: result: no
+configure:18920: checking if security_release_secctx has 1 arg
+configure:18958: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:119:2: error: too few arguments to =
+function =E2=80=98security_release_secctx=E2=80=99
+  security_release_secctx(NULL);
+  ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/src/lustre-2.15.1/build/conftest.c:113:
+include/linux/security.h:1291:20: note: declared here
+ static inline void security_release_secctx(char *secdata, u32 seclen)
+                    ^~~~~~~~~~~~~~~~~~~~~~~
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:18961: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/security.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	security_release_secctx(NULL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:18979: result: no
+configure:18992: checking if kfree_sensitive() is available
+configure:19031: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+configure:19034: $? =3D 0
+configure:19036: test -s build/conftest.o
+configure:19039: $? =3D 0
+configure:19052: result: yes
+configure:19065: checking for crypto/sha2.h
+configure:19098: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c:113:10: fatal error: crypto/sha2.h:=
+ No such file or directory
+ #include <crypto/sha2.h>
+          ^~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19101: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+| #include <crypto/sha2.h>
+| int
+| main (void)
+| {
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19118: result: no
+configure:19131: checking if list_cmp_func_t type is defined
+configure:19169: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror -Wno-unused-variable M=3D/usr/src/lustre-2.15.=
+1/build
+configure:19172: $? =3D 0
+configure:19174: test -s build/conftest.o
+configure:19177: $? =3D 0
+configure:19190: result: yes
+configure:19206: checking for crypto/internal/cipher.h
+configure:19239: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c:114:10: fatal error: crypto/interna=
+l/cipher.h: No such file or directory
+ #include <crypto/internal/cipher.h>
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19242: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+| #include <crypto/internal/cipher.h>
+| int
+| main (void)
+| {
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19259: result: no
+configure:19275: checking if task_is_running() is defined
+configure:19314: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:121:6: error: implicit declaration =
+of function =E2=80=98task_is_running=E2=80=99; did you mean =E2=80=98task_p=
+id_nr_ns=E2=80=99? [-Werror=3Dimplicit-function-declaration]
+  if (task_is_running(current))
+      ^~~~~~~~~~~~~~~
+      task_pid_nr_ns
+cc1: all warnings being treated as errors
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19317: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/sched.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	if (task_is_running(current))
+| 		schedule();
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19335: result: no
+configure:19351: checking for linux/stdarg.h
+configure:19384: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c:114:10: fatal error: linux/stdarg.h=
+: No such file or directory
+ #include <linux/stdarg.h>
+          ^~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19387: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+| #include <linux/stdarg.h>
+| int
+| main (void)
+| {
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19404: result: no
+configure:19419: checking for linux/panic_notifier.h
+configure:19452: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c:114:10: fatal error: linux/panic_no=
+tifier.h: No such file or directory
+ #include <linux/panic_notifier.h>
+          ^~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19455: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+| #include <linux/panic_notifier.h>
+| int
+| main (void)
+| {
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19472: result: no
+configure:19486: checking does function 'param_set_uint_minmax' exist
+configure:19524: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/=
+lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/u=
+api -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/i=
+nclude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation =
+-Wno-stringop-truncation -Wno-stringop-overflow M=3D/usr/src/lustre-2.15.1/=
+build
+/usr/src/lustre-2.15.1/build/conftest.c: In function =E2=80=98main=E2=80=99:
+/usr/src/lustre-2.15.1/build/conftest.c:121:2: error: implicit declaration =
+of function =E2=80=98param_set_uint_minmax=E2=80=99; did you mean =E2=80=98=
+param_set_uint=E2=80=99? [-Werror=3Dimplicit-function-declaration]
+  param_set_uint_minmax(NULL, NULL, 0, 0);
+  ^~~~~~~~~~~~~~~~~~~~~
+  param_set_uint
+cc1: some warnings being treated as errors
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19527: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 	#include <linux/moduleparam.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 	param_set_uint_minmax(NULL, NULL, 0, 0);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19545: result: no
+configure:19559: checking for linux/blk-integrity.h
+configure:19592: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -I/usr/=
+src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x86/include/generated =
+-I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/src/linux-5.10.153/incl=
+ude/uapi -Iinclude/generated -I/usr/src/linux-5.10.153/arch/x86/include/uap=
+i -Iarch/x86/include/generated/uapi -I/usr/src/linux-5.10.153/include/uapi =
+-Iinclude/generated/uapi -include /usr/src/linux-5.10.153/include/linux/kco=
+nfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depends -o scripts -o includ=
+e/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFLAGS=3D-Werror-implicit-=
+function-declaration -Werror M=3D/usr/src/lustre-2.15.1/build
+/usr/src/lustre-2.15.1/build/conftest.c:114:10: fatal error: linux/blk-inte=
+grity.h: No such file or directory
+ #include <linux/blk-integrity.h>
+          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [scripts/Makefile.build:286: /usr/src/lustre-2.15.1/build/conf=
+test.o] Error 1
+make: *** [Makefile:1837: /usr/src/lustre-2.15.1/build] Error 2
+configure:19595: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+| #include <linux/blk-integrity.h>
+| int
+| main (void)
+| {
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19612: result: no
+configure:19626: LNet kernel checks
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D
+configure:19631: checking whether to enable tunable backoff TCP support
+configure:19640: result: yes
+configure:19644: checking if Linux kernel has tunable backoff TCP support
+configure:19661: result: no
+configure:19669: checking whether to use Compat RDMA
+configure:19769: result: yes
+configure:19804: checking whether to use any OFED backport headers
+configure:19812: result: no
+configure:19821: checking whether to enable OpenIB gen2 support
+configure:19878: cp conftest.c build && make -d modules LDFLAGS=3D LD=3D/us=
+r/bin/ld -m elf_x86_64 CC=3Dgcc -f /usr/src/lustre-2.15.1/build/Makefile LU=
+STRE_LINUX_CONFIG=3D/usr/src/linux-5.10.153/.config LINUXINCLUDE=3D -includ=
+e /usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5.6/include/linu=
+x/compat-2.6.h -I/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5=
+=2E6/include -I/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5.6=
+/include/uapi -I/usr/src/linux-5.10.153/arch/x86/include -Iinclude -Iarch/x=
+86/include/generated -I/usr/src/linux-5.10.153/include -Iinclude2 -I/usr/sr=
+c/linux-5.10.153/include/uapi -Iinclude/generated -I/usr/src/linux-5.10.153=
+/arch/x86/include/uapi -Iarch/x86/include/generated/uapi -I/usr/src/linux-5=
+=2E10.153/include/uapi -Iinclude/generated/uapi -include /usr/src/linux-5.1=
+0.153/include/linux/kconfig.h KBUILD_EXTRA_SYMBOLS=3D  -o tmp_include_depen=
+ds -o scripts -o include/config/MARKER -C /usr/src/linux-5.10.153 EXTRA_CFL=
+AGS=3D-Werror-implicit-function-declaration -g -I/usr/src/lustre-2.15.1/lib=
+cfs/include -I/usr/src/lustre-2.15.1/libcfs/include/libcfs -I/usr/src/lustr=
+e-2.15.1/lnet/include/uapi -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src=
+/lustre-2.15.1/lustre/include/uapi -I/usr/src/lustre-2.15.1/lustre/include =
+-Wno-format-truncation -Wno-stringop-truncation -Wno-stringop-overflow M=3D=
+/usr/src/lustre-2.15.1/build
+ERROR: modpost: "rdma_destroy_id" [/usr/src/lustre-2.15.1/build/conftest.ko=
+] undefined!
+make[1]: *** [scripts/Makefile.modpost:123: /usr/src/lustre-2.15.1/build/Mo=
+dule.symvers] Error 1
+make[1]: *** Deleting file '/usr/src/lustre-2.15.1/build/Module.symvers'
+make: *** [Makefile:1741: modules] Error 2
+configure:19881: $? =3D 2
+configure: failed program was:
+| /* confdefs.h */
+| #define PACKAGE_NAME "Lustre"
+| #define PACKAGE_TARNAME "lustre"
+| #define PACKAGE_VERSION "2.15.1"
+| #define PACKAGE_STRING "Lustre 2.15.1"
+| #define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+| #define PACKAGE_URL ""
+| #define PACKAGE "lustre"
+| #define VERSION "2.15.1"
+| #define STDC_HEADERS 1
+| #define HAVE_SYS_TYPES_H 1
+| #define HAVE_SYS_STAT_H 1
+| #define HAVE_STDLIB_H 1
+| #define HAVE_STRING_H 1
+| #define HAVE_MEMORY_H 1
+| #define HAVE_STRINGS_H 1
+| #define HAVE_INTTYPES_H 1
+| #define HAVE_STDINT_H 1
+| #define HAVE_UNISTD_H 1
+| #define HAVE_DLFCN_H 1
+| #define LT_OBJDIR ".libs/"
+| #define LUSTRE_MAJOR 2
+| #define LUSTRE_MINOR 15
+| #define LUSTRE_PATCH 1
+| #define LUSTRE_FIX 0
+| #define LUSTRE_VERSION_STRING "2.15.1"
+| #define SIZEOF_UNSIGNED_LONG_LONG 8
+| #define HAVE_PYTHON "3.7"
+| #define HAVE_MODULE_LOADING_SUPPORT 1
+| #define HAVE_KTIME_GET_TS64 1
+| #define HAVE_PREPARE_TO_WAIT_EVENT 1
+| #define HAVE_KERNEL_PARAM_OPS 1
+| #define HAVE_KTIME_ADD 1
+| #define HAVE_KTIME_AFTER 1
+| #define HAVE_KTIME_BEFORE 1
+| #define HAVE_KTIME_COMPARE 1
+| #define HAVE_SHRINKER_COUNT 1
+| #define HAVE_MATCH_WILDCARD 1
+| #define HAVE_MAPPING_AS_EXITING_FLAG 1
+| #define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+| #define HAVE_GLOB 1
+| #define HAVE_NS_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64 1
+| #define HAVE_KTIME_GET_REAL_TS64 1
+| #define HAVE_KTIME_GET_REAL_SECONDS 1
+| #define HAVE_KTIME_TO_TIMESPEC64 1
+| #define HAVE_TIMESPEC64_SUB 1
+| #define HAVE_TIMESPEC64_TO_KTIME 1
+| #define HAVE_KTIME_GET_SECONDS 1
+| #define HAVE_WAIT_WOKEN 1
+| #define HAVE_KTIME_MS_DELTA 1
+| #define HAVE_KERNEL_PARAM_LOCK 1
+| #define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+| #define HAVE_KSTRTOBOOL_FROM_USER 1
+| #define HAVE_NETLINK_CALLBACK_START 1
+| #define HAVE_CRYPTO_HASH_HELPERS 1
+| #define HAVE_KSET_FIND_OBJ 1
+| #define HAVE_RHASHTABLE_REPLACE 1
+| #define HAVE_STRINGHASH 1
+| #define HAVE_RHASHTABLE_LOOKUP 1
+| #define HAVE_RHLTABLE 1
+| #define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+| #define HAVE_RHASHTABLE_WALK_ENTER 1
+| #define HAVE_HOTPLUG_STATE_MACHINE 1
+| #define HAVE_REFCOUNT_T 1
+| #define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+| #define HAVE_SCHED_HEADERS 1
+| #define HAVE_KREF_READ 1
+| #define HAVE_RHT_BUCKET_VAR 1
+| #define HAVE_PROCESSOR_H 1
+| #define HAVE_WAIT_BIT_HEADER_H 1
+| #define HAVE_MEMALLOC_RECLAIM 1
+| #define HAVE_NL_PARSE_WITH_EXT_ACK 1
+| #define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+| #define HAVE_CPUS_READ_LOCK 1
+| #define HAVE_UUID_T 1
+| #define HAVE_NLA_STRDUP 1
+| #define HAVE_WAIT_QUEUE_ENTRY 1
+| #define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+| #define HAVE_NEW_DEFINE_TIMER 1
+| #define HAVE_NEW_KERNEL_WRITE 1
+| #define HAVE_KERNEL_READ_LAST_POSP 1
+| #define HAVE_TIMER_SETUP 1
+| #define HAVE_WAIT_VAR_EVENT 1
+| #define HAVE_BITMAP_ALLOC 1
+| #define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+| #define HAVE_TCP_SOCK_SET_NODELAY 1
+| #define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+| #define HAVE_XARRAY_SUPPORT 1
+| #define HAVE_NL_DUMP_WITH_EXT_ACK 1
+| #define HAVE_IOV_ITER_TYPE 1
+| #define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+| #define HAVE_GET_REQUEST_KEY_AUTH 1
+| #define HAVE_LOOKUP_USER_KEY 1
+| #define HAVE_CACHE_DETAIL_WRITERS 1
+| #define HAVE_GENL_DUMPIT_INFO 1
+| #define HAVE_TCP_SOCK_SET_QUICKACK 1
+| #define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+| #define HAVE_TCP_SOCK_SET_KEEPCNT 1
+| #define HAVE_MMAP_LOCK 1
+| #define HAVE_VMALLOC_2ARGS 1
+| #define HAVE_KFREE_SENSITIVE 1
+| #define HAVE_LIST_CMP_FUNC_T 1
+| #define HAVE_COMPAT_RDMA 1
+| /* end confdefs.h.  */
+|=20
+| #include <linux/kernel.h>
+| #include <linux/module.h>
+|=20
+| #if defined(NEED_LOCKDEP_IS_HELD_DISCARD_CONST)  && defined(CONFIG_LOCKDE=
+P)  && defined(lockdep_is_held)
+| #undef lockdep_is_held
+| 	#define lockdep_is_held(lock) 		lock_is_held((struct lockdep_map *)&(loc=
+k)->dep_map)
+| #endif
+|=20
+|=20
+| 			#ifdef HAVE_COMPAT_RDMA
+| 			#undef PACKAGE_NAME
+| 			#undef PACKAGE_TARNAME
+| 			#undef PACKAGE_VERSION
+| 			#undef PACKAGE_STRING
+| 			#undef PACKAGE_BUGREPORT
+| 			#undef PACKAGE_URL
+| 			#include <linux/compat-2.6.h>
+| 			#endif
+| 			#include <linux/version.h>
+| 			#include <linux/pci.h>
+| 			#include <linux/gfp.h>
+| 			#include <rdma/rdma_cm.h>
+| 			#include <rdma/ib_cm.h>
+| 			#include <rdma/ib_verbs.h>
+|=20
+| int
+| main (void)
+| {
+|=20
+| 			struct rdma_cm_id      *cm_idi __attribute__ ((unused));
+| 			struct rdma_conn_param  conn_param __attribute__ ((unused));
+| 			struct ib_device_attr   device_attr __attribute__ ((unused));
+| 			struct ib_qp_attr       qp_attr __attribute__ ((unused));
+| 			enum   ib_cm_rej_reason rej_reason __attribute__ ((unused));
+| 			rdma_destroy_id(NULL);
+|=20
+|   ;
+|   return 0;
+| };
+| MODULE_LICENSE("GPL");
+configure:19899: result: no
+configure:19909: error: can't compile with OpenIB gen2 headers under /usr/s=
+rc/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5.6
+
+## ---------------- ##
+## Cache variables. ##
+## ---------------- ##
+
+ac_cv_build=3Dx86_64-pc-linux-gnu
+ac_cv_c_compiler_gnu=3Dyes
+ac_cv_env_CCASFLAGS_set=3D
+ac_cv_env_CCASFLAGS_value=3D
+ac_cv_env_CCAS_set=3D
+ac_cv_env_CCAS_value=3D
+ac_cv_env_CC_set=3D
+ac_cv_env_CC_value=3D
+ac_cv_env_CFLAGS_set=3D
+ac_cv_env_CFLAGS_value=3D
+ac_cv_env_CPPFLAGS_set=3D
+ac_cv_env_CPPFLAGS_value=3D
+ac_cv_env_CPP_set=3D
+ac_cv_env_CPP_value=3D
+ac_cv_env_LDFLAGS_set=3D
+ac_cv_env_LDFLAGS_value=3D
+ac_cv_env_LIBNL3_CFLAGS_set=3D
+ac_cv_env_LIBNL3_CFLAGS_value=3D
+ac_cv_env_LIBNL3_LIBS_set=3D
+ac_cv_env_LIBNL3_LIBS_value=3D
+ac_cv_env_LIBS_set=3D
+ac_cv_env_LIBS_value=3D
+ac_cv_env_LT_SYS_LIBRARY_PATH_set=3D
+ac_cv_env_LT_SYS_LIBRARY_PATH_value=3D
+ac_cv_env_PKG_CONFIG_LIBDIR_set=3D
+ac_cv_env_PKG_CONFIG_LIBDIR_value=3D
+ac_cv_env_PKG_CONFIG_PATH_set=3D
+ac_cv_env_PKG_CONFIG_PATH_value=3D
+ac_cv_env_PKG_CONFIG_set=3D
+ac_cv_env_PKG_CONFIG_value=3D
+ac_cv_env_TEST_DIR_set=3D
+ac_cv_env_TEST_DIR_value=3D
+ac_cv_env_TEST_JOBS_set=3D
+ac_cv_env_TEST_JOBS_value=3D
+ac_cv_env_build_alias_set=3D
+ac_cv_env_build_alias_value=3D
+ac_cv_env_host_alias_set=3D
+ac_cv_env_host_alias_value=3D
+ac_cv_env_target_alias_set=3D
+ac_cv_env_target_alias_value=3D
+ac_cv_header_dlfcn_h=3Dyes
+ac_cv_header_inttypes_h=3Dyes
+ac_cv_header_memory_h=3Dyes
+ac_cv_header_stdc=3Dyes
+ac_cv_header_stdint_h=3Dyes
+ac_cv_header_stdlib_h=3Dyes
+ac_cv_header_string_h=3Dyes
+ac_cv_header_strings_h=3Dyes
+ac_cv_header_sys_stat_h=3Dyes
+ac_cv_header_sys_types_h=3Dyes
+ac_cv_header_unistd_h=3Dyes
+ac_cv_host=3Dx86_64-pc-linux-gnu
+ac_cv_objext=3Do
+ac_cv_path_BISON=3D/usr/bin/bison
+ac_cv_path_EGREP=3D'/bin/grep -E'
+ac_cv_path_FGREP=3D'/bin/grep -F'
+ac_cv_path_FLEX=3D/usr/bin/flex
+ac_cv_path_GREP=3D/bin/grep
+ac_cv_path_PYTHON=3D/usr/bin/python3
+ac_cv_path_RPMBUILD=3D/usr/bin/rpmbuild
+ac_cv_path_SED=3D/bin/sed
+ac_cv_path_SWIG=3D/usr/bin/swig
+ac_cv_path_ac_pt_PKG_CONFIG=3D/usr/bin/pkg-config
+ac_cv_path_install=3D'/usr/bin/install -c'
+ac_cv_path_lt_DD=3D/bin/dd
+ac_cv_path_mkdir=3D/bin/mkdir
+ac_cv_prog_AWK=3Dgawk
+ac_cv_prog_CPP=3D'gcc -E'
+ac_cv_prog_ac_ct_AR=3Dar
+ac_cv_prog_ac_ct_CC=3Dgcc
+ac_cv_prog_ac_ct_LD=3D'/usr/bin/ld -m elf_x86_64'
+ac_cv_prog_ac_ct_MANIFEST_TOOL=3Dmt
+ac_cv_prog_ac_ct_OBJDUMP=3Dobjdump
+ac_cv_prog_ac_ct_RANLIB=3Dranlib
+ac_cv_prog_ac_ct_STRIP=3Dstrip
+ac_cv_prog_cc_c89=3D
+ac_cv_prog_cc_g=3Dyes
+ac_cv_prog_make_make_set=3Dyes
+ac_cv_sizeof_unsigned_long_long=3D8
+ac_cv_target=3Dx86_64-pc-linux-gnu
+am_cv_CCAS_dependencies_compiler_type=3Dgcc3
+am_cv_CC_dependencies_compiler_type=3Dgcc3
+am_cv_make_support_nested_variables=3Dyes
+am_cv_prog_cc_c_o=3Dyes
+am_cv_prog_tar_pax=3Dgnutar
+lb_cv_compile_bitmap_alloc=3Dyes
+lb_cv_compile_broken_hash_64=3Dno
+lb_cv_compile_build_modules=3Dyes
+lb_cv_compile_cache_detail_writers_atomic=3Dyes
+lb_cv_compile_cb_start=3Dyes
+lb_cv_compile_clear_and_wake_up_bit=3Dyes
+lb_cv_compile_config_MODULES=3Dyes
+lb_cv_compile_config_MODVERSIONS=3Dno
+lb_cv_compile_config_SUSE_KERNEL=3Dno
+lb_cv_compile_cpu_hotplug_state_machine=3Dyes
+lb_cv_compile_cpu_read_lock=3Dyes
+lb_cv_compile_crypto_hash_helpers=3Dyes
+lb_cv_compile_define_timer=3Dyes
+lb_cv_compile_force_sig_with_task=3Dno
+lb_cv_compile_genl_dumpit_info=3Dyes
+lb_cv_compile_get_request_key_auth_exported=3Dyes
+lb_cv_compile_get_user_pages_6arg=3Dno
+lb_cv_compile_get_user_pages_gup_flags=3Dyes
+lb_cv_compile_glob=3Dyes
+lb_cv_compile_hlist_add_after=3Dno
+lb_cv_compile_iov_iter_has_type_member=3Dyes
+lb_cv_compile_kernel_old_timeval=3Dyes
+lb_cv_compile_kernel_param_lock=3Dyes
+lb_cv_compile_kernel_param_ops=3Dyes
+lb_cv_compile_kernel_read=3Dyes
+lb_cv_compile_kernel_setsockopt_exists=3Dno
+lb_cv_compile_kernel_write_match=3Dyes
+lb_cv_compile_kfree_sensitive_exists=3Dyes
+lb_cv_compile_kref_read=3Dyes
+lb_cv_compile_kstrtobool_from_user=3Dyes
+lb_cv_compile_ktime_add=3Dyes
+lb_cv_compile_ktime_after=3Dyes
+lb_cv_compile_ktime_before=3Dyes
+lb_cv_compile_ktime_compare=3Dyes
+lb_cv_compile_ktime_get_ns=3Dyes
+lb_cv_compile_ktime_get_real_ns=3Dyes
+lb_cv_compile_ktime_get_real_seconds=3Dyes
+lb_cv_compile_ktime_get_real_ts64=3Dyes
+lb_cv_compile_ktime_get_seconds=3Dyes
+lb_cv_compile_ktime_get_ts64=3Dyes
+lb_cv_compile_ktime_ms_delta=3Dyes
+lb_cv_compile_ktime_to_timespec64=3Dyes
+lb_cv_compile_list_cmp_func_t=3Dyes
+lb_cv_compile_lockdep_is_held=3Dyes
+lb_cv_compile_lookup_user_key_exported=3Dyes
+lb_cv_compile_macro_iov_iter_type_exists=3Dyes
+lb_cv_compile_mapping_exiting_exists=3Dyes
+lb_cv_compile_match_wildcard=3Dyes
+lb_cv_compile_memalloc_noreclaim=3Dyes
+lb_cv_compile_mmap_write_lock=3Dyes
+lb_cv_compile_netlink_dump_ext_ack=3Dyes
+lb_cv_compile_netlink_ext_ack=3Dyes
+lb_cv_compile_nla_strdup=3Dyes
+lb_cv_compile_nr_unstable_nfs_exists=3Dno
+lb_cv_compile_openib_gen2_support=3Dno
+lb_cv_compile_param_set_uint_minmax=3Dno
+lb_cv_compile_prepare_to_wait_event=3Dyes
+lb_cv_compile_rhashtable_insert_fast=3Dno
+lb_cv_compile_rhashtable_lookup=3Dyes
+lb_cv_compile_rhashtable_lookup_get_insert_fast=3Dyes
+lb_cv_compile_rhashtable_replace_fast=3Dyes
+lb_cv_compile_rhashtable_walk_enter=3Dyes
+lb_cv_compile_rhashtable_walk_init=3Dno
+lb_cv_compile_rht_bucket_var=3Dyes
+lb_cv_compile_rhtable=3Dyes
+lb_cv_compile_security_release_secctx_1arg=3Dno
+lb_cv_compile_shrinker_count_objects=3Dyes
+lb_cv_compile_stacktrace_ops=3Dno
+lb_cv_compile_stacktrace_ops_address_return_int=3Dno
+lb_cv_compile_struct_wait_bit_queue_entry_exists=3Dyes
+lb_cv_compile_task_is_running=3Dno
+lb_cv_compile_tcp_sock_set_keepcnt_exists=3Dyes
+lb_cv_compile_tcp_sock_set_keepidle_exists=3Dyes
+lb_cv_compile_tcp_sock_set_keepintvl_exists=3Dyes
+lb_cv_compile_tcp_sock_set_nodelay_exists=3Dyes
+lb_cv_compile_tcp_sock_set_quickack_exists=3Dyes
+lb_cv_compile_timer_setup=3Dyes
+lb_cv_compile_timespec64=3Dyes
+lb_cv_compile_timespec64_sub=3Dyes
+lb_cv_compile_timespec64_to_ktime=3Dyes
+lb_cv_compile_topology_sibling_cpumask=3Dyes
+lb_cv_compile_totalram_pages=3Dyes
+lb_cv_compile_uuid_t=3Dyes
+lb_cv_compile_vmalloc_2args=3Dyes
+lb_cv_compile_wait_queue_entry=3Dyes
+lb_cv_compile_wait_queue_task_list=3Dyes
+lb_cv_compile_wait_var_event=3Dyes
+lb_cv_compile_wait_woken=3Dyes
+lb_cv_compile_xarray_support=3Dyes
+lb_cv_export_kallsyms_lookup_name=3Dno
+lb_cv_export_kset_find_obj=3Dyes
+lb_cv_export_save_stack_trace_tsk=3Dno
+lb_cv_file__boot_kernel_h=3Dno
+lb_cv_file__usr_src_linux_5_10_153=3Dyes
+lb_cv_file__usr_src_linux_5_10_153__config=3Dyes
+lb_cv_file__usr_src_linux_5_10_153_include_generated_autoconf_h=3Dyes
+lb_cv_file__usr_src_linux_5_10_153_include_generated_uapi_linux_version_h=
+=3Dyes
+lb_cv_file__usr_src_linux_5_10_153_include_linux_kconfig_h=3Dyes
+lb_cv_file__usr_src_linux_5_10_153_include_linux_version_h=3Dno
+lb_cv_file__var_adm_running_kernel_h=3Dno
+lb_cv_header_crypto_internal_cipher_h=3Dno
+lb_cv_header_crypto_sha2_h=3Dno
+lb_cv_header_linux_blk_integrity_h=3Dno
+lb_cv_header_linux_panic_notifier_h=3Dno
+lb_cv_header_linux_processor_h=3Dyes
+lb_cv_header_linux_refcount_h=3Dyes
+lb_cv_header_linux_sched_signal_h=3Dyes
+lb_cv_header_linux_stdarg_h=3Dno
+lb_cv_header_linux_stringhash_h=3Dyes
+lb_cv_header_linux_wait_bit_h=3Dyes
+lb_cv_mainline_kernel_sig=3Dno
+lb_cv_module_loading=3Dyes
+lb_cv_module_symvers=3DModule.symvers
+lb_cv_module_target=3DM
+lb_cv_rhel_kernel_version=3D
+lb_cv_ubuntu_kernel_sig=3Dno
+lb_cv_uses_dpkg=3Dyes
+lb_cv_utsrelease=3D5.10.153
+lt_cv_ar_at_file=3D@
+lt_cv_archive_cmds_need_lc=3Dno
+lt_cv_deplibs_check_method=3Dpass_all
+lt_cv_file_magic_cmd=3D'$MAGIC_CMD'
+lt_cv_file_magic_test_file=3D
+lt_cv_ld_reload_flag=3D-r
+lt_cv_nm_interface=3D'BSD nm'
+lt_cv_objdir=3D.libs
+lt_cv_path_LD=3D/usr/bin/ld
+lt_cv_path_NM=3D'/usr/bin/nm -B'
+lt_cv_path_mainfest_tool=3Dno
+lt_cv_prog_compiler_c_o=3Dyes
+lt_cv_prog_compiler_pic=3D'-fPIC -DPIC'
+lt_cv_prog_compiler_pic_works=3Dyes
+lt_cv_prog_compiler_rtti_exceptions=3Dno
+lt_cv_prog_compiler_static_works=3Dyes
+lt_cv_prog_gnu_ld=3Dyes
+lt_cv_sharedlib_from_linklib_cmd=3D'printf %s\n'
+lt_cv_shlibpath_overrides_runpath=3Dyes
+lt_cv_sys_global_symbol_pipe=3D'sed -n -e '\''s/^.*[	 ]\([ABCDGIRSTW][ABCDG=
+IRSTW]*\)[	 ][	 ]*\([_A-Za-z][_A-Za-z0-9]*\)$/\1 \2 \2/p'\'' | sed '\''/ __=
+gnu_lto/d'\'''
+lt_cv_sys_global_symbol_to_c_name_address=3D'sed -n -e '\''s/^: \(.*\) .*$/=
+  {"\1", (void *) 0},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(.*\)$/=
+  {"\1", (void *) \&\1},/p'\'''
+lt_cv_sys_global_symbol_to_c_name_address_lib_prefix=3D'sed -n -e '\''s/^: =
+\(.*\) .*$/  {"\1", (void *) 0},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* =
+=2E* \(lib.*\)$/  {"\1", (void *) \&\1},/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDG=
+IRSTW]* .* \(.*\)$/  {"lib\1", (void *) \&\1},/p'\'''
+lt_cv_sys_global_symbol_to_cdecl=3D'sed -n -e '\''s/^T .* \(.*\)$/extern in=
+t \1();/p'\'' -e '\''s/^[ABCDGIRSTW][ABCDGIRSTW]* .* \(.*\)$/extern char \1=
+;/p'\'''
+lt_cv_sys_global_symbol_to_import=3D
+lt_cv_sys_max_cmd_len=3D1572864
+lt_cv_to_host_file_cmd=3Dfunc_convert_file_noop
+lt_cv_to_tool_file_cmd=3Dfunc_convert_file_noop
+lt_cv_truncate_bin=3D'/bin/dd bs=3D4096 count=3D1'
+
+## ----------------- ##
+## Output variables. ##
+## ----------------- ##
+
+ACLOCAL=3D'${SHELL} /usr/src/lustre-2.15.1/config/missing aclocal-1.15'
+AMDEPBACKSLASH=3D'\'
+AMDEP_FALSE=3D'#'
+AMDEP_TRUE=3D''
+AMTAR=3D'$${TAR-tar}'
+AM_BACKSLASH=3D'\'
+AM_DEFAULT_V=3D'$(AM_DEFAULT_VERBOSITY)'
+AM_DEFAULT_VERBOSITY=3D'1'
+AM_V=3D'$(V)'
+AR=3D'ar'
+AUTOCONF=3D'${SHELL} /usr/src/lustre-2.15.1/config/missing autoconf'
+AUTOCONF_HDIR=3D'generated'
+AUTOHEADER=3D'${SHELL} /usr/src/lustre-2.15.1/config/missing autoheader'
+AUTOMAKE=3D'${SHELL} /usr/src/lustre-2.15.1/config/missing automake-1.15'
+AWK=3D'gawk'
+BASH_COMPLETION_DIR=3D''
+BISON=3D'/usr/bin/bison'
+BUILD_GNILND_FALSE=3D''
+BUILD_GNILND_TRUE=3D''
+BUILD_LUSTREIOKIT_FALSE=3D''
+BUILD_LUSTREIOKIT_TRUE=3D''
+BUILD_LUTF_FALSE=3D''
+BUILD_LUTF_TRUE=3D''
+BUILD_O2IBLND_FALSE=3D''
+BUILD_O2IBLND_TRUE=3D''
+CC=3D'gcc'
+CCAS=3D'gcc'
+CCASDEPMODE=3D'depmode=3Dgcc3'
+CCASFLAGS=3D'-Wall -fPIC -D_GNU_SOURCE'
+CCDEPMODE=3D'depmode=3Dgcc3'
+CFLAGS=3D'-g -O2'
+CLIENT_FALSE=3D''
+CLIENT_TRUE=3D''
+CONFIG_CACHE_FILE=3D''
+CONFIG_INCLUDE=3D'/usr/src/linux-5.10.153/include/linux/kconfig.h'
+CPP=3D'gcc -E'
+CPPFLAGS=3D'-I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/lustre-2.15.=
+1/lnet/utils/ -I/usr/src/lustre-2.15.1/lustre/include '
+CYGPATH_W=3D'echo'
+DEBUGFS=3D''
+DEFS=3D''
+DEPDIR=3D'.deps'
+DLLTOOL=3D'false'
+DOC_FALSE=3D''
+DOC_TRUE=3D''
+DSYMUTIL=3D''
+DUMPBIN=3D''
+DUMPE2FS=3D''
+E2FSCK=3D''
+E2FSPROGS=3D''
+E2LABEL=3D''
+ECHO_C=3D''
+ECHO_N=3D'-n'
+ECHO_T=3D''
+EGREP=3D'/bin/grep -E'
+ENABLEO2IB=3D'withpath'
+ENABLE_BASH_COMPLETION_FALSE=3D''
+ENABLE_BASH_COMPLETION_TRUE=3D''
+ENABLE_CRYPTO=3D''
+ENABLE_DOC=3D'0'
+ENABLE_GSS=3D''
+ENABLE_LDISKFS=3D''
+ENABLE_SERVER=3D''
+ENABLE_ZFS=3D''
+EXEEXT=3D''
+EXT2FS_DEVEL_FALSE=3D''
+EXT2FS_DEVEL_TRUE=3D''
+EXT4_SRC_DIR=3D''
+EXTRA_KCFLAGS=3D' -g -I/usr/src/lustre-2.15.1/libcfs/include -I/usr/src/lus=
+tre-2.15.1/libcfs/include/libcfs -I/usr/src/lustre-2.15.1/lnet/include/uapi=
+ -I/usr/src/lustre-2.15.1/lnet/include -I/usr/src/lustre-2.15.1/lustre/incl=
+ude/uapi -I/usr/src/lustre-2.15.1/lustre/include -Wno-format-truncation -Wn=
+o-stringop-truncation -Wno-stringop-overflow'
+EXTRA_OFED_CONFIG=3D' -include /usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx=
+-ofed-kernel-5.6/include/linux/compat-2.6.h'
+EXTRA_OFED_INCLUDE=3D' -I/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-=
+kernel-5.6/include -I/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kern=
+el-5.6/include/uapi'
+EXTRA_SYMBOLS=3D''
+FGREP=3D'/bin/grep -F'
+FLEX=3D'/usr/bin/flex'
+GETSEPOL_FALSE=3D''
+GETSEPOL_TRUE=3D''
+GNICPPFLAGS=3D''
+GNILND=3D''
+GREP=3D'/bin/grep'
+GSS_FALSE=3D''
+GSS_KEYRING_FALSE=3D''
+GSS_KEYRING_TRUE=3D''
+GSS_PIPEFS_FALSE=3D''
+GSS_PIPEFS_TRUE=3D''
+GSS_SSK_FALSE=3D''
+GSS_SSK_TRUE=3D''
+GSS_TRUE=3D''
+HAVE_SYSTEMD_FALSE=3D''
+HAVE_SYSTEMD_TRUE=3D''
+INCLUDE_RULES=3D'include /usr/src/lustre-2.15.1/Rules'
+INSTALL_DATA=3D'${INSTALL} -m 644'
+INSTALL_PROGRAM=3D'${INSTALL}'
+INSTALL_SCRIPT=3D'${INSTALL}'
+INSTALL_STRIP_PROGRAM=3D'$(install_sh) -c -s'
+K5VERS=3D''
+KMODEXT=3D'.ko'
+KMP_MODDIR=3D''
+KRBCFLAGS=3D''
+KRBDIR=3D''
+KRBLDFLAGS=3D''
+KRBLIBS=3D''
+LD=3D'/usr/bin/ld -m elf_x86_64'
+LDFLAGS=3D''
+LDISKFS_ENABLED_FALSE=3D''
+LDISKFS_ENABLED_TRUE=3D''
+LDISKFS_SERIES=3D''
+LDISKFS_SUBDIR=3D''
+LDLIBMOUNT=3D''
+LIBAIO_FALSE=3D''
+LIBAIO_TRUE=3D''
+LIBEFENCE=3D''
+LIBNL3_CFLAGS=3D''
+LIBNL3_LIBS=3D''
+LIBOBJS=3D''
+LIBPTHREAD_FALSE=3D''
+LIBPTHREAD_TRUE=3D''
+LIBREADLINE=3D''
+LIBS=3D''
+LIBTOOL=3D'$(SHELL) $(top_builddir)/libtool'
+LINUX=3D'/usr/src/linux-5.10.153'
+LINUXRELEASE=3D'5.10.153'
+LINUX_CONFIG=3D'/usr/src/linux-5.10.153/.config'
+LINUX_FALSE=3D''
+LINUX_OBJ=3D'/usr/src/linux-5.10.153'
+LINUX_TRUE=3D''
+LIPO=3D''
+LLCRYPT_FALSE=3D''
+LLCRYPT_TRUE=3D''
+LN_S=3D'ln -s'
+LTLIBOBJS=3D''
+LT_SYS_LIBRARY_PATH=3D''
+LUSTRE=3D'/usr/src/lustre-2.15.1/lustre'
+LUSTREIOKIT_SUBDIR=3D''
+MAINT=3D''
+MAINTAINER_MODE_FALSE=3D'#'
+MAINTAINER_MODE_TRUE=3D''
+MAKEINFO=3D'${SHELL} /usr/src/lustre-2.15.1/config/missing makeinfo'
+MANIFEST_TOOL=3D':'
+MANPAGES_FALSE=3D''
+MANPAGES_TRUE=3D''
+MKDIR_P=3D'/bin/mkdir -p'
+MKE2FS=3D''
+MODULES_FALSE=3D''
+MODULES_TRUE=3D''
+MODULE_TARGET=3D'M'
+MOSTLYCLEANFILES=3D''
+MPICC_WRAPPER=3D''
+MPITESTS_FALSE=3D''
+MPITESTS_TRUE=3D''
+MPI_BIN=3D''
+NET_SNMP_CFLAGS=3D''
+NET_SNMP_CONFIG=3D''
+NET_SNMP_LIBS=3D''
+NM=3D'/usr/bin/nm -B'
+NMEDIT=3D''
+O2IBLND=3D''
+O2IBPATH=3D'/usr/src/MLNX_OFED_SRC-5.6-2.0.9.0/work/mlnx-ofed-kernel-5.6'
+OBJDUMP=3D'objdump'
+OBJEXT=3D'o'
+OSDADDON=3D''
+OTOOL64=3D''
+OTOOL=3D''
+PACKAGE=3D'lustre'
+PACKAGE_BUGREPORT=3D'https://jira.whamcloud.com/'
+PACKAGE_NAME=3D'Lustre'
+PACKAGE_STRING=3D'Lustre 2.15.1'
+PACKAGE_TARNAME=3D'lustre'
+PACKAGE_URL=3D''
+PACKAGE_VERSION=3D'2.15.1'
+PATCHED_INTEGRITY_INTF=3D''
+PATH_SEPARATOR=3D':'
+PFSCK=3D''
+PKG_CONFIG=3D'/usr/bin/pkg-config'
+PKG_CONFIG_LIBDIR=3D''
+PKG_CONFIG_PATH=3D''
+PLUGINS_FALSE=3D''
+PLUGINS_TRUE=3D''
+PTHREAD_LIBS=3D''
+PYTHON=3D'/usr/bin/python3'
+PYTHON_CPPFLAGS=3D'-I/usr/include/python3.7m'
+PYTHON_EXTRA_LDFLAGS=3D'-Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-fun=
+ctions'
+PYTHON_EXTRA_LIBS=3D'-lcrypt -lpthread -ldl  -lutil -lm'
+PYTHON_LIBS=3D'-L/usr/lib -lpython3.7m'
+PYTHON_SITE_PKG=3D'/usr/lib/python3/dist-packages'
+PYTHON_VERSION_CHECK=3D'yes'
+RANLIB=3D'ranlib'
+RHEL_FALSE=3D''
+RHEL_TRUE=3D''
+RPMBUILD=3D'/usr/bin/rpmbuild'
+RPMBUILD_BINARY_ARGS=3D''
+SED=3D'/bin/sed'
+SELINUX=3D''
+SELINUX_FALSE=3D''
+SELINUX_TRUE=3D''
+SERVER_FALSE=3D''
+SERVER_TRUE=3D''
+SET_MAKE=3D''
+SHELL=3D'/bin/bash'
+SNMP_DIST_SUBDIR=3D''
+SNMP_SUBDIR=3D''
+SPL=3D''
+SPLIT_FALSE=3D''
+SPLIT_TRUE=3D''
+SPL_ENABLED_FALSE=3D''
+SPL_ENABLED_TRUE=3D''
+SPL_OBJ=3D''
+SPL_VERSION=3D''
+STRIP=3D'strip'
+SUSE_FALSE=3D''
+SUSE_TRUE=3D''
+SWIG=3D'/usr/bin/swig'
+SWIG_LIB=3D'/usr/share/swig3.0'
+SYMVERFILE=3D'Module.symvers'
+TESTS_FALSE=3D''
+TESTS_TRUE=3D''
+TEST_DIR=3D''
+TEST_JOBS=3D''
+TUNE2FS=3D''
+UBUNTU_FALSE=3D''
+UBUNTU_TRUE=3D''
+USE_QUILT_FALSE=3D''
+USE_QUILT_TRUE=3D''
+UTILS_FALSE=3D''
+UTILS_TRUE=3D''
+VERSION=3D'2.15.1'
+VERSION_HDIR=3D'generated/uapi/linux'
+XATTR_HANDLER_FALSE=3D''
+XATTR_HANDLER_TRUE=3D''
+ZFS=3D''
+ZFS_ENABLED_FALSE=3D''
+ZFS_ENABLED_TRUE=3D''
+ZFS_LIBZFS_INCLUDE=3D''
+ZFS_LIBZFS_LDFLAGS=3D''
+ZFS_LIBZFS_LIBS=3D''
+ZFS_OBJ=3D''
+ZFS_VERSION=3D''
+ac_configure_args=3D' '\''--prefix=3D/opt/lustre'\'' '\''--with-linux=3D/us=
+r/src/linux-5.10.153'\'' '\''--with-o2ib=3D/usr/src/MLNX_OFED_SRC-5.6-2.0.9=
+=2E0/work/mlnx-ofed-kernel-5.6'\'' '\''--disable-server'\'' '\''--enable-mp=
+itests=3Dno'\'''
+ac_ct_AR=3D'ar'
+ac_ct_CC=3D'gcc'
+ac_ct_DUMPBIN=3D''
+agentdir=3D''
+am__EXEEXT_FALSE=3D''
+am__EXEEXT_TRUE=3D''
+am__fastdepCCAS_FALSE=3D'#'
+am__fastdepCCAS_TRUE=3D''
+am__fastdepCC_FALSE=3D'#'
+am__fastdepCC_TRUE=3D''
+am__include=3D'include'
+am__isrc=3D''
+am__leading_dot=3D'.'
+am__nodep=3D'_no'
+am__quote=3D''
+am__tar=3D'tar --format=3Dposix -chf - "$$tardir"'
+am__untar=3D'tar -xf -'
+bindir=3D'${exec_prefix}/bin'
+build=3D'x86_64-pc-linux-gnu'
+build_alias=3D''
+build_cpu=3D'x86_64'
+build_os=3D'linux-gnu'
+build_vendor=3D'pc'
+datadir=3D'${datarootdir}'
+datarootdir=3D'${prefix}/share'
+demodir=3D'$(docdir)/demo'
+docdir=3D'${datadir}/doc/$(PACKAGE)'
+dvidir=3D'${docdir}'
+exec_prefix=3D'NONE'
+host=3D'x86_64-pc-linux-gnu'
+host_alias=3D''
+host_cpu=3D'x86_64'
+host_os=3D'linux-gnu'
+host_vendor=3D'pc'
+htmldir=3D'${docdir}'
+includedir=3D'${prefix}/include'
+infodir=3D'${datarootdir}/info'
+install_sh=3D'${SHELL} /usr/src/lustre-2.15.1/config/install-sh'
+lb_target_os=3D'linux'
+libdir=3D'${exec_prefix}/lib'
+libexecdir=3D'${exec_prefix}/libexec'
+localedir=3D'${datarootdir}/locale'
+localstatedir=3D'${prefix}/var'
+mandir=3D'${datarootdir}/man'
+mibdir=3D''
+mkdir_p=3D'$(MKDIR_P)'
+modulefsdir=3D'/lib/modules/5.10.153//fs/lustre'
+modulenetdir=3D'/lib/modules/5.10.153//net/lustre'
+oldincludedir=3D'/usr/include'
+patch_avail=3D''
+pdfdir=3D'${docdir}'
+pkgexampledir=3D'${pkgdatadir}/examples'
+prefix=3D'/opt/lustre'
+program_transform_name=3D's,x,x,'
+psdir=3D'${docdir}'
+quilt_avail=3D''
+rootsbindir=3D'/sbin'
+sbindir=3D'${exec_prefix}/sbin'
+sharedstatedir=3D'${prefix}/com'
+sysconfdir=3D'/etc'
+systemdsystemunitdir=3D''
+target=3D'x86_64-pc-linux-gnu'
+target_alias=3D''
+target_cpu=3D'x86_64'
+target_os=3D'linux-gnu'
+target_vendor=3D'pc'
+
+## ----------- ##
+## confdefs.h. ##
+## ----------- ##
+
+/* confdefs.h */
+#define PACKAGE_NAME "Lustre"
+#define PACKAGE_TARNAME "lustre"
+#define PACKAGE_VERSION "2.15.1"
+#define PACKAGE_STRING "Lustre 2.15.1"
+#define PACKAGE_BUGREPORT "https://jira.whamcloud.com/"
+#define PACKAGE_URL ""
+#define PACKAGE "lustre"
+#define VERSION "2.15.1"
+#define STDC_HEADERS 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRING_H 1
+#define HAVE_MEMORY_H 1
+#define HAVE_STRINGS_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_STDINT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_DLFCN_H 1
+#define LT_OBJDIR ".libs/"
+#define LUSTRE_MAJOR 2
+#define LUSTRE_MINOR 15
+#define LUSTRE_PATCH 1
+#define LUSTRE_FIX 0
+#define LUSTRE_VERSION_STRING "2.15.1"
+#define SIZEOF_UNSIGNED_LONG_LONG 8
+#define HAVE_PYTHON "3.7"
+#define HAVE_MODULE_LOADING_SUPPORT 1
+#define HAVE_KTIME_GET_TS64 1
+#define HAVE_PREPARE_TO_WAIT_EVENT 1
+#define HAVE_KERNEL_PARAM_OPS 1
+#define HAVE_KTIME_ADD 1
+#define HAVE_KTIME_AFTER 1
+#define HAVE_KTIME_BEFORE 1
+#define HAVE_KTIME_COMPARE 1
+#define HAVE_SHRINKER_COUNT 1
+#define HAVE_MATCH_WILDCARD 1
+#define HAVE_MAPPING_AS_EXITING_FLAG 1
+#define HAVE_IOV_ITER_HAS_TYPE_MEMBER 1
+#define HAVE_GLOB 1
+#define HAVE_NS_TO_TIMESPEC64 1
+#define HAVE_TIMESPEC64 1
+#define HAVE_KTIME_GET_REAL_TS64 1
+#define HAVE_KTIME_GET_REAL_SECONDS 1
+#define HAVE_KTIME_TO_TIMESPEC64 1
+#define HAVE_TIMESPEC64_SUB 1
+#define HAVE_TIMESPEC64_TO_KTIME 1
+#define HAVE_KTIME_GET_SECONDS 1
+#define HAVE_WAIT_WOKEN 1
+#define HAVE_KTIME_MS_DELTA 1
+#define HAVE_KERNEL_PARAM_LOCK 1
+#define HAVE_TOPOLOGY_SIBLING_CPUMASK 1
+#define HAVE_KSTRTOBOOL_FROM_USER 1
+#define HAVE_NETLINK_CALLBACK_START 1
+#define HAVE_CRYPTO_HASH_HELPERS 1
+#define HAVE_KSET_FIND_OBJ 1
+#define HAVE_RHASHTABLE_REPLACE 1
+#define HAVE_STRINGHASH 1
+#define HAVE_RHASHTABLE_LOOKUP 1
+#define HAVE_RHLTABLE 1
+#define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+#define HAVE_RHASHTABLE_WALK_ENTER 1
+#define HAVE_HOTPLUG_STATE_MACHINE 1
+#define HAVE_REFCOUNT_T 1
+#define HAVE_RHASHTABLE_LOOKUP_GET_INSERT_FAST 1
+#define HAVE_SCHED_HEADERS 1
+#define HAVE_KREF_READ 1
+#define HAVE_RHT_BUCKET_VAR 1
+#define HAVE_PROCESSOR_H 1
+#define HAVE_WAIT_BIT_HEADER_H 1
+#define HAVE_MEMALLOC_RECLAIM 1
+#define HAVE_NL_PARSE_WITH_EXT_ACK 1
+#define HAVE_WAIT_QUEUE_ENTRY_LIST 1
+#define HAVE_CPUS_READ_LOCK 1
+#define HAVE_UUID_T 1
+#define HAVE_NLA_STRDUP 1
+#define HAVE_WAIT_QUEUE_ENTRY 1
+#define HAVE_WAIT_BIT_QUEUE_ENTRY 1
+#define HAVE_NEW_DEFINE_TIMER 1
+#define HAVE_NEW_KERNEL_WRITE 1
+#define HAVE_KERNEL_READ_LAST_POSP 1
+#define HAVE_TIMER_SETUP 1
+#define HAVE_WAIT_VAR_EVENT 1
+#define HAVE_BITMAP_ALLOC 1
+#define HAVE_CLEAR_AND_WAKE_UP_BIT 1
+#define HAVE_TCP_SOCK_SET_NODELAY 1
+#define HAVE_TCP_SOCK_SET_KEEPIDLE 1
+#define HAVE_XARRAY_SUPPORT 1
+#define HAVE_NL_DUMP_WITH_EXT_ACK 1
+#define HAVE_IOV_ITER_TYPE 1
+#define HAVE_TOTALRAM_PAGES_AS_FUNC 1
+#define HAVE_GET_REQUEST_KEY_AUTH 1
+#define HAVE_LOOKUP_USER_KEY 1
+#define HAVE_CACHE_DETAIL_WRITERS 1
+#define HAVE_GENL_DUMPIT_INFO 1
+#define HAVE_TCP_SOCK_SET_QUICKACK 1
+#define HAVE_TCP_SOCK_SET_KEEPINTVL 1
+#define HAVE_TCP_SOCK_SET_KEEPCNT 1
+#define HAVE_MMAP_LOCK 1
+#define HAVE_VMALLOC_2ARGS 1
+#define HAVE_KFREE_SENSITIVE 1
+#define HAVE_LIST_CMP_FUNC_T 1
+#define HAVE_COMPAT_RDMA 1
+
+configure: exit 1
+
+--quvdcnnkr66kll7y
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -271,4 +10713,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============2499426323955620875==--
+--quvdcnnkr66kll7y--
