@@ -4,50 +4,117 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 45F46C433FE
-	for <lustre-devel@archiver.kernel.org>; Wed, 23 Nov 2022 13:37:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id BAC7CC4332F
+	for <lustre-devel@archiver.kernel.org>; Wed, 23 Nov 2022 17:25:19 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4NHMcm0HT6z1wbY;
-	Wed, 23 Nov 2022 05:37:28 -0800 (PST)
-Received: from mail-lj1-f174.google.com (mail-lj1-f174.google.com
- [209.85.208.174])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4NHSgc5NZDz1y2G;
+	Wed, 23 Nov 2022 09:25:16 -0800 (PST)
+Received: from NAM12-DM6-obe.outbound.protection.outlook.com
+ (mail-dm6nam12on2050.outbound.protection.outlook.com [40.107.243.50])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4NHMcK3QChz1wLc
- for <lustre-devel@lists.lustre.org>; Wed, 23 Nov 2022 05:37:05 -0800 (PST)
-Received: by mail-lj1-f174.google.com with SMTP id z4so4497242ljq.6
- for <lustre-devel@lists.lustre.org>; Wed, 23 Nov 2022 05:37:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=uncc.edu; s=google;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=0czsbRsPJQ/SX18VmGI8VIeCPQU8oLuszUZGoGC5gwQ=;
- b=Am52yhEOYRs6nxGTS7M/5RVk5PVAv58lL5tdDkDbbrv9cyApLruQxYsKtqTLi4yzNo
- 03nbzjNjwYoH1AzNzdWr515ewujHmCrg2p/wfPRo3S2OsVf8b+V2onZG3BR0uw5z9b8q
- LM4+r2e8P141XE9tbxJnXAD+w6Hqv1/X0ulcU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20210112;
- h=to:subject:message-id:date:from:mime-version:x-gm-message-state
- :from:to:cc:subject:date:message-id:reply-to;
- bh=0czsbRsPJQ/SX18VmGI8VIeCPQU8oLuszUZGoGC5gwQ=;
- b=Ebz+uRQQ0XHkn1A4Q+gPwlwO9Y8qunnITTc3i8kZWpq/Oh1UGelgJ9UCvIidMjuqP8
- adQtkEDOibtq3b9jx5s5qrDKQcntFTtRP2yCTC8TdbqzjPHn1NQaOswg7wvQ22hvb+4L
- wupb4XBT6rgU5fE5Bms+4vuP0/XV7OTF6TgNzmQfE1H1v8AxVQlePzuCnrQpeiXLTVnz
- sQyYYDhkHLjv24gM6x4IgrK9RP3qmgY80DpsSEafZLCh7WWwqBo1XZThEfMFqPBfjZbd
- IZFqqVxUwmCRXQhhK2Vaa+x3PzMj/Ttjt7SQuxr8wiu/IsfYfk8j1Dg7Nk+ZAF/e8g/1
- mfBg==
-X-Gm-Message-State: ANoB5pkbz7fK0XGaHNhoxrsJC00LUomjEYQnhBXxJHmIyRMfAAPxwHlg
- fJUrIwkWFjMDcZFye2KLEnKgkhkD14KIhdnJTVU7UifD/Xt0Ig==
-X-Google-Smtp-Source: AA0mqf5TXCT3zLaVZ/w8EjlQXmWve2XthtzJT3lkuK6HLrVD0YGKYCqhMstgfTAcUshBjeVV+Zx6hJa6eKzzklYVCas=
-X-Received: by 2002:a2e:908e:0:b0:277:515b:3dcd with SMTP id
- l14-20020a2e908e000000b00277515b3dcdmr8715655ljg.501.1669210622039; Wed, 23
- Nov 2022 05:37:02 -0800 (PST)
+ 4NHSgT5Bbdz1wNq
+ for <lustre-devel@lists.lustre.org>; Wed, 23 Nov 2022 09:25:09 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=UFIrOjQ2NUx77pK2Vnnz+m/cuLu3JAeh6uHYWtopZ/G91Gu5fkOUqmUzwMhcqjlUIzNAR1EAetJ16bLBrm9r+BlOfgMN2WlVw/YFsFpBGNtbjTFykgb2cIfMEpz6jRLynXUHvs4u1X9IKkZvzVLwE7q1onwblZT4e2r5IWIChvu0+yMo7iKxHvDeC3qtXF/chj28vQmoqkIm/WrDB/uG7AGgcRhN1kvmyxS7zmYIo9rh8MYBC7EKqhPdpHibw/OuS/b6t/C5u4UjFBzyay0uA8vWFEU91Iq/kfRIhj0JucbZprSsno2IRPcOM+m+wZMBBYLA302AA85DcUeFdX3pKQ==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=qQHcfG6X8ArzEvZk5dpU9rXTbb1trSNE+NZcc5RHVy0=;
+ b=ZLaD3HNMAOqg17PJVu54o4PtR2mHBDMV9LzCRQeWLxrVStyuvhsSC9yIhah+sv1FcrcEuIsGOAixQ4H4hM/SdeqcQu71VFZBTfL8T9gQaywmi9ey9gXYQ86Zsjl9jPsXGBHFUd8qgdH+xHQyZJzcc+CMPmmLPFTD6Qq04V40fpqUkMFs6ztDaR0SI8nhZgxjKpGQLD0g02z3f+HmF9pT3/55L6Nl5lFpqxeosrMiRVCQMnttsEyN+e9a1G52DHn6yCTNGjvmr1H9ylzg9Kp5DxlGvnrS0hKk5b4bOlL7WlMRYj0JRM3X4BJYFWkZrH2LBC/H36TyS9ilwkDmCZyw/g==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=whamcloud.com; dmarc=pass action=none
+ header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ s=selector2;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=qQHcfG6X8ArzEvZk5dpU9rXTbb1trSNE+NZcc5RHVy0=;
+ b=t8Yl6i9s1RxwqWhBhh3KrQi3X+aQVJV2+42WuC21rkgEJP1PXfyGmfBl8AQLVnGi1Dvg00i4tnHFqrGbwnk/hvA96VWCKDfZG613pWGk432HCOYnzamweWhHTnWyzUSJU86GphqquIaoDVSrFdKNvL4p5J2D9iZtyoXNWghEi5A=
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
+ by DM4PR19MB5691.namprd19.prod.outlook.com (2603:10b6:8:5e::5) with
+ Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.5857.18; Wed, 23 Nov 2022 17:25:06 +0000
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::5576:15e7:aec1:4e84]) by MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::5576:15e7:aec1:4e84%3]) with mapi id 15.20.5834.015; Wed, 23 Nov 2022
+ 17:25:06 +0000
+To: Saisha Kamat <skamat1@uncc.edu>
+CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: [lustre-devel] Question about how online LFSCK works
+Thread-Index: AQHY/0DRKzT1IfWUV0yF4jMawqIonK5Mwoy6
+Date: Wed, 23 Nov 2022 17:25:05 +0000
+Message-ID: <217785FC-1D57-4137-A354-A560F976F703@whamcloud.com>
+References: <CACyzrcRce01W3_8C1TsOJEQrtSj7qnBTWW6TDpcz_1kEKgCvhw@mail.gmail.com>
+In-Reply-To: <CACyzrcRce01W3_8C1TsOJEQrtSj7qnBTWW6TDpcz_1kEKgCvhw@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-Hashtags: #NewslettersPlus
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=whamcloud.com;
+x-ms-publictraffictype: Email
+x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|DM4PR19MB5691:EE_
+x-ms-office365-filtering-correlation-id: 706f2d3f-31e0-4a61-e954-08dacd77a9cf
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+x-microsoft-antispam-message-info: VNT4RKliDA6p0MDfXMJjQAjyPc9f9Pfwtrp0ZRcn9w92MGSk6eq5Nj/m0wpPgApzKdJN6Na4+JR5PjmEl/VMavbWTvZ4QXjGWkMvi07eXqqf8TtOUKJzi5ve35tqy7kB4b7tDeSyKkvykp7SKtHfMYt+0fW4uSCq+hV8Z9kUlLso1wDU40AYz5hnOcegvxIMgMGPoDKcZt204tFsMj0dHdfvg6BjlSSTOenO+lhmT8gJRQYL6HJWdeZFXthDiVxBcJJKSucYdyaqO79Nvpa2yfQ67K5ppqfHAshZ5WURUkqXYRd0ML4LVlBKa9/dchf5W5IFoNF3i+G0IZY2vEJ8LkoHz6T9YBwmzx/FBmmLF7eZ47HZLtjSb7Dm+ax7u7CKHfJS593d3ueeKlYpAkPvJ7bEnucCoNlZPCj4hrOWsOzIXcFEKATxkahFfTXRL6PnU7tO3b+9DGW9eazvm3OzSuvAocQJkvJY3ku/v5n/HV5Isv8VFSkM+U/bZH1YuSy9UDQzOUA2+C3naGtSeAkg6mKM5WBNADk+Nv1gjkyZ7E2tBloTVAPR1PjF9SU/2DbKkSOpJ7VRjmavN6NKoHVEC7ap5DFbL31EZL4Z1o5/whmzmyZdEwZqjWv+Ayi0GF3+xk5HyYCkg6gAD3IsbfLf7890DTDKsiHuHAfDwTVuJx1V8qGyZqUrbYF/7oZrX5yq0sb8IjnTTMN4cinvY5Heke0o0IabUQVro4dMUn23annDwi8MwbG0tCF/8DslH8ueSKchgpqWurLdu95lKIgNvw==
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230022)(4636009)(39850400004)(136003)(346002)(366004)(376002)(396003)(451199015)(2616005)(41300700001)(8936002)(186003)(53546011)(6506007)(6916009)(316002)(4326008)(8676002)(26005)(6512007)(66446008)(66476007)(76116006)(66946007)(66556008)(64756008)(36756003)(86362001)(122000001)(38100700002)(38070700005)(33656002)(5660300002)(2906002)(83380400001)(71200400001)(478600001)(966005)(6486002)(13693001)(45980500001);
+ DIR:OUT; SFP:1101; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?ZUhkQlZyQjg2bUd5S0cwSUo0RmFYNjFrM0YxOE9LL01UdVhtcmUvcEliMEZ3?=
+ =?utf-8?B?S2ZoSEwxcUY0YWp2eVlTUk04YkljMzdyMUNsdFJ0bEVXcGQ3TnRMY3J0Smw5?=
+ =?utf-8?B?cnF6RzB5d05keXR4L1Eyb0t1eWo5YTJFUFZ2b1ZnZytRdnBVZUxER2llZm9J?=
+ =?utf-8?B?Nm4zZDBTZjBmMm1QWW9xTEdmN3FsSUhIKzdjVzFLc25WYlN0c2haNTc4c0gy?=
+ =?utf-8?B?ZmorN1hUVWZUNi9SWXo5bUp4OVY1bDRnRFBGaVVHTlU1Mzk4YUJkNmMraDVT?=
+ =?utf-8?B?Zno0Zmk4Mmo2OUt5QUpQeVp2Ti8rVEwxUkh2Y3podlk5UVFuNWtpRVB5aEgz?=
+ =?utf-8?B?L3h4MlZMZmdHSUh3U2Nmbkh6SUtWS0xEdjRjcGRPNjZqbHJxcWJ1bDdMWTZM?=
+ =?utf-8?B?UEFheWFTb2gzTStlVVdnSE9vMWZKRS9RakJ2VmJ4SytqNm51L1Jta0h1Z2tU?=
+ =?utf-8?B?a2VwclBsc2w1L3kzNW9COWppbVh1MjNKeC9QS24xaWpQbFRlLzJRWS9hNmtS?=
+ =?utf-8?B?M29Bbm0vcDU0b3dIMlRxZXBOeHlucFRvU0dNT3JWL0pYR1dlcmt6QWdheXBG?=
+ =?utf-8?B?WDdVelR2NzREMGI3SXlobytFMzZhY2tYdDZtUVJ2VmtqQUdMVDd0RkV0bFR2?=
+ =?utf-8?B?WFdpWXN3OUo4NXN5c3RkUjIwU2VkWGk4NHF3MHdkOXBxdEx5NzhEWXB0NklY?=
+ =?utf-8?B?Y1VqZms2cnNabm9TL1BzM2owb1FjZFJ3OEZhdnloV1U5ZitqK0RUSW16U3hk?=
+ =?utf-8?B?ZkdiQjJWd05ZNGJZR25yanRnMEYzUmd4OCtzSjlDY2Via20xMEtMOHFRejJv?=
+ =?utf-8?B?WUxuc2dpSGZZQUQxY0I1bVd1VkNXd25jSGxUeEpVdS8xOUNYNUo0Z2ZZU0Fy?=
+ =?utf-8?B?RzdjR25YKzNqdWlTanAvUzAxL25sMGlCcldOZ1VnOGFqZUVxNmdPZVpLOXBL?=
+ =?utf-8?B?S0M1RHpIT2Z0REloVHhsNHFiOE1aUEk2ZDRtTHZpMnUxckFZUUNXQ3N1ZEd1?=
+ =?utf-8?B?anZGR2RxZmZRS1lYV1ZsV2NQU1ZHVk5vN2JCd2FFRjNZZlM3WHNjRnJhVXVX?=
+ =?utf-8?B?UnoyS0p5bUZaS2NXQUw2RGh3OTUxd0tIMFRrdEVGYjJ6NmhhTDRHNjRWRDlH?=
+ =?utf-8?B?MHQxSUEza3VPeW56S0hTalVnZk45TGZORnR4eThNWFZOUk52RWpsNDJCdERn?=
+ =?utf-8?B?ell2YzdTZHlCMFgrTW9ENm5lSnByQXVQcmQyeldqcWdlYWRRZmhPcGgxMlcy?=
+ =?utf-8?B?SzFYdlF6VGI1REZrT3FKV1JGd3Z2VHNhWFhBelRYSWcyQnJFZUw2YTVWN0Ns?=
+ =?utf-8?B?bWN0eks2Z2tlWHlvR1Q2Wk42OFY3ZVBsYXQrdGRWeERjRWdZbmt3dDZPVTMz?=
+ =?utf-8?B?Y1B5WVNMdE9rZmM1TXJ0UmY2WjVFanAwRTY4TDE2R29JaUh0VnkzVUFmNzdp?=
+ =?utf-8?B?cU9WeSt1RWV3VXQ0OEI0bUQrREhaQkU5dWdldTZuei95S3plV3k0aXIwTi84?=
+ =?utf-8?B?TUJZWDk3eFpTNkhMMHhBeGhTYzl5czRncThmN3lkOG1wMmplbGRGS0pRbkQv?=
+ =?utf-8?B?OTVNTFlMQWRNbXY0NHd2akUxckd3RkFKSGlGczNWRzFEamhDRm5rak5Ub1B6?=
+ =?utf-8?B?QnNvYWRHL1NpeTZXSmc4b3pnZXk2MFA1bUFDVVJVanI1cE54SzRJMU1ybThl?=
+ =?utf-8?B?d2hhYm4xTHo3TTZBbVFxQzNjbjZ5QTIzcUIybzNjOHdLZGRES3lWckhYK2xJ?=
+ =?utf-8?B?NXQrN3JJVjFyYjZod09LNE45QmNLVmhCV0xoMnJteG53bkFXeEEzSDdqSWRm?=
+ =?utf-8?B?NUNzWTgxVzdlTGZTVjBvSVV6dVZaUlZzZVMraS9ZQVQ0ZGxJV2RyamVUeGFU?=
+ =?utf-8?B?UlJtakFVNlNySWlVeEtSRzJQTHNyK0xoUHNwdkY5cWtuWmFxcnYxSDhmMUdB?=
+ =?utf-8?B?VUpTeXhQZ01XM3k4b1BJUmpVbmg1OXR1OTIzQXRpMHFMd09JWEhwWG9uTDFQ?=
+ =?utf-8?B?dUd6U2dxb2tCbVB5QlQ2V0t3S3QwcjJmZkdrc3ZBTGwyY0NOL1FwVU1VOVdB?=
+ =?utf-8?B?dXUwbEc2TFA2S3YyekJHbjFpcTh1TW0xVDBjcVk0aEdSVzJJdHVXUk5OVXFo?=
+ =?utf-8?Q?jFD4=3D?=
 MIME-Version: 1.0
-Date: Wed, 23 Nov 2022 08:36:51 -0500
-Message-ID: <CACyzrcRce01W3_8C1TsOJEQrtSj7qnBTWW6TDpcz_1kEKgCvhw@mail.gmail.com>
-To: lustre-devel@lists.lustre.org
-Subject: [lustre-devel] Question about how online LFSCK works
+X-OriginatorOrg: whamcloud.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 706f2d3f-31e0-4a61-e954-08dacd77a9cf
+X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Nov 2022 17:25:05.9654 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: p9SxO+ta4YVpkgXuryJwlvc9UoqjXOThm3DiY/ePnVmwb77XjX+QLkyebU4DTaEt
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM4PR19MB5691
+Subject: Re: [lustre-devel] Question about how online LFSCK works
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -60,53 +127,140 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Saisha Kamat via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Saisha Kamat <skamat1@uncc.edu>
-Content-Type: multipart/mixed; boundary="===============1465833545474963503=="
+From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Andreas Dilger <adilger@whamcloud.com>
+Content-Type: multipart/mixed; boundary="===============2499426323955620875=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1465833545474963503==
-Content-Type: multipart/alternative; boundary="0000000000002f0ee005ee236220"
+--===============2499426323955620875==
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_217785FC1D574137A354A560F976F703whamcloudcom_"
 
---0000000000002f0ee005ee236220
-Content-Type: text/plain; charset="UTF-8"
+--_000_217785FC1D574137A354A560F976F703whamcloudcom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Hi all,
-I am a Ph.D student at UNC-Charlotte, working on Lustre File System Checker.
+VGhlIExGU0NLIGNoZWNraW5nIGlzIHJ1biBpbiBhIG11bHRpLXN0YWdlIGV4ZWN1dGlvbi4gQXQg
+dGhlIGxvd2VzdCBsZXZlbCwgdGhlIE9JIFNjcnViIHNjYW5zIHRoZSBsZGlza2ZzIG9yIFpGUyBp
+bm9kZXMgZnJvbSB0aGUgc3RvcmFnZSBhbmQgcGVyZm9ybXMgbG9jYWwgc2FuaXR5IGNoZWNrcyAo
+ZWcuIEZJRCBmcm9tIHhhdHRyIHZzLiBPSSBGSUQtPmlub2RlIG1hcHBpbmcpIGFuZCB0aGVuIExG
+U0NLIGNvbnN1bWVzIHRoZXNlIG9iamVjdHMgKHNlbWktYXN5bmNocm9ub3VzbHkpIHRvIHBlcmZv
+cm0gZGlzdHJpYnV0ZWQgY29uc2lzdGVuY3kgY2hlY2tzIChlZy4gbmFtZXNwYWNlIGNoZWNrcyBm
+b3IgcmVtb3RlL3N0cmlwZWQgZGlyZWN0b3JpZXMsIGxpbmsgRUEgY2hlY2tzIGZvciBjaGlsZC0+
+cGFyZW50IGRpcmVjdG9yeSBsb29rdXAsIGxheW91dCBjaGVja3MgZm9yIE1EVCBpbm9kZSB0byBP
+U1Qgb2JqZWN0IHJlZmVyZW5jZXMsIGV0YykuICBGb3IgY2VydGFpbiB0eXBlcyBvZiBjaGVja3Ms
+IGlmIGluY29uc2lzdGVuY2llcyBhcmUgZm91bmQgKGVnLiB1bnJlZmVyZW5jZWQgT1NUIG9iamVj
+dHMpIHRoZXkgbWF5IGJlIHB1dCBpbnRvIGEgbGlzdCBmb3Igc3VwcGxlbWVudGFyeSBjaGVja2lu
+ZyBhZnRlciB0aGUgc2NhbiBoYXMgY29tcGxldGVkLg0KDQpTaW5jZSB0aGUgc2NhbiBpcyBsaW5l
+YXIgYnkgdGhlIHVuZGVybHlpbmcgZmlsZXN5c3RlbSBpbm9kZSB0YWJsZSwgaXQgaXMgb2YgY291
+cnNlIHBvc3NpYmxlIHRvIG1pc3MgbmV3IGVudHJpZXMgYWRkZWQgYmVoaW5kIHRoZSBjdXJyZW50
+IGN1cnNvciwgb3Igc2VlIG5ldyBlbnRyaWVzIGFkZGVkIGluIGZyb250IG9mIHRoZSBjdXJzb3Iu
+ICBJbiBtb3N0IGNhc2VzIHRoZXNlIG9iamVjdHMgY2FuIGJlIGNoZWNrZWQgaW5kZXBlbmRlbnRs
+eSBhbmQgd2l0aG91dCBpc3N1ZSBzaW5jZSB0aGUgaW50ZXJzZWN0aW9uIG9mIHRoZSBzY2Fubmlu
+ZyBhbmQgY2hhbmdlcyBpcyB2ZXJ5IHJhcmUuDQoNClRvIGF2b2lkIGltcGFjdGluZyBwZXJmb3Jt
+YW5jZSwgdGhlIGNoZWNraW5nIGlzIGxhcmdlbHkgZG9uZSB3aXRob3V0IGxvY2tpbmcuIEhvd2V2
+ZXIsIGluIHRoZSByYXJlIGNhc2VzIHRoYXQgYW4gaW5jb25zaXN0ZW5jeSBpcyBmb3VuZCwgTEZT
+Q0sgd2lsbCBsb2NrIHRoZSBvYmplY3QocykgaW52b2x2ZWQgYW5kIHJlLWNoZWNrIHRoZSBjb25z
+aXN0ZW5jeSwgdG8gYXZvaWQgc3VjaCB0cmFuc2llbnQgZXJyb3JzLg0KDQpEdWUgdG8gdGhlIGR5
+bmFtaWMgbmF0dXJlIG9mIHRoZSBmaWxlc3lzdGVtLCBhbmQgdGhlIHNjYWxlIGF0IHdoaWNoIEx1
+c3RyZSBvcGVyYXRlcywgd2UgY2FuJ3Qga2VlcCB0aGUgc3lzdGVtIHN0YXRpYyBkdXJpbmcgYSBm
+dWxsIGNoZWNrLiBJbiBzb21lIGNhc2VzIHRyYW5zaWVudCBlcnJvcnMgb24gbW9kaWZpZWQgb2Jq
+ZWN0cyBtYXkgYmUgZGVmZXJyZWQgZm9yIGEgbGF0ZXIgc2Nhbi4NCg0KQWxsIG9iamVjdCB1cGRh
+dGVzIGFyZSBtYXJrZWQgd2l0aCBhIHRyYW5zYWN0aW9uIG51bWJlciB0aGF0IGlzIG1vbm90b25p
+Y2FsbHkgaW5jcmVhc2luZyAocGVyIHRhcmdldCksIHNvIGluIHNvbWUgY2FzZXMgTEZTQ0sgY2Fu
+IGlnbm9yZSBlcnJvcnMgdGhhdCBhcmUgZm91bmQgb24gb2JqZWN0cyBtb2RpZmllZCBzaW5jZSB0
+aGUgc3RhcnQgb2YgdGhlIHNjYW4sIGFuZCB0aGVpciBjb25zaXN0ZW5jeSBjb3VsZCBiZSByZS12
+ZXJpZmllZCBvbiBhIHN1YnNlcXVlbnQgTEZTQ0sgcnVuLg0KDQpDaGVlcnMsIEFuZHJlYXMNCg0K
+T24gTm92IDIzLCAyMDIyLCBhdCAwNjozOCwgU2Fpc2hhIEthbWF0IHZpYSBsdXN0cmUtZGV2ZWwg
+PGx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPiB3cm90ZToNCg0K77u/DQpIaSBhbGwsDQpJ
+IGFtIGEgUGguRCBzdHVkZW50IGF0IFVOQy1DaGFybG90dGUsIHdvcmtpbmcgb24gTHVzdHJlIEZp
+bGUgU3lzdGVtIENoZWNrZXIuDQoNCkkgaGFkIGEgcXVlc3Rpb24gcmVsYXRlZCB0byBob3cgb25s
+aW5lIExGU0NLIHdvcmtzLiBTcGVjaWZpY2FsbHksIGhvdyBkb2VzIExGU0NLIGRpZmZlcmVudGlh
+dGUgb2xkIG1ldGFkYXRhIGFuZCBuZXcgbWV0YWRhdGEgY3JlYXRlZCBkdXJpbmcgaXRzIGV4ZWN1
+dGlvbj8gV2lsbCB0aGUgbmV3IG1ldGFkYXRhIGJlIGNoZWNrZWQ/IGFuZCBpZiB5ZXMsIHdoZW4g
+d2lsbCB0aGV5IGJlIGNoZWNrZWQgYnkgTEZTQ0s/IENhbiB5b3UgcGxlYXNlIHBvaW50IG1lIHRv
+IHRoZSBzb3VyY2UgY29kZSB0byB1bmRlcnN0YW5kIG1vcmUgZGV0YWlscz8NCg0KVGhhbmtzIHZl
+cnkgbXVjaCENClNhaXNoYQ0KDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fXw0KbHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdA0KbHVzdHJlLWRldmVsQGxpc3Rz
+Lmx1c3RyZS5vcmcNCmh0dHA6Ly9saXN0cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUt
+ZGV2ZWwtbHVzdHJlLm9yZw0K
 
-I had a question related to how online LFSCK works. Specifically, how does
-LFSCK differentiate old metadata and new metadata created
-during its execution? Will the new metadata be checked? and if yes, when
-will they be checked by LFSCK? Can you please point me to the source code
-to understand more details?
+--_000_217785FC1D574137A354A560F976F703whamcloudcom_
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Thanks very much!
-Saisha
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IGRpcj0iYXV0byI+DQpU
+aGUgTEZTQ0sgY2hlY2tpbmcgaXMgcnVuIGluIGEgbXVsdGktc3RhZ2UgZXhlY3V0aW9uLiBBdCB0
+aGUgbG93ZXN0IGxldmVsLCB0aGUgT0kgU2NydWIgc2NhbnMgdGhlIGxkaXNrZnMgb3IgWkZTIGlu
+b2RlcyBmcm9tIHRoZSBzdG9yYWdlIGFuZCBwZXJmb3JtcyBsb2NhbCBzYW5pdHkgY2hlY2tzIChl
+Zy4gRklEIGZyb20geGF0dHIgdnMuIE9JIEZJRC0mZ3Q7aW5vZGUgbWFwcGluZykgYW5kIHRoZW4g
+TEZTQ0sgY29uc3VtZXMgdGhlc2Ugb2JqZWN0cyAoc2VtaS1hc3luY2hyb25vdXNseSkNCiB0byBw
+ZXJmb3JtIGRpc3RyaWJ1dGVkIGNvbnNpc3RlbmN5IGNoZWNrcyAoZWcuIG5hbWVzcGFjZSBjaGVj
+a3MgZm9yIHJlbW90ZS9zdHJpcGVkIGRpcmVjdG9yaWVzLCBsaW5rIEVBIGNoZWNrcyBmb3IgY2hp
+bGQtJmd0O3BhcmVudCBkaXJlY3RvcnkgbG9va3VwLCBsYXlvdXQgY2hlY2tzIGZvciBNRFQgaW5v
+ZGUgdG8gT1NUIG9iamVjdCByZWZlcmVuY2VzLCBldGMpLiAmbmJzcDtGb3IgY2VydGFpbiB0eXBl
+cyBvZiBjaGVja3MsIGlmIGluY29uc2lzdGVuY2llcw0KIGFyZSBmb3VuZCAoZWcuIHVucmVmZXJl
+bmNlZCBPU1Qgb2JqZWN0cykgdGhleSBtYXkgYmUgcHV0IGludG8gYSBsaXN0IGZvciBzdXBwbGVt
+ZW50YXJ5IGNoZWNraW5nIGFmdGVyIHRoZSBzY2FuIGhhcyBjb21wbGV0ZWQuJm5ic3A7DQo8ZGl2
+Pjxicj4NCjwvZGl2Pg0KPGRpdj5TaW5jZSB0aGUgc2NhbiBpcyBsaW5lYXIgYnkgdGhlIHVuZGVy
+bHlpbmcgZmlsZXN5c3RlbSBpbm9kZSB0YWJsZSwgaXQgaXMgb2YgY291cnNlIHBvc3NpYmxlIHRv
+IG1pc3MgbmV3IGVudHJpZXMgYWRkZWQgYmVoaW5kIHRoZSBjdXJyZW50IGN1cnNvciwgb3Igc2Vl
+IG5ldyBlbnRyaWVzIGFkZGVkIGluIGZyb250IG9mIHRoZSBjdXJzb3IuICZuYnNwO0luIG1vc3Qg
+Y2FzZXMgdGhlc2Ugb2JqZWN0cyBjYW4gYmUgY2hlY2tlZCBpbmRlcGVuZGVudGx5DQogYW5kIHdp
+dGhvdXQgaXNzdWUgc2luY2UgdGhlIGludGVyc2VjdGlvbiBvZiB0aGUgc2Nhbm5pbmcgYW5kIGNo
+YW5nZXMgaXMgdmVyeSByYXJlLjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+VG8gYXZv
+aWQgaW1wYWN0aW5nIHBlcmZvcm1hbmNlLCB0aGUgY2hlY2tpbmcgaXMgbGFyZ2VseSBkb25lIHdp
+dGhvdXQgbG9ja2luZy4gSG93ZXZlciwgaW4gdGhlIHJhcmUgY2FzZXMgdGhhdCBhbiBpbmNvbnNp
+c3RlbmN5IGlzIGZvdW5kLCBMRlNDSyB3aWxsIGxvY2sgdGhlIG9iamVjdChzKSBpbnZvbHZlZCBh
+bmQgcmUtY2hlY2sgdGhlIGNvbnNpc3RlbmN5LCB0byBhdm9pZCBzdWNoIHRyYW5zaWVudCBlcnJv
+cnMuPC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj5EdWUgdG8gdGhlIGR5bmFtaWMgbmF0
+dXJlIG9mIHRoZSBmaWxlc3lzdGVtLCBhbmQgdGhlIHNjYWxlIGF0IHdoaWNoIEx1c3RyZSBvcGVy
+YXRlcywgd2UgY2FuJ3Qga2VlcCB0aGUgc3lzdGVtIHN0YXRpYyBkdXJpbmcgYSBmdWxsIGNoZWNr
+LiBJbiBzb21lIGNhc2VzIHRyYW5zaWVudCBlcnJvcnMgb24gbW9kaWZpZWQgb2JqZWN0cyBtYXkg
+YmUgZGVmZXJyZWQgZm9yIGEgbGF0ZXIgc2Nhbi4mbmJzcDs8L2Rpdj4NCjxkaXY+PGJyPg0KPC9k
+aXY+DQo8ZGl2PkFsbCBvYmplY3QgdXBkYXRlcyBhcmUgbWFya2VkIHdpdGggYSB0cmFuc2FjdGlv
+biBudW1iZXIgdGhhdCBpcyBtb25vdG9uaWNhbGx5IGluY3JlYXNpbmcgKHBlciB0YXJnZXQpLCBz
+byBpbiBzb21lIGNhc2VzIExGU0NLIGNhbiBpZ25vcmUgZXJyb3JzIHRoYXQgYXJlIGZvdW5kIG9u
+IG9iamVjdHMgbW9kaWZpZWQgc2luY2UgdGhlIHN0YXJ0IG9mIHRoZSBzY2FuLCBhbmQgdGhlaXIg
+Y29uc2lzdGVuY3kgY291bGQgYmUgcmUtdmVyaWZpZWQgb24NCiBhIHN1YnNlcXVlbnQgTEZTQ0sg
+cnVuLiZuYnNwOzwvZGl2Pg0KPGRpdj48YnI+DQo8ZGl2IGRpcj0ibHRyIj5DaGVlcnMsIEFuZHJl
+YXM8L2Rpdj4NCjxkaXYgZGlyPSJsdHIiPjxicj4NCjxibG9ja3F1b3RlIHR5cGU9ImNpdGUiPk9u
+IE5vdiAyMywgMjAyMiwgYXQgMDY6MzgsIFNhaXNoYSBLYW1hdCB2aWEgbHVzdHJlLWRldmVsICZs
+dDtsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZyZndDsgd3JvdGU6PGJyPg0KPGJyPg0KPC9i
+bG9ja3F1b3RlPg0KPC9kaXY+DQo8YmxvY2txdW90ZSB0eXBlPSJjaXRlIj4NCjxkaXYgZGlyPSJs
+dHIiPu+7vw0KPGRpdiBkaXI9Imx0ciI+DQo8dGFibGUgY2VsbHBhZGRpbmc9IjAiIGNsYXNzPSJn
+bWFpbC1hakMiIHN0eWxlPSJib3JkZXItc3BhY2luZzowcHg7bGluZS1oZWlnaHQ6MjBweDtmb250
+LWZhbWlseTomcXVvdDtHb29nbGUgU2FucyZxdW90OyxSb2JvdG8sUm9ib3RvRHJhZnQsSGVsdmV0
+aWNhLEFyaWFsLHNhbnMtc2VyaWY7Zm9udC1zaXplOjE0cHgiPg0KPHRib2R5Pg0KPHRyIGNsYXNz
+PSJnbWFpbC1hanYiPg0KPHRkIGNvbHNwYW49IjIiIHRhYmluZGV4PSIwIiBjbGFzcz0iZ21haWwt
+Z0wiIHN0eWxlPSJ2ZXJ0aWNhbC1hbGlnbjp0b3A7d2lkdGg6YXV0bztwYWRkaW5nOjJweCAwcHgi
+Pg0KPHNwYW4gY2xhc3M9ImdtYWlsLWdJIiBzdHlsZT0idmVydGljYWwtYWxpZ246dG9wIj5IaSBh
+bGwsPGJyPg0KSSBhbSBhIFBoLkQgc3R1ZGVudCBhdCBVTkMtQ2hhcmxvdHRlLCB3b3JraW5nIG9u
+IEx1c3RyZSBGaWxlIFN5c3RlbSBDaGVja2VyLjxicj4NCjxicj4NCkkgaGFkIGEgcXVlc3Rpb24g
+cmVsYXRlZCB0byBob3cgb25saW5lIExGU0NLIHdvcmtzLiBTcGVjaWZpY2FsbHksIGhvdyBkb2Vz
+IExGU0NLIGRpZmZlcmVudGlhdGUgb2xkIG1ldGFkYXRhIGFuZCBuZXcgbWV0YWRhdGEgY3JlYXRl
+ZCBkdXJpbmcmbmJzcDtpdHMmbmJzcDtleGVjdXRpb24/IFdpbGwgdGhlIG5ldyBtZXRhZGF0YSBi
+ZSBjaGVja2VkPyBhbmQgaWYgeWVzLCB3aGVuIHdpbGwgdGhleSBiZSBjaGVja2VkIGJ5IExGU0NL
+PyBDYW4geW91IHBsZWFzZSBwb2ludA0KIG1lJm5ic3A7dG8gdGhlIHNvdXJjZSBjb2RlIHRvIHVu
+ZGVyc3RhbmQgbW9yZSBkZXRhaWxzPzxicj4NCjxicj4NClRoYW5rcyB2ZXJ5IG11Y2ghPGJyPg0K
+PHNwYW4gYXJpYS1sYWJlbD0iIiBjbGFzcz0iZ21haWwtYy1tcmtkd25fX2JyIiBzdHlsZT0iYm94
+LXNpemluZzppbmhlcml0O2Rpc3BsYXk6YmxvY2s7aGVpZ2h0OjhweDtmb250LWZhbWlseTpTbGFj
+ay1MYXRvLFNsYWNrLUZyYWN0aW9ucyxhcHBsZUxvZ28sc2Fucy1zZXJpZjtmb250LXNpemU6MTVw
+eDtmb250LXZhcmlhbnQtbGlnYXR1cmVzOmNvbW1vbi1saWdhdHVyZXMiPjwvc3Bhbj5TYWlzaGE8
+YnI+DQo8YnI+DQo8L3NwYW4+PC90ZD4NCjwvdHI+DQo8L3Rib2R5Pg0KPC90YWJsZT4NCjwvZGl2
+Pg0KPHNwYW4+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX188
+L3NwYW4+PGJyPg0KPHNwYW4+bHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdDwvc3Bhbj48YnI+DQo8
+c3Bhbj5sdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZzwvc3Bhbj48YnI+DQo8c3Bhbj5odHRw
+Oi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmc8
+L3NwYW4+PGJyPg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8L2Rpdj4NCjwvYm9keT4NCjwvaHRt
+bD4NCg==
 
---0000000000002f0ee005ee236220
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+--_000_217785FC1D574137A354A560F976F703whamcloudcom_--
 
-<div dir=3D"ltr"><table cellpadding=3D"0" class=3D"gmail-ajC" style=3D"bord=
-er-spacing:0px;line-height:20px;font-family:&quot;Google Sans&quot;,Roboto,=
-RobotoDraft,Helvetica,Arial,sans-serif;font-size:14px"><tbody><tr class=3D"=
-gmail-ajv"><td colspan=3D"2" tabindex=3D"0" class=3D"gmail-gL" style=3D"ver=
-tical-align:top;width:auto;padding:2px 0px"><span class=3D"gmail-gI" style=
-=3D"vertical-align:top">Hi all,<br>I am a Ph.D student at UNC-Charlotte, wo=
-rking on Lustre File System Checker.<br><br>I had a question related to how=
- online LFSCK works. Specifically, how does LFSCK differentiate old metadat=
-a and new metadata created during=C2=A0its=C2=A0execution? Will the new met=
-adata be checked? and if yes, when will they be checked by LFSCK? Can you p=
-lease point me=C2=A0to the source code to understand more details?<br><br>T=
-hanks very much!<br><span aria-label=3D"" class=3D"gmail-c-mrkdwn__br" styl=
-e=3D"box-sizing:inherit;display:block;height:8px;font-family:Slack-Lato,Sla=
-ck-Fractions,appleLogo,sans-serif;font-size:15px;font-variant-ligatures:com=
-mon-ligatures"></span>Saisha<br><br></span></td></tr></tbody></table></div>
-
---0000000000002f0ee005ee236220--
-
---===============1465833545474963503==
+--===============2499426323955620875==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -117,4 +271,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============1465833545474963503==--
+--===============2499426323955620875==--
