@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 529CBC05027
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 3E4F6C25B50
 	for <lustre-devel@archiver.kernel.org>; Mon, 23 Jan 2023 23:24:27 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4P15P673VNz1yGd;
-	Mon, 23 Jan 2023 15:08:10 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4P15P73X67z22R9;
+	Mon, 23 Jan 2023 15:08:11 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4P15Kq5YbRz1yCH
- for <lustre-devel@lists.lustre.org>; Mon, 23 Jan 2023 15:05:19 -0800 (PST)
+ 4P15NC0w7cz22PM
+ for <lustre-devel@lists.lustre.org>; Mon, 23 Jan 2023 15:07:23 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 666CC9F1;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 8A60AA1D;
  Mon, 23 Jan 2023 18:00:58 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 6524758987; Mon, 23 Jan 2023 18:00:58 -0500 (EST)
+ id 88FFF5898C; Mon, 23 Jan 2023 18:00:58 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon, 23 Jan 2023 18:00:33 -0500
-Message-Id: <1674514855-15399-21-git-send-email-jsimmons@infradead.org>
+Date: Mon, 23 Jan 2023 18:00:42 -0500
+Message-Id: <1674514855-15399-30-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1674514855-15399-1-git-send-email-jsimmons@infradead.org>
 References: <1674514855-15399-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 20/42] lustre: uapi: remove _GNU_SOURCE
- dependency in lustre_user.h
+Subject: [lustre-devel] [PATCH 29/42] lustre: llite: remove false outdated
+ comment
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,53 +42,48 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lai Siyao <lai.siyao@whamcloud.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Aurelien Degremont <degremoa@amazon.com>
 
-The lustre_user.h header uses the non-standard strchrnul() function
-in userspace.
+Old commit from before Lustre was submitted upstream changed
+ll_i2gids() behavior without updating the function
+documentation accordingly. Fix it as this is confusing.
 
-Implement an alternative approach to avoid external dependencies on
-the lustre_user.h header.
-
-Fixes: 90c2d33680 ("lustre: uapi: avoid gcc-11 -Werror=stringop-overread warning")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16335
-Lustre-commit: efc5c8d4de60d3943 ("LU-16335 build: remove _GNU_SOURCE dependency in lustre_user.h")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/49328
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16438
+Lustre-commit: 557bb0004d7ea1d87 ("LU-16438 llite: remove false outdated comment");
+Signed-off-by: Aurelien Degremont <degremoa@amazon.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/49539
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/uapi/linux/lustre/lustre_user.h | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ fs/lustre/llite/namei.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index a2f46e7f4257..9bbb1c9ab0b9 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -1715,9 +1715,11 @@ static inline __kernel_size_t changelog_rec_snamelen(struct changelog_rec *rec)
- 
- static inline char *changelog_rec_sname(struct changelog_rec *rec)
- {
--	char *cr_name = changelog_rec_name(rec);
-+	char *str = changelog_rec_name(rec);
- 
--	return cr_name + strlen(cr_name) + 1;
-+	while (*str != '\0')
-+		str++;
-+	return str + 1;
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 93abec81896f..f23d3ae49fae 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -518,11 +518,7 @@ u32 ll_i2suppgid(struct inode *i)
+ 		return (u32)(-1);
  }
  
- /**
+-/* Pack the required supplementary groups into the supplied groups array.
+- * If we don't need to use the groups from the target inode(s) then we
+- * instead pack one or more groups from the user's supplementary group
+- * array in case it might be useful.  Not needed if doing an MDS-side upcall.
+- */
++/* Pack the required supplementary groups into the supplied groups array. */
+ void ll_i2gids(u32 *suppgids, struct inode *i1, struct inode *i2)
+ {
+ 	LASSERT(i1);
 -- 
 2.27.0
 
