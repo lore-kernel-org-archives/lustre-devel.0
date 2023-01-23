@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 86206C54EAA
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Jan 2023 23:11:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 2A605C05027
+	for <lustre-devel@archiver.kernel.org>; Mon, 23 Jan 2023 23:12:02 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4P15K16n74z1yC5;
-	Mon, 23 Jan 2023 15:04:37 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4P15KG5Gq5z21BS;
+	Mon, 23 Jan 2023 15:04:50 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4P15G75Pp0z1yD0
- for <lustre-devel@lists.lustre.org>; Mon, 23 Jan 2023 15:02:07 -0800 (PST)
+ 4P15K73jjHz1yCj
+ for <lustre-devel@lists.lustre.org>; Mon, 23 Jan 2023 15:04:43 -0800 (PST)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 3B9AF6D0;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 5ABFD9EA;
  Mon, 23 Jan 2023 18:00:58 -0500 (EST)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 36B2858987; Mon, 23 Jan 2023 18:00:58 -0500 (EST)
+ id 5862358987; Mon, 23 Jan 2023 18:00:58 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon, 23 Jan 2023 18:00:22 -0500
-Message-Id: <1674514855-15399-10-git-send-email-jsimmons@infradead.org>
+Date: Mon, 23 Jan 2023 18:00:30 -0500
+Message-Id: <1674514855-15399-18-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1674514855-15399-1-git-send-email-jsimmons@infradead.org>
 References: <1674514855-15399-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 09/42] lustre: ldebugfs: make job_stats and
- rename_stats valid YAML
+Subject: [lustre-devel] [PATCH 17/42] lustre: misc: rename lprocfs_stats
+ functions
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,199 +42,303 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lei Feng <flei@whamcloud.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Lei Feng <flei@whamcloud.com>
+From: Andreas Dilger <adilger@whamcloud.com>
 
-Adjust the format of job_stats and rename_stats to make
-them valid YAML.  This fixes the output to correctly indent
-the items to follow YAML formatting rules.
+Rename lprocfs_{alloc,register,clear,free}_stats() to be
+lprocfs_stats_*() so these functions can be found more easily
+in relation to struct lprocfs_stats.
 
-Add a test case to verify the format of these params is valid
-YAML to avoid other errors being introduced in the future.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16110
-Lustre-commit: e96cb6ff1fea7a2bc ("LU-16110 lprocfs: make job_stats and rename_stats valid YAML")
-Signed-off-by: Lei Feng <flei@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/48417
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Li Xi <lixi@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16231
+Lustre-commit: 6293a8723d850d72e ("LU-16231 misc: rename lprocfs_stats functions")
+Signed-off-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/48847
+Reviewed-by: Ellis Wilson <elliswilson@microsoft.com>
+Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lprocfs_status.h  |  2 +-
- fs/lustre/llite/lproc_llite.c       |  8 ++++---
- fs/lustre/mdc/lproc_mdc.c           |  3 ++-
- fs/lustre/obdclass/genops.c         |  2 +-
- fs/lustre/obdclass/lprocfs_status.c | 36 ++++++++++++++++++++++-------
- fs/lustre/osc/lproc_osc.c           |  6 +++--
- 6 files changed, 41 insertions(+), 16 deletions(-)
+ fs/lustre/include/lprocfs_status.h  |  6 +++---
+ fs/lustre/ldlm/ldlm_pool.c          |  4 ++--
+ fs/lustre/ldlm/ldlm_resource.c      |  4 ++--
+ fs/lustre/llite/lproc_llite.c       | 14 +++++++-------
+ fs/lustre/obdclass/lprocfs_status.c | 22 +++++++++++-----------
+ fs/lustre/obdclass/lu_object.c      |  5 +++--
+ fs/lustre/ptlrpc/lproc_ptlrpc.c     |  6 +++---
+ 7 files changed, 31 insertions(+), 30 deletions(-)
 
 diff --git a/fs/lustre/include/lprocfs_status.h b/fs/lustre/include/lprocfs_status.h
-index f53125c96683..ef923ae4ca37 100644
+index ef923ae4ca37..c7a6dd71a931 100644
 --- a/fs/lustre/include/lprocfs_status.h
 +++ b/fs/lustre/include/lprocfs_status.h
-@@ -461,7 +461,7 @@ int lprocfs_obd_setup(struct obd_device *obd, bool uuid_only);
- int lprocfs_obd_cleanup(struct obd_device *obd);
- void lprocfs_stats_header(struct seq_file *seq, ktime_t now,
- 			  ktime_t ts_init, int width, const char *colon,
--			  bool show_units);
-+			  bool show_units, const char *prefix);
+@@ -439,9 +439,9 @@ u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
+ 			    enum lprocfs_fields_flags field);
  
- /* Generic callbacks */
- int ldebugfs_uint(struct seq_file *m, void *data);
+ extern struct lprocfs_stats *
+-lprocfs_alloc_stats(unsigned int num, enum lprocfs_stats_flags flags);
+-void lprocfs_clear_stats(struct lprocfs_stats *stats);
+-void lprocfs_free_stats(struct lprocfs_stats **stats);
++lprocfs_stats_alloc(unsigned int num, enum lprocfs_stats_flags flags);
++void lprocfs_stats_clear(struct lprocfs_stats *stats);
++void lprocfs_stats_free(struct lprocfs_stats **stats);
+ int ldebugfs_alloc_md_stats(struct obd_device *obd,
+ 			    unsigned int num_private_stats);
+ void ldebugfs_free_md_stats(struct obd_device *obd);
+diff --git a/fs/lustre/ldlm/ldlm_pool.c b/fs/lustre/ldlm/ldlm_pool.c
+index 8c6491d97f73..f0e629c5dd24 100644
+--- a/fs/lustre/ldlm/ldlm_pool.c
++++ b/fs/lustre/ldlm/ldlm_pool.c
+@@ -597,7 +597,7 @@ static int ldlm_pool_debugfs_init(struct ldlm_pool *pl)
+ 	ldlm_add_var(&pool_vars[0], pl->pl_debugfs_entry, "state", pl,
+ 		     &lprocfs_pool_state_fops);
+ 
+-	pl->pl_stats = lprocfs_alloc_stats(LDLM_POOL_LAST_STAT -
++	pl->pl_stats = lprocfs_stats_alloc(LDLM_POOL_LAST_STAT -
+ 					   LDLM_POOL_FIRST_STAT, 0);
+ 	if (!pl->pl_stats) {
+ 		rc = -ENOMEM;
+@@ -652,7 +652,7 @@ static void ldlm_pool_sysfs_fini(struct ldlm_pool *pl)
+ static void ldlm_pool_debugfs_fini(struct ldlm_pool *pl)
+ {
+ 	if (pl->pl_stats) {
+-		lprocfs_free_stats(&pl->pl_stats);
++		lprocfs_stats_free(&pl->pl_stats);
+ 		pl->pl_stats = NULL;
+ 	}
+ 	debugfs_remove_recursive(pl->pl_debugfs_entry);
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 866f31dfdfa2..98c3e4fb4466 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -430,7 +430,7 @@ static void ldlm_namespace_debugfs_unregister(struct ldlm_namespace *ns)
+ 	debugfs_remove_recursive(ns->ns_debugfs_entry);
+ 
+ 	if (ns->ns_stats)
+-		lprocfs_free_stats(&ns->ns_stats);
++		lprocfs_stats_free(&ns->ns_stats);
+ }
+ 
+ static void ldlm_namespace_sysfs_unregister(struct ldlm_namespace *ns)
+@@ -448,7 +448,7 @@ static int ldlm_namespace_sysfs_register(struct ldlm_namespace *ns)
+ 	err = kobject_init_and_add(&ns->ns_kobj, &ldlm_ns_ktype, NULL,
+ 				   "%s", ldlm_ns_name(ns));
+ 
+-	ns->ns_stats = lprocfs_alloc_stats(LDLM_NSS_LAST, 0);
++	ns->ns_stats = lprocfs_stats_alloc(LDLM_NSS_LAST, 0);
+ 	if (!ns->ns_stats) {
+ 		kobject_put(&ns->ns_kobj);
+ 		return -ENOMEM;
 diff --git a/fs/lustre/llite/lproc_llite.c b/fs/lustre/llite/lproc_llite.c
-index a57d7bb0a848..ef7ca4c67681 100644
+index 7157886c31cc..c4a514aa1e4f 100644
 --- a/fs/lustre/llite/lproc_llite.c
 +++ b/fs/lustre/llite/lproc_llite.c
-@@ -2020,7 +2020,8 @@ static int ll_rw_extents_stats_pp_seq_show(struct seq_file *seq, void *v)
- 	}
+@@ -680,7 +680,7 @@ static ssize_t ll_wr_track_id(struct kobject *kobj, const char *buffer,
+ 		sbi->ll_stats_track_type = STATS_TRACK_ALL;
+ 	else
+ 		sbi->ll_stats_track_type = type;
+-	lprocfs_clear_stats(sbi->ll_stats);
++	lprocfs_stats_clear(sbi->ll_stats);
+ 	return count;
+ }
  
- 	spin_lock(&sbi->ll_pp_extent_lock);
--	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":", 1);
-+	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":",
-+			     true, "");
- 	seq_printf(seq, "%15s %19s       | %20s\n", " ", "read", "write");
- 	seq_printf(seq, "%13s   %14s %4s %4s  | %14s %4s %4s\n",
- 		   "extents", "calls", "%", "cum%", "calls", "%", "cum%");
-@@ -2157,7 +2158,8 @@ static int ll_rw_extents_stats_seq_show(struct seq_file *seq, void *v)
- 	}
+@@ -1885,7 +1885,7 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
+ 			    &ll_rw_offset_stats_fops);
  
- 	spin_lock(&sbi->ll_lock);
--	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":", 1);
-+	lprocfs_stats_header(seq, ktime_get(), rw_extents->pp_init, 25, ":",
-+			     true, "");
+ 	/* File operations stats */
+-	sbi->ll_stats = lprocfs_alloc_stats(LPROC_LL_FILE_OPCODES,
++	sbi->ll_stats = lprocfs_stats_alloc(LPROC_LL_FILE_OPCODES,
+ 					    LPROCFS_STATS_FLAG_NONE);
+ 	if (!sbi->ll_stats) {
+ 		err = -ENOMEM;
+@@ -1902,7 +1902,7 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
+ 	debugfs_create_file("stats", 0644, sbi->ll_debugfs_entry, sbi->ll_stats,
+ 			    &lprocfs_stats_seq_fops);
  
- 	seq_printf(seq, "%15s %19s       | %20s\n", " ", "read", "write");
- 	seq_printf(seq, "%13s   %14s %4s %4s  | %14s %4s %4s\n",
-@@ -2341,7 +2343,7 @@ static int ll_rw_offset_stats_seq_show(struct seq_file *seq, void *v)
- 	}
- 	spin_lock(&sbi->ll_process_lock);
- 	lprocfs_stats_header(seq, ktime_get(), sbi->ll_process_stats_init, 25,
--			     ":", true);
-+			     ":", true, "");
- 	seq_printf(seq, "%3s %10s %14s %14s %17s %17s %14s\n",
- 		   "R/W", "PID", "RANGE START", "RANGE END",
- 		   "SMALLEST EXTENT", "LARGEST EXTENT", "OFFSET");
-diff --git a/fs/lustre/mdc/lproc_mdc.c b/fs/lustre/mdc/lproc_mdc.c
-index cb3744ad9f93..81397a388681 100644
---- a/fs/lustre/mdc/lproc_mdc.c
-+++ b/fs/lustre/mdc/lproc_mdc.c
-@@ -513,7 +513,8 @@ static int mdc_stats_seq_show(struct seq_file *seq, void *v)
- 	struct obd_device *obd = seq->private;
- 	struct osc_stats *stats = &obd2osc_dev(obd)->od_stats;
+-	sbi->ll_ra_stats = lprocfs_alloc_stats(ARRAY_SIZE(ra_stat_string),
++	sbi->ll_ra_stats = lprocfs_stats_alloc(ARRAY_SIZE(ra_stat_string),
+ 					       LPROCFS_STATS_FLAG_NONE);
+ 	if (!sbi->ll_ra_stats) {
+ 		err = -ENOMEM;
+@@ -1933,9 +1933,9 @@ int ll_debugfs_register_super(struct super_block *sb, const char *name)
+ 	return 0;
  
--	lprocfs_stats_header(seq, ktime_get(), stats->os_init, 25, ":", true);
-+	lprocfs_stats_header(seq, ktime_get(), stats->os_init, 25, ":", true,
-+			     "");
- 	seq_printf(seq, "lockless_write_bytes\t\t%llu\n",
- 		   stats->os_lockless_writes);
- 	seq_printf(seq, "lockless_read_bytes\t\t%llu\n",
-diff --git a/fs/lustre/obdclass/genops.c b/fs/lustre/obdclass/genops.c
-index 6e4d2402efee..a20b119f9c37 100644
---- a/fs/lustre/obdclass/genops.c
-+++ b/fs/lustre/obdclass/genops.c
-@@ -1448,7 +1448,7 @@ int obd_mod_rpc_stats_seq_show(struct client_obd *cli, struct seq_file *seq)
+ out_ra_stats:
+-	lprocfs_free_stats(&sbi->ll_ra_stats);
++	lprocfs_stats_free(&sbi->ll_ra_stats);
+ out_stats:
+-	lprocfs_free_stats(&sbi->ll_stats);
++	lprocfs_stats_free(&sbi->ll_stats);
+ out_debugfs:
+ 	debugfs_remove_recursive(sbi->ll_debugfs_entry);
  
- 	spin_lock_irq(&cli->cl_mod_rpcs_waitq.lock);
- 	lprocfs_stats_header(seq, ktime_get(), cli->cl_mod_rpcs_init, 25,
--			     ":", true);
-+			     ":", true, "");
- 	seq_printf(seq, "modify_RPCs_in_flight:  %hu\n",
- 		   cli->cl_mod_rpcs_in_flight);
+@@ -1962,8 +1962,8 @@ void ll_debugfs_unregister_super(struct super_block *sb)
+ 	kset_unregister(&sbi->ll_kset);
+ 	wait_for_completion(&sbi->ll_kobj_unregister);
  
+-	lprocfs_free_stats(&sbi->ll_ra_stats);
+-	lprocfs_free_stats(&sbi->ll_stats);
++	lprocfs_stats_free(&sbi->ll_ra_stats);
++	lprocfs_stats_free(&sbi->ll_stats);
+ }
+ 
+ static void ll_display_extents_info(struct ll_rw_extents_info *rw_extents,
 diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
-index 01b8132087d6..edc576d5f957 100644
+index 5e4ad7c227b1..0d669f4dde15 100644
 --- a/fs/lustre/obdclass/lprocfs_status.c
 +++ b/fs/lustre/obdclass/lprocfs_status.c
-@@ -1373,21 +1373,40 @@ static void *lprocfs_stats_seq_next(struct seq_file *p, void *v, loff_t *pos)
- 	return lprocfs_stats_seq_start(p, pos);
+@@ -1205,7 +1205,7 @@ int lprocfs_stats_alloc_one(struct lprocfs_stats *stats, unsigned int cpuid)
+ 	return rc;
  }
  
-+/**
-+ * print header of stats including snapshot_time, start_time and elapsed_time.
-+ *
-+ * @seq		the file to print content to
-+ * @now		end time to calculate elapsed_time
-+ * @ts_init		start time to calculate elapsed_time
-+ * @width		the width of key to align them well
-+ * @colon		"" or ":"
-+ * @show_units		show units or not
-+ * @prefix		prefix (indent) before printing each line of header
-+ *			to align them with other content
-+ */
- void lprocfs_stats_header(struct seq_file *seq, ktime_t now, ktime_t ts_init,
--			  int width, const char *colon, bool show_units)
-+			  int width, const char *colon, bool show_units,
-+			  const char *prefix)
+-struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
++struct lprocfs_stats *lprocfs_stats_alloc(unsigned int num,
+ 					  enum lprocfs_stats_flags flags)
  {
- 	const char *units = show_units ? " secs.nsecs" : "";
- 	struct timespec64 ts;
-+	const char *field;
+ 	struct lprocfs_stats *stats;
+@@ -1259,12 +1259,12 @@ struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
+ 	return stats;
  
-+	field = (colon && colon[0]) ? "snapshot_time:" : "snapshot_time";
- 	ts = ktime_to_timespec64(now);
--	seq_printf(seq, "%-*s%s %llu.%09lu%s\n", width,
--		   "snapshot_time", colon, (s64)ts.tv_sec, ts.tv_nsec, units);
-+	seq_printf(seq, "%s%-*s %llu.%09lu%s\n", prefix, width, field,
-+		   (s64)ts.tv_sec, ts.tv_nsec, units);
-+
-+	field = (colon && colon[0]) ? "start_time:" : "start_time";
- 	ts = ktime_to_timespec64(ts_init);
--	seq_printf(seq, "%-*s%s %llu.%09lu%s\n", width,
--		   "start_time", colon, (s64)ts.tv_sec, ts.tv_nsec, units);
-+	seq_printf(seq, "%s%-*s %llu.%09lu%s\n", prefix, width, field,
-+		   (s64)ts.tv_sec, ts.tv_nsec, units);
-+
-+	field = (colon && colon[0]) ? "elapsed_time:" : "elapsed_time";
- 	ts = ktime_to_timespec64(ktime_sub(now, ts_init));
--	seq_printf(seq, "%-*s%s %llu.%09lu%s\n", width,
--		   "elapsed_time", colon, (s64)ts.tv_sec, ts.tv_nsec, units);
-+	seq_printf(seq, "%s%-*s %llu.%09lu%s\n", prefix, width, field,
-+		   (s64)ts.tv_sec, ts.tv_nsec, units);
+ fail:
+-	lprocfs_free_stats(&stats);
++	lprocfs_stats_free(&stats);
+ 	return NULL;
  }
- EXPORT_SYMBOL(lprocfs_stats_header);
+-EXPORT_SYMBOL(lprocfs_alloc_stats);
++EXPORT_SYMBOL(lprocfs_stats_alloc);
  
-@@ -1400,7 +1419,8 @@ static int lprocfs_stats_seq_show(struct seq_file *p, void *v)
- 	int idx = *(loff_t *)v;
+-void lprocfs_free_stats(struct lprocfs_stats **statsh)
++void lprocfs_stats_free(struct lprocfs_stats **statsh)
+ {
+ 	struct lprocfs_stats *stats = *statsh;
+ 	unsigned int num_entry;
+@@ -1286,7 +1286,7 @@ void lprocfs_free_stats(struct lprocfs_stats **statsh)
+ 	kvfree(stats->ls_cnt_header);
+ 	kvfree(stats);
+ }
+-EXPORT_SYMBOL(lprocfs_free_stats);
++EXPORT_SYMBOL(lprocfs_stats_free);
  
- 	if (idx == 0)
--		lprocfs_stats_header(p, ktime_get(), stats->ls_init, 25, "", 1);
-+		lprocfs_stats_header(p, ktime_get(), stats->ls_init, 25, "",
-+				     true, "");
+ u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
+ 			      enum lprocfs_fields_flags field)
+@@ -1312,12 +1312,12 @@ u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
+ }
+ EXPORT_SYMBOL(lprocfs_stats_collector);
  
- 	hdr = &stats->ls_cnt_header[idx];
- 	lprocfs_stats_collect(stats, idx, &ctr);
-diff --git a/fs/lustre/osc/lproc_osc.c b/fs/lustre/osc/lproc_osc.c
-index 54b86d17eb78..c4b1e3e4e2cc 100644
---- a/fs/lustre/osc/lproc_osc.c
-+++ b/fs/lustre/osc/lproc_osc.c
-@@ -702,7 +702,8 @@ static int osc_rpc_stats_seq_show(struct seq_file *seq, void *v)
+-void lprocfs_clear_stats(struct lprocfs_stats *stats)
++void lprocfs_stats_clear(struct lprocfs_stats *stats)
+ {
+ 	struct lprocfs_counter *percpu_cntr;
+-	int i, j;
+ 	unsigned int num_entry;
+ 	unsigned long flags = 0;
++	int i, j;
  
- 	spin_lock(&cli->cl_loi_list_lock);
+ 	num_entry = lprocfs_stats_lock(stats, LPROCFS_GET_NUM_CPU, &flags);
  
--	lprocfs_stats_header(seq, ktime_get(), cli->cl_stats_init, 25, ":", 1);
-+	lprocfs_stats_header(seq, ktime_get(), cli->cl_stats_init, 25, ":",
-+			     true, "");
- 	seq_printf(seq, "read RPCs in flight:  %d\n",
- 		   cli->cl_r_in_flight);
- 	seq_printf(seq, "write RPCs in flight: %d\n",
-@@ -814,7 +815,8 @@ static int osc_stats_seq_show(struct seq_file *seq, void *v)
- 	struct obd_device *obd = seq->private;
- 	struct osc_stats *stats = &obd2osc_dev(obd)->od_stats;
+@@ -1347,7 +1347,7 @@ void lprocfs_clear_stats(struct lprocfs_stats *stats)
  
--	lprocfs_stats_header(seq, ktime_get(), stats->os_init, 25, ":", true);
-+	lprocfs_stats_header(seq, ktime_get(), stats->os_init, 25, ":", true,
-+			     "");
- 	seq_printf(seq, "lockless_write_bytes\t\t%llu\n",
- 		   stats->os_lockless_writes);
- 	seq_printf(seq, "lockless_read_bytes\t\t%llu\n",
+ 	lprocfs_stats_unlock(stats, LPROCFS_GET_NUM_CPU, &flags);
+ }
+-EXPORT_SYMBOL(lprocfs_clear_stats);
++EXPORT_SYMBOL(lprocfs_stats_clear);
+ 
+ static ssize_t lprocfs_stats_seq_write(struct file *file,
+ 				       const char __user *buf,
+@@ -1356,7 +1356,7 @@ static ssize_t lprocfs_stats_seq_write(struct file *file,
+ 	struct seq_file *seq = file->private_data;
+ 	struct lprocfs_stats *stats = seq->private;
+ 
+-	lprocfs_clear_stats(stats);
++	lprocfs_stats_clear(stats);
+ 
+ 	return len;
+ }
+@@ -1601,7 +1601,7 @@ int ldebugfs_alloc_md_stats(struct obd_device *obd,
+ 		return -EINVAL;
+ 
+ 	num_stats = ARRAY_SIZE(mps_stats) + num_private_stats;
+-	stats = lprocfs_alloc_stats(num_stats, 0);
++	stats = lprocfs_stats_alloc(num_stats, 0);
+ 	if (!stats)
+ 		return -ENOMEM;
+ 
+@@ -1630,7 +1630,7 @@ void ldebugfs_free_md_stats(struct obd_device *obd)
+ 		return;
+ 
+ 	obd->obd_md_stats = NULL;
+-	lprocfs_free_stats(&stats);
++	lprocfs_stats_free(&stats);
+ }
+ EXPORT_SYMBOL(ldebugfs_free_md_stats);
+ 
+diff --git a/fs/lustre/obdclass/lu_object.c b/fs/lustre/obdclass/lu_object.c
+index 7ecd0c4faee7..468dd43b6151 100644
+--- a/fs/lustre/obdclass/lu_object.c
++++ b/fs/lustre/obdclass/lu_object.c
+@@ -1091,7 +1091,7 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
+ 		init_waitqueue_head(&bkt->lsb_waitq);
+ 	}
+ 
+-	s->ls_stats = lprocfs_alloc_stats(LU_SS_LAST_STAT, 0);
++	s->ls_stats = lprocfs_stats_alloc(LU_SS_LAST_STAT, 0);
+ 	if (!s->ls_stats) {
+ 		kvfree(s->ls_bkts);
+ 		s->ls_bkts = NULL;
+@@ -1147,7 +1147,7 @@ void lu_site_fini(struct lu_site *s)
+ 	}
+ 
+ 	if (s->ls_stats)
+-		lprocfs_free_stats(&s->ls_stats);
++		lprocfs_stats_free(&s->ls_stats);
+ }
+ EXPORT_SYMBOL(lu_site_fini);
+ 
+@@ -1163,6 +1163,7 @@ int lu_site_init_finish(struct lu_site *s)
+ 	if (result == 0)
+ 		list_add(&s->ls_linkage, &lu_sites);
+ 	up_write(&lu_sites_guard);
++
+ 	return result;
+ }
+ EXPORT_SYMBOL(lu_site_init_finish);
+diff --git a/fs/lustre/ptlrpc/lproc_ptlrpc.c b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+index 603259dcd3eb..e0b85bd9f74e 100644
+--- a/fs/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/fs/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -198,7 +198,7 @@ ptlrpc_ldebugfs_register(struct dentry *root, char *dir,
+ 	LASSERT(!*debugfs_root_ret);
+ 	LASSERT(!*stats_ret);
+ 
+-	svc_stats = lprocfs_alloc_stats(EXTRA_MAX_OPCODES + LUSTRE_MAX_OPCODES,
++	svc_stats = lprocfs_stats_alloc(EXTRA_MAX_OPCODES + LUSTRE_MAX_OPCODES,
+ 					0);
+ 	if (!svc_stats)
+ 		return;
+@@ -1257,7 +1257,7 @@ void ptlrpc_lprocfs_unregister_service(struct ptlrpc_service *svc)
+ 	debugfs_remove_recursive(svc->srv_debugfs_entry);
+ 
+ 	if (svc->srv_stats)
+-		lprocfs_free_stats(&svc->srv_stats);
++		lprocfs_stats_free(&svc->srv_stats);
+ }
+ 
+ void ptlrpc_lprocfs_unregister_obd(struct obd_device *obd)
+@@ -1269,7 +1269,7 @@ void ptlrpc_lprocfs_unregister_obd(struct obd_device *obd)
+ 	debugfs_remove_recursive(obd->obd_svc_debugfs_entry);
+ 
+ 	if (obd->obd_svc_stats)
+-		lprocfs_free_stats(&obd->obd_svc_stats);
++		lprocfs_stats_free(&obd->obd_svc_stats);
+ }
+ EXPORT_SYMBOL(ptlrpc_lprocfs_unregister_obd);
+ 
 -- 
 2.27.0
 
