@@ -2,31 +2,32 @@ Return-Path: <lustre-devel-bounces@lists.lustre.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B06FC77B70
-	for <lustre-devel@archiver.kernel.org>; Sun,  9 Apr 2023 12:42:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67EC0C77B61
+	for <lustre-devel@archiver.kernel.org>; Sun,  9 Apr 2023 12:42:11 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PvWV96PHRz22Yl;
-	Sun,  9 Apr 2023 05:23:29 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PvWVC6wGHz22Yp;
+	Sun,  9 Apr 2023 05:23:31 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4PvWQ00kPKz22S6
- for <lustre-devel@lists.lustre.org>; Sun,  9 Apr 2023 05:19:52 -0700 (PDT)
+ 4PvWS62n1tz1yGl
+ for <lustre-devel@lists.lustre.org>; Sun,  9 Apr 2023 05:21:42 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 57C75100848E;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 608AE1008490;
  Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 55FEB2AB; Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
+ id 5F5262B3; Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  9 Apr 2023 08:13:12 -0400
-Message-Id: <1681042400-15491-33-git-send-email-jsimmons@infradead.org>
+Date: Sun,  9 Apr 2023 08:13:14 -0400
+Message-Id: <1681042400-15491-35-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1681042400-15491-1-git-send-email-jsimmons@infradead.org>
 References: <1681042400-15491-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 32/40] lustre: ptlrpc: fix clang build errors
+Subject: [lustre-devel] [PATCH 34/40] lnet: add 'force' option to lnetctl
+ peer del
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -39,113 +40,133 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Serguei Smirnov <ssmirnov@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Timothy Day <timday@amazon.com>
+From: Serguei Smirnov <ssmirnov@whamcloud.com>
 
-Fixed bugs which cause errors on Clang.
+Add --force option to 'lnetctl peer del' command.
+If the peer has primary NID locked, this option allows
+for the peer to be deleted manually:
+  lnetctl peer del --prim_nid <nid> --force
 
-The majority of changes involve adding
-defines for the 'ptlrpc_nrs_ctl' enum.
-This avoids having to explicitly cast
-enums from one type to another.
+Add --prim_lock option to 'lnetctl peer add' command.
+If specified, the primary NID of the peer is locked
+such that it is going to be the NID used to identify
+the peer in communications with Lustre layer.
 
-A 'strlcpy' in 'sptlrpc_process_config'
-was copying the wrong number of bytes.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16518
-Lustre-commit: 50f28f81b5aa8f8ad ("LU-16518 ptlrpc: fix clang build errors")
-Signed-off-by: Timothy Day <timday@amazon.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/49859
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: jsimmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14668
+Lustre-commit: f1b2d8d60c593a670 ("LU-14668 lnet: add 'force' option to lnetctl peer del")
+Signed-off-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50149
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_nrs.h       | 11 ++++++++++-
- fs/lustre/include/lustre_nrs_delay.h | 14 ++++++--------
- fs/lustre/ptlrpc/nrs_delay.c         |  2 +-
- fs/lustre/ptlrpc/sec_config.c        |  2 +-
- 4 files changed, 18 insertions(+), 11 deletions(-)
+ include/linux/lnet/lib-lnet.h      |  6 ++++--
+ include/uapi/linux/lnet/lnet-dlc.h |  4 +++-
+ net/lnet/lnet/api-ni.c             |  6 ++++--
+ net/lnet/lnet/peer.c               | 12 ++++++++----
+ 4 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_nrs.h b/fs/lustre/include/lustre_nrs.h
-index 7e0a840..0e0dd73 100644
---- a/fs/lustre/include/lustre_nrs.h
-+++ b/fs/lustre/include/lustre_nrs.h
-@@ -64,7 +64,16 @@ enum ptlrpc_nrs_ctl {
- 	 * Policies can start using opcodes from this value and onwards for
- 	 * their own purposes; the assigned value itself is arbitrary.
- 	 */
--	PTLRPC_NRS_CTL_1ST_POL_SPEC = 0x20,
-+	PTLRPC_NRS_CTL_POL_SPEC_01 = 0x20,
-+	PTLRPC_NRS_CTL_POL_SPEC_02,
-+	PTLRPC_NRS_CTL_POL_SPEC_03,
-+	PTLRPC_NRS_CTL_POL_SPEC_04,
-+	PTLRPC_NRS_CTL_POL_SPEC_05,
-+	PTLRPC_NRS_CTL_POL_SPEC_06,
-+	PTLRPC_NRS_CTL_POL_SPEC_07,
-+	PTLRPC_NRS_CTL_POL_SPEC_08,
-+	PTLRPC_NRS_CTL_POL_SPEC_09,
-+	PTLRPC_NRS_CTL_POL_SPEC_10
- };
+diff --git a/include/linux/lnet/lib-lnet.h b/include/linux/lnet/lib-lnet.h
+index a8aa924..e26e150 100644
+--- a/include/linux/lnet/lib-lnet.h
++++ b/include/linux/lnet/lib-lnet.h
+@@ -953,8 +953,10 @@ bool lnet_peer_is_pref_rtr_locked(struct lnet_peer_ni *lpni,
+ int lnet_peer_add_pref_rtr(struct lnet_peer_ni *lpni, struct lnet_nid *nid);
+ int lnet_peer_ni_set_non_mr_pref_nid(struct lnet_peer_ni *lpni,
+ 				     struct lnet_nid *nid);
+-int lnet_user_add_peer_ni(struct lnet_nid *key_nid, struct lnet_nid *nid, bool mr);
+-int lnet_del_peer_ni(struct lnet_nid *key_nid, struct lnet_nid *nid);
++int lnet_user_add_peer_ni(struct lnet_nid *key_nid, struct lnet_nid *nid,
++			  bool mr, bool lock_prim);
++int lnet_del_peer_ni(struct lnet_nid *key_nid, struct lnet_nid *nid,
++		     int force);
+ int lnet_get_peer_info(struct lnet_ioctl_peer_cfg *cfg, void __user *bulk);
+ int lnet_get_peer_ni_info(u32 peer_index, u64 *nid,
+ 			  char alivness[LNET_MAX_STR_LEN],
+diff --git a/include/uapi/linux/lnet/lnet-dlc.h b/include/uapi/linux/lnet/lnet-dlc.h
+index 63578a0..fc1d40c 100644
+--- a/include/uapi/linux/lnet/lnet-dlc.h
++++ b/include/uapi/linux/lnet/lnet-dlc.h
+@@ -298,7 +298,9 @@ struct lnet_ioctl_peer_cfg {
+ 	struct libcfs_ioctl_hdr prcfg_hdr;
+ 	lnet_nid_t prcfg_prim_nid;
+ 	lnet_nid_t prcfg_cfg_nid;
+-	__u32 prcfg_count;
++	__u32 prcfg_count;	/* ADD_PEER_NI: used for 'lock_prim' option
++				 * DEL_PEER_NI: used for 'force' option
++				 */
+ 	__u32 prcfg_mr;
+ 	__u32 prcfg_state;
+ 	__u32 prcfg_size;
+diff --git a/net/lnet/lnet/api-ni.c b/net/lnet/lnet/api-ni.c
+index 20093a9..9095d4e 100644
+--- a/net/lnet/lnet/api-ni.c
++++ b/net/lnet/lnet/api-ni.c
+@@ -4239,7 +4239,8 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		mutex_lock(&the_lnet.ln_api_mutex);
+ 		lnet_nid4_to_nid(cfg->prcfg_prim_nid, &prim_nid);
+ 		lnet_nid4_to_nid(cfg->prcfg_cfg_nid, &nid);
+-		rc = lnet_user_add_peer_ni(&prim_nid, &nid, cfg->prcfg_mr);
++		rc = lnet_user_add_peer_ni(&prim_nid, &nid, cfg->prcfg_mr,
++					   cfg->prcfg_count == 1);
+ 		mutex_unlock(&the_lnet.ln_api_mutex);
+ 		return rc;
+ 	}
+@@ -4255,7 +4256,8 @@ u32 lnet_get_dlc_seq_locked(void)
+ 		lnet_nid4_to_nid(cfg->prcfg_prim_nid, &prim_nid);
+ 		lnet_nid4_to_nid(cfg->prcfg_cfg_nid, &nid);
+ 		rc = lnet_del_peer_ni(&prim_nid,
+-				      &nid);
++				      &nid,
++				      cfg->prcfg_count);
+ 		mutex_unlock(&the_lnet.ln_api_mutex);
+ 		return rc;
+ 	}
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index 0a5e73a..619973b 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -1978,9 +1978,12 @@ struct lnet_peer_net *
+ 	return lnet_peer_add_nid(lp, nid, flags);
+ }
  
- /**
-diff --git a/fs/lustre/include/lustre_nrs_delay.h b/fs/lustre/include/lustre_nrs_delay.h
-index 52c3885..75bf56d 100644
---- a/fs/lustre/include/lustre_nrs_delay.h
-+++ b/fs/lustre/include/lustre_nrs_delay.h
-@@ -73,14 +73,12 @@ struct nrs_delay_req {
- 	time64_t	req_start_time;
- };
+-int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid, bool mr)
++int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid,
++			  bool mr, bool lock_prim)
+ {
+-	return lnet_add_peer_ni(prim_nid, nid, mr, LNET_PEER_CONFIGURED);
++	int fl = LNET_PEER_CONFIGURED | (LNET_PEER_LOCK_PRIMARY * lock_prim);
++
++	return lnet_add_peer_ni(prim_nid, nid, mr, fl);
+ }
  
--enum nrs_ctl_delay {
--	NRS_CTL_DELAY_RD_MIN = PTLRPC_NRS_CTL_1ST_POL_SPEC,
--	NRS_CTL_DELAY_WR_MIN,
--	NRS_CTL_DELAY_RD_MAX,
--	NRS_CTL_DELAY_WR_MAX,
--	NRS_CTL_DELAY_RD_PCT,
--	NRS_CTL_DELAY_WR_PCT,
--};
-+#define NRS_CTL_DELAY_RD_MIN PTLRPC_NRS_CTL_POL_SPEC_01
-+#define NRS_CTL_DELAY_WR_MIN PTLRPC_NRS_CTL_POL_SPEC_02
-+#define NRS_CTL_DELAY_RD_MAX PTLRPC_NRS_CTL_POL_SPEC_03
-+#define NRS_CTL_DELAY_WR_MAX PTLRPC_NRS_CTL_POL_SPEC_04
-+#define NRS_CTL_DELAY_RD_PCT PTLRPC_NRS_CTL_POL_SPEC_05
-+#define NRS_CTL_DELAY_WR_PCT PTLRPC_NRS_CTL_POL_SPEC_06
+ static int
+@@ -2029,7 +2032,8 @@ int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid, bool
+  * being modified/deleted by a different thread.
+  */
+ int
+-lnet_del_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid)
++lnet_del_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid,
++		 int force)
+ {
+ 	struct lnet_peer *lp;
+ 	struct lnet_peer_ni *lpni;
+@@ -2061,7 +2065,7 @@ int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid, bool
+ 	lnet_net_unlock(LNET_LOCK_EX);
  
- /** @} delay */
- 
-diff --git a/fs/lustre/ptlrpc/nrs_delay.c b/fs/lustre/ptlrpc/nrs_delay.c
-index 127f00c..b249749 100644
---- a/fs/lustre/ptlrpc/nrs_delay.c
-+++ b/fs/lustre/ptlrpc/nrs_delay.c
-@@ -322,7 +322,7 @@ static int nrs_delay_ctl(struct ptlrpc_nrs_policy *policy,
- 
- 	assert_spin_locked(&policy->pol_nrs->nrs_lock);
- 
--	switch ((enum nrs_ctl_delay)opc) {
-+	switch (opc) {
- 	default:
- 		return -EINVAL;
- 
-diff --git a/fs/lustre/ptlrpc/sec_config.c b/fs/lustre/ptlrpc/sec_config.c
-index e0ddebd..1b56ef4 100644
---- a/fs/lustre/ptlrpc/sec_config.c
-+++ b/fs/lustre/ptlrpc/sec_config.c
-@@ -649,7 +649,7 @@ int sptlrpc_process_config(struct lustre_cfg *lcfg)
- 	 *	is a actual filesystem.
- 	 */
- 	if (server_name2fsname(target, fsname, NULL))
--		strlcpy(fsname, target, sizeof(target));
-+		strlcpy(fsname, target, sizeof(fsname));
- 
- 	rc = sptlrpc_parse_rule(param, &rule);
- 	if (rc)
+ 	if (LNET_NID_IS_ANY(nid) || nid_same(nid, &lp->lp_primary_nid)) {
+-		if (lp->lp_state & LNET_PEER_LOCK_PRIMARY) {
++		if (!force && lp->lp_state & LNET_PEER_LOCK_PRIMARY) {
+ 			CERROR("peer %s created by Lustre. Must preserve primary NID, but will remove other NIDs\n",
+ 			       libcfs_nidstr(&lp->lp_primary_nid));
+ 			return lnet_reset_peer(lp);
 -- 
 1.8.3.1
 
