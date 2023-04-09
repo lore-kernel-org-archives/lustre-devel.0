@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 31B7FC77B70
-	for <lustre-devel@archiver.kernel.org>; Sun,  9 Apr 2023 12:38:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 4A4F2C77B61
+	for <lustre-devel@archiver.kernel.org>; Sun,  9 Apr 2023 12:39:05 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PvWRW0QtXz22VH;
-	Sun,  9 Apr 2023 05:21:09 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PvWRm6jGHz22Vc;
+	Sun,  9 Apr 2023 05:21:24 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4PvWLb3MTRz1yD0
- for <lustre-devel@lists.lustre.org>; Sun,  9 Apr 2023 05:16:55 -0700 (PDT)
+ 4PvWNc3dykz22Q0
+ for <lustre-devel@lists.lustre.org>; Sun,  9 Apr 2023 05:18:40 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 2CDD51008485;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 49352100848B;
  Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id 2B5102AB; Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
+ id 47B482AB; Sun,  9 Apr 2023 08:13:28 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  9 Apr 2023 08:13:03 -0400
-Message-Id: <1681042400-15491-24-git-send-email-jsimmons@infradead.org>
+Date: Sun,  9 Apr 2023 08:13:09 -0400
+Message-Id: <1681042400-15491-30-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1681042400-15491-1-git-send-email-jsimmons@infradead.org>
 References: <1681042400-15491-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 23/40] lustre: llite: replace lld_nfs_dentry
- flag with opencache handling
+Subject: [lustre-devel] [PATCH 29/40] lnet: don't delete peer created by
+ Lustre
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -42,209 +42,99 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Amir Shehata <ashehata@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-The lld_nfs_dentry flag was created for the case of caching the
-open lock (opencache) when fetching fhandles for NFSv3. This same
-path is used by the fhandle APIs. This lighter open changes key
-behaviors since the open lock is always cached which we don't
-want. Lustre introduced a way to modify caching the open lock
-based on the number of opens done on a file within a certain
-span of time. We can replace lld_nfs_dentry flag with the
-new open lock caching. This way for fhandle handling we match
-the open lock caching behavior of a normal file open.
+From: Amir Shehata <ashehata@whamcloud.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16463
-Lustre-commit: d7a85652f4fcb8319 ("LU-16463 llite: replace lld_nfs_dentry flag with opencache handling")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/49237
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Etienne AUJAMES <eaujames@ddn.com>
+Peers created by Lustre have their primary NIDs locked.
+If that peer is deleted, it'll confuse lustre. So when manually
+deleting a peer using:
+   lnetctl peer del --prim_nid ...
+We must continue to preserve the primary NID. Therefore we delete
+all the constituent NIDs, but keep the primary NID. We then
+flag the peer for rediscovery.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-14668
+Lustre-commit: 7cc5b4329fc2eecbf ("LU-14668 lnet: don't delete peer created by Lustre")
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/43565
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Serguei Smirnov <ssmirnov@whamcloud.com>
+Reviewed-by: Cyril Bordage <cbordage@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/file.c           | 26 ++++++++------------------
- fs/lustre/llite/llite_internal.h | 13 +++++++------
- fs/lustre/llite/llite_nfs.c      | 15 +--------------
- fs/lustre/llite/namei.c          |  8 +++++++-
- fs/lustre/llite/super25.c        |  2 ++
- 5 files changed, 25 insertions(+), 39 deletions(-)
+ net/lnet/lnet/peer.c | 45 +++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 43 insertions(+), 2 deletions(-)
 
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index a9d247c..fb8ede2 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -916,7 +916,7 @@ int ll_file_open(struct inode *inode, struct file *file)
- 		if (!it->it_disposition) {
- 			struct dentry *dentry = file_dentry(file);
- 			struct ll_sb_info *sbi = ll_i2sbi(inode);
--			struct ll_dentry_data *ldd;
-+			int open_threshold = sbi->ll_oc_thrsh_count;
+diff --git a/net/lnet/lnet/peer.c b/net/lnet/lnet/peer.c
+index fa2ca54..0a5e73a 100644
+--- a/net/lnet/lnet/peer.c
++++ b/net/lnet/lnet/peer.c
+@@ -1983,6 +1983,40 @@ int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid, bool
+ 	return lnet_add_peer_ni(prim_nid, nid, mr, LNET_PEER_CONFIGURED);
+ }
  
- 			/* We cannot just request lock handle now, new ELC code
- 			 * means that one of other OPEN locks for this file
-@@ -927,22 +927,20 @@ int ll_file_open(struct inode *inode, struct file *file)
- 			mutex_unlock(&lli->lli_och_mutex);
- 			/*
- 			 * Normally called under two situations:
--			 * 1. NFS export.
-+			 * 1. fhandle / NFS export.
- 			 * 2. A race/condition on MDS resulting in no open
- 			 *    handle to be returned from LOOKUP|OPEN request,
- 			 *    for example if the target entry was a symlink.
- 			 *
--			 * In NFS path we know there's pathologic behavior
--			 * so we always enable open lock caching when coming
--			 * from there. It's detected by setting a flag in
--			 * ll_iget_for_nfs.
--			 *
- 			 * After reaching number of opens of this inode
- 			 * we always ask for an open lock on it to handle
- 			 * bad userspace actors that open and close files
- 			 * in a loop for absolutely no good reason
- 			 */
--			ldd = ll_d2d(dentry);
-+			/* fhandle / NFS path. */
-+			if (lli->lli_open_thrsh_count != UINT_MAX)
-+				open_threshold = lli->lli_open_thrsh_count;
++static int
++lnet_reset_peer(struct lnet_peer *lp)
++{
++	struct lnet_peer_net *lpn, *lpntmp;
++	struct lnet_peer_ni *lpni, *lpnitmp;
++	unsigned int flags;
++	int rc;
 +
- 			if (filename_is_volatile(dentry->d_name.name,
- 						 dentry->d_name.len,
- 						 NULL)) {
-@@ -951,17 +949,9 @@ int ll_file_open(struct inode *inode, struct file *file)
- 				 * We do not want openlock for volatile
- 				 * files under any circumstances
- 				 */
--			} else if (ldd && ldd->lld_nfs_dentry) {
--				/* NFS path. This also happens to catch
--				 * open by fh files I guess
--				 */
--				it->it_flags |= MDS_OPEN_LOCK;
--				/* clear the flag for future lookups */
--				ldd->lld_nfs_dentry = 0;
--			} else if (sbi->ll_oc_thrsh_count > 0) {
-+			} else if (open_threshold > 0) {
- 				/* Take MDS_OPEN_LOCK with many opens */
--				if (lli->lli_open_fd_count >=
--				    sbi->ll_oc_thrsh_count)
-+				if (lli->lli_open_fd_count >= open_threshold)
- 					it->it_flags |= MDS_OPEN_LOCK;
- 
- 				/* If this is open after we just closed */
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index 6bbc781..cdfc75e 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -72,7 +72,6 @@
- struct ll_dentry_data {
- 	unsigned int			lld_sa_generation;
- 	unsigned int			lld_invalid:1;
--	unsigned int			lld_nfs_dentry:1;
- 	struct rcu_head			lld_rcu_head;
- };
- 
-@@ -145,11 +144,6 @@ struct ll_inode_info {
- 	u64				lli_open_fd_write_count;
- 	u64				lli_open_fd_exec_count;
- 
--	/* Number of times this inode was opened */
--	u64				lli_open_fd_count;
--	/* When last close was performed on this inode */
--	ktime_t				lli_close_fd_time;
--
- 	/* Protects access to och pointers and their usage counters */
- 	struct mutex			lli_och_mutex;
- 
-@@ -162,6 +156,13 @@ struct ll_inode_info {
- 	s64				lli_btime;
- 	spinlock_t			lli_agl_lock;
- 
-+	/* inode specific open lock caching threshold */
-+	u32				lli_open_thrsh_count;
-+	/* Number of times this inode was opened */
-+	u64				lli_open_fd_count;
-+	/* When last close was performed on this inode */
-+	ktime_t				lli_close_fd_time;
++	lnet_peer_cancel_discovery(lp);
 +
- 	/* Try to make the d::member and f::member are aligned. Before using
- 	 * these members, make clear whether it is directory or not.
- 	 */
-diff --git a/fs/lustre/llite/llite_nfs.c b/fs/lustre/llite/llite_nfs.c
-index 3c4c9ef..232b2b3 100644
---- a/fs/lustre/llite/llite_nfs.c
-+++ b/fs/lustre/llite/llite_nfs.c
-@@ -114,7 +114,6 @@ struct inode *search_inode_for_lustre(struct super_block *sb,
- 		struct lu_fid *fid, struct lu_fid *parent)
- {
- 	struct inode *inode;
--	struct dentry *result;
- 
- 	if (!fid_is_sane(fid))
- 		return ERR_PTR(-ESTALE);
-@@ -131,19 +130,7 @@ struct inode *search_inode_for_lustre(struct super_block *sb,
- 		return ERR_PTR(-ESTALE);
++	flags = LNET_PEER_CONFIGURED;
++	if (lp->lp_state & LNET_PEER_MULTI_RAIL)
++		flags |= LNET_PEER_MULTI_RAIL;
++
++	list_for_each_entry_safe(lpn, lpntmp, &lp->lp_peer_nets, lpn_peer_nets) {
++		list_for_each_entry_safe(lpni, lpnitmp, &lpn->lpn_peer_nis,
++					 lpni_peer_nis) {
++			if (nid_same(&lpni->lpni_nid, &lp->lp_primary_nid))
++				continue;
++
++			rc = lnet_peer_del_nid(lp, &lpni->lpni_nid, flags);
++			if (rc) {
++				CERROR("Failed to delete %s from peer %s\n",
++				       libcfs_nidstr(&lpni->lpni_nid),
++				       libcfs_nidstr(&lp->lp_primary_nid));
++			}
++		}
++	}
++
++	/* mark it for discovery the next time we use it */
++	lp->lp_state &= ~LNET_PEER_NIDS_UPTODATE;
++	return 0;
++}
++
+ /*
+  * Implementation of IOC_LIBCFS_DEL_PEER_NI.
+  *
+@@ -2026,8 +2060,15 @@ int lnet_user_add_peer_ni(struct lnet_nid *prim_nid, struct lnet_nid *nid, bool
  	}
+ 	lnet_net_unlock(LNET_LOCK_EX);
  
--	result = d_obtain_alias(inode);
--	if (IS_ERR(result))
--		return result;
--
--	/*
--	 * Need to signal to the ll_intent_file_open that
--	 * we came from NFS and so opencache needs to be
--	 * enabled for this one
--	 */
--	spin_lock(&result->d_lock);
--	ll_d2d(result)->lld_nfs_dentry = 1;
--	spin_unlock(&result->d_lock);
--	return result;
-+	return d_obtain_alias(inode);
- }
+-	if (LNET_NID_IS_ANY(nid) || nid_same(nid, &lp->lp_primary_nid))
+-		return lnet_peer_del(lp);
++	if (LNET_NID_IS_ANY(nid) || nid_same(nid, &lp->lp_primary_nid)) {
++		if (lp->lp_state & LNET_PEER_LOCK_PRIMARY) {
++			CERROR("peer %s created by Lustre. Must preserve primary NID, but will remove other NIDs\n",
++			       libcfs_nidstr(&lp->lp_primary_nid));
++			return lnet_reset_peer(lp);
++		} else {
++			return lnet_peer_del(lp);
++		}
++	}
  
- /**
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 9314a17..ada539e 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -1144,6 +1144,7 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
- 	struct ll_sb_info *sbi = NULL;
- 	struct pcc_create_attach pca = { NULL, NULL };
- 	bool encrypt = false;
-+	int open_threshold;
- 	int rc = 0;
- 
- 	CDEBUG(D_VFSTRACE,
-@@ -1224,7 +1225,12 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
- 	 * we only need to request open lock if it was requested
- 	 * for every open
- 	 */
--	if (ll_i2sbi(dir)->ll_oc_thrsh_count == 1 &&
-+	if (ll_i2info(dir)->lli_open_thrsh_count != UINT_MAX)
-+		open_threshold = ll_i2info(dir)->lli_open_thrsh_count;
-+	else
-+		open_threshold = ll_i2sbi(dir)->ll_oc_thrsh_count;
-+
-+	if (open_threshold == 1 &&
- 	    exp_connect_flags2(ll_i2mdexp(dir)) &
- 	    OBD_CONNECT2_ATOMIC_OPEN_LOCK)
- 		it->it_flags |= MDS_OPEN_LOCK;
-diff --git a/fs/lustre/llite/super25.c b/fs/lustre/llite/super25.c
-index 5349a25..50272a7 100644
---- a/fs/lustre/llite/super25.c
-+++ b/fs/lustre/llite/super25.c
-@@ -55,6 +55,8 @@ static struct inode *ll_alloc_inode(struct super_block *sb)
- 		return NULL;
- 
- 	inode_init_once(&lli->lli_vfs_inode);
-+	lli->lli_open_thrsh_count = UINT_MAX;
-+
- 	return &lli->lli_vfs_inode;
- }
- 
+ 	flags = LNET_PEER_CONFIGURED;
+ 	if (lp->lp_state & LNET_PEER_MULTI_RAIL)
 -- 
 1.8.3.1
 
