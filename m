@@ -4,56 +4,30 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 286C5C6FD1D
-	for <lustre-devel@archiver.kernel.org>; Mon, 20 Mar 2023 15:15:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id BE6D7C77B70
+	for <lustre-devel@archiver.kernel.org>; Sun,  9 Apr 2023 12:13:52 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PgJF76Kx7z1yDk;
-	Mon, 20 Mar 2023 08:14:51 -0700 (PDT)
-Received: from mail-yw1-f180.google.com (mail-yw1-f180.google.com
- [209.85.128.180])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4PvWGh1CXXz1y6F;
+	Sun,  9 Apr 2023 05:13:32 -0700 (PDT)
+Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4PgJ4j4gH4z1yD2
- for <lustre-devel@lists.lustre.org>; Mon, 20 Mar 2023 08:07:33 -0700 (PDT)
-Received: by mail-yw1-f180.google.com with SMTP id
- 00721157ae682-5447d217bc6so229256447b3.7
- for <lustre-devel@lists.lustre.org>; Mon, 20 Mar 2023 08:07:33 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20210112; t=1679324846;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=3tTU+x7jqjENzGTDKZKox3KlYTmAVikdEp64EH4lJI8=;
- b=HoD8pRU4mwFILWqJ11DOxQjdivtQsN/vNCaG1+DS4Tij8NTi1rcR6DVAdf5BLVmKNn
- Y1XENo2p0GE98V6C385g/ubwbKLu1phvCpFiLIBBPl+/QBjio/+mm7qALfh4Jj7XqtOJ
- fo8nGgypvFmXoUcFmt5R3K89jFs7zZXG2W21iNhBn1PwlQ23nV1QV0J8vou7T696OWN2
- MkYUl6swVq/iI6v7QkMDhXutZ9H9Ls2sq8Fwufjjf1pHMTN09nCUplWk85qcPYIepi+B
- jVjhKvRVrHHRdJhkvhbC0fwGYsEPmxPV5dAwU+TXN/lsDPpxFyIcePwYsMz7pHWqvAAS
- E56Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20210112; t=1679324846;
- h=to:subject:message-id:date:from:mime-version:x-gm-message-state
- :from:to:cc:subject:date:message-id:reply-to;
- bh=3tTU+x7jqjENzGTDKZKox3KlYTmAVikdEp64EH4lJI8=;
- b=K5IkFRYLPIXoK+c8nzDGkuTrMwmfocDUw+kv0yn5mw8TQm0TwO15zQD76eguUHLgX8
- C5ZPooNiRIgf85O4Lv7rmVZyGgN7kyPQ5dF2Jm58sqYMCYV0zR2TnYR19xyQXqMaCfnL
- JYkgkNB6UzNmfgEQPTdSltKIb73r7A3ThMNgqRn5QzY4iGzNOs0X4aJM7kzKCU/rTjhX
- hrQUqIoxxGZg9cgmEeUW7c8MqOtbb6+ezB2dQ5H1BoK7sX9SNBpOUU8axo3JYQGTqbQq
- z7AXTacVad3FDQ5zMnGrLDE5xoZyy1aJX+xP9iOAfsjmkrS6yBvqeUfSFKltY6K5LuBO
- MQJw==
-X-Gm-Message-State: AO0yUKVq6FxRnPgGyDvPcAo9p4HhUl5WJJ6PfHPzsVBggqtx5DHSp0Ou
- WIJ+fiVi1dRYX4Z7ifYYJFsaDomyryhZcOwIDLdiK4jTRkA=
-X-Google-Smtp-Source: AK7set+XWQjNIUIphUc4xnW3Snsh2D7g0iFiih2WMcJ3RuV1E+spKk65RB81TZK6GWFf4oO74ID0lB84PmO7KotVq/M=
-X-Received: by 2002:a81:ae22:0:b0:533:9185:fc2c with SMTP id
- m34-20020a81ae22000000b005339185fc2cmr10519481ywh.7.1679324845219; Mon, 20
- Mar 2023 08:07:25 -0700 (PDT)
-MIME-Version: 1.0
-Date: Mon, 20 Mar 2023 09:07:14 -0600
-Message-ID: <CAGfFL-yyvYfBieOVAr-ge9UxJedFWnq9zvnPA+t5baV8KDhYgw@mail.gmail.com>
-To: Lustre Developement <lustre-devel@lists.lustre.org>
-X-Mailman-Approved-At: Mon, 20 Mar 2023 08:14:39 -0700
-Subject: [lustre-devel] Fwd: MSST 2023 Agenda and Registration
+ 4PvWGd12JGz1wY2
+ for <lustre-devel@lists.lustre.org>; Sun,  9 Apr 2023 05:13:29 -0700 (PDT)
+Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id C53B31008269;
+ Sun,  9 Apr 2023 08:13:27 -0400 (EDT)
+Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
+ id B456E2AB; Sun,  9 Apr 2023 08:13:27 -0400 (EDT)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Sun,  9 Apr 2023 08:12:40 -0400
+Message-Id: <1681042400-15491-1-git-send-email-jsimmons@infradead.org>
+X-Mailer: git-send-email 1.8.3.1
+Subject: [lustre-devel] [PATCH 00/40] lustre: backport OpenSFS changes from
+ March XX, 2023
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -66,102 +40,183 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: John Bent via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: John Bent <johnbent@gmail.com>
-Content-Type: multipart/mixed; boundary="===============7760316386850801097=="
+Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7760316386850801097==
-Content-Type: multipart/alternative; boundary="000000000000dca4f705f7564853"
+Merge in the patches landed to the OpenSFS tree.
 
---000000000000dca4f705f7564853
-Content-Type: text/plain; charset="UTF-8"
+Alex Deiter (1):
+  lustre: enc: file names encryption when using secure boot
 
-All,
+Amir Shehata (2):
+  lnet: Lock primary NID logic
+  lnet: don't delete peer created by Lustre
 
-Please see below for information about the upcoming MSST in May. In
-addition to many other excellent talks, Oleg Drokin from Whamcloud will be
-discussing the Lustre write-back cache.
+Andreas Dilger (1):
+  lustre: tgt: skip free inodes in OST weights
 
-From: MSST-Conference <msst-conference-bounces@six.pairlist.net> on behalf
-of: Sam Coleman <SamC@Webstart.com>
-Date: Saturday, Mar 18, 2023 at 3:48 PM
-To: msst-conference@six.pairlist.net <msst-conference@six.pairlist.net>
-Subject: [EXTERNAL] MSST 2023 Agenda and Registration
+Andrew Perepechko (2):
+  lustre: lov: fiemap improperly handles fm_extent_count=0
+  lustre: llite: SIGBUS is possible on a race with page reclaim
 
-MSST folks,
+Andriy Skulysh (1):
+  lustre: osc: page fault in osc_release_bounce_pages()
 
-The MSST Planning Committee is excited to publish the agenda for the
-upcoming 2023 MSST Conference, to take place during the week of May 22,
-2023 at Santa Clara University. There will be four tutorials on Monday May
-22 about file systems and metadata. The Invited Track runs on Tuesday May
-23 and Wednesday May 24. Introduced by Erik Reidel's keynote about data's
-impact on the environment, it includes twenty two talks from across the
-industry, grouped into eight sessions. Several panels are planned and
-breaks are provided to encourage the hallway conversations which have also
-been a proud part of the MSST tradition. There is a mix of talks, ranging
-from production systems to highly speculative research, and a few broader
-perspective type analyses.
+Aurelien Degremont (2):
+  lustre: llite: fix relatime support
+  lustre: ptlrpc: clarify AT error message
 
-The program details can be found at our regular web site:
-https://storageconference.us
+Chris Horn (3):
+  lnet: Peers added via kernel API should be permanent
+  lnet: memory leak in copy_ioc_udsp_descr
+  lnet: lnet_parse_route uses wrong loop var
 
-Registration is open at:  https://commerce.cashnet.com/MSST23
+Cyril Bordage (2):
+  lnet: o2iblnd: Fix key mismatch issue
+  lnet: remove crash with UDSP
 
-Also, please reach out to the committee at any time with questions or
-feedback, through our contact page:
+Etienne AUJAMES (1):
+  lustre: llog: fix processing of a wrapped catalog
 
-https://storageconference.us/contact.html
+Hongchao Zhang (1):
+  lustre: quota: fix insane grant quota
 
-We hope to see you in Santa Clara!
+James Simmons (1):
+  lustre: llite: replace lld_nfs_dentry flag with opencache handling
 
-Sam
+Lai Siyao (2):
+  lustre: llite: match lock in corresponding namespace
+  lustre: uapi: add DMV_IMP_INHERIT connect flag
 
---000000000000dca4f705f7564853
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Li Dongyang (1):
+  lustre: fid: clean up OBIF_MAX_OID and IDIF_MAX_OID
 
-<div dir=3D"ltr">All,<div><br></div><div>Please see below for information a=
-bout the upcoming MSST in May. In addition to many other excellent talks, O=
-leg Drokin from Whamcloud will be discussing the Lustre write-back cache.</=
-div><div><br></div><div>From: MSST-Conference &lt;<a href=3D"mailto:msst-co=
-nference-bounces@six.pairlist.net">msst-conference-bounces@six.pairlist.net=
-</a>&gt; on behalf of: Sam Coleman &lt;SamC@Webstart.com&gt;<br>Date: Satur=
-day, Mar 18, 2023 at 3:48 PM<br>To: <a href=3D"mailto:msst-conference@six.p=
-airlist.net">msst-conference@six.pairlist.net</a> &lt;<a href=3D"mailto:mss=
-t-conference@six.pairlist.net">msst-conference@six.pairlist.net</a>&gt;<br>=
-Subject: [EXTERNAL] MSST 2023 Agenda and Registration<br><br>MSST folks,<br=
-><br>The MSST Planning Committee is excited to publish the agenda for the u=
-pcoming 2023 MSST Conference, to take place during the week of May 22, 2023=
- at Santa Clara University. There will be four tutorials on Monday May 22 a=
-bout file systems and metadata. The Invited Track runs on Tuesday May 23 an=
-d Wednesday May 24. Introduced by Erik Reidel&#39;s keynote about data&#39;=
-s impact on the environment, it includes twenty two talks from across the i=
-ndustry, grouped into eight sessions. Several panels are planned and breaks=
- are provided to encourage the hallway conversations which have also been a=
- proud part of the MSST tradition. There is a mix of talks, ranging from pr=
-oduction systems to highly speculative research, and a few broader perspect=
-ive type analyses.<br><br>The program details can be found at our regular w=
-eb site: =C2=A0<a href=3D"https://storageconference.us">https://storageconf=
-erence.us</a><br><br>Registration is open at: =C2=A0<a href=3D"https://comm=
-erce.cashnet.com/MSST23">https://commerce.cashnet.com/MSST23</a><br><br>Als=
-o, please reach out to the committee at any time with questions or feedback=
-, through our contact page: <br><br><a href=3D"https://storageconference.us=
-/contact.html">https://storageconference.us/contact.html</a><br><br>We hope=
- to see you in Santa Clara!<br><br>Sam<br></div></div>
+Mikhail Pershin (1):
+  lustre: client: -o network needs add_conn processing
 
---000000000000dca4f705f7564853--
+Mr NeilBrown (1):
+  lustre: ldlm: remove client_import_find_conn()
 
---===============7760316386850801097==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Oleg Drokin (1):
+  lustre: update version to 2.15.54
+
+Patrick Farrell (1):
+  lustre: clio: Remove cl_page_size()
+
+Qian Yingjin (4):
+  lustre: protocol: basic batching processing framework
+  lustre: readahead: add stats for read-ahead page count
+  lustre: llite: check truncated page in ->readpage()
+  lustre: llite: check read page past requested
+
+Sebastien Buisson (4):
+  lustre: enc: align Base64 encoding with RFC 4648 base64url
+  lustre: sec: fid2path for encrypted files
+  lustre: sec: Lustre/HSM on enc file with enc key
+  lustre: fileset: check fileset for operations by fid
+
+Sergey Cheremencev (2):
+  lustre: quota: enforce project quota for root
+  lustre: tgt: add qos debug
+
+Serguei Smirnov (1):
+  lnet: add 'force' option to lnetctl peer del
+
+Timothy Day (2):
+  lnet: libcfs: remove unused hash code
+  lustre: ptlrpc: fix clang build errors
+
+Vitaly Fertman (2):
+  lustre: ldlm: BL_AST lock cancel still can be batched
+  lustre: llite: dir layout inheritance fixes
+
+Yang Sheng (1):
+  lustre: ldlm: send the cancel RPC asap
+
+ fs/lustre/include/cl_object.h            |   1 -
+ fs/lustre/include/lu_object.h            |  14 +-
+ fs/lustre/include/lustre_crypto.h        |   3 +
+ fs/lustre/include/lustre_disk.h          |   3 +-
+ fs/lustre/include/lustre_export.h        |   5 +
+ fs/lustre/include/lustre_fid.h           |   6 +-
+ fs/lustre/include/lustre_import.h        |   1 +
+ fs/lustre/include/lustre_log.h           |  16 +
+ fs/lustre/include/lustre_net.h           |  45 ++-
+ fs/lustre/include/lustre_nrs.h           |  11 +-
+ fs/lustre/include/lustre_nrs_delay.h     |  14 +-
+ fs/lustre/include/lustre_req_layout.h    |  28 +-
+ fs/lustre/include/lustre_swab.h          |   3 +
+ fs/lustre/include/obd.h                  |  86 ++++-
+ fs/lustre/include/obd_class.h            |  48 +++
+ fs/lustre/include/obd_support.h          |   7 +-
+ fs/lustre/ldlm/ldlm_lib.c                |  44 +--
+ fs/lustre/ldlm/ldlm_lockd.c              |   8 +-
+ fs/lustre/ldlm/ldlm_request.c            | 122 +++++--
+ fs/lustre/llite/crypto.c                 |  35 +-
+ fs/lustre/llite/dir.c                    | 122 +++++--
+ fs/lustre/llite/file.c                   | 262 ++++++++++++--
+ fs/lustre/llite/llite_internal.h         |  44 ++-
+ fs/lustre/llite/llite_lib.c              |  10 +-
+ fs/lustre/llite/llite_mmap.c             |  19 +
+ fs/lustre/llite/llite_nfs.c              |  15 +-
+ fs/lustre/llite/lproc_llite.c            |  65 +++-
+ fs/lustre/llite/namei.c                  |  25 +-
+ fs/lustre/llite/rw.c                     | 105 +++++-
+ fs/lustre/llite/rw26.c                   |  16 +-
+ fs/lustre/llite/super25.c                |   2 +
+ fs/lustre/llite/vvp_io.c                 |  12 +-
+ fs/lustre/llite/vvp_page.c               |  37 ++
+ fs/lustre/lmv/lmv_internal.h             |  12 +
+ fs/lustre/lmv/lmv_obd.c                  | 267 ++++++++++++--
+ fs/lustre/lov/lov_object.c               |   7 +-
+ fs/lustre/lov/lov_page.c                 |   2 +-
+ fs/lustre/mdc/Makefile                   |   2 +-
+ fs/lustre/mdc/mdc_batch.c                |  62 ++++
+ fs/lustre/mdc/mdc_internal.h             |   3 +
+ fs/lustre/mdc/mdc_request.c              |  14 +-
+ fs/lustre/obdclass/cl_page.c             |  24 --
+ fs/lustre/obdclass/llog.c                |  21 +-
+ fs/lustre/obdclass/llog_cat.c            | 128 ++++---
+ fs/lustre/obdclass/lu_tgt_descs.c        |  52 +--
+ fs/lustre/obdclass/obd_config.c          |  17 -
+ fs/lustre/osc/osc_cache.c                |   2 +-
+ fs/lustre/osc/osc_quota.c                |   1 +
+ fs/lustre/osc/osc_request.c              |   3 +
+ fs/lustre/ptlrpc/Makefile                |   2 +-
+ fs/lustre/ptlrpc/batch.c                 | 588 +++++++++++++++++++++++++++++++
+ fs/lustre/ptlrpc/client.c                |  25 ++
+ fs/lustre/ptlrpc/layout.c                | 126 ++++++-
+ fs/lustre/ptlrpc/lproc_ptlrpc.c          |   1 +
+ fs/lustre/ptlrpc/nrs_delay.c             |   2 +-
+ fs/lustre/ptlrpc/pack_generic.c          |  27 +-
+ fs/lustre/ptlrpc/sec_config.c            |   2 +-
+ fs/lustre/ptlrpc/service.c               |  11 +-
+ fs/lustre/ptlrpc/wiretest.c              |  14 +-
+ include/linux/libcfs/libcfs_hash.h       |  18 -
+ include/linux/lnet/lib-lnet.h            |   7 +-
+ include/uapi/linux/lnet/lnet-dlc.h       |   4 +-
+ include/uapi/linux/lustre/lustre_idl.h   |  96 ++++-
+ include/uapi/linux/lustre/lustre_ostid.h |   4 +-
+ include/uapi/linux/lustre/lustre_user.h  |   1 +
+ include/uapi/linux/lustre/lustre_ver.h   |   4 +-
+ net/lnet/klnds/o2iblnd/o2iblnd.c         |   5 +-
+ net/lnet/klnds/o2iblnd/o2iblnd_cb.c      |  17 +-
+ net/lnet/lnet/api-ni.c                   |   6 +-
+ net/lnet/lnet/config.c                   |   2 +-
+ net/lnet/lnet/peer.c                     | 191 +++++++---
+ net/lnet/lnet/udsp.c                     |  36 +-
+ 72 files changed, 2526 insertions(+), 514 deletions(-)
+ create mode 100644 fs/lustre/mdc/mdc_batch.c
+ create mode 100644 fs/lustre/ptlrpc/batch.c
+
+-- 
+1.8.3.1
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============7760316386850801097==--
