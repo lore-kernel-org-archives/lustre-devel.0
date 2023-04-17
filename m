@@ -4,32 +4,32 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 1A9BFC77B70
-	for <lustre-devel@archiver.kernel.org>; Mon, 17 Apr 2023 14:12:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id D6F84C77B76
+	for <lustre-devel@archiver.kernel.org>; Mon, 17 Apr 2023 14:13:58 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Q0T7W6K51z22Vv;
-	Mon, 17 Apr 2023 06:54:31 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Q0T7j4HkCz1yG6;
+	Mon, 17 Apr 2023 06:54:41 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Q0T2G44w1z21HF
- for <lustre-devel@lists.lustre.org>; Mon, 17 Apr 2023 06:49:58 -0700 (PDT)
+ 4Q0T2c18Hsz21Hy
+ for <lustre-devel@lists.lustre.org>; Mon, 17 Apr 2023 06:50:16 -0700 (PDT)
 Received: from star.ccs.ornl.gov (star.ccs.ornl.gov [160.91.202.134])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id B2E231008498;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id BCAC1100849A;
  Mon, 17 Apr 2023 09:47:24 -0400 (EDT)
 Received: by star.ccs.ornl.gov (Postfix, from userid 2004)
- id B1BD9372; Mon, 17 Apr 2023 09:47:24 -0400 (EDT)
+ id BB4C6379; Mon, 17 Apr 2023 09:47:24 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Mon, 17 Apr 2023 09:47:18 -0400
-Message-Id: <1681739243-29375-23-git-send-email-jsimmons@infradead.org>
+Date: Mon, 17 Apr 2023 09:47:20 -0400
+Message-Id: <1681739243-29375-25-git-send-email-jsimmons@infradead.org>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1681739243-29375-1-git-send-email-jsimmons@infradead.org>
 References: <1681739243-29375-1-git-send-email-jsimmons@infradead.org>
-Subject: [lustre-devel] [PATCH 22/27] lustre: obdclass: change
- class_add/check_uuid to large nid
+Subject: [lustre-devel] [PATCH 24/27] lustre: llite: only first sync to MDS
+ matter
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -49,196 +49,108 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-class_add_uuid() and class_check_uuid() are changed to take
-a struct lnet_nid* rather than a u64 (aka lnet_nid_t).
+fsync() is supposed to sync metadata and data, but given file's
+layout the only first MDS_SYNC matters to ensure the file creation
+has been committed, everything else go to OSTs (data and attributes)
+also, uid/gid/mode, EAs and ACLs must be subject to sync.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10391
-Lustre-commit: 16d84b030520c431da ("LU-10391 obdclass: change class_add/check_uuid to large nid")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50086
-Reviewed-by: jsimmons <jsimmons@infradead.org>
-Reviewed-by: Frank Sehr <fsehr@whamcloud.com>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11404
+Lustre-commit: 1c8a49bedff2746775 ("LU-11404 llite: only first sync to MDS matter")
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/33175
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Mikhail Pershin <mpershin@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/obd_class.h    |  4 ++--
- fs/lustre/ldlm/ldlm_lib.c        | 13 +++++++++----
- fs/lustre/obdclass/lustre_peer.c | 24 ++++++++++--------------
- fs/lustre/obdclass/obd_config.c  |  5 +++--
- 4 files changed, 24 insertions(+), 22 deletions(-)
+ fs/lustre/llite/acl.c            |  2 ++
+ fs/lustre/llite/file.c           | 19 ++++++++++++++-----
+ fs/lustre/llite/llite_internal.h |  1 +
+ fs/lustre/llite/llite_lib.c      |  1 +
+ fs/lustre/llite/xattr.c          |  1 +
+ 5 files changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/fs/lustre/include/obd_class.h b/fs/lustre/include/obd_class.h
-index 0c95c3c..f77fd12 100644
---- a/fs/lustre/include/obd_class.h
-+++ b/fs/lustre/include/obd_class.h
-@@ -1742,11 +1742,11 @@ struct lwp_register_item {
- /* lustre_peer.c    */
- int lustre_uuid_to_peer(const char *uuid, struct lnet_nid *peer_nid,
- 			int index);
--int class_add_uuid(const char *uuid, u64 nid);
-+int class_add_uuid(const char *uuid, struct lnet_nid *nid);
- int class_del_uuid(const char *uuid);
- int class_add_nids_to_uuid(struct obd_uuid *uuid, lnet_nid_t *nids,
- 			   int nid_count);
--int class_check_uuid(struct obd_uuid *uuid, u64 nid);
-+int class_check_uuid(struct obd_uuid *uuid, struct lnet_nid *nid);
+diff --git a/fs/lustre/llite/acl.c b/fs/lustre/llite/acl.c
+index bd045cc..91a7421 100644
+--- a/fs/lustre/llite/acl.c
++++ b/fs/lustre/llite/acl.c
+@@ -94,6 +94,8 @@ int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
+ 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
+ 			 value ? OBD_MD_FLXATTR : OBD_MD_FLXATTRRM,
+ 			 name, value, value_size, 0, 0, &req);
++	if (!rc)
++		ll_i2info(inode)->lli_synced_to_mds = false;
  
- /* class_obd.c */
- extern char obd_jobid_name[];
-diff --git a/fs/lustre/ldlm/ldlm_lib.c b/fs/lustre/ldlm/ldlm_lib.c
-index b1ce0d4..4f9cf5f 100644
---- a/fs/lustre/ldlm/ldlm_lib.c
-+++ b/fs/lustre/ldlm/ldlm_lib.c
-@@ -141,16 +141,18 @@ int client_import_add_conn(struct obd_import *imp, struct obd_uuid *uuid,
- EXPORT_SYMBOL(client_import_add_conn);
- 
- int client_import_dyn_add_conn(struct obd_import *imp, struct obd_uuid *uuid,
--			       lnet_nid_t prim_nid, int priority)
-+			       lnet_nid_t prim_nid4, int priority)
- {
- 	struct ptlrpc_connection *ptlrpc_conn;
-+	struct lnet_nid prim_nid;
- 	int rc;
- 
--	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, LNET_NIDNET(prim_nid));
-+	lnet_nid4_to_nid(prim_nid4, &prim_nid);
-+	ptlrpc_conn = ptlrpc_uuid_to_connection(uuid, LNET_NID_NET(&prim_nid));
- 	if (!ptlrpc_conn) {
- 		const char *str_uuid = obd_uuid2str(uuid);
- 
--		rc = class_add_uuid(str_uuid, prim_nid);
-+		rc = class_add_uuid(str_uuid, &prim_nid);
- 		if (rc) {
- 			CERROR("%s: failed to add UUID '%s': rc = %d\n",
- 			       imp->imp_obd->obd_name, str_uuid, rc);
-@@ -172,7 +174,10 @@ int client_import_add_nids_to_conn(struct obd_import *imp, lnet_nid_t *nids,
- 
- 	spin_lock(&imp->imp_lock);
- 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
--		if (class_check_uuid(&conn->oic_uuid, nids[0])) {
-+		struct lnet_nid nid;
-+
-+		lnet_nid4_to_nid(nids[0], &nid);
-+		if (class_check_uuid(&conn->oic_uuid, &nid)) {
- 			*uuid = conn->oic_uuid;
- 			spin_unlock(&imp->imp_lock);
- 			rc = class_add_nids_to_uuid(&conn->oic_uuid, nids,
-diff --git a/fs/lustre/obdclass/lustre_peer.c b/fs/lustre/obdclass/lustre_peer.c
-index 2049c41..aae69d3 100644
---- a/fs/lustre/obdclass/lustre_peer.c
-+++ b/fs/lustre/obdclass/lustre_peer.c
-@@ -77,15 +77,13 @@ int lustre_uuid_to_peer(const char *uuid, struct lnet_nid *peer_nid, int index)
- /* Add a nid to a niduuid.  Multiple nids can be added to a single uuid;
-  * LNET will choose the best one.
-  */
--int class_add_uuid(const char *uuid, lnet_nid_t nid4)
-+int class_add_uuid(const char *uuid, struct lnet_nid *nid)
- {
- 	struct uuid_nid_data *data, *entry;
--	struct lnet_nid nid;
- 	int found = 0;
- 	int rc;
- 
--	LASSERT(nid4 != 0);  /* valid newconfig NID is never zero */
--	lnet_nid4_to_nid(nid4, &nid);
-+	LASSERT(nid->nid_type != 0);  /* valid newconfig NID is never zero */
- 
- 	if (strlen(uuid) > UUID_MAX - 1)
- 		return -EOVERFLOW;
-@@ -95,7 +93,7 @@ int class_add_uuid(const char *uuid, lnet_nid_t nid4)
- 		return -ENOMEM;
- 
- 	obd_str2uuid(&data->un_uuid, uuid);
--	data->un_nids[0] = nid;
-+	data->un_nids[0] = *nid;
- 	data->un_nid_count = 1;
- 
- 	spin_lock(&g_uuid_lock);
-@@ -105,12 +103,12 @@ int class_add_uuid(const char *uuid, lnet_nid_t nid4)
- 
- 			found = 1;
- 			for (i = 0; i < entry->un_nid_count; i++)
--				if (nid_same(&nid, &entry->un_nids[i]))
-+				if (nid_same(nid, &entry->un_nids[i]))
- 					break;
- 
- 			if (i == entry->un_nid_count) {
- 				LASSERT(entry->un_nid_count < MTI_NIDS_MAX);
--				entry->un_nids[entry->un_nid_count++] = nid;
-+				entry->un_nids[entry->un_nid_count++] = *nid;
- 			}
- 			break;
+ 	ptlrpc_req_finished(req);
+ out_value:
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index ceac08c..0186db4 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -4758,11 +4758,20 @@ int ll_fsync(struct file *file, loff_t start, loff_t end, int datasync)
  		}
-@@ -121,13 +119,13 @@ int class_add_uuid(const char *uuid, lnet_nid_t nid4)
- 
- 	if (found) {
- 		CDEBUG(D_INFO, "found uuid %s %s cnt=%d\n", uuid,
--		       libcfs_nidstr(&nid), entry->un_nid_count);
-+		       libcfs_nidstr(nid), entry->un_nid_count);
- 		rc = LNetAddPeer(entry->un_nids, entry->un_nid_count);
- 		CDEBUG(D_INFO, "Add peer %s rc = %d\n",
- 		       libcfs_nidstr(&data->un_nids[0]), rc);
- 		kfree(data);
- 	} else {
--		CDEBUG(D_INFO, "add uuid %s %s\n", uuid, libcfs_nidstr(&nid));
-+		CDEBUG(D_INFO, "add uuid %s %s\n", uuid, libcfs_nidstr(nid));
- 		rc = LNetAddPeer(data->un_nids, data->un_nid_count);
- 		CDEBUG(D_INFO, "Add peer %s rc = %d\n",
- 		       libcfs_nidstr(&data->un_nids[0]), rc);
-@@ -218,15 +216,13 @@ int class_add_nids_to_uuid(struct obd_uuid *uuid, lnet_nid_t *nids,
- EXPORT_SYMBOL(class_add_nids_to_uuid);
- 
- /* check if @nid exists in nid list of @uuid */
--int class_check_uuid(struct obd_uuid *uuid, lnet_nid_t nid4)
-+int class_check_uuid(struct obd_uuid *uuid, struct lnet_nid *nid)
- {
- 	struct uuid_nid_data *entry;
--	struct lnet_nid nid;
- 	int found = 0;
- 
--	lnet_nid4_to_nid(nid4, &nid);
- 	CDEBUG(D_INFO, "check if uuid %s has %s.\n",
--	       obd_uuid2str(uuid), libcfs_nidstr(&nid));
-+	       obd_uuid2str(uuid), libcfs_nidstr(nid));
- 
- 	spin_lock(&g_uuid_lock);
- 	list_for_each_entry(entry, &g_uuid_list, un_list) {
-@@ -237,7 +233,7 @@ int class_check_uuid(struct obd_uuid *uuid, lnet_nid_t nid4)
- 
- 		/* found the uuid, check if it has @nid */
- 		for (i = 0; i < entry->un_nid_count; i++) {
--			if (nid_same(&entry->un_nids[i], &nid)) {
-+			if (nid_same(&entry->un_nids[i], nid)) {
- 				found = 1;
- 				break;
- 			}
-diff --git a/fs/lustre/obdclass/obd_config.c b/fs/lustre/obdclass/obd_config.c
-index f2173df..81021e1 100644
---- a/fs/lustre/obdclass/obd_config.c
-+++ b/fs/lustre/obdclass/obd_config.c
-@@ -822,6 +822,7 @@ static int process_param2_config(struct lustre_cfg *lcfg)
- int class_process_config(struct lustre_cfg *lcfg)
- {
- 	struct obd_device *obd;
-+	struct lnet_nid nid;
- 	int err;
- 
- 	LASSERT(lcfg && !IS_ERR(lcfg));
-@@ -839,8 +840,8 @@ int class_process_config(struct lustre_cfg *lcfg)
- 		       lustre_cfg_string(lcfg, 1), lcfg->lcfg_nid,
- 		       libcfs_nid2str(lcfg->lcfg_nid));
- 
--		err = class_add_uuid(lustre_cfg_string(lcfg, 1),
--				     lcfg->lcfg_nid);
-+		lnet_nid4_to_nid(lcfg->lcfg_nid, &nid);
-+		err = class_add_uuid(lustre_cfg_string(lcfg, 1), &nid);
- 		goto out;
  	}
- 	case LCFG_DEL_UUID: {
+ 
+-	err = md_fsync(ll_i2sbi(inode)->ll_md_exp, ll_inode2fid(inode), &req);
+-	if (!rc)
+-		rc = err;
+-	if (!err)
+-		ptlrpc_req_finished(req);
++	if (S_ISREG(inode->i_mode) && !lli->lli_synced_to_mds) {
++		/*
++		 * only the first sync on MDS makes sense,
++		 * everything else is stored on OSTs
++		 */
++		err = md_fsync(ll_i2sbi(inode)->ll_md_exp,
++			       ll_inode2fid(inode), &req);
++		if (!rc)
++			rc = err;
++		if (!err) {
++			lli->lli_synced_to_mds = true;
++			ptlrpc_req_finished(req);
++		}
++	}
+ 
+ 	if (S_ISREG(inode->i_mode)) {
+ 		struct ll_file_data *fd = file->private_data;
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index 6590399..129c817 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -155,6 +155,7 @@ struct ll_inode_info {
+ 	s64				lli_ctime;
+ 	s64				lli_btime;
+ 	spinlock_t			lli_agl_lock;
++	bool				lli_synced_to_mds;
+ 
+ 	/* inode specific open lock caching threshold */
+ 	u32				lli_open_thrsh_count;
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index c54ca1f..002e870 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -2181,6 +2181,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
+ 	rc = ll_md_setattr(dentry, op_data);
+ 	if (rc)
+ 		goto out;
++	lli->lli_synced_to_mds = false;
+ 
+ 	if (!S_ISREG(inode->i_mode) || hsm_import) {
+ 		rc = 0;
+diff --git a/fs/lustre/llite/xattr.c b/fs/lustre/llite/xattr.c
+index c90f501..ceaad60 100644
+--- a/fs/lustre/llite/xattr.c
++++ b/fs/lustre/llite/xattr.c
+@@ -160,6 +160,7 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
+ 		}
+ 		return rc;
+ 	}
++	ll_i2info(inode)->lli_synced_to_mds = false;
+ 
+ 	ptlrpc_req_finished(req);
+ 
 -- 
 1.8.3.1
 
