@@ -4,44 +4,48 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id A03F9C001B0
-	for <lustre-devel@archiver.kernel.org>; Mon, 24 Jul 2023 08:04:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 15BE3EC8748
+	for <lustre-devel@archiver.kernel.org>; Fri,  8 Sep 2023 12:01:35 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4R8XkM0MsLz1yDC;
-	Mon, 24 Jul 2023 01:04:27 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Rhvnq5hZLz1yDn;
+	Fri,  8 Sep 2023 05:00:47 -0700 (PDT)
 Received: from sainfoin-smtp-out.extra.cea.fr (sainfoin-smtp-out.extra.cea.fr
  [132.167.192.228])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4R8Xk84n4zz1wX7
- for <lustre-devel@lists.lustre.org>; Mon, 24 Jul 2023 01:04:16 -0700 (PDT)
+ 4RhvnQ09LXz1wZL
+ for <lustre-devel@lists.lustre.org>; Fri,  8 Sep 2023 05:00:25 -0700 (PDT)
 Received: from pisaure.intra.cea.fr (pisaure.intra.cea.fr [132.166.88.21])
  by sainfoin-sys.extra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with
- ESMTP id 36O84DZj035502
- for <lustre-devel@lists.lustre.org>; Mon, 24 Jul 2023 10:04:13 +0200
+ ESMTP id 388C0NEr009539
+ for <lustre-devel@lists.lustre.org>; Fri, 8 Sep 2023 14:00:23 +0200
 Received: from pisaure.intra.cea.fr (localhost [127.0.0.1])
- by localhost (Postfix) with SMTP id 92F9A2046BE
- for <lustre-devel@lists.lustre.org>; Mon, 24 Jul 2023 10:04:13 +0200 (CEST)
+ by localhost (Postfix) with SMTP id 2298D204BC2
+ for <lustre-devel@lists.lustre.org>; Fri,  8 Sep 2023 14:00:23 +0200 (CEST)
 Received: from muguet1-smtp-out.intra.cea.fr (muguet1-smtp-out.intra.cea.fr
  [132.166.192.12])
- by pisaure.intra.cea.fr (Postfix) with ESMTP id 853AB2036D1
- for <lustre-devel@lists.lustre.org>; Mon, 24 Jul 2023 10:04:13 +0200 (CEST)
+ by pisaure.intra.cea.fr (Postfix) with ESMTP id 10BED204BBB
+ for <lustre-devel@lists.lustre.org>; Fri,  8 Sep 2023 14:00:23 +0200 (CEST)
 Received: from zia.cdc.esteban.ctsi (out.dam.intra.cea.fr [132.165.76.10])
  by muguet1-sys.intra.cea.fr (8.14.7/8.14.7/CEAnet-Internet-out-4.0) with SMTP
- id 36O84D8P045073
- for <lustre-devel@lists.lustre.org>; Mon, 24 Jul 2023 10:04:13 +0200
-Received: (qmail 44061 invoked from network); 24 Jul 2023 08:04:13 -0000
-Message-ID: <ae37ae59-fb07-7894-7fb2-13dfc4e14866@cea.fr>
-Date: Mon, 24 Jul 2023 10:04:12 +0200
+ id 388C0MLk015599
+ for <lustre-devel@lists.lustre.org>; Fri, 8 Sep 2023 14:00:23 +0200
+Received: (qmail 45516 invoked from network); 8 Sep 2023 12:00:22 -0000
+Message-ID: <9a7c28a9-6427-59ff-decb-fcb3ef053504@cea.fr>
+Date: Fri, 8 Sep 2023 14:00:22 +0200
 MIME-Version: 1.0
-Content-Language: fr-FR, en-US
-To: <lustre-discuss@lists.lustre.org>, <lustre-devel@lists.lustre.org>
 From: COURRIER Guillaume <guillaume.courrier@cea.fr>
+Content-Language: fr-FR, en-US
+References: <3fd0bfaa-b6a5-c64c-3662-290564d63dac@cea.fr>
+To: <lustre-devel@lists.lustre.org>, <lustre-discuss@lists.lustre.org>,
+ <robinhood-news@lists.sf.net>, <robinhood-support@lists.sf.net>
 Organization: CEA-DAM
+In-Reply-To: <3fd0bfaa-b6a5-c64c-3662-290564d63dac@cea.fr>
 X-ClientProxiedBy: DAMO-U-MSG-P004.dam.intra.cea.fr (172.23.8.14) To
- DAMO-U-MSG-P004.dam.intra.cea.fr (172.23.8.14)
-Subject: [lustre-devel] [LAD23] Call for presentations + Registrations
+ DAMO-U-MSG-P003.dam.intra.cea.fr (172.23.8.13)
+Subject: [lustre-devel] [LAD23] Call for presentations closing soon + end of
+ early bird fee
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -54,24 +58,30 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Reply-To: lad@cea.fr
-Content-Type: multipart/mixed; boundary="===============8848879098811921751=="
+Reply-To: COURRIER Guillaume <guillaume.courrier@cea.fr>
+Content-Type: multipart/mixed; boundary="===============1431228305502022276=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8848879098811921751==
+--===============1431228305502022276==
 Content-Type: multipart/alternative;
-	boundary="------------ppzqa308ywkkIs9yhda5kmHP"
+	boundary="------------4KJRViiek56yq57AMXX5weT1"
 Content-Language: fr-FR, en-US
 
---------------ppzqa308ywkkIs9yhda5kmHP
+--------------4KJRViiek56yq57AMXX5weT1
 Content-Type: text/plain; charset="UTF-8"; format=flowed
 Content-Transfer-Encoding: 7bit
 
 *LAD'23 - Lustre Administrators and Developers Workshop*
 
-*October 04-06, 2023**
-**Face-to-Face event, Bordeaux, France*
+*October 04-06, 2023
+Face-to-Face event, Bordeaux, France*
+
+Last call for the LAD workshop:
+
+  * Early Bird registrations are open until September 10th!
+  * Submissions are open until September 17th, do not hesitate to
+    participate!
 
 The Lustre Administrators & Developers workshop is a great opportunity 
 for worldwide Lustre administrators and developers to gather and 
@@ -85,44 +95,51 @@ October 2023, preceded by the Lustre's developer summit on the 4th of
 October, an invitation-only event for developers to exchange about the 
 future of Lustre.
 
-Submissions are now open until September 17th! Do not hesitate to share 
-your latest Lustre experiences with the community: 
-https://easychair.org/cfp/LAD23!
-Registrations are also open until September 24th: 
-https://lad.eofs.org/register.php <https://lad.eofs.org/register.php>.
+We welcome presentations about:
+
+  * feedback / news about a particular Lustre feature;
+  * a good Lustre success (/ failure) story;
+  * anything in general that affects the Lustre community.
+
+Sorry if you received this multiple times.
 
 Best regards,
+
 The LAD organization team
 lad@cea.fr
 
-*Web site:*
-https://www.eofs.eu/events/lad23 <https://www.eofs.eu/events/lad23>
-*Registration link:*
-https://lad.eofs.org/register.php <https://lad.eofs.org/register.php>
-*Submission link:*
+*Web site:**
+*https://www.eofs.eu/events/lad23*
+**Registration link:**
+*https://lad.eofs.org/register.php*
+**Submission link:*
 https://easychair.org/cfp/LAD23
-<https://easychair.org/cfp/LAD23><https://easychair.org/cfp/LAD23>
 
-
-<https://easychair.org/cfp/LAD23><https://easychair.org/cfp/LAD23>
-
---------------ppzqa308ywkkIs9yhda5kmHP
+--------------4KJRViiek56yq57AMXX5weT1
 Content-Type: multipart/related;
-	boundary="------------3hDiXqCgNe0Rv6EbEjBOuMJ1"
+	boundary="------------yuR5N0GXfD0CTUIn2nxEfKHy"
 
---------------3hDiXqCgNe0Rv6EbEjBOuMJ1
+--------------yuR5N0GXfD0CTUIn2nxEfKHy
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: 7bit
 
 <html>
   <head>
-
-    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   </head>
   <body>
-    <p><b>LAD'23 - Lustre Administrators and Developers Workshop</b></p>
-    <p><b>October 04-06, 2023</b><b><br>
-      </b><b>Face-to-Face event, Bordeaux, France</b></p>
+    <b>LAD'23 - Lustre Administrators and Developers Workshop</b>
+    <p><b>October 04-06, 2023<br>
+        Face-to-Face event, Bordeaux, France</b></p>
+    <p><span class="reactions__container"><span
+          class="chat-message__text "
+          aria-describedby="floating-ui-2662"><span> </span></span></span></p>
+    <p>Last call for the LAD workshop:</p>
+    <ul>
+      <li>Early Bird registrations are open until September 10th!</li>
+      <li>Submissions are open until September 17th, do not hesitate to
+        participate!</li>
+    </ul>
     <p>The Lustre Administrators &amp; Developers workshop is a great
       opportunity for worldwide Lustre administrators and developers to
       gather and exchange their experiences, developments, tools, best
@@ -134,52 +151,39 @@ Content-Transfer-Encoding: 7bit
       of October 2023, preceded by the Lustre's developer summit on the
       4th of October, an invitation-only event for developers to
       exchange about the future of Lustre.</p>
-    <p>Submissions are now open until September 17th! Do not hesitate to
-      share your latest Lustre experiences with the community: <font
-        color="#729fcf"><span style="font-size: 11pt;" lang="EN-US"><a
-            href="https://easychair.org/cfp/LAD23"
-            class="moz-txt-link-freetext">https://easychair.org/cfp/LAD23</a></span></font>!<br>
-      Registrations are also open until September 24th: <font
-        color="#729fcf"><span style="font-size: 11pt;" lang="EN-US"><a
-            href="https://lad.eofs.org/register.php"><span
-              class="owaautolink"><span style="font-size: 11pt;"
-                lang="EN-US">https://</span></span><span
-              style="font-size: 11pt;" lang="EN-US">lad.eofs.org/register.php</span></a></span></font>.</p>
-    <p>Best regards,<br>
-      The LAD organization team<br>
-      <font color="#729fcf"><span style="font-size: 11pt;"><a
-            href="mailto:lad@cea.fr" class="moz-txt-link-freetext">lad@cea.fr</a></span></font></p>
-    <b>Web site:</b><br>
-    <font color="#729fcf"><a href="https://www.eofs.eu/events/lad23"
-        id="LPlnk725115"><span style="font-size: 11pt;">https://www.eofs.eu/events/lad23</span></a></font><br>
-    <b>Registration link:</b><br>
-    <font color="#729fcf"><a href="https://lad.eofs.org/register.php"><span
-          class="owaautolink"><span style="font-size: 11pt;"
-            lang="EN-US">https://</span></span><span style="font-size:
-          11pt;" lang="EN-US">lad.eofs.org/register.php</span></a></font><br>
-    <b>Submission link:</b><br>
-    <font color="#729fcf"><a href="https://easychair.org/cfp/LAD23"><span
-          class="owaautolink"><span style="font-size: 11pt;"
-            lang="EN-US">https://easychair.org</span></span><span
-          style="font-size: 11pt;" lang="EN-US">/cfp/LAD23<br>
-        </span></a></font><font color="#729fcf"><a
-        href="https://easychair.org/cfp/LAD23"><span style="font-size:
-          11pt;" lang="EN-US"></span></a></font>
-    <p><br>
+    <p>We welcome presentations about:</p>
+    <ul>
+      <li>feedback / news about a particular Lustre feature;</li>
+      <li>a good Lustre success (/ failure) story;</li>
+      <li>anything in general that affects the Lustre community.</li>
+    </ul>
+    <p><span class="reactions__container"><span
+          class="chat-message__text "
+          aria-describedby="floating-ui-2662"><span> </span></span></span></p>
+    <p>Sorry if you received this multiple times.</p>
+    Best regards,<br>
+    <p> The LAD organization team<br>
+      <a class="moz-txt-link-abbreviated moz-txt-link-freetext"
+        href="mailto:lad@cea.fr">lad@cea.fr</a></p>
+    <p><b>Web site:</b><b><br>
+      </b><a class="moz-txt-link-freetext"
+        href="https://www.eofs.eu/events/lad23">https://www.eofs.eu/events/lad23</a><b><br>
+      </b><b>Registration link:</b><b><br>
+      </b><a class="moz-txt-link-freetext"
+        href="https://lad.eofs.org/register.php">https://lad.eofs.org/register.php</a><b><br>
+      </b><b>Submission link:</b><br>
+      <a class="moz-txt-link-freetext"
+        href="https://easychair.org/cfp/LAD23">https://easychair.org/cfp/LAD23</a><br>
     </p>
-    <font color="#729fcf"><a href="https://easychair.org/cfp/LAD23"><span
-          style="font-size: 11pt;" lang="EN-US"></span></a></font><font
-      color="#729fcf"><a href="https://easychair.org/cfp/LAD23"><span
-          style="font-size: 11pt;" lang="EN-US"></span></a></font><img
-      moz-do-not-send="false" src="cid:part1.t94D987f.YRQMKrGP@cea.fr"
-      alt="" width="256" height="144">
-    <p></p>
+    <img moz-do-not-send="false"
+      src="cid:part1.LN4wrWoJ.nRdyzjMH@cea.fr" alt="" class=""
+      width="256" height="144">
   </body>
 </html>
---------------3hDiXqCgNe0Rv6EbEjBOuMJ1
+--------------yuR5N0GXfD0CTUIn2nxEfKHy
 Content-Type: image/png; name="lad23_5_4_mini.png"
 Content-Disposition: inline; filename="lad23_5_4_mini.png"
-Content-ID: <part1.t94D987f.YRQMKrGP@cea.fr>
+Content-ID: <part1.LN4wrWoJ.nRdyzjMH@cea.fr>
 Content-Transfer-Encoding: base64
 
 iVBORw0KGgoAAAANSUhEUgAAAQAAAACQCAYAAADnY7WRAAAACXBIWXMAAAD7AAAA+wFieMcI
@@ -742,11 +746,11 @@ UVlZmZTfns81WJTBZDLNWpDy7/LRSSgU+tBhpL/LwiSTyaC/v1+Kz/K1WCwGj8cjuShOp/Mj
 PQFoNvlIFEAhSSaTYoZQg7FKLpFQ/lBBTE1NYdmyZR867+DvMj/R1Wj+Lh+fDA0NSd/b7XbJ
 ZiSl/eOU/weNrhphJhWt9wAAAABJRU5ErkJggg==
 
---------------3hDiXqCgNe0Rv6EbEjBOuMJ1--
+--------------yuR5N0GXfD0CTUIn2nxEfKHy--
 
---------------ppzqa308ywkkIs9yhda5kmHP--
+--------------4KJRViiek56yq57AMXX5weT1--
 
---===============8848879098811921751==
+--===============1431228305502022276==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -757,4 +761,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============8848879098811921751==--
+--===============1431228305502022276==--
