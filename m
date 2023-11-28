@@ -4,129 +4,113 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 26DEBC4332F
-	for <lustre-devel@archiver.kernel.org>; Sun,  5 Nov 2023 06:16:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 97A74C4167B
+	for <lustre-devel@archiver.kernel.org>; Tue, 28 Nov 2023 19:47:40 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4SNPMT6h6xz1yCN;
-	Sat,  4 Nov 2023 23:14:29 -0700 (PDT)
-Received: from outbound-ip191b.ess.barracuda.com
- (outbound-ip191b.ess.barracuda.com [209.222.82.124])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4SftK63TYJz1yCH;
+	Tue, 28 Nov 2023 11:47:38 -0800 (PST)
+Received: from BN3PR00CU001.outbound.protection.outlook.com
+ (mail-eastus2azon11020002.outbound.protection.outlook.com [52.101.56.2])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4SNPLw35YJz1y7C; Sat,  4 Nov 2023 23:14:00 -0700 (PDT)
-Received: from NAM12-MW2-obe.outbound.protection.outlook.com
- (mail-mw2nam12lp2040.outbound.protection.outlook.com [104.47.66.40]) by
- mx-outbound22-77.us-east-2b.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Sun, 05 Nov 2023 06:13:56 +0000
+ 4SftK40td4z1wYk
+ for <lustre-devel@lists.lustre.org>; Tue, 28 Nov 2023 11:47:36 -0800 (PST)
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=U/J/c0Y42cxxM0RQfuE1sph1zjeuHZhy0NKMyivALOiv8hR2x/5pdJaxka+neQEjYe6m2kY58H/ANzk+UPbt4BQS91AOpjisuX6saa0HU31e1CvYEI+HJwY9CUCBuqYaSM8QTof18uSDZ8DJH29VFm2idoJM3GwPxP3YgbbIKJ4Hx34K88eJkoASlo8YfZJvyuAfBbRYHYsBzwjqlT38QGJcNKuWiOlv5sn8D5keFf+gxqxxqQbESwAQELVqpXhfbnM+Ncfxay3S9wpVl0uVeEITkxqcuZKpFag7ufD9zjtS+skbY9GQ8koIk/Jpe9BVRZtSxpTk5Zkk98TuJbeQkA==
+ b=P/j5QiaibwY22vslSqfFyNp6cw0HuWFIh9ivWgeKZXc/5Qi2sjxqW9WpeXBwWxbUS0gNguojU6W67CAgJNZgkb3AnqJPbVN2OvmFiuKkjePcmAtSHcfstUhr8OfaX9eh1pSynaRrjx9BpkRidqIYujVemxM59jIXDCWArvDjzJ6Yz+9Jfkr9egkn9zvKbJzYs1Y/lehLwjy2CGqIWRrZF9no7r0hx0icHToe9cF7XaTyJVU69B5ILZZhYobATLfq5y1oIGBXwbS/sM3zJAiRY3TTDKfIi4AOX064zwZDTTqRJ+0ktqibenT6Cno2C7aWoX/nVq1P8BBDAlGwdBpJdA==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector9901;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=pPohsyTd3enyhpGpQfwJkmpUkHDJx0lmnFJwf2BVZh8=;
- b=nWFnpolU6c8+HDxyP1xGRamiYlfCFrpxzcLWPT0d/zjYxg72CbsZVN/+KnADY4h6DLVVp9/XQBbcayroHdpmm+CHMcKNR/a395wROOjkrqMjFTsh4OUyr4hZuk8c1tfW3W6b1zLetzVz1tyAnAZfSQwDHIO4QIK45mEjCzUP0HklfLSvhTjMlEUl/nyd+/MxudKRGNXh0Bx3yyBY6ZjKQqstvPx94GvqLz/XeyXVBSUPjLnQ7rqol8pKyxWOLRVI5jlDbd1TudSgZTO56UiX6oL9VxQccMDvD1dydS116r1SXSbactoqe2swPscl4reXuNSAeyOX49oDj+1FdQ2GHA==
+ bh=a1N9R7fC2c7EMHqiIbEPvPB3G4//di0V1PBBlAlnBx8=;
+ b=W35DLg0jK0j/8EnQLKkfxm++FKyEfJyaK/jy3goEkfE+7g3ojwXSW1b9glSDZRLOja3LwYM//VjswMPFZfqadb0yoQ8vFYIkx0LPOWbjss4lkkWPR7ogq8lUDkP+nIY6DncVHKIdXMlxDh2rYFbKdX+KUoAwKFRchKytlGY17y0wN3+H5oie07pbWbsKbWIOu2B7UoHnFDbcV7DE12IlkWZyOCuAC383L0MYfhja/DrJqri1+xyFON6LapVayeeBDAUIBUJt0PH9rkim7jr550AMCLBGtjj+wWJcH148sp9c2wZfcpdD6TS09IjGi7H6Tl2xTtS5mO7X6atYAprWLQ==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
+ smtp.mailfrom=microsoft.com; dmarc=pass action=none
+ header.from=microsoft.com; dkim=pass header.d=microsoft.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com;
  s=selector2;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=pPohsyTd3enyhpGpQfwJkmpUkHDJx0lmnFJwf2BVZh8=;
- b=KDCUQLezxIFswvQWGeDRc4crVWEQlGi10lnn1xan8OtYhWgLNfPQFo5Hb8wkti1j0GXP36zYJwJMImf07VoVOoASrgBw+ptrImyriyX/JBtCZegVOxheKGtGHfcWyFS85ohX0Aj9ryJP+eNliM6XbKrp6F9oW8X3c5mq8ZTufZE=
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
- by MW5PR19MB5628.namprd19.prod.outlook.com (2603:10b6:303:1a2::14)
+ bh=a1N9R7fC2c7EMHqiIbEPvPB3G4//di0V1PBBlAlnBx8=;
+ b=dZbrjkzKl1mX6p70JWSIEDC+e0p6gXij34kps6qdTbzVvROH2U1QXkTx/dQHORWEeyrW09PhtDGRpCwn3sNicgIXjnIc02W+MyKIBUoqcnQ2O78N02P8sopR6UDLqo3AT6DyvSOC5MoBzGQDxrn7ZWMsOLgZNT3xPAVYR0iKi4Q=
+Received: from CH2PR21MB1495.namprd21.prod.outlook.com (2603:10b6:610:8d::16)
+ by SJ0PR21MB2071.namprd21.prod.outlook.com (2603:10b6:a03:38d::11)
  with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.6954.25; Sun, 5 Nov
- 2023 06:13:52 +0000
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::5159:beb7:af36:75b3]) by MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::5159:beb7:af36:75b3%3]) with mapi id 15.20.6954.021; Sun, 5 Nov 2023
- 06:13:52 +0000
-To: Lustre discussion list <lustre-discuss@lists.lustre.org>
-CC: Lustre development list <lustre-devel@lists.lustre.org>
-Thread-Topic: Possible change to "lfs find -size" default units?
-Thread-Index: AQHaD68/jth4niBccUKc2CnV4nauWw==
-Date: Sun, 5 Nov 2023 06:13:52 +0000
-Message-ID: <AC27A36D-F1C1-4B48-B038-E6C91B0C0B6E@ddn.com>
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.7068.6; Tue, 28 Nov
+ 2023 19:47:32 +0000
+Received: from CH2PR21MB1495.namprd21.prod.outlook.com
+ ([fe80::f82b:f52a:f6ac:94ed]) by CH2PR21MB1495.namprd21.prod.outlook.com
+ ([fe80::f82b:f52a:f6ac:94ed%7]) with mapi id 15.20.7068.002; Tue, 28 Nov 2023
+ 19:47:32 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: LDISKFS-fs error: osd_iget: special inode unallocated,
+ Remounting filesystem read-only
+Thread-Index: AdoiMyl4aY2IfKFNTIK3sO2x22kTZg==
+Date: Tue, 28 Nov 2023 19:47:32 +0000
+Message-ID: <CH2PR21MB1495094E10A3B5DAD923431DBCBCA@CH2PR21MB1495.namprd21.prod.outlook.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-mailer: Apple Mail (2.3445.104.21)
+msip_labels: MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ActionId=d627c788-657e-4a33-872c-4daa06a176e2;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_ContentBits=0;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Enabled=true;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Method=Standard;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_Name=Internal;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SetDate=2023-11-28T19:43:04Z;
+ MSIP_Label_f42aa342-8706-4288-bd11-ebb85995028c_SiteId=72f988bf-86f1-41af-91ab-2d7cd011db47;
 authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
+ header.d=none;dmarc=none action=none header.from=microsoft.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|MW5PR19MB5628:EE_
-x-ms-office365-filtering-correlation-id: 95f1e2d6-f9cd-4eea-842b-08dbddc6620d
+x-ms-traffictypediagnostic: CH2PR21MB1495:EE_|SJ0PR21MB2071:EE_
+x-ms-office365-filtering-correlation-id: e659be74-e77d-42b0-dc15-08dbf04adcbb
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: c0Y2uR7fQWJaUSj0qE28WxWw5inDU0n736S0wSnb/dSCL/nvr2K9F1zrxBLck3dnZl0bTU1DaL/I7K2rCFpm9OU/CYqDIFYFHliUot1nVyKyv62UMDBJbr9Am00Zqso4z7nTE+HuFKuRpi0v43s+2AVAQ57aP3ilVSYBYQWXAPD/uX/wQFnUzMEMppfgil9eVDCCEeMxLnjYXxXNCHMa3S+JQKsIlJr9WlJ1hZpB1E9VQ6pw2v21RB7qgCxMtgCbUnIM/a7kNn9H787ujGBuV/dSs8QWCpea55PJFTcKxrWNWnh+tTs+Nunq+Cr5IGRxVyM/vot3FSa73jBm79c48FC8iZ8pSmwscMGxQedDOYFiTlD3awmtrO+LVJ7TkKn1X0tsSgsB8HCs7kxQY77Ammuuv4keAC66+2jVWI5fEZjZynFHibFWzWBOLgO6gbH6Pzp2aZ4//vAv5lkN1hPBpznjmtJ+rLNFZwUjXpYUqZDGzJDhCiZRts+GcjL+lMPxhozXrHiSn8O9Cs3McLex7uWrRDbXFL9eRvjs8uqv2N5zYKf2iITV8CrQucQHZkt/lJ0yAn+K+fzMHGJHQPtucFxwZidEY2c1oXd0plHcSI/QjtZ5p+N94KJMmY93tRfA
+x-microsoft-antispam-message-info: EU9/nO5aBT7UMQX+Xi/Rgf4POMspXhb/6gXLgfekmIuT69TC5gkH4wCMJ+c4RkoEStlR6Y7xZ9z+Fd2OfD2BLSFsr6balRLrN0YFi/lSgEAyX0APcud0BEvF7XHyV8aF4Iw5mSYq9oxK9wUDxeb4QL2jGRw9b+22GU9h44pz5KYmlns7oBfiKQmq7GDTJs9tFwFYF8YHe++zjYJbTlQzSnohV82DTLJOE+9jmvgEkk5yjQeQ/rPdhD5C585SumadgjlmDNtgI/znDAamymnczl4sT+1gM7ZwzfHWdjD4TrRHHJW/uNvwFuuX5SSjRxvX1U+5THbngPRUF1mbHTor4xIaYYSRQM8dn++8hmwvRy/tE80tPyZvR2N9uLlyTEFFIoPh1uFALR5+OznVS8fSwzzdCJ4H+/E7TgLocHpYqdmZvplej/7aGff5VUkquICyWKKlafqWvBSGrOt5dB2jnq8nBp+dgRg5uc77JhtECffRodTSeC7c/7MHoVjzvzlw1b14po+ImAZ5W/3tQlNX7BcJPQ7wyeAFmtvVv5G7E5kWR8cBdpc2meRhFG/cqFLGQUvUlm1Th6mFkVDL0tvjUj+/nMnyFb+U6AyYI4H6RcqvAQCEXd3bmSibuItyh31CyFKYJD8DYxa7vBtEk03X0Q==
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230031)(396003)(136003)(366004)(39840400004)(376002)(346002)(230922051799003)(451199024)(1800799009)(64100799003)(186009)(2906002)(6486002)(4744005)(478600001)(64756008)(316002)(76116006)(66476007)(66446008)(66946007)(66556008)(6916009)(4326008)(5660300002)(450100002)(91956017)(8936002)(8676002)(6506007)(6512007)(9686003)(41300700001)(71200400001)(26005)(83380400001)(38070700009)(122000001)(38100700002)(86362001)(33656002)(36756003);
- DIR:OUT; SFP:1101; 
+ IPV:NLI; SFV:NSPM; H:CH2PR21MB1495.namprd21.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230031)(376002)(39860400002)(366004)(346002)(396003)(136003)(230922051799003)(1800799012)(64100799003)(186009)(451199024)(38070700009)(55016003)(122000001)(2906002)(41300700001)(33656002)(5660300002)(86362001)(82960400001)(9686003)(71200400001)(83380400001)(82950400001)(38100700002)(6506007)(7696005)(10290500003)(478600001)(8990500004)(66446008)(76116006)(66556008)(64756008)(52536014)(6916009)(8676002)(66946007)(316002)(66476007)(8936002);
+ DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?LHq1UV7BYRrWXGRYZ+m1PJCqf4qxiEWlCO+n/6+08ZkkcpmZivZ5scYdEKVs?=
- =?us-ascii?Q?09cPGeSsqwV6uKOtTghyFmmeAsrB2VJGu6IiTvrY73n7KfbSpuOeQDN2e1kj?=
- =?us-ascii?Q?Nk/qM1Mm+v/x832sjgQRNzu3DPaQbTcEJR4q7/7GgwcyZStDT0dnbjwgTLxn?=
- =?us-ascii?Q?TUgQSkm8FwPU4kVEg1Weu2+4WSdN5cgymX1PFXZcfpP5MZbtjqrqdoagdOAN?=
- =?us-ascii?Q?0IYzRDZdMvq5rvB8tJZ0qFNJHHdma4OAb1iXq1wuifB38gBUOKqLd0yaqg1C?=
- =?us-ascii?Q?xG39KBJCrGs02SPAR3tUjwTa0gilN9dR9MfoMlwxksnKrIEble7CDds+qliR?=
- =?us-ascii?Q?vCAZu4oufoAvSaM3bxAXxF0Ly5aENRtK0+za32Pct/kHNH1O59BJXLeM2JFC?=
- =?us-ascii?Q?6d1g1s8txTKUmftJfp4fDLzuJUjER8tFGNjWsQd2LrSheVfCiVefC9ky0IQJ?=
- =?us-ascii?Q?hFa0RpKyKoGVQ6Fn/8SApn6GNQpW6jY+MWGuOAvvF/jOgp1dPlqbvbr2IFIl?=
- =?us-ascii?Q?27CS9rA6kOzRDPjALRVfrEGErVXbmJjmie5PTC0ThCSDJGdeEBHKpi30iXZ5?=
- =?us-ascii?Q?ZrIre5tbZ0n9oRPzAZRrGyM7Fv9mYyohabJ3VDtKghxYwqjcRF3aIoU0PSYm?=
- =?us-ascii?Q?RNPg7XZ0ezNpdb3CYhuHSS0C8wk353JXVYF+REcpCwItFQI+1u5Ki/MnE13H?=
- =?us-ascii?Q?6wQKHdj16X1b9sc47hLIwiRrhrPkDSichVAl090gCQr3p6lT1BrrQ6aCik5E?=
- =?us-ascii?Q?l70WpgH2ofVX/YuBnw96/Lhfv8JfYu212nhbcDFqE4AOCHy25b/Hp5YPp9zv?=
- =?us-ascii?Q?1NClrv0XFuhAL/JtqD/1GU0jNbwboHCSWvN+LFGAwf4zGrYIlDyELS4EIzkS?=
- =?us-ascii?Q?X0BsrD4J3leEvXN9Y9Kx5mbel6bUldMwc8JjaInvj+68DAy3rRn9WZZInBYZ?=
- =?us-ascii?Q?QXmJDNA7idOS0E0/tJHmGIcoN1jnWgz1QWiWgHoqnBtyOlG+kPM28XcsxNWg?=
- =?us-ascii?Q?OQIFZVhd8UCaGo8PxMws6e1sdogD5tUcj2altIDM+JbtH5fLRAMF8xo+nHgy?=
- =?us-ascii?Q?flBuoYXT4slGWXByloXwIJ76Fi6CZhzYA0PqBGhVWgZwfLPcP/eD/9jIOQUt?=
- =?us-ascii?Q?QeOpHcgEXrcxzjTP/DOgUz6JGF50aW5cSPN8k1t2OcfFrKmHif5Ci6zJjNKB?=
- =?us-ascii?Q?MsZ3fZCRjUzrdyK7uFbwhfXZVPxqYgdsVMeU4syJV7bGJdQWngDSDRZMLRs5?=
- =?us-ascii?Q?rRe0lfLfae1Xb219jPtUIwWKpK77uqOYHGKvIfcqCXEEhClIuoJ6e/w3A3q0?=
- =?us-ascii?Q?8bHOCqJZhRSXN47KciVFxcQe1LE3UJzG8NwcmC7ZRpSIzzE0xVkc7zfQZMid?=
- =?us-ascii?Q?WLIbyYuAPalsc2Ul/JdcwwYFexYpbTZOB9mm/c/XIXtIFZoy/R5U8VdClTDJ?=
- =?us-ascii?Q?gQsLD32HWzgDeuoq4jEPeznsLhzOzRWmgGxBQkhG4uUqFlje/kPoz5wsXEev?=
- =?us-ascii?Q?XLNAbPdLGY0IFMhbaFl/KOoCceEoOxLLZCskplMkz9H3N8CoqojwvOPGT941?=
- =?us-ascii?Q?mGUxFUKPyN6ySkhqPr7OeSWd3MN9WMVh16/h3VLP?=
-Content-ID: <4BE337CFB049674F917575964A1702BD@namprd19.prod.outlook.com>
+x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?gLtJ4sfMXzHrbbXo1UDBo8YPE5lX/X98G5LKjmgexmPd8E0x30Rxe+q2BHR1?=
+ =?us-ascii?Q?vOpfedbrb58gbW4+NORvqqIaWdG6iRujkNYvUzjwYag7BVfPYoPuQbRmWb0u?=
+ =?us-ascii?Q?yjlzPMV8wDhbQoT3CHE0T6gsQv/AxHCtKRFB7SZ1RY6xVEab+djdmdM823SU?=
+ =?us-ascii?Q?1D8uAMViIVlzxK8hEMkvq0QIBx6Pr3NbcTLP6ZOZnTPcwbhhwEcbrbZsotls?=
+ =?us-ascii?Q?A3zukB/WrDBAQL6vl4QTyqHHHa9wMssU4B/rQcnyh03Z0WUhCytVIwH3dq8l?=
+ =?us-ascii?Q?vVqzOZVL1Ecea4SO+ShPBPfWV+ShKv08wGn4lXOzeK8NrqWcUUqU7WWBo/gf?=
+ =?us-ascii?Q?t1zmjQjDWwVat3DZbsU2oCiaWFPiUwigwr+A8+cMQ/vRnVf8S1enr3JfVlA2?=
+ =?us-ascii?Q?e/jdt7maRtPMcivKYR0dcByyQSFSTHDPEdtfkwpla2jm2uBdwO6ZM+A7bGnE?=
+ =?us-ascii?Q?3R4ghd1JeU4UyIrx6wazNkMqgKKNgEdaS9Fym8DJGU2rYKFBkJZIcjqCbiDk?=
+ =?us-ascii?Q?zyUjNSlimCb8vswAf91uqWrzQ0ZDDxMzGh5IaVKE0bHaodP2VXlJbbYluJEl?=
+ =?us-ascii?Q?8X+l3fUc1StZOLdDCaokHkQm7MAzFZMYnoRYcTQUg9fYmBjCxoLN8hiWq4Wq?=
+ =?us-ascii?Q?PdH0OhsrkehHeMHuYhpRPPzRTUko7eiBoIyl2pZQN5e2aKfW6zXXKyXXK5KV?=
+ =?us-ascii?Q?/1IiNF79h0UEVbyBZt1mOp5DYOYVW/J3hJdsI4DzY5hTpZlVi2GVMEjATSbK?=
+ =?us-ascii?Q?7FZGVgTr5+RueVNO9NPqnj5ehU+36K+c5re/x11CbcsZj2iWAhu26TOF4e8N?=
+ =?us-ascii?Q?q/em/JQ2Mf2phg+0LcXi6hV2+/uWoWKA+dx3zW57bHGTrqdicxgdZRhDeK9E?=
+ =?us-ascii?Q?dhgF1kJoCNoEqOJYp5ZObsU2sEro0MAPzNOF27H48qiuL+n1tsDoz0FnabzB?=
+ =?us-ascii?Q?5n/fzy7+RN/eUbNWIJsP8WXVoM27wlSf5BiXOITDRdVKinEm5cvSoB230oWf?=
+ =?us-ascii?Q?z3TOwkvcS9bqVLbMkYJHy7xcHM5QmKT7RHHVGTZ68paN7fFDpAn1Yr1wXVoz?=
+ =?us-ascii?Q?vUF/ug/zXS9t6aMMS3X5LjpVEvXOk3gboN1DOuwkFd8rtqdf7H6q9j+LkCP+?=
+ =?us-ascii?Q?SsKqqd0wSnqvtNeoZO82fc+ZEs4EWXfUrjCxrQhf/D3WSPIwO4aH0XWXHeOG?=
+ =?us-ascii?Q?oSXKmQr7s6tqgrTC6Rx92MsMt4Siiy+8tL+wcf1jv1bz+b4FWqolMbzboz54?=
+ =?us-ascii?Q?oGtlS3/5vZCnhYMacNFeB42BmDwo8njWhYbQCYF3nNq120JlgsdO5BXaihAv?=
+ =?us-ascii?Q?TzCJdt/CKigI3FPgC1Oh9qaN1vK5Ti7r/cbkujExymdvNSOb7Yw9KiOhJ364?=
+ =?us-ascii?Q?YrgXTQ3M4R7VYmp2hHOm45LGSA2lPF1DhCB9Cw+j53H/j343hfINKV/34dxc?=
+ =?us-ascii?Q?wmtJRiPE2mZAnELldlGxVYxR6e9rqCPMjhXXRg3fQ7bIjND3xn2Xifqbqjsk?=
+ =?us-ascii?Q?m6jbSfc3+Whtj2uTD4WchcEeX2+nFLNwuB+F19K+OwzvQvHICQMlTSSlm/XX?=
+ =?us-ascii?Q?cx0CILqUQI7bhP3I8hFiM4unEa8j+mw3wVCTxByy?=
 MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: eqSVpg95Vg0+SYdHXa1HS5QYALiwONtpCohSJoi3s9Fx28nOFMtVdl/5FxPxfqE6zTfEY0IajUxrsird4ItP1pOkZI9w66ogARTFoRssz4kN9DC2vv7aUntvzDTNBKtMydmK2H9kANcRhIZPU1rQUXumEwdbxQlPr12fMW9l+ln24Li1SZFzX8qwfcncSMZ7nZhqWCBfsoLtXYadVR8ax3yFquFwsr6e2b1DX541HBO1fBjAgZKaM3N+eD9HymW1eGc0QsSFHRPnc/PJB8AIoHnFN7FaWTr9U3Yt4lkQnI3lqbH/2Pky9n0qD4IkvTTyf7lALCf4cNqeEdWgLa9oIYjlK+CbQpSRFquBmZYxhAi+YLozAb7FwKh+VwlU4LXH50Qy4j3nZa7fr9S/fTbFs7X4Yo4fasS60Q1j7CRe4LPF015TmcBBE0Dsw2WcFj2Gcj8v3HyH0AomKaWXgFDpKcDWr5WgfZgtStPG8PYopjDJMxOurgeXwTe34aAWIQAnwrpILyjYA+P0vGh+BeSuR4Aw6d8FQ1KAjTHKn46wCUoy9/4albeBM4ilwbSwOwOxPGGzHgwI5HIVL6a/EtPf2+X0loUYjNHuoQYfrQfnMKXAGhf1Jt6EEChBvm6fKKJTGsuxImMsG9Nxuk6sWbqNEOT984blP1BSWufBYZ19JatLSb3SuW1HN887y17E23lGmf4NY66nAEjJnFxGrrhGJ/3cBVvqW9nqKKjuSEEqvFR8jeXtKsOSXvU6yFO0gIZo7RNy0aqrX5pxWpfMrq6K0KqDwy+M3S6ogNPZ5b64KXi5RmO6NPytRJ/lLHic/FcS
-X-OriginatorOrg: whamcloud.com
+X-OriginatorOrg: microsoft.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 95f1e2d6-f9cd-4eea-842b-08dbddc6620d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Nov 2023 06:13:52.1103 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: CH2PR21MB1495.namprd21.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: e659be74-e77d-42b0-dc15-08dbf04adcbb
+X-MS-Exchange-CrossTenant-originalarrivaltime: 28 Nov 2023 19:47:32.4394 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-id: 72f988bf-86f1-41af-91ab-2d7cd011db47
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: kZOO4pT5NviqGBgE/9g0PtthHJhMTSh/GO2gkWKtFTEkqq2tQbms9eydnP5S5w8U
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MW5PR19MB5628
-X-BESS-ID: 1699164836-105709-12349-7585-1
-X-BESS-VER: 2019.1_20231024.1900
-X-BESS-Apparent-Source-IP: 104.47.66.40
-X-BESS-Parts: H4sIAAAAAAACA4uuVkqtKFGyUioBkjpK+cVKVuampkBGBlDM0sQ4KdUiLTnNIN
- EgJdnA1NLMIDHZ0NI8KdHA3CI1yVipNhYARXnG/UAAAAA=
-X-BESS-Outbound-Spam-Score: 0.00
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.251919 [from 
- cloudscan-ea17-231.us-east-2b.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
-Subject: [lustre-devel] Possible change to "lfs find -size" default units?
+X-MS-Exchange-CrossTenant-userprincipalname: XJIK0fKEeNFT7aZnf34E1lBt2RjktX8ubhb6JCT1o5E8kf0lJZxiCUFMgzlC3B02s33zH6B70XDiGQ8L/JPH0m000YrOy++QBZbBlOovbtE=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SJ0PR21MB2071
+Subject: [lustre-devel] LDISKFS-fs error: osd_iget: special inode
+ unallocated, Remounting filesystem read-only
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -139,31 +123,33 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Andreas Dilger <adilger@whamcloud.com>
+From: Cyrus Ramavarapu via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Cyrus Ramavarapu <cramavarapu@microsoft.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-I've recently realized that "lfs find -size N" defaults to looking for files of N *bytes* by default, unlike regular find(1) that is assuming 512-byte blocks by default if no units are given.
-
-I'm wondering if it would be disruptive to users if the default unit for -size was changed to 512-byte blocks instead of bytes, or if it is most common to specify a unit suffix like "lfs find -size +1M" and the change would mostly be unnoticed?  I would add a 'c' suffix for compatibility with find(1) to allow specifying an exact number of chars (bytes).
-
-On the other hand, possibly this would be *less* confusing for users that are already used to the behavior of regular "find"?
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Whamcloud
-
-
-
-
-
-
-
+Hello,
+ 
+I have recently started seeing sanity-lfsck failures in tests 18g, 23b, and 23c on Ubuntu 20.04 5.15.0-1051-azure due to the MDT filesystem going readonly preventing either the start of LFSCK or LFSCK operations. In all cases logs on the MDS show the following:
+ 
+Nov 20 20:06:59 e72f0907-59ba-4ffd-9528-2e3ad47050e4-mdsmgs-a0-vm kernel: LDISKFS-fs error (device dm-0): osd_iget:500: inode #195: comm mdt03_003: iget: special inode unallocated Nov 20 20:06:59 e72f0907-59ba-4ffd-9528-2e3ad47050e4-mdsmgs-a0-vm kernel: Aborting journal on device dm-0-8.
+Nov 20 20:06:59 e72f0907-59ba-4ffd-9528-2e3ad47050e4-mdsmgs-a0-vm kernel: LustreError: 29024:0:(osd_handler.c:1787:osd_trans_commit_cb()) transaction @0x00000000a2d278af commit error: 2 Nov 20 20:06:59 e72f0907-59ba-4ffd-9528-2e3ad47050e4-mdsmgs-a0-vm kernel: LDISKFS-fs (dm-0): Remounting filesystem read-only
+ 
+LFSCK operations if they start will fail with error code 117 (EFSCORRUPTED):
+ 
+00000020:00000001:8.0:1700166322.660540:0:43212:0:(lu_object.c:908:lu_object_find_at()) Process leaving (rc=18446744073709551499 : -117 : ffffffffffffff8b)
+00100000:00000001:8.0:1700166322.660541:0:43212:0:(lfsck_layout.c:3241:lfsck_layout_scan_orphan_one()) Process leaving via out (rc=18446744073709551499 : -117 : 0xffffffffffffff8b)
+ 
+In both cases, the error comes from an ldiskfs_iget operation which passes the LDISKFS_IGET_SPECIAL flag to __ext4_iget. A recent ext4 patch started checking for this flag and will return EFSCORRUPTED if the inode is unallocated (https://lkml.kernel.org/stable/20230320145452.175177331@linuxfoundation.org/ ).
+ 
+Adding LDISKFS_IGET_SPECIAL always to ldiskfs_iget was done as part of LU-13166 (https://review.whamcloud.com/c/fs/lustre-release/+/37421 ) and feels broad to me in the context of the upstream ext4 change. At the moment I am investigating removing the LDISKFS_IGET_SPECIAL flag from ldiskfs_iget to see how it impacts the LFSCK tests and to determine if a more targeted change can be made to satisfy the intent of LU-13166.
+ 
+Any suggestions or thoughts on how to approach this problem would be greatly appreciated. Additional logs or debugging information can be provided if needed.
+ 
+Thank you and best,
+Cyrus Ramavarapu
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
