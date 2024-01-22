@@ -4,142 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 7583AC3DA6E
-	for <lustre-devel@archiver.kernel.org>; Sat, 23 Dec 2023 06:52:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 00777C47DD3
+	for <lustre-devel@archiver.kernel.org>; Mon, 22 Jan 2024 19:35:50 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Sxvx12J4qz1yBc;
-	Fri, 22 Dec 2023 22:52:21 -0800 (PST)
-Received: from outbound-ip191a.ess.barracuda.com
- (outbound-ip191a.ess.barracuda.com [209.222.82.58])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4TJgS12Swdz1yDr;
+	Mon, 22 Jan 2024 11:35:45 -0800 (PST)
+Received: from mail-yb1-f171.google.com (mail-yb1-f171.google.com
+ [209.85.219.171])
+ (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
+ key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Sxvwl0vMyz1wL4; Fri, 22 Dec 2023 22:52:07 -0800 (PST)
-Received: from NAM10-BN7-obe.outbound.protection.outlook.com
- (mail-bn7nam10lp2101.outbound.protection.outlook.com [104.47.70.101]) by
- mx-outbound43-252.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Sat, 23 Dec 2023 06:52:05 +0000
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=TZIatghkGBhq1i3beG+eu81d1E3yIPfsZrFq7IykNKqGZzjCFnT7xDVjr7q+sjBgh5Qml2rf1TOr00h3dmOCl8pcCpQQPhzoPM7ZAxJZ3hrExEHb5ad3KaVi9JhPHkpytq/8xIIVWdcKC/dDSezL1jY9eTdlNvUXbBD320IoW8+nLeyCDkmWt+ifo3T5Imw6+c5Dpzq4nNTWZZfAwy/atKUXKF89omfhidCP+eGsGrwFqVdSUh9+DynqpWxENXwLIymHNIWt8o+1J1xQCCPdKySUjKVgHa8y3WFo0cpc93f6UFvl0VE7sprIuF4hvpUFEM3Oo01xZkPlROdEOVuvoQ==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=OkjwrBH1d5NKy5OkNZsUi0OFHCzUZtcOWgMTIpHU0WM=;
- b=P8Q6A3VaNUBbzDdyqG4GfiHZLl2tNBgGbbdzh38kRRXRZLNI3tVPvffwCUZA1pN7K6LMWXTdLxTcxleJ9asD04mRsaEkCfGIiQbqjNzj3/rWoi2YdTMchRYVYFZj56xq5HaAmj/Fjvxxa0mYwL0xmRP4ZSWGiznPnUmP57wM3WreO1g+kjxl+zkdOz64OA0oM7oFDtbH3zIk+764QC1VQxdNS+AClUIIVrzGg4YP52ACsC+JVb8yR5IJu2m+yHSXxOMCv+luSCjrpPo22wKYuEm5cN/2ii7nvxIfP17Uf5Rbhzi8AfU/K4dYJ1BR2NW4x1Oj6uQTuyI2RWF7bu+7aw==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=OkjwrBH1d5NKy5OkNZsUi0OFHCzUZtcOWgMTIpHU0WM=;
- b=gb37JTXrWMe+8u6DlS/T9bFSjRGQ/y3BOKtEU8slnyJzZVGeVHkQyceYeasPqrMBe1Ob/i3gvbyhijrbM2F0QuuEkLmMtP/zYhCkIw2TOWBn0SNSBmI9Xi0gWC99fWvcXQb9lTNeiP2k5rNY9qP5niTSLxkNuFjt87PWyj5O2BY=
-Received: from PH7PR19MB7534.namprd19.prod.outlook.com (2603:10b6:510:27c::20)
- by PH7PR19MB6458.namprd19.prod.outlook.com (2603:10b6:510:1fe::19)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.7113.21; Sat, 23 Dec
- 2023 06:52:02 +0000
-Received: from PH7PR19MB7534.namprd19.prod.outlook.com
- ([fe80::2ff0:13b0:12f8:c18a]) by PH7PR19MB7534.namprd19.prod.outlook.com
- ([fe80::2ff0:13b0:12f8:c18a%7]) with mapi id 15.20.7113.019; Sat, 23 Dec 2023
- 06:52:02 +0000
-To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
- "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
- "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>, lustre-discuss
- <lustre-discuss-bounces@lists.lustre.org>
-Thread-Topic: Lustre 2.15.4 released
-Thread-Index: AQHaNWyITlrifKlfY0SRqCPXTmHtUw==
-Date: Sat, 23 Dec 2023 06:52:01 +0000
-Message-ID: <2D29A047-2256-4E02-AE32-CDEE9C7CF443@ddn.com>
-Accept-Language: en-CA, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Microsoft-MacOutlook/16.79.23120117
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: PH7PR19MB7534:EE_|PH7PR19MB6458:EE_
-x-ms-office365-filtering-correlation-id: e82966a3-3d2c-4265-dd19-08dc0383aab5
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: 3AsqO1Dkkqmz6JkodmzYaNWx0X3JZwId7oKrkv1uH9Tkaj6jJN1rIs9y/m2PSzKn+bDJyXzbKC4jFcWoyK5IWLtrc1JLfYQpTHr9j8X2y+O4wqmLEy/Hatwbus7DnrL5vgNGYFBC3W7eIaCmU8b25rSle1kypaG7ED9YhETu42ek4Jh8WP9aKnsD2i9QoYtz1smZae9zZR3/RD5yHAcRiMjKEnRQsDZNtRkQFIGT9yH4acKmrRfrTJYad4YGqM3lPjddwbFgSlBkmq4xmOzVRanv26KZnytRh0vb5ApnRZWn5gOaAakgmby6xkvj9XXbKtmxUNOIMGf48PZhIoorV9vkUJ1cB9Q67UA+E+qxdrDbUIx2mURJiFjzdsepQG7ECh89/qGCO2i6cRrrRITjO7Af4C9EBU91T0J/M2zWkwY4wzn0i/EWMB838WXa7bBPuKF0gyV//gHtdrspgNfJ6NhRV6h4k6nTJ6El2xq0gai4RKxjbuepqksBbQHJjx1vqgqLLJVDHawtthwUh2u5LQDqO1Jt4zU0mpIumRqUtFyYJYeBwITIaMDAptnNtvTCjDxl6lB1odp1DQRJPPGqFOz/Dd11qDLT0xjPMZETlUA+WWXSbcvgG9Pf/Uc6/KYE5QeDtg9pI6xjH1cbnYE4tRdCQr2ezehYbWR+gLMGP5w=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:PH7PR19MB7534.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230031)(39850400004)(346002)(376002)(366004)(396003)(136003)(230922051799003)(451199024)(1800799012)(64100799003)(186009)(2906002)(71200400001)(33656002)(6506007)(478600001)(6486002)(4744005)(8676002)(8936002)(7116003)(316002)(91956017)(110136005)(64756008)(66446008)(66476007)(66556008)(66946007)(76116006)(5660300002)(86362001)(38070700009)(83380400001)(166002)(36756003)(38100700002)(122000001)(41300700001)(9686003)(6512007)(13693001);
- DIR:OUT; SFP:1101; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?eC9mdFZ2NmtyR2Q5Zjlqa2NuU0p6L3U0WEFZU0YwaEhjTzVkN1VXOFNrQjVM?=
- =?utf-8?B?bWdPa2pUcnhtd2ZMb0lOOXozcWRJcWpKYmNGekRuMlVNMVYrZlZxSjhsQ1gr?=
- =?utf-8?B?V0ZiZ25MbGJheEdjTGEzSWN6eW8zV05CMUtKbE5Gb2R0dmFtbUZocElqRWhh?=
- =?utf-8?B?eXVHRGREQktxMm1kdDByeEFuSWhEdzhyWGVzN0JuOW80ZU1EWGh1aHl3OW1D?=
- =?utf-8?B?elhXdVpuWkJKVmpOZkRPRUFoa2RHZVVBaVJ6dWJheklKeVFBaXBUU2wrQTNH?=
- =?utf-8?B?ZS9WYllSTjNiUHd4L1FxbkoyeDNmOUx0TkFHZFZvZ08raHp0cG1PT3p6L3NL?=
- =?utf-8?B?WXMvaUFnY0Q3dWswaVlEY1NqamlyRGN0ODV4clZ4OExYRlJ3RXdKVVJ0YkFi?=
- =?utf-8?B?eTRGSVlzQk92ekNPaW1Vc3h2cUc1WmFudlNwREExRUdwWE1tUlVDamY1dHB6?=
- =?utf-8?B?ZmtuL0k3bVdnV09YVUp2TWsvdnllSExjVnVaZGdleTcxNk9pK3dCZjRDcDNy?=
- =?utf-8?B?dFRkMTA1SUFqOWRTYVE0M3JpMmo2RFQwalRZNlUwSEtabmVsRzViKzdEdnV1?=
- =?utf-8?B?Y0J3WlFCSWdIMWpDZldXRFRuNU1YaFpqRHNWazBRLzNyMkVkR2Q2WmlvcXgr?=
- =?utf-8?B?UEFSMHlvZzNOajRnUlJLMzl6c3hnUmZvRDF5VjFtaTMzNDNSZE5CUEhlYUV5?=
- =?utf-8?B?R3dHTy9VZEFWNjlFRUttd0ZlNUFsOHhvWFJ3WlhybkRxVnBDMkFGUWNiYUFo?=
- =?utf-8?B?S29Ydk5hUnFXbU5sNlNzTWd6cU1xTGV1Vk1DWlJrRnpqVU1LRDJqRldKb0M4?=
- =?utf-8?B?UDkwN29vZGs4aVhkQ083SjJOWE5URHZHWXlYUFhEWEVsZHlqMS9KT0Q1emdt?=
- =?utf-8?B?L0d6SFBEd0d2WkNMcEo0cUhJSEZqY0ZMeUEvWjNVMWRDMmsvUE1GSjVrMWNy?=
- =?utf-8?B?cE14dUdYSzVHTnBJUWJSbGlOVit1OW1YV2hYNGw4N0ZHcUdrcUNjK3pDWWI3?=
- =?utf-8?B?QmpqK0lNS09pTDlQRU1Mdkp0R3lnOXpRc2xGRzhlZ1JkWjNtZEJhZDZOOFln?=
- =?utf-8?B?V3BmOVIxYlpVRW8rRGdYc3RrbTFwd00ySGhJTEhqV1lLWHJ6UW0raUV5WkVZ?=
- =?utf-8?B?ZFYzWDRNQlQ1elpPSGtMcHNCVTh3M2VHNnRXc2Y5Y2FYVzAyMnNZdmR4VktY?=
- =?utf-8?B?UTdPMU5qYVFNOWtqK2Q5Z1dNUjZHSEROUlAybFQ2WjNZOGpRRDg1bkpjTlZK?=
- =?utf-8?B?eGhzNytmNkIzZFg5aFFMRzZ1di9vekdZTXBDemxCa0dPdis4SUVFcHZEdHJN?=
- =?utf-8?B?SDE5bjJnVGg5eU9naFo4QitGbHduUTlRY1ZyWkQreVM5ekdtRk5JTndkUEo5?=
- =?utf-8?B?NXNaeWdoR3l1WTk3OUdwUlUvek50cDkyU0w1L1MxU3IrdFpSZm54WWV3S1RH?=
- =?utf-8?B?RzZEeGJmVU0rcG1PRlBhZzRFbm9CYS9UV2lINWxDK0Y2OXJuWmRIWE04V01V?=
- =?utf-8?B?dUhVUjFmeURXdmpPUGJJTmxqdHFrWFVCQ3VocVhCcGFCemZ2bU1jZzkyTkIr?=
- =?utf-8?B?T0pBUnBWWkVnRWxiN3JZb2ZPZjFRRFFiTWRudWFDbmg5VFZTb0I1RE52eHR6?=
- =?utf-8?B?QmNMVWM2enc4RURSYm1nZVJROURRdG0xMGlJVGtjenVZTnJQOVVzbmd5V0tw?=
- =?utf-8?B?TW9IeDBWcDFDaGZCc2V3TWtBVWFNZ0RyR2RNZ0FmSEkxaG8xMDMwMzYxM2hC?=
- =?utf-8?B?ejVZOFdkSEdvd2FFTUVZT3RNMzZpa25NSkYxaDBmZk1nOFFOdmR1NHhQd3dM?=
- =?utf-8?B?RXNkLzZSMUNqdzNOYjcxYkg3M1gyeHpZdWNmdjNLM1J2ZzB0RW1Od3U5THV5?=
- =?utf-8?B?cDNzcG5jYjFsMnBINGNqVmVwY2c1SDZFcUFrZmMwSnk1Tm1OZVg0Y1EyWFdn?=
- =?utf-8?B?dWNsTWhwOTVBUEozMnE0U3JFNHluRERmQWRjZjlhUmVKZFB2dnRVZ0ZDaGFp?=
- =?utf-8?B?VWg0dFBhKzNzVEdvenovUXgzdGdQRi9UMkNsWElLbGwxYyt5RjRsdHU2WHRr?=
- =?utf-8?B?ZktoVC9lcE5POGxsYXVxeFlJc1dmWlN3eldtSU5uTmJsN1BqOGVHNXcydWhn?=
- =?utf-8?B?YzY1aE5aZExQZ002TnpHaXZrV3JrTG5uS04zRnpJK1ZTT0ZkbTZqYVRJUDdO?=
- =?utf-8?Q?5p+5EUrkDdIV+0QeO5VezCIO1TeLtTEZ0CHI2sCoakyB?=
+ 4TJgRq3Wvsz1yDD
+ for <lustre-devel@lists.lustre.org>; Mon, 22 Jan 2024 11:35:35 -0800 (PST)
+Received: by mail-yb1-f171.google.com with SMTP id
+ 3f1490d57ef6-dc227feab99so3311185276.2
+ for <lustre-devel@lists.lustre.org>; Mon, 22 Jan 2024 11:35:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=aeoncomputing-com.20230601.gappssmtp.com; s=20230601; t=1705952134;
+ x=1706556934; darn=lists.lustre.org; 
+ h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+ :date:message-id:reply-to;
+ bh=6PlYfL4JopKr7EdIrUWY4+4Mo9+t7j0GjEPY8U7xhzI=;
+ b=Y3stSQh4/UTYMxzgDbac5jddxfVN14pQq21goqlPf99DhF71o3/yD5ZPtMP/PLw1XV
+ MESjhUR9uR7GjDs8ORwaOY0zZlH9vP7kbLPwgcmpyEyPqiwe5kbbmU2GH0Hh0IJXKIME
+ 9gQGqwuFnaMHB2cVl4gQzbpSTakqWvPVvOtmjY4AgNx0W+zXmE34VY8UnJ8O1LuGSdY/
+ BsLPrU5kSNmDFAKyibbdIUNA/+q+euqLvLKzEQXid1akHZU6t1IYIv0i5OIelLXlnLcm
+ mRrdAMhIk3cXM5NJrhbBb17SkV29khzvYrJRKfVy/9beyCF/qCNaAdfedO7EOQHI131F
+ 63HQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20230601; t=1705952134; x=1706556934;
+ h=to:subject:message-id:date:from:mime-version:x-gm-message-state
+ :from:to:cc:subject:date:message-id:reply-to;
+ bh=6PlYfL4JopKr7EdIrUWY4+4Mo9+t7j0GjEPY8U7xhzI=;
+ b=As8KC43yLFvdAyDFvWB8u3jbAW8U1kgs6yQBeXEaSNd26c+ohOvwL1+XMx49Kg01zO
+ ausWIXCuvrthvRbSDQo165XEYFV5yfY1RCTrdOuKGPrZ9v88wI8hJrs+02zC12VOdHf7
+ 5VK+LHyxl7lF6PaA92977pUy1xb6LqCASnQM7Lu84x0thUZTwJuh4OgOAtXrKFJbb1nS
+ 8yDiLHem58i5rrASW6HCG3obyGAr4XnUB+q4xpwNJ2S43dpGUgIT/sQLEZuP0vVdW6TX
+ drvv0y38frsoa1yKks1mS9wjgtB+qn7TG8DmskNoNRoml0Bi9+XFQVmg/QnrptGlrzj1
+ ZKOg==
+X-Gm-Message-State: AOJu0YyIG4yzdEcnfP42Xig1s9gDUlOwNdiU/0CiLDL0GQOdUQzLzV6u
+ Pukt1d9hiz5JXIPaMSA6IOkgZg354g0DYplB8mTMSidPSzbUcwi+R1YnejYfk64uTF+rbWQj1Nl
+ ngjsFJzX0LFwfjX2lTNAo2MhHnmhO0RdUbIENGGueiCzrujm7Srg=
+X-Google-Smtp-Source: AGHT+IGPAsnBURcqZLP7Yvd0KimEY521xb7WGcYGtmoeiQIMzKiUJpLyJn43OrmjWafH85ySRLz6ORiZoS8pxmve2a8=
+X-Received: by 2002:a05:6902:2610:b0:da0:442f:988e with SMTP id
+ dw16-20020a056902261000b00da0442f988emr2533315ybb.19.1705952134269; Mon, 22
+ Jan 2024 11:35:34 -0800 (PST)
 MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: A0XheLM7UBCOIItqiHCW7BArdnJYt9+VLfD9wdTue9LvOcmVyKsnhkn954DE/SPIbjbDp67LgF035J6VkelwPiXUUhHjkJ4icLxAbYHFFcg9oks1CfWPbWTisxNj8LgjVWxy9xvOsTmtzW6AzybO5IEwiUt9GSeLKuVLr7V24+E4R6sJv0azCjmyqHkd1R9Vf+Yx3lTCAYnjrrB8NcyEN/j7SQgs/zPNfvYBmP/+o85IUmoWFsbJGIOhqs4y+YEgYToKjWTtyZbu24XM6ME0ygvHmxbYfhNdanACLTF755l9tQjr9FOE1+WzTkpVFVzQlho6cYaVjUhlPAXSWpIytU9lyoqJ7ddK4PQKq9yaUP8gvVLcJyZs3N1BaJwRxOxr0bCo2FxiQxAli/g68ep5nq4fePnoL4SJLJx/UMGI3HZpzIlERbnWgkA2kH+n9wvTDmXBTB6qVFSKYG8KqVnaHf5SeMxGKDdyIu4jTNqnc2fqh9I9vaLNbM4bfIsQNbMs93YDunbTkmEgHnTfcz7dxpSCHWAkH0ZIVCqXd418jzs2nvGgzAJpc9SXGOVG1o/zDhhjzYwVLN5EU/CBW70+Mj64F9BKMhLBMDi9t9C7rHTg7/iEEEALuyapgcWyXFZvRYVfcAheHSyOPG8wenSyrUcIo08p+UszVhvewGZHcnc=
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: PH7PR19MB7534.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e82966a3-3d2c-4265-dd19-08dc0383aab5
-X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Dec 2023 06:52:01.8813 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: mkNLeoB6pLYBM5dM8TxL4XGbbE3VU9+syeyyFZI+SI4BKub9IBf3OSosQp8wSWkN
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: PH7PR19MB6458
-X-BESS-ID: 1703314325-111260-12389-5600-1
-X-BESS-VER: 2019.1_20231221.2126
-X-BESS-Apparent-Source-IP: 104.47.70.101
-X-BESS-Parts: H4sIAAAAAAACAzXLOw4CMQxF0b24niL+4WS2gigSJ9Y0iIIUSGj2Toqhebp60r
- l/YXwm7DDXbvB6w44otupYp1VORLfRCrWg6qmrplzDWLkIGpzb3x/zeXlTzJcvaGP0HN
- 5NvGkLDhehYCb1KAjn4wePKIrygQAAAA==
-X-BESS-Outbound-Spam-Score: 0.00
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.253009 [from 
- cloudscan9-152.us-east-2a.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 HTML_MESSAGE           BODY: HTML included in message 
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
-Subject: [lustre-devel] Lustre 2.15.4 released
+From: Jeff Johnson <jeff.johnson@aeoncomputing.com>
+Date: Mon, 22 Jan 2024 11:35:23 -0800
+Message-ID: <CAFCYAsfNnaLzKZrOTLLOc0S3077reuEWjs0ytJYNHm4+-5R4Sw@mail.gmail.com>
+To: lustre-devel@lists.lustre.org
+Subject: [lustre-devel] Cannot find documentation or comment blocks
+ specifically defining lnet metrics
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -152,186 +69,78 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Peter Jones <pjones@whamcloud.com>
-Content-Type: multipart/mixed; boundary="===============0074801441736820760=="
+Content-Type: multipart/mixed; boundary="===============1649262764815180910=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============0074801441736820760==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_2D29A04722564E02AE32CDEE9C7CF443ddncom_"
+--===============1649262764815180910==
+Content-Type: multipart/alternative; boundary="000000000000f7a34a060f8deebd"
 
---_000_2D29A04722564E02AE32CDEE9C7CF443ddncom_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+--000000000000f7a34a060f8deebd
+Content-Type: text/plain; charset="UTF-8"
 
-V2UgYXJlIHBsZWFzZWQgdG8gYW5ub3VuY2UgdGhhdCB0aGUgTHVzdHJlIDIuMTUuNCBSZWxlYXNl
-IGhhcyBiZWVuIGRlY2xhcmVkIEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yIGRvd25sb2FkPGh0dHBz
-Oi8vZG93bmxvYWRzLndoYW1jbG91ZC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4xNS40Lz4g
-PGh0dHBzOi8vZG93bmxvYWRzLmhwZGQuaW50ZWwuY29tL3B1YmxpYy9sdXN0cmUvbHVzdHJlLTIu
-MTEuMC8+IC4gWW91IGNhbiBhbHNvIGdyYWIgdGhlIHNvdXJjZSBmcm9tIGdpdDxodHRwczovL2dp
-dC53aGFtY2xvdWQuY29tLz9wPWZzL2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDtoPWNhYzg3
-MGNmNGQyYmQ5OTA1YjFiMmJiZTU2M2RlZmU2ZDc0OGFjOTQ+DQoNCkRldGFpbHMgb2YgY2hhbmdl
-cyBzaW5jZSAyLjE1LjM8aHR0cHM6Ly93aWtpLmx1c3RyZS5vcmcvTHVzdHJlXzIuMTUuM19DaGFu
-Z2Vsb2c+IGNhbiBiZSBmb3VuZCBpbiB0aGUgMi4xNS40IGNoYW5nZSBsb2cuPGh0dHBzOi8vd2lr
-aS5sdXN0cmUub3JnL0x1c3RyZV8yLjE1LjRfQ2hhbmdlbG9nPg0KDQpUaGVyZSBhcmUgdGhlIGZv
-bGxvd2luZyBub3RhYmxlIGVuaGFuY2VtZW50cyBvdmVyIDIuMTUuMzoNCg0KUkhFTCA4LjkgaXMg
-bm93IHN1cHBvcnRlZCBmb3Igc2VydmVycyBhbmQgY2xpZW50cyAgKExVLTE3MzM4PGh0dHBzOi8v
-amlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xNzMzOD4pLg0KDQpSSEVMIDkuMyBpcyBub3cg
-c3VwcG9ydGVkIGZvciBjbGllbnRzICAgKExVLTE3Mjc0PGh0dHBzOi8vamlyYS53aGFtY2xvdWQu
-Y29tL2Jyb3dzZS9MVS0xNzI3ND4pDQoNClRoZXJlIGFyZSBhbHNvIGEgbnVtYmVyIG9mIHVzZWZ1
-bCBmaXhlcyBhbmQgaXQgd291bGQgYmUgYWR2aXNhYmxlIGZvciBhbnlvbmUgcnVubmluZyAyLjE1
-LnggaW4gcHJvZHVjdGlvbiB0byB1cGdyYWRlIHRvIHRoaXMgdmVyc2lvbi4NCg0KUGxlYXNlIGxv
-ZyBhbnkgaXNzdWVzIGZvdW5kIGluIHRoZSBpc3N1ZSB0cmFja2luZyBzeXN0ZW08aHR0cHM6Ly9q
-aXJhLndoYW1jbG91ZC5jb20vPi4NCg0KVGhhbmtzIHRvIGFsbCB0aG9zZSB3aG8gaGF2ZSBjb250
-cmlidXRlZCB0byB0aGUgY3JlYXRpb24gb2YgdGhpcyByZWxlYXNlLg0KDQpUaGUgbmV4dCBMVFMg
-cmVsZWFzZSB3aWxsIGJlIDIuMTUuNQ0KDQo=
+Greetings all...
 
---_000_2D29A04722564E02AE32CDEE9C7CF443ddncom_
-Content-Type: text/html; charset="utf-8"
-Content-ID: <447B3BBDE44ABE4CB6FD9DD5531C4ED9@namprd19.prod.outlook.com>
-Content-Transfer-Encoding: base64
+I'm modifying a Lustre metrics reporting tool and incorporating lnet
+metrics into the data gathered. I dug through all the documentation I could
+find and looked through source for comment blocks and didn't find anything
+definitive. I'm hoping someone here could clarify. While some metrics are
+obvious (*_drop) others I would rather not develop to based on assumptions.
 
-PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
-bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
-dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
-dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
-dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
-dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
-bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
-ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
-IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
-IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQovKiBTdHlsZSBEZWZpbml0aW9ucyAqLw0KcC5Nc29Ob3Jt
-YWwsIGxpLk1zb05vcm1hbCwgZGl2Lk1zb05vcm1hbA0KCXttYXJnaW46MGluOw0KCWZvbnQtc2l6
-ZToxMi4wcHQ7DQoJZm9udC1mYW1pbHk6IkNhbGlicmkiLHNhbnMtc2VyaWY7fQ0KYTpsaW5rLCBz
-cGFuLk1zb0h5cGVybGluaw0KCXttc28tc3R5bGUtcHJpb3JpdHk6OTk7DQoJY29sb3I6IzA1NjND
-MTsNCgl0ZXh0LWRlY29yYXRpb246dW5kZXJsaW5lO30NCnNwYW4uYXBwbGUtY29udmVydGVkLXNw
-YWNlDQoJe21zby1zdHlsZS1uYW1lOmFwcGxlLWNvbnZlcnRlZC1zcGFjZTt9DQpzcGFuLkVtYWls
-U3R5bGUxOQ0KCXttc28tc3R5bGUtdHlwZTpwZXJzb25hbC1yZXBseTsNCglmb250LWZhbWlseToi
-Q2FsaWJyaSIsc2Fucy1zZXJpZjsNCgljb2xvcjp3aW5kb3d0ZXh0O30NCi5Nc29DaHBEZWZhdWx0
-DQoJe21zby1zdHlsZS10eXBlOmV4cG9ydC1vbmx5Ow0KCWZvbnQtc2l6ZToxMC4wcHQ7DQoJbXNv
-LWxpZ2F0dXJlczpub25lO30NCkBwYWdlIFdvcmRTZWN0aW9uMQ0KCXtzaXplOjguNWluIDExLjBp
-bjsNCgltYXJnaW46MS4waW4gMS4waW4gMS4waW4gMS4waW47fQ0KZGl2LldvcmRTZWN0aW9uMQ0K
-CXtwYWdlOldvcmRTZWN0aW9uMTt9DQotLT48L3N0eWxlPg0KPC9oZWFkPg0KPGJvZHkgbGFuZz0i
-RU4tVVMiIGxpbms9IiMwNTYzQzEiIHZsaW5rPSIjOTU0RjcyIiBzdHlsZT0id29yZC13cmFwOmJy
-ZWFrLXdvcmQiPg0KPGRpdiBjbGFzcz0iV29yZFNlY3Rpb24xIj4NCjxwIGNsYXNzPSJNc29Ob3Jt
-YWwiPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+V2UgYXJlIHBsZWFzZWQgdG8gYW5ub3VuY2Ug
-dGhhdCB0aGUgTHVzdHJlIDIuMTwvc3Bhbj41PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4uPC9z
-cGFuPjQ8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPiBSZWxlYXNlIGhhcyBiZWVuIGRlY2xhcmVk
-IEdBIGFuZCBpcyBhdmFpbGFibGUgZm9yJm5ic3A7PC9zcGFuPjxhIGhyZWY9Imh0dHBzOi8vZG93
-bmxvYWRzLndoYW1jbG91ZC5jb20vcHVibGljL2x1c3RyZS9sdXN0cmUtMi4xNS40LyI+ZG93bmxv
-YWQ8L2E+PGEgaHJlZj0iaHR0cHM6Ly9kb3dubG9hZHMuaHBkZC5pbnRlbC5jb20vcHVibGljL2x1
-c3RyZS9sdXN0cmUtMi4xMS4wLyI+Jm5ic3A7PC9hPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+
-Lg0KIFlvdSBjYW4gYWxzbyBncmFiIHRoZSBzb3VyY2UgZnJvbTwvc3Bhbj48YSBocmVmPSJodHRw
-czovL2dpdC53aGFtY2xvdWQuY29tLz9wPWZzL2x1c3RyZS1yZWxlYXNlLmdpdDthPWNvbW1pdDto
-PWNhYzg3MGNmNGQyYmQ5OTA1YjFiMmJiZTU2M2RlZmU2ZDc0OGFjOTQiPiZuYnNwO2dpdDwvYT48
-c3BhbiBsYW5nPSJFTi1DQSI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05v
-cm1hbCI+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PHNwYW4gbGFuZz0i
-RU4tQ0EiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxl
-PSJtYXJnaW4tcmlnaHQ6LjVpbiI+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj5EZXRhaWxzIG9m
-IGNoYW5nZXMgc2luY2UmbmJzcDs8L3NwYW4+PGEgaHJlZj0iaHR0cHM6Ly93aWtpLmx1c3RyZS5v
-cmcvTHVzdHJlXzIuMTUuM19DaGFuZ2Vsb2ciIHRpdGxlPSJodHRwczovL3dpa2kubHVzdHJlLm9y
-Zy9MdXN0cmVfMi4xMi44X0NoYW5nZWxvZyI+PHNwYW4gc3R5bGU9ImNvbG9yOndpbmRvd3RleHQi
-PjIuMTUuMzwvc3Bhbj48L2E+PHNwYW4gY2xhc3M9ImFwcGxlLWNvbnZlcnRlZC1zcGFjZSI+PHNw
-YW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PC9zcGFuPjxzcGFuIHN0eWxlPSJj
-b2xvcjpibGFjayI+Y2FuDQogYmUgZm91bmQgaW4gdGhlJm5ic3A7PC9zcGFuPjxhIGhyZWY9Imh0
-dHBzOi8vd2lraS5sdXN0cmUub3JnL0x1c3RyZV8yLjE1LjRfQ2hhbmdlbG9nIj48c3BhbiBzdHls
-ZT0iY29sb3I6d2luZG93dGV4dCI+Mi4xNS40IGNoYW5nZSBsb2cuPC9zcGFuPjwvYT48c3BhbiBs
-YW5nPSJFTi1DQSIgc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQ7Y29sb3I6YmxhY2siPjxvOnA+PC9v
-OnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJjYXJldC1jb2xvcjog
-cmdiKDAsIDAsIDApO2ZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0
-LWFsaWduOnN0YXJ0O3dpZG93czogYXV0bzstd2Via2l0LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87
-LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4O3dvcmQtc3BhY2luZzowcHgiPg0KPHNwYW4g
-c3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDs8L3NwYW4+PHNwYW4gbGFuZz0iRU4tQ0EiIHN0eWxl
-PSJjb2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1h
-bCIgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5v
-cm1hbDtvcnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQt
-dGV4dC1zaXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29y
-ZC1zcGFjaW5nOjBweCI+DQo8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPlRoZXJlIDwvc3Bhbj5h
-cmU8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPiB0aGUgZm9sbG93aW5nIG5vdGFibGUgZW5oYW5j
-ZW1lbnRzIG92ZXIgMi4xNS48L3NwYW4+MzxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+Ojwvc3Bh
-bj48c3BhbiBsYW5nPSJFTi1DQSIgc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bh
-bj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAw
-LCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpz
-dGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQt
-dGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxiPjxzcGFuIHN0eWxl
-PSJjb2xvcjpibGFjaztiYWNrZ3JvdW5kOndoaXRlIj4mbmJzcDs8L3NwYW4+PC9iPjxzcGFuIGxh
-bmc9IkVOLUNBIiBzdHlsZT0iY29sb3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxw
-IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApO2ZvbnQt
-dmFyaWFudC1jYXBzOiBub3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0LWFsaWduOnN0YXJ0O3dpZG93
-czogYXV0bzstd2Via2l0LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87LXdlYmtpdC10ZXh0LXN0cm9r
-ZS13aWR0aDogMHB4O3dvcmQtc3BhY2luZzowcHgiPg0KPGI+PHNwYW4gc3R5bGU9ImNvbG9yOmJs
-YWNrO2JhY2tncm91bmQ6d2hpdGUiPlJIRUwgOC45Jm5ic3A7PC9zcGFuPjwvYj48c3BhbiBzdHls
-ZT0iY29sb3I6YmxhY2s7YmFja2dyb3VuZDp3aGl0ZSI+aXMgbm93IHN1cHBvcnRlZCBmb3Igc2Vy
-dmVycyBhbmQgY2xpZW50czxzcGFuIGNsYXNzPSJhcHBsZS1jb252ZXJ0ZWQtc3BhY2UiPiZuYnNw
-Ozwvc3Bhbj48L3NwYW4+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4mbmJzcDsoPC9zcGFuPjxh
-IGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xNzMzOCIgdGl0bGU9
-Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0xNTc5NSI+PHNwYW4gc3R5bGU9
-ImNvbG9yOndpbmRvd3RleHQiPkxVLTE3MzM4PC9zcGFuPjwvYT48c3BhbiBzdHlsZT0iY29sb3I6
-YmxhY2siPikuJm5ic3A7PC9zcGFuPjxzcGFuIGxhbmc9IkVOLUNBIiBzdHlsZT0iY29sb3I6Ymxh
-Y2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJj
-YXJldC1jb2xvcjogcmdiKDAsIDAsIDApO2ZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7b3JwaGFu
-czogYXV0bzt0ZXh0LWFsaWduOnN0YXJ0O3dpZG93czogYXV0bzstd2Via2l0LXRleHQtc2l6ZS1h
-ZGp1c3Q6IGF1dG87LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4O3dvcmQtc3BhY2luZzow
-cHgiPg0KPHNwYW4gbGFuZz0iRU4tQ0EiIHN0eWxlPSJmb250LXNpemU6MTQuMHB0O2NvbG9yOmJs
-YWNrIj4mbmJzcDs8L3NwYW4+PHNwYW4gbGFuZz0iRU4tQ0EiIHN0eWxlPSJjb2xvcjpibGFjayI+
-PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImNhcmV0
-LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtvcnBoYW5zOiBh
-dXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1zaXplLWFkanVz
-dDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFjaW5nOjBweCI+
-DQo8Yj48c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPlJIRUwgOS48L3NwYW4+MzwvYj48c3BhbiBz
-dHlsZT0iY29sb3I6YmxhY2siPiA8c3BhbiBzdHlsZT0iYmFja2dyb3VuZDp3aGl0ZSI+DQppcyBu
-b3cgc3VwcG9ydGVkIGZvciBjbGllbnRzPHNwYW4gY2xhc3M9ImFwcGxlLWNvbnZlcnRlZC1zcGFj
-ZSI+Jm5ic3A7PC9zcGFuPjwvc3Bhbj4mbmJzcDsgKDwvc3Bhbj48YSBocmVmPSJodHRwczovL2pp
-cmEud2hhbWNsb3VkLmNvbS9icm93c2UvTFUtMTcyNzQiPjxzcGFuIHN0eWxlPSJjb2xvcjp3aW5k
-b3d0ZXh0Ij5MVS0xNzI3NDwvc3Bhbj48L2E+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj4pPC9z
-cGFuPjxvOnA+PC9vOnA+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gbGFuZz0iRU4t
-Q0EiIHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+
-DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPlRoZXJlIGFy
-ZSBhbHNvIGEgbnVtYmVyIG9mIHVzZWZ1bCBmaXhlcyBhbmQgaXQgd291bGQgYmUgYWR2aXNhYmxl
-IGZvciBhbnlvbmUgcnVubmluZyAyLjE1LnggaW4gcHJvZHVjdGlvbiB0byB1cGdyYWRlIHRvIHRo
-aXMgdmVyc2lvbi48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj48
-c3BhbiBsYW5nPSJFTi1DQSIgc3R5bGU9ImZvbnQtc2l6ZToxNC4wcHQiPjxvOnA+Jm5ic3A7PC9v
-OnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJjYXJldC1jb2xvcjog
-cmdiKDAsIDAsIDApO2ZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0
-LWFsaWduOnN0YXJ0O3dpZG93czogYXV0bzstd2Via2l0LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87
-LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4O3dvcmQtc3BhY2luZzowcHgiPg0KPHNwYW4g
-c3R5bGU9ImNvbG9yOmJsYWNrIj5QbGVhc2UgbG9nIGFueSBpc3N1ZXMgZm91bmQgaW4gdGhlJm5i
-c3A7PC9zcGFuPjxhIGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tLyI+PHNwYW4gc3R5
-bGU9ImNvbG9yOnB1cnBsZSI+aXNzdWUgdHJhY2tpbmcgc3lzdGVtPC9zcGFuPjwvYT48c3BhbiBz
-dHlsZT0iY29sb3I6YmxhY2siPi48L3NwYW4+PHNwYW4gbGFuZz0iRU4tQ0EiIHN0eWxlPSJjb2xv
-cjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5
-bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7Zm9udC12YXJpYW50LWNhcHM6IG5vcm1hbDtv
-cnBoYW5zOiBhdXRvO3RleHQtYWxpZ246c3RhcnQ7d2lkb3dzOiBhdXRvOy13ZWJraXQtdGV4dC1z
-aXplLWFkanVzdDogYXV0bzstd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7d29yZC1zcGFj
-aW5nOjBweCI+DQo8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPiZuYnNwOzwvc3Bhbj48c3BhbiBs
-YW5nPSJFTi1DQSIgc3R5bGU9ImNvbG9yOmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8
-cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250
-LXZhcmlhbnQtY2Fwczogbm9ybWFsO29ycGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRv
-d3M6IGF1dG87LXdlYmtpdC10ZXh0LXNpemUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJv
-a2Utd2lkdGg6IDBweDt3b3JkLXNwYWNpbmc6MHB4Ij4NCjxzcGFuIHN0eWxlPSJjb2xvcjpibGFj
-ayI+VGhhbmtzIHRvIGFsbCB0aG9zZSB3aG8gaGF2ZSBjb250cmlidXRlZCB0byB0aGUgY3JlYXRp
-b24gb2YgdGhpcyByZWxlYXNlLjwvc3Bhbj48c3BhbiBsYW5nPSJFTi1DQSIgc3R5bGU9ImNvbG9y
-OmJsYWNrIj48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
-ZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTtmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsO29y
-cGhhbnM6IGF1dG87dGV4dC1hbGlnbjpzdGFydDt3aWRvd3M6IGF1dG87LXdlYmtpdC10ZXh0LXNp
-emUtYWRqdXN0OiBhdXRvOy13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDt3b3JkLXNwYWNp
-bmc6MHB4Ij4NCjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+Jm5ic3A7PC9zcGFuPjxzcGFuIGxh
-bmc9IkVOLUNBIiBzdHlsZT0iY29sb3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxw
-IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApO2ZvbnQt
-dmFyaWFudC1jYXBzOiBub3JtYWw7b3JwaGFuczogYXV0bzt0ZXh0LWFsaWduOnN0YXJ0O3dpZG93
-czogYXV0bzstd2Via2l0LXRleHQtc2l6ZS1hZGp1c3Q6IGF1dG87LXdlYmtpdC10ZXh0LXN0cm9r
-ZS13aWR0aDogMHB4O3dvcmQtc3BhY2luZzowcHgiPg0KPHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNr
-Ij5UaGUgbmV4dCBMVFMgcmVsZWFzZSB3aWxsIGJlIDIuMTUuPC9zcGFuPjU8c3BhbiBsYW5nPSJF
-Ti1DQSI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4g
-bGFuZz0iRU4tQ0EiPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPC9ib2R5
-Pg0KPC9odG1sPg0K
+msgs_alloc
+msgs_max
+rst_alloc
+send_count
+recv_count
+route_count
+drop_count
+send_length
+recv_length
+route_length
+drop_length
 
---_000_2D29A04722564E02AE32CDEE9C7CF443ddncom_--
+If someone can point me to the document that clearly defines the above I'd
+appreciate it, so far I can't find any. As I said I don't want to develop
+based on assumptions.
 
---===============0074801441736820760==
+For example, when sampled over a short period of time does...
+
+((X_length / X_count) / # samples) = avg rpc size of X type?
+
+Send, Recv, Route and Drop are fairly clear. Length and Count I am assuming
+are just that, n bytes and IOs. msgs_alloc, msgs_max, rst_alloc are less
+obvious.
+
+Thanks!
+
+--Jeff
+
+--000000000000f7a34a060f8deebd
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">Greetings all...<div><br></div><div>I&#39;m modifying a Lu=
+stre metrics reporting tool and incorporating lnet metrics=C2=A0into the da=
+ta gathered. I dug through all the documentation I could find and looked th=
+rough source for comment blocks and didn&#39;t find anything definitive. I&=
+#39;m hoping someone here could clarify. While some metrics are obvious (*_=
+drop) others I would rather not develop to based on assumptions.=C2=A0</div=
+><div><br></div><div>msgs_alloc<br>msgs_max<br>rst_alloc<br>send_count<br>r=
+ecv_count<br>route_count<br>drop_count<br>send_length<br>recv_length<br>rou=
+te_length<br>drop_length<br clear=3D"all"><div><br></div><div>If someone ca=
+n point me to the document that clearly defines the above I&#39;d appreciat=
+e it, so far I can&#39;t find any. As I said I don&#39;t want to develop ba=
+sed on assumptions.</div><div><br></div><div>For example, when sampled over=
+ a short period of time does...<br></div><div><br></div><div>((X_length / X=
+_count) / # samples) =3D avg rpc size of X type?</div><div><br></div><div>S=
+end, Recv, Route and Drop are fairly clear. Length and Count I am assuming =
+are just that, n bytes and IOs. msgs_alloc, msgs_max, rst_alloc are less ob=
+vious.</div><div><br></div><div>Thanks!</div><div><br></div><div>--Jeff</di=
+v><br></div></div>
+
+--000000000000f7a34a060f8deebd--
+
+--===============1649262764815180910==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -342,4 +151,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============0074801441736820760==--
+--===============1649262764815180910==--
