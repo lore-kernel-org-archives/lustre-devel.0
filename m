@@ -4,144 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 17AE6C48286
-	for <lustre-devel@archiver.kernel.org>; Thu,  1 Feb 2024 21:00:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 7F369C4828F
+	for <lustre-devel@archiver.kernel.org>; Sun,  4 Feb 2024 17:35:01 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4TQrrY3Hvyz21Bx;
-	Thu,  1 Feb 2024 12:59:57 -0800 (PST)
-Received: from outbound-ip191b.ess.barracuda.com
- (outbound-ip191b.ess.barracuda.com [209.222.82.124])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4TSc8d0JZmz1y6q;
+	Sun,  4 Feb 2024 09:34:57 -0800 (PST)
+Received: from mail-yb1-f182.google.com (mail-yb1-f182.google.com
+ [209.85.219.182])
+ (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
+ key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4TQrrH0PgJz1whT
- for <lustre-devel@lists.lustre.org>; Thu,  1 Feb 2024 12:59:42 -0800 (PST)
-Received: from NAM10-DM6-obe.outbound.protection.outlook.com
- (mail-dm6nam10lp2101.outbound.protection.outlook.com [104.47.58.101]) by
- mx-outbound43-187.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Thu, 01 Feb 2024 20:59:25 +0000
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=gOpk3VSPrbacVlZADbuF2HHiOk5BmX35iwFNutYJblZsrK+OIkcA8WojLx+1n3L7T75tbtk9+VY002X5nDbqMIB6GFqRK4GP7GCCIKveQl2gCvb/gc+s1vUG+RUKwxkHlDyxYYuC+VO9KMM2UIlySs/Fl7Nm06I3MCfrdDnmbs5sWZXIl+SgW3VCJn2x4+R56aF34yPOkuR7AVPKZazQshkgIyvu/MFvd16/vXQ0lxrPmALdj4tIHWLzqT+1w7mS8ntwzM/IL5uEHY65X9YpbVVP9ErNeihfm9o4mdnVsSfsoLgWIxwLXWliuQTDhKIqRzOqJ2CiLa1nmWeV6pkVYQ==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector9901;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=V/IegxQEWdPhZNPvxyNwIPW2KgQ/W2oQpl6gUxzds0c=;
- b=VpIeSzI3u6AUzA220nkh7nYjDNPblCWZwRaERwYIynsYlCKd1ycDO6ILhxsRC5VCODg3Mc+uFhIPJ45fzNCygBMv1AvNziu2+8D9G1UYB57cOa9tj9/niCVRUuLzfPdQNU4ou8fo3TSJw7bMRWXVcaASE9AmRdO6anPwTsChEA+Cq9mqgeq7ZZ/nvMIUvxl1Y7YgPZ8R6WupyjDs4r4+wCPSmVPB2mU6Vb412lOkYYsdnd8kLubWJumPtjERDvF+9TubDKauKV5zqAhAho9mFLmJuuNmEPW9aJcIfxGIUucBTf9MPUf8R/bxerpjoW1G9oysAGpmITqI+MZCGJpyqA==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=V/IegxQEWdPhZNPvxyNwIPW2KgQ/W2oQpl6gUxzds0c=;
- b=Zuf/7pn2ZAHKDJVpqPQUrvS5I7w+gFvqieQ0b+tmCgQFarObcftg3udIKc0WOwlNCap5ggb53S2b/F3VHhy1m+PBoCottOFNaBPq95np81Wn5RbaT94yn2xQYq+Gpo978FRMjGF7qMQ/MCHgM2YaxRA1sOkc4SWQbZgsahY6sIQ=
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
- by SN7PR19MB7334.namprd19.prod.outlook.com (2603:10b6:806:32b::16)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.7228.36; Thu, 1 Feb
- 2024 20:59:22 +0000
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::22d5:7dc1:2df8:5fdb]) by MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::22d5:7dc1:2df8:5fdb%4]) with mapi id 15.20.7249.024; Thu, 1 Feb 2024
- 20:59:22 +0000
-To: Saisha Kamat <skamat1@charlotte.edu>
-Thread-Topic: [lustre-devel] [EXTERNAL] Re: Direct Modification of Lustre
- Metadata on Disk
-Thread-Index: AQHaVLAA3Fpslzeqwki1F2DysyPfTrD1+a6A
-Date: Thu, 1 Feb 2024 20:59:22 +0000
-Message-ID: <1825EEAC-C476-44ED-8C88-C52A713E2273@ddn.com>
+ 4TSc8T2hyMz1wLM
+ for <lustre-devel@lists.lustre.org>; Sun,  4 Feb 2024 09:34:49 -0800 (PST)
+Received: by mail-yb1-f182.google.com with SMTP id
+ 3f1490d57ef6-dc6cbe1ac75so1717703276.1
+ for <lustre-devel@lists.lustre.org>; Sun, 04 Feb 2024 09:34:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=charlotte.edu; s=google; t=1707068087; x=1707672887; darn=lists.lustre.org; 
+ h=cc:to:subject:message-id:date:from:in-reply-to:references
+ :mime-version:from:to:cc:subject:date:message-id:reply-to;
+ bh=MSIgjcHaAs9SKAzX+8tL/TX3x/MO3eUrcguo+RFko+I=;
+ b=VtFWaOimPT8q1ClZHci7GmHRze/cazaZPUrkR/EzLD2zvNvRi4Eg2IeyOElLtRkryR
+ k6IC9lUGY5DoOzVApVEXKr494l11RXJmhge06bMiWuO44YzAu6FZ+8cjpJDApII/FQ4g
+ cW260rO1SHpzvj2jorOpDulnv3hcK/f5ELUmggttKpiGnFpXZAHEv+fSjCAenREan1dO
+ AKBQxTYqyHKXCYr4nbssDn8AZGa08SItV6AoPIt7zG4KEeCNcaZW/kd95o7g271JRY4Q
+ giW9/MGHoPNvVIfkFxbBN2Wo81OKJ61YXAatnbe7SvPrUiRI1itqvTjO1maD210qENeo
+ avdg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20230601; t=1707068087; x=1707672887;
+ h=cc:to:subject:message-id:date:from:in-reply-to:references
+ :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
+ :reply-to;
+ bh=MSIgjcHaAs9SKAzX+8tL/TX3x/MO3eUrcguo+RFko+I=;
+ b=ppLTl0kHvWE5aPRoQ272yz3oWWIF7/EUc1ztryj87nx/iZ2NhuyKb3hCKO6LvJCPe6
+ 3/hLWv7ElRffYGhiajdmagzpV1lDc1OZoTtXPzg11tSkzUDDtZskaqnBkERU/mDNU9h+
+ 0R6QMuvPC6ujuFxEv3i8JlUGn6hRACkpuQnRxH1XogZbSR2f5SecrMAza7oxHhl8MFfY
+ w9n9QA2K7hW9kbroTQyKLK9k9cInMysJbZz4KkY/5DErKIQwEuvpP1ZnpuJi5lNw4KI/
+ KUoPe2m2w6EKdgLyFG3FqhhTSqE01eBdn94E30CatCfc5ua1hxsSoem4IPRvCAwiMc3j
+ xAQQ==
+X-Gm-Message-State: AOJu0YzG9Tg/7H7/jRDE8CTR4nAT9Q7raN2AhT6IdMF7aTfA8rLj4tRY
+ taaypsq1zAyMapKAo9uDbjzpb2CBi9q6isf4Z5Pu4suWBqqR0JlOdh2cmFU89kPdPjhBSne7X7I
+ qQCvir5Dy+GBwYjoiU7SYpX/uX5ODTsZsW9ijTQ==
+X-Google-Smtp-Source: AGHT+IG0IgETAt8JZSxwTKNoX/vwA4wpORzGHgIEm3ko6uKP4MMieA34BHPuh47zvEhbB3ArmBlQiu8t58etgVBbaIE=
+X-Received: by 2002:a05:6902:1345:b0:dc6:b1ab:b400 with SMTP id
+ g5-20020a056902134500b00dc6b1abb400mr2668291ybu.18.1707068087340; Sun, 04 Feb
+ 2024 09:34:47 -0800 (PST)
+MIME-Version: 1.0
 References: <CACyzrcQosBre=vRYDN+VeB=o=9bB-mJGT=NrQBhJi_59Eqe7jw@mail.gmail.com>
  <LO2P265MB7274C2E5806D5C1E9655B5B4AB792@LO2P265MB7274.GBRP265.PROD.OUTLOOK.COM>
  <CACyzrcQEW_R2byC5AzvF7GwbD1z9o25MgnY2DS8yRd8ePrUz6g@mail.gmail.com>
-In-Reply-To: <CACyzrcQEW_R2byC5AzvF7GwbD1z9o25MgnY2DS8yRd8ePrUz6g@mail.gmail.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: Apple Mail (2.3445.104.21)
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|SN7PR19MB7334:EE_
-x-ms-office365-filtering-correlation-id: d2e1d115-9d7b-4808-3c33-08dc2368aabc
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
-x-microsoft-antispam-message-info: ZezAC9mGADhlC7dyTD023HZgK1TupXR2Ch+vyPSL4keo6tT/60qKFgRcwqS8K2BsiaNW0OpP3pogufsGjCkMEygEMmvDonoo9OLTxoeMXw6akDoRNj2E3iB2qfGyE4iOLvBe6F27LkwfYRn4tURLGSBNimLx7w+cW5aQ5AAiiScz2Sjt1/6A3tzSRyyMZSNtBAk29rJLR8ADjvn3yXcvj+kE+gyW4VhdEHbaJYwIX6QhC28gsIxeYYERw7G2GRgOvEZgZ5gs5zVJVhQjIdz/mUbFJvonvzIPc3DzizlMEmaEdSXa5S1hZgMy+cHGYdLOmO5b+Kcr/jTy0uRBV9cDxR0nWccnz0HgoXN8jcBZGZ/MQiRTRccODMpYY1DbeqiGS31VFyIOiWlYBmZIwZtBhh48c+ds5/M2x4QyhO7OTVl1MD2n447Nv4ODT8aJgOhkIOVZDbhIUvWsFUYhaS7/xezP+j5z90towuNGliHDoLnZodcevlcedUaMG+RvKq5zp5FV5HMA8g//i9hs/SP9duEdDVK4WJcp3+QTPMu42U1TfVIZU7MqFp5ydJBPYZF8WTMf7SZ/Ea5gjhJ05DthqSLbk64JODSOhTsVizMv/wZZbH+i2+wk7Okdd0jkjBlV81Dxh0R+BHYoMitobNusPfS5Iy8ni8TlkAh7EYiIMpQ=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230031)(396003)(136003)(346002)(366004)(376002)(39850400004)(230922051799003)(230173577357003)(230273577357003)(64100799003)(1800799012)(451199024)(186009)(4326008)(66476007)(66556008)(66946007)(54906003)(66446008)(6916009)(6486002)(76116006)(64756008)(9686003)(478600001)(6512007)(71200400001)(8936002)(6506007)(53546011)(8676002)(316002)(38100700002)(2906002)(83380400001)(5660300002)(966005)(26005)(122000001)(41300700001)(36756003)(33656002)(86362001)(38070700009)(13693001);
- DIR:OUT; SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?ZVFGWmNVRGtuSXB4QWRLaEo2dWZ0SkFUN3Q5djUyR1ZYQ2hYYldJQXliTXR2?=
- =?utf-8?B?WHFDU1M4MW90UXFneDY3UHFvSmFJaUNtN3dYazFQbVFlMlJhclVOLzdCRFlL?=
- =?utf-8?B?ejJKZFVjWG8rOS9aYnpnKzJJUDZHZW10SEVGbWtqTDlUUS9aNUNJSDFvN3Fu?=
- =?utf-8?B?WGZDOEtQZTlCSGlnUFZ4c29UcHpQVWJxc3BONW1FTUxDRFFlYzVnRVRTUWNr?=
- =?utf-8?B?VzAyN0w5dnN5ZHNLVkFIVEdjWkJCb0kwSWdrM05UeFkzYythMmR4Nk1INTJk?=
- =?utf-8?B?SXBtT3pJZUpuSElTNjc0MVcyRVhVOFc1T3BGWldLRjI5T3dhc1VGdHJ2c0Y5?=
- =?utf-8?B?Q2cvbG1KaXdQSTB6ZFNHUFZkdmxFbXNzMVlpWFpTSHp2QTBTVGtObFFaUENt?=
- =?utf-8?B?V2N5NXNsNVVJOVhkVi9FMmZDc2NlOFpFUkJwaEhxNFJHVENnNU80c0puc2Ur?=
- =?utf-8?B?WVc4cVI2S1MrQUd5eC9xRWpOK2hOL0NUc0QvQml4T1BDd1BQckpMRVRrUTNs?=
- =?utf-8?B?NitnMHJTL0JOdUgvSWxCdDdVZFUvUCtTcDFWaGx0bS90QXNGcXRWRTFXUXZ2?=
- =?utf-8?B?V1k1S0FuUm1YblFqZkFLdGJLSjU3cVNxZjIyVHVESTJXdGpjUWYyVkpMR012?=
- =?utf-8?B?ZC9OMFV1RkxtaWlRcklhT2QzbFpTL1M2Rm5nYVpwdTZXZFhaSWFkdytXa1VJ?=
- =?utf-8?B?RkRJRUxHT1dueUw4L1A1Y3ZGck9ZWXVXRjZaOTQ2cHBCd0hVNGp0SmU1K00y?=
- =?utf-8?B?WWhiWEFjM25CU0ZoVWdvWWNleThaZXR4eEJkWjZaTGJwVm1RUmR0Zy9EUXpp?=
- =?utf-8?B?MGpEVGpqbDgxdW1tWnJwbGRxaHhlcDMvYlVib2plY05QdEtXQkFRdE14dmI1?=
- =?utf-8?B?b2ZjdVl1aElIOUpKTytLZWdiVnR0MU1NbDh5VXB3QVh0TnVqVWlkaVd1aklG?=
- =?utf-8?B?UHBveWIxU0FLbFh5YVRXVlhnTUV3Zkl1T2k2QW1paE43aTJIWmxJL0tnTnRm?=
- =?utf-8?B?SHRmaGduV1RjVlVOUTkwKzFSc2h2RDFKSWx2cnJVQmNEZjJpeGxRME40Wmx4?=
- =?utf-8?B?dExzYWQ4azVsb3Z1cWxMTTE4RDJDN083OVF1ODdyTnVHallOV2RvVGlWaExh?=
- =?utf-8?B?Y2NaQUM2bUJjV0U2MDY4S0RCZ0pJUWtlK0pxQm9aa3M4SzI3RUhYc1JLZmw1?=
- =?utf-8?B?cTh4dlV1OGZVa2RoMDl3bTc3K2hOV3FsSStLRUROZDFNRTJDQ3FrbzlWejlE?=
- =?utf-8?B?YWNLdmltQmphUC9UcXNPbmJmYjFEVjV1TldZendmcG16aE1ZRjBwaDZnbkVS?=
- =?utf-8?B?MkQvWDNOdFVUUFVXTFdDNmkrQ2hUbWFEZGhNSlFMR0JoM0cxOC9ZUkdhUjVo?=
- =?utf-8?B?UXAxS0Jmd1lEU3NIeW5ldldrNWI3U0Ntc1VLcmIxT05LYjhFY0w3OXZxc3R4?=
- =?utf-8?B?dkF6S2htNGFDTEtkQ0pOcWNvaU8yWkhwR0ZZLzJFc1RhWFEwNGRNcU9ZaC94?=
- =?utf-8?B?SXFxK3lxVzVJTmhEQVQwTUZhdGRGYzFoZEV0SlduRlZ2b25JaExqcm9UaHor?=
- =?utf-8?B?dW9wa0dKcHpPbXFUSWxsakkzMStmdzQ0WVlxV0hyK1NSUC9raEtpa0JUUmd2?=
- =?utf-8?B?UzJqSjh5aUJaVVcyVkZOTExuWE50OENGeHlHZWxQckVCdk9MWmVIZzBaVUNL?=
- =?utf-8?B?VzJjR0MvQllPTWpxbVRwekZGN1R0UDAzMGl5NEpPOHI1bG55UmFtL3ZQdU9s?=
- =?utf-8?B?UFRVaW5JbXI4UmRRK0UveDBVaUNoUzkySnpiMjY1ZUd6V1gxbTVHcUNoMThO?=
- =?utf-8?B?SnBDSktLYUp2U1l1Ukp0TmI2VEpUUDMyR3IvY1VuUXh6alkyOExYd2EzQUhD?=
- =?utf-8?B?UHgzTDhyMzhVaUdPKzhiSER3TmQvbXgvd0QvbTVibXR3SXpqUU53RHlZNnFr?=
- =?utf-8?B?eVo2azZJQkpRREN4eUZvWkhGblM1TkFGcWZYb2RpbXhMMmE4S3JwMEFiaHhR?=
- =?utf-8?B?VkdUUExUdnhMN1E2b0dISEhGTTFqMjVmakV3cklTd1BUZm11KzhBWmpodkxI?=
- =?utf-8?B?VDR3Mkdhbk9yWWpLcis1dFNiSHhxZ3RwYy95UmFGdmJ1cUYrQXlFWW55VXpL?=
- =?utf-8?Q?W/oGtyAjFDUbpMKbwManlwdqV?=
-MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: keOS/zFJKcT7073//CQ9ZfVbgQzj/OhFmsmlwle27CzCSm3AQN3G7Vd+qPpmM/ZB7rpR6RGUDB5Y08ITibeoyY/HnFhxRptTHA72DErtS+tuwufgEy3Bq/yU3YLX7soBwGJYkOPoi+uARBefvQbQ4K5h8/yRJ/2XiZvrEvo94CpDB5vzMW3o/FpXi+IEiCR8SwajxJEkn3k4ombBJD1odfBr0jeAD66ShU9HSdX2x89DvqFi2Oocu7lGkMQsC8IVekJZ4NX7gipkRDRp0n30zolToGKJTvXMKuGPk2i4fTk6h/WgOhLLgXFvZePgMz+v8VWWUlizLBt7zWFfTToIXVmWpvL8sks9Fe4zEqJDAYD//TQvqCRSLtm/HpkZnhjDH+4VdEqPQLTNwNzMt1ITu6/HFA14aubuARaFqEI78Wx39nHk3ZrIvGDJ66XITfp/5cSWh8H9hBZp5JFLBoIHiCtuAwdBn4QQlpdFFRZQVWOO+MxyuT+UDzSKSXV4OP8jAkQbKKgKUMNsEMH967StWcCKVY8KrGLF24Mo0j+p7HYQmr8Hhb8zY1VvcVdBO5q+V+cOp1TNNZtg9W8KeP0TeIgDFypXu9jYMaEcYFoT8j3eXXMDwzA277mRPxim6jh5I6Wj6l7IvjEkAyTRvWXFn2PqIdYToFdmysZHxquDKL0=
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d2e1d115-9d7b-4808-3c33-08dc2368aabc
-X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Feb 2024 20:59:22.7551 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: YpFl9KBlZO/FKXnRTkM+mLA+HcSuIPGLyv5eVjuz3V7ONUqEXC3iVUqixhlfs78i
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN7PR19MB7334
-X-BESS-ID: 1706821165-111195-12532-3099-1
-X-BESS-VER: 2019.1_20240130.2130
-X-BESS-Apparent-Source-IP: 104.47.58.101
-X-BESS-Parts: H4sIAAAAAAACAzXLsQ6DMAyE4XfxzOAkOAZepergA1ssiKEZKlW8ezPA8ut00v
- f6kX8bLdR6Bzo/tIyFU197P2NitgTF6lUkelYrbrxFdkCYruHxeztuP2nR25cwgWVGDs
- NWqyYRxpxNx9mRlK73H+pJHvWBAAAA
-X-BESS-Outbound-Spam-Score: 0.10
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.253919 [from 
- cloudscan23-92.us-east-2b.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 HTML_MESSAGE           BODY: HTML included in message 
- 0.10 BSF_SC0_SA085          META: Custom Rule SA085 
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.10 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_SC0_SA085, BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
+ <1825EEAC-C476-44ED-8C88-C52A713E2273@ddn.com>
+In-Reply-To: <1825EEAC-C476-44ED-8C88-C52A713E2273@ddn.com>
+Date: Sun, 4 Feb 2024 12:34:36 -0500
+Message-ID: <CACyzrcQ6iaPE0_BxPRZTBZLrZD_WvunmawVnvvQkwBVjm9mu3w@mail.gmail.com>
+To: Andreas Dilger <adilger@whamcloud.com>
 Subject: Re: [lustre-devel] [EXTERNAL] Re: Direct Modification of Lustre
  Metadata on Disk
 X-BeenThere: lustre-devel@lists.lustre.org
@@ -156,267 +73,373 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Andreas Dilger <adilger@whamcloud.com>
+From: Saisha Kamat via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Saisha Kamat <skamat1@charlotte.edu>
 Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============2456205103445053462=="
+Content-Type: multipart/mixed; boundary="===============8587270121869797978=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============2456205103445053462==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_1825EEACC47644ED8C88C52A713E2273ddncom_"
+--===============8587270121869797978==
+Content-Type: multipart/alternative; boundary="000000000000f4303c061091c2c1"
 
---_000_1825EEACC47644ED8C88C52A713E2273ddncom_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+--000000000000f4303c061091c2c1
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-WW91IGNhbm5vdCB1c2UgZGVidWdmcyB0byBtb2RpZnkgYSBtb3VudGVkIGZpbGVzeXN0ZW0sIG5v
-IGRpZmZlcmVudGx5IHRoYW4geW91IGNhbm5vdCByZXBsYWNlIHRoZSB0aXJlIG9uIHlvdXIgY2Fy
-IHdoaWxlIHlvdSBhcmUgZHJpdmluZyBpdCBvbiB0aGUgaGlnaHdheS4uLg0KDQpJZiB5b3Ugd2Fu
-dCB0byBpbmplY3QgY29ycnVwdGlvbiBpbnRvIHRoZSBmaWxlc3lzdGVtIHdoaWxlIGl0IGlzIG1v
-dW50ZWQgKHdpdGhvdXQgY29ycnVwdGluZyB0aGUgd2hvbGUgZmlsZXN5c3RlbSksIHlvdSBjb3Vs
-ZCB1c2UgIkNGU19GQUlMX0NIRUNLKCkiIHRvIGFkZCBmYXVsdCBpbmplY3Rpb24gcG9pbnRzIGRp
-cmVjdGx5IGludG8gdGhlIGNvZGUsIGFzIGlzIGRvbmUgYnkgTEZTQ0sgdG8gY3JlYXRlIHNwZWNp
-ZmljIGNvcnJ1cHRpb25zIGFuZCB0aGVuIHJlcGFpciB0aGVtIChzZWUgbHVzdHJlL3Rlc3RzL3Nh
-bml0eS1sZnNjay5zaCkuDQoNCkNoZWVycywgQW5kcmVhcw0KDQpPbiBKYW4gMzEsIDIwMjQsIGF0
-IDE4OjQxLCBTYWlzaGEgS2FtYXQgdmlhIGx1c3RyZS1kZXZlbCA8bHVzdHJlLWRldmVsQGxpc3Rz
-Lmx1c3RyZS5vcmc8bWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPj4gd3JvdGU6
-DQoNCkhlbGxvIEFydGVtLA0KDQpJIGFwb2xvZ2l6ZSBmb3IgdGhlIGRlbGF5IGluIG15IHJlc3Bv
-bnNlLiBJIGFsc28gd2FudCB0byB0aGFuayB5b3UgZm9yDQp0aGUgc3VnZ2VzdGlvbi4NCkhvd2V2
-ZXIsIG91ciBvYmplY3RpdmUgaXMgdG8gaW5qZWN0IG1vZGlmaWNhdGlvbnMgd2hpbGUgTHVzdHJl
-IGlzDQptb3VudGVkLCBzcGVjaWZpY2FsbHkgdGFyZ2V0aW5nIHhhdHRyIGZhdWx0cyBzdWNoIGFz
-IExNQSwgTGlua2VhLCBhbmQNCkxvdmVhLiBDb3VsZCB5b3UgcGxlYXNlIGFkdmlzZSBvbiB3aGlj
-aCBkZWJ1Z2ZzIHV0aWxpdHkgSSBjYW4gdXNlIGZvcg0KdGhpcyBwdXJwb3NlPw0KDQpXZSB3b3Vs
-ZCBncmVhdGx5IGFwcHJlY2lhdGUgeW91ciBndWlkYW5jZSBhbmQgY2xhcml0eSBvbiB0aGVzZSBt
-YXR0ZXJzLg0KDQpUaGFua3MgYW5kIFJlZ2FyZHMsDQpTYWlzaGENCg0KT24gRnJpLCBKYW4gMjYs
-IDIwMjQgYXQgNToyNOKAr1BNIEJsYWdvZGFyZW5rbyBBcnRlbQ0KPGFydGVtLmJsYWdvZGFyZW5r
-b0BnbWFpbC5jb208bWFpbHRvOmFydGVtLmJsYWdvZGFyZW5rb0BnbWFpbC5jb20+PiB3cm90ZToN
-Cg0KW0NhdXRpb246IEVtYWlsIGZyb20gRXh0ZXJuYWwgU2VuZGVyLiBEbyBub3QgY2xpY2sgb3Ig
-b3BlbiBsaW5rcyBvciBhdHRhY2htZW50cyB1bmxlc3MgeW91IGtub3cgdGhpcyBzZW5kZXIuXQ0K
-DQoNCkhpIFNhaXNoYSwNCg0KDQoNClRoYW5rcyBmb3IgeW91ciBpbnRlcmVzdCBpbiBMdXN0cmUg
-RlMgYW5kIHJlc2VhcmNoIGVmZm9ydHMuDQoNClJlZ2FyZGluZyB5b3VyIHF1ZXN0aW9uLiBIYWQg
-TURTIGJlZW4gbW91bnRlZCB3aGVuIHRoZXJlIHdhcyB0aGUgeGF0dHJlIGRpcmVjdCBtb2RpZmlj
-YXRpb24gYXR0ZW1wdD8NCg0KSWYgeWVzLCB0aGVuIHhhdHRyIGRhdGEgY29uc2lzdGVuY3kgaXMg
-bm90IGd1YXJhbnRlZWQuDQoNCklmIGl0IGlzIHBvc3NpYmxlLCB1bm1vdW50IE1EUywgbWFrZSBt
-b2RpZmljYXRpb25zLCBhbmQgbW91bnQgaXQgYmFjay4NCg0KDQoNCklmIE1EUyBiYWNrZW5kIGlz
-IExESVNLRlMsIGFmdGVyIHVubW91bnRpbmcgTURTLCB5b3UgY2FuIG1vdW50IGl0IGFzDQoNCg0K
-DQpNb3VudCAtdCBsZGlza2ZzIDxwYXRoX3RvX2Rldj4gPG1vdW50X3BvaW50PiBhbmQgbW9kaWZ5
-IGFueSBmaWxlLg0KDQpUaGVyZSBpcyBhbHNvIGRlYnVnZnMgdXRpbGl0eSB3aGljaCBhbGxvd3Mg
-cGVyZm9ybSBtYW55IHVzZWZ1bCBtb2RpZmljYXRpb25zIHdpdGhvdXQgbW91bnRpbmcuDQoNCg0K
-DQpCZXN0IHJlZ2FyZHMsDQoNCkFydGVtIEJsYWdvZGFyZW5rbw0KDQoNCg0KQmVzdCByZWdhDQoN
-CkZyb206IGx1c3RyZS1kZXZlbCBsdXN0cmUtZGV2ZWwtYm91bmNlc0BsaXN0cy5sdXN0cmUub3Jn
-PG1haWx0bzpsdXN0cmUtZGV2ZWwtYm91bmNlc0BsaXN0cy5sdXN0cmUub3JnPiBvbiBiZWhhbGYg
-b2YgU2Fpc2hhIEthbWF0IHZpYSBsdXN0cmUtZGV2ZWwgbHVzdHJlLWRldmVsQGxpc3RzLmx1c3Ry
-ZS5vcmc8bWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPg0KRGF0ZTogRnJpZGF5
-LCAyNiBKYW51YXJ5IDIwMjQgYXQgMTk6NTgNClRvOiBsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJl
-Lm9yZzxtYWlsdG86bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmc+IGx1c3RyZS1kZXZlbEBs
-aXN0cy5sdXN0cmUub3JnPG1haWx0bzpsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NClN1
-YmplY3Q6IFtsdXN0cmUtZGV2ZWxdIERpcmVjdCBNb2RpZmljYXRpb24gb2YgTHVzdHJlIE1ldGFk
-YXRhIG9uIERpc2sNCg0KSGVsbG8sDQoNCkkgYW0gYSBQaC5ELiBzdHVkZW50IGF0IFVOQy1DaGFy
-bG90dGUsIGZvY3VzaW5nIG9uIHJlc2VhcmNoIHJlbGF0ZWQgdG8NCnRoZSBMdXN0cmUgRmlsZSBT
-eXN0ZW0uIEFzIHBhcnQgb2YgbXkgcHJvamVjdCwgSSBhbSBpbnZlc3RpZ2F0aW5nDQpzY2VuYXJp
-b3MgaW52b2x2aW5nIHRoZSBkaXJlY3QgbW9kaWZpY2F0aW9uIG9mIHhhdHRyIG1ldGFkYXRhIG9u
-IHRoZQ0KTHVzdHJlIGRpc2ssIHdpdGhvdXQgdW5tb3VudGluZyB0aGUgTHVzdHJlIHNlcnZlcnMu
-DQoNClRvIGFjaGlldmUgdGhpcywgSSBoYXZlIGF0dGVtcHRlZCB0byBvcGVuIHRoZSBNRFMgKE1l
-dGFkYXRhIFNlcnZlcikNCmRpc2sgcGFydGl0aW9uIGFzIGEgZmlsZSBkZXNjcmlwdG9yLCBsb2Nh
-dGUgdGhlIHRhcmdldCBmaWxlIGFuZCBpdHMNCnhhdHRyLCBhbmQgd3JpdGUgYSBmYXVsdHkgdmFs
-dWUuIEhvd2V2ZXIsIEkgaGF2ZSBlbmNvdW50ZXJlZCBhbg0KdW5leHBlY3RlZCBpc3N1ZSB3aGVy
-ZSBteSBjaGFuZ2VzIGFwcGVhciB0byBiZSBzYXZlZCB0byBtZW1vcnkgYW5kIGFyZQ0Kbm90IGJl
-aW5nIHN5bmNocm9uaXplZCB3aXRoIHRoZSBkaXNrLg0KQWZ0ZXIgY29tcGxldGluZyB0aGUgd3Jp
-dGUgb3BlcmF0aW9uLCB3aGVuIEkgcmVhZCB0aGUgc2FtZSB4YXR0cg0KYWdhaW4sIGl0IHJlZmxl
-Y3RzIHRoZSBjb3JydXB0ZWQgdmFsdWUuIFN0cmFuZ2VseSwgd2hlbiB1c2luZyB0aGUNCiJnZXRm
-YXR0ciIgY29tbWFuZCwgdGhlIG9yaWdpbmFsLCBjb3JyZWN0IHZhbHVlIGlzIGRpc3BsYXllZC4g
-VGhpcw0KZGlzY3JlcGFuY3kgaGFzIHJhaXNlZCBkb3VidHMgYWJvdXQgd2hldGhlciBMdXN0cmUg
-cGVybWl0cyBkaXJlY3QNCm1vZGlmaWNhdGlvbnMgdG8gaXRzIG1ldGFkYXRhIG9uIHRoZSBkaXNr
-Lg0KRnVydGhlcm1vcmUsIEkgb2JzZXJ2ZWQgdGhhdCBldmVuIGFmdGVyIHVubW91bnRpbmcgYW5k
-IHJlbW91bnRpbmcgdGhlDQpMdXN0cmUgZmlsZSBzeXN0ZW0sIHRoZSB4YXR0ciBjb250aW51ZXMg
-dG8gZGlzcGxheSB0aGUgY29ycnVwdGVkIHZhbHVlDQp1cG9uIHJlYWRpbmcsIHdoZXJlYXMgImdl
-dGZhdHRyIiBzdGlsbCByZXR1cm5zIHRoZSBvcmlnaW5hbCwgY29ycmVjdA0KdmFsdWUuDQoNClBs
-ZWFzZSBoZWxwIG1lIHVuZGVyc3RhbmQgd2hldGhlciBMdXN0cmUgYWxsb3dzIGRpcmVjdCBtb2Rp
-ZmljYXRpb25zDQp0byBpdHMgbWV0YWRhdGEgb24gdGhlIGRpc2sgYW5kIGlmIHRoZXJlIGFyZSBh
-bnkgaW5oZXJlbnQgbGltaXRhdGlvbnMNCm9yIGNvbnNpZGVyYXRpb25zIHRoYXQgSSBzaG91bGQg
-YmUgYXdhcmUgb2YuDQpBZGRpdGlvbmFsbHksIGFueSByZWNvbW1lbmRhdGlvbnMgb3IgYWx0ZXJu
-YXRpdmUgYXBwcm9hY2hlcyBmb3INCnNpbXVsYXRpbmcgZmF1bHR5IGNvbmRpdGlvbnMgZm9yIHRl
-c3RpbmcgcHVycG9zZXMgd291bGQgYmUgaGlnaGx5DQp2YWx1YWJsZSB0byBteSByZXNlYXJjaC4N
-Cg0KVGhhbmtzIGFuZCBSZWdhcmRzLA0KU2Fpc2hhDQpfX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fXw0KbHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdA0KbHVzdHJl
-LWRldmVsQGxpc3RzLmx1c3RyZS5vcmc8bWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUu
-b3JnPg0KaHR0cDovL2xpc3RzLmx1c3RyZS5vcmcvbGlzdGluZm8uY2dpL2x1c3RyZS1kZXZlbC1s
-dXN0cmUub3JnDQoNCg0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX18NCmx1c3RyZS1kZXZlbCBtYWlsaW5nIGxpc3QNCmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0
-cmUub3JnPG1haWx0bzpsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NCmh0dHA6Ly9saXN0
-cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZw0KDQpDaGVl
-cnMsIEFuZHJlYXMNCi0tDQpBbmRyZWFzIERpbGdlcg0KTHVzdHJlIFByaW5jaXBhbCBBcmNoaXRl
-Y3QNCldoYW1jbG91ZA0KDQoNCg0KDQoNCg0KDQo=
+Thank you for the clarification. I am proceeding to check the
+CFS_FAIL_CHECK().
 
---_000_1825EEACC47644ED8C88C52A713E2273ddncom_
-Content-Type: text/html; charset="utf-8"
-Content-ID: <B85FF0CC48F2734EAA788E1EB1E84980@namprd19.prod.outlook.com>
-Content-Transfer-Encoding: base64
+On Thu, Feb 1, 2024 at 3:59 PM Andreas Dilger <adilger@whamcloud.com> wrote=
+:
 
-PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
-dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IHN0eWxlPSJ3b3JkLXdy
-YXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0
-ZXItd2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4NCllvdSBjYW5ub3QgdXNlIGRlYnVnZnMgdG8gbW9k
-aWZ5IGEgbW91bnRlZCBmaWxlc3lzdGVtLCBubyBkaWZmZXJlbnRseSB0aGFuIHlvdSBjYW5ub3Qg
-cmVwbGFjZSB0aGUgdGlyZSBvbiB5b3VyIGNhciB3aGlsZSB5b3UgYXJlIGRyaXZpbmcgaXQgb24g
-dGhlIGhpZ2h3YXkuLi4NCjxkaXYgY2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8ZGl2
-IGNsYXNzPSIiPklmIHlvdSB3YW50IHRvIGluamVjdCBjb3JydXB0aW9uIGludG8gdGhlIGZpbGVz
-eXN0ZW0gd2hpbGUgaXQgaXMgbW91bnRlZCAod2l0aG91dCBjb3JydXB0aW5nIHRoZSB3aG9sZSBm
-aWxlc3lzdGVtKSwgeW91IGNvdWxkIHVzZSAmcXVvdDtDRlNfRkFJTF9DSEVDSygpJnF1b3Q7IHRv
-IGFkZCBmYXVsdCBpbmplY3Rpb24gcG9pbnRzIGRpcmVjdGx5IGludG8gdGhlIGNvZGUsIGFzIGlz
-IGRvbmUgYnkgTEZTQ0sgdG8gY3JlYXRlIHNwZWNpZmljIGNvcnJ1cHRpb25zDQogYW5kIHRoZW4g
-cmVwYWlyIHRoZW0gKHNlZSBsdXN0cmUvdGVzdHMvc2FuaXR5LWxmc2NrLnNoKS48L2Rpdj4NCjxk
-aXYgY2xhc3M9IiI+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8ZGl2IGNsYXNzPSIiPkNoZWVycywg
-QW5kcmVhczxiciBjbGFzcz0iIj4NCjxkaXY+PGJyIGNsYXNzPSIiPg0KPGJsb2NrcXVvdGUgdHlw
-ZT0iY2l0ZSIgY2xhc3M9IiI+DQo8ZGl2IGNsYXNzPSIiPk9uIEphbiAzMSwgMjAyNCwgYXQgMTg6
-NDEsIFNhaXNoYSBLYW1hdCB2aWEgbHVzdHJlLWRldmVsICZsdDs8YSBocmVmPSJtYWlsdG86bHVz
-dHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmciIGNsYXNzPSIiPmx1c3RyZS1kZXZlbEBsaXN0cy5s
-dXN0cmUub3JnPC9hPiZndDsgd3JvdGU6PC9kaXY+DQo8YnIgY2xhc3M9IkFwcGxlLWludGVyY2hh
-bmdlLW5ld2xpbmUiPg0KPGRpdiBjbGFzcz0iIj4NCjxkaXYgY2xhc3M9IiI+SGVsbG8gQXJ0ZW0s
-PGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KSSBhcG9sb2dpemUgZm9yIHRoZSBkZWxheSBp
-biBteSByZXNwb25zZS4gSSBhbHNvIHdhbnQgdG8gdGhhbmsgeW91IGZvcjxiciBjbGFzcz0iIj4N
-CnRoZSBzdWdnZXN0aW9uLjxiciBjbGFzcz0iIj4NCkhvd2V2ZXIsIG91ciBvYmplY3RpdmUgaXMg
-dG8gaW5qZWN0IG1vZGlmaWNhdGlvbnMgd2hpbGUgTHVzdHJlIGlzPGJyIGNsYXNzPSIiPg0KbW91
-bnRlZCwgc3BlY2lmaWNhbGx5IHRhcmdldGluZyB4YXR0ciBmYXVsdHMgc3VjaCBhcyBMTUEsIExp
-bmtlYSwgYW5kPGJyIGNsYXNzPSIiPg0KTG92ZWEuIENvdWxkIHlvdSBwbGVhc2UgYWR2aXNlIG9u
-IHdoaWNoIGRlYnVnZnMgdXRpbGl0eSBJIGNhbiB1c2UgZm9yPGJyIGNsYXNzPSIiPg0KdGhpcyBw
-dXJwb3NlPzxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCldlIHdvdWxkIGdyZWF0bHkgYXBw
-cmVjaWF0ZSB5b3VyIGd1aWRhbmNlIGFuZCBjbGFyaXR5IG9uIHRoZXNlIG1hdHRlcnMuPGJyIGNs
-YXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KVGhhbmtzIGFuZCBSZWdhcmRzLDxiciBjbGFzcz0iIj4N
-ClNhaXNoYTxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCk9uIEZyaSwgSmFuIDI2LCAyMDI0
-IGF0IDU6MjTigK9QTSBCbGFnb2RhcmVua28gQXJ0ZW08YnIgY2xhc3M9IiI+DQombHQ7PGEgaHJl
-Zj0ibWFpbHRvOmFydGVtLmJsYWdvZGFyZW5rb0BnbWFpbC5jb20iIGNsYXNzPSIiPmFydGVtLmJs
-YWdvZGFyZW5rb0BnbWFpbC5jb208L2E+Jmd0OyB3cm90ZTo8YnIgY2xhc3M9IiI+DQo8YmxvY2tx
-dW90ZSB0eXBlPSJjaXRlIiBjbGFzcz0iIj48YnIgY2xhc3M9IiI+DQpbQ2F1dGlvbjogRW1haWwg
-ZnJvbSBFeHRlcm5hbCBTZW5kZXIuIERvIG5vdCBjbGljayBvciBvcGVuIGxpbmtzIG9yIGF0dGFj
-aG1lbnRzIHVubGVzcyB5b3Uga25vdyB0aGlzIHNlbmRlci5dPGJyIGNsYXNzPSIiPg0KPGJyIGNs
-YXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KSGkgU2Fpc2hhLDxiciBjbGFzcz0iIj4NCjxiciBjbGFz
-cz0iIj4NCjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NClRoYW5rcyBmb3IgeW91ciBpbnRl
-cmVzdCBpbiBMdXN0cmUgRlMgYW5kIHJlc2VhcmNoIGVmZm9ydHMuPGJyIGNsYXNzPSIiPg0KPGJy
-IGNsYXNzPSIiPg0KUmVnYXJkaW5nIHlvdXIgcXVlc3Rpb24uIEhhZCBNRFMgYmVlbiBtb3VudGVk
-IHdoZW4gdGhlcmUgd2FzIHRoZSB4YXR0cmUgZGlyZWN0IG1vZGlmaWNhdGlvbiBhdHRlbXB0Pzxi
-ciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCklmIHllcywgdGhlbiB4YXR0ciBkYXRhIGNvbnNp
-c3RlbmN5IGlzIG5vdCBndWFyYW50ZWVkLjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCklm
-IGl0IGlzIHBvc3NpYmxlLCB1bm1vdW50IE1EUywgbWFrZSBtb2RpZmljYXRpb25zLCBhbmQgbW91
-bnQgaXQgYmFjay48YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8
-YnIgY2xhc3M9IiI+DQpJZiBNRFMgYmFja2VuZCBpcyBMRElTS0ZTLCBhZnRlciB1bm1vdW50aW5n
-IE1EUywgeW91IGNhbiBtb3VudCBpdCBhczxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCjxi
-ciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCk1vdW50IC10IGxkaXNrZnMgJmx0O3BhdGhfdG9f
-ZGV2Jmd0OyAmbHQ7bW91bnRfcG9pbnQmZ3Q7IGFuZCBtb2RpZnkgYW55IGZpbGUuPGJyIGNsYXNz
-PSIiPg0KPGJyIGNsYXNzPSIiPg0KVGhlcmUgaXMgYWxzbyBkZWJ1Z2ZzIHV0aWxpdHkgd2hpY2gg
-YWxsb3dzIHBlcmZvcm0gbWFueSB1c2VmdWwgbW9kaWZpY2F0aW9ucyB3aXRob3V0IG1vdW50aW5n
-LjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0iIj4NCjxiciBjbGFzcz0i
-Ij4NCkJlc3QgcmVnYXJkcyw8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpBcnRlbSBCbGFn
-b2RhcmVua288YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQo8YnIg
-Y2xhc3M9IiI+DQpCZXN0IHJlZ2E8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpGcm9tOiBs
-dXN0cmUtZGV2ZWwgPGEgaHJlZj0ibWFpbHRvOmx1c3RyZS1kZXZlbC1ib3VuY2VzQGxpc3RzLmx1
-c3RyZS5vcmciIGNsYXNzPSIiPg0KbHVzdHJlLWRldmVsLWJvdW5jZXNAbGlzdHMubHVzdHJlLm9y
-ZzwvYT4gb24gYmVoYWxmIG9mIFNhaXNoYSBLYW1hdCB2aWEgbHVzdHJlLWRldmVsDQo8YSBocmVm
-PSJtYWlsdG86bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmciIGNsYXNzPSIiPmx1c3RyZS1k
-ZXZlbEBsaXN0cy5sdXN0cmUub3JnPC9hPjxiciBjbGFzcz0iIj4NCkRhdGU6IEZyaWRheSwgMjYg
-SmFudWFyeSAyMDI0IGF0IDE5OjU4PGJyIGNsYXNzPSIiPg0KVG86IDxhIGhyZWY9Im1haWx0bzps
-dXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZyIgY2xhc3M9IiI+bHVzdHJlLWRldmVsQGxpc3Rz
-Lmx1c3RyZS5vcmc8L2E+DQo8YSBocmVmPSJtYWlsdG86bHVzdHJlLWRldmVsQGxpc3RzLmx1c3Ry
-ZS5vcmciIGNsYXNzPSIiPmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPC9hPjxiciBjbGFz
-cz0iIj4NClN1YmplY3Q6IFtsdXN0cmUtZGV2ZWxdIERpcmVjdCBNb2RpZmljYXRpb24gb2YgTHVz
-dHJlIE1ldGFkYXRhIG9uIERpc2s8YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpIZWxsbyw8
-YnIgY2xhc3M9IiI+DQo8YnIgY2xhc3M9IiI+DQpJIGFtIGEgUGguRC4gc3R1ZGVudCBhdCBVTkMt
-Q2hhcmxvdHRlLCBmb2N1c2luZyBvbiByZXNlYXJjaCByZWxhdGVkIHRvPGJyIGNsYXNzPSIiPg0K
-dGhlIEx1c3RyZSBGaWxlIFN5c3RlbS4gQXMgcGFydCBvZiBteSBwcm9qZWN0LCBJIGFtIGludmVz
-dGlnYXRpbmc8YnIgY2xhc3M9IiI+DQpzY2VuYXJpb3MgaW52b2x2aW5nIHRoZSBkaXJlY3QgbW9k
-aWZpY2F0aW9uIG9mIHhhdHRyIG1ldGFkYXRhIG9uIHRoZTxiciBjbGFzcz0iIj4NCkx1c3RyZSBk
-aXNrLCB3aXRob3V0IHVubW91bnRpbmcgdGhlIEx1c3RyZSBzZXJ2ZXJzLjxiciBjbGFzcz0iIj4N
-CjxiciBjbGFzcz0iIj4NClRvIGFjaGlldmUgdGhpcywgSSBoYXZlIGF0dGVtcHRlZCB0byBvcGVu
-IHRoZSBNRFMgKE1ldGFkYXRhIFNlcnZlcik8YnIgY2xhc3M9IiI+DQpkaXNrIHBhcnRpdGlvbiBh
-cyBhIGZpbGUgZGVzY3JpcHRvciwgbG9jYXRlIHRoZSB0YXJnZXQgZmlsZSBhbmQgaXRzPGJyIGNs
-YXNzPSIiPg0KeGF0dHIsIGFuZCB3cml0ZSBhIGZhdWx0eSB2YWx1ZS4gSG93ZXZlciwgSSBoYXZl
-IGVuY291bnRlcmVkIGFuPGJyIGNsYXNzPSIiPg0KdW5leHBlY3RlZCBpc3N1ZSB3aGVyZSBteSBj
-aGFuZ2VzIGFwcGVhciB0byBiZSBzYXZlZCB0byBtZW1vcnkgYW5kIGFyZTxiciBjbGFzcz0iIj4N
-Cm5vdCBiZWluZyBzeW5jaHJvbml6ZWQgd2l0aCB0aGUgZGlzay48YnIgY2xhc3M9IiI+DQpBZnRl
-ciBjb21wbGV0aW5nIHRoZSB3cml0ZSBvcGVyYXRpb24sIHdoZW4gSSByZWFkIHRoZSBzYW1lIHhh
-dHRyPGJyIGNsYXNzPSIiPg0KYWdhaW4sIGl0IHJlZmxlY3RzIHRoZSBjb3JydXB0ZWQgdmFsdWUu
-IFN0cmFuZ2VseSwgd2hlbiB1c2luZyB0aGU8YnIgY2xhc3M9IiI+DQomcXVvdDtnZXRmYXR0ciZx
-dW90OyBjb21tYW5kLCB0aGUgb3JpZ2luYWwsIGNvcnJlY3QgdmFsdWUgaXMgZGlzcGxheWVkLiBU
-aGlzPGJyIGNsYXNzPSIiPg0KZGlzY3JlcGFuY3kgaGFzIHJhaXNlZCBkb3VidHMgYWJvdXQgd2hl
-dGhlciBMdXN0cmUgcGVybWl0cyBkaXJlY3Q8YnIgY2xhc3M9IiI+DQptb2RpZmljYXRpb25zIHRv
-IGl0cyBtZXRhZGF0YSBvbiB0aGUgZGlzay48YnIgY2xhc3M9IiI+DQpGdXJ0aGVybW9yZSwgSSBv
-YnNlcnZlZCB0aGF0IGV2ZW4gYWZ0ZXIgdW5tb3VudGluZyBhbmQgcmVtb3VudGluZyB0aGU8YnIg
-Y2xhc3M9IiI+DQpMdXN0cmUgZmlsZSBzeXN0ZW0sIHRoZSB4YXR0ciBjb250aW51ZXMgdG8gZGlz
-cGxheSB0aGUgY29ycnVwdGVkIHZhbHVlPGJyIGNsYXNzPSIiPg0KdXBvbiByZWFkaW5nLCB3aGVy
-ZWFzICZxdW90O2dldGZhdHRyJnF1b3Q7IHN0aWxsIHJldHVybnMgdGhlIG9yaWdpbmFsLCBjb3Jy
-ZWN0PGJyIGNsYXNzPSIiPg0KdmFsdWUuPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KUGxl
-YXNlIGhlbHAgbWUgdW5kZXJzdGFuZCB3aGV0aGVyIEx1c3RyZSBhbGxvd3MgZGlyZWN0IG1vZGlm
-aWNhdGlvbnM8YnIgY2xhc3M9IiI+DQp0byBpdHMgbWV0YWRhdGEgb24gdGhlIGRpc2sgYW5kIGlm
-IHRoZXJlIGFyZSBhbnkgaW5oZXJlbnQgbGltaXRhdGlvbnM8YnIgY2xhc3M9IiI+DQpvciBjb25z
-aWRlcmF0aW9ucyB0aGF0IEkgc2hvdWxkIGJlIGF3YXJlIG9mLjxiciBjbGFzcz0iIj4NCkFkZGl0
-aW9uYWxseSwgYW55IHJlY29tbWVuZGF0aW9ucyBvciBhbHRlcm5hdGl2ZSBhcHByb2FjaGVzIGZv
-cjxiciBjbGFzcz0iIj4NCnNpbXVsYXRpbmcgZmF1bHR5IGNvbmRpdGlvbnMgZm9yIHRlc3Rpbmcg
-cHVycG9zZXMgd291bGQgYmUgaGlnaGx5PGJyIGNsYXNzPSIiPg0KdmFsdWFibGUgdG8gbXkgcmVz
-ZWFyY2guPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KVGhhbmtzIGFuZCBSZWdhcmRzLDxi
-ciBjbGFzcz0iIj4NClNhaXNoYTxiciBjbGFzcz0iIj4NCl9fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fPGJyIGNsYXNzPSIiPg0KbHVzdHJlLWRldmVsIG1haWxp
-bmcgbGlzdDxiciBjbGFzcz0iIj4NCjxhIGhyZWY9Im1haWx0bzpsdXN0cmUtZGV2ZWxAbGlzdHMu
-bHVzdHJlLm9yZyIgY2xhc3M9IiI+bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmc8L2E+PGJy
-IGNsYXNzPSIiPg0KaHR0cDovL2xpc3RzLmx1c3RyZS5vcmcvbGlzdGluZm8uY2dpL2x1c3RyZS1k
-ZXZlbC1sdXN0cmUub3JnPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIiPg0KPGJyIGNsYXNzPSIi
-Pg0KPC9ibG9ja3F1b3RlPg0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX188YnIgY2xhc3M9IiI+DQpsdXN0cmUtZGV2ZWwgbWFpbGluZyBsaXN0PGJyIGNsYXNz
-PSIiPg0KPGEgaHJlZj0ibWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnIiBjbGFz
-cz0iIj5sdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZzwvYT48YnIgY2xhc3M9IiI+DQpodHRw
-Oi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmc8
-YnIgY2xhc3M9IiI+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9ibG9ja3F1b3RlPg0KPC9kaXY+DQo8YnIg
-Y2xhc3M9IiI+DQo8ZGl2IGNsYXNzPSIiPg0KPGRpdiBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1j
-b2xvcjogcmdiKDAsIDAsIDApOyBjb2xvcjogcmdiKDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzog
-bm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zv
-cm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0
-LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQtZGVjb3JhdGlvbjogbm9uZTsgd29yZC13cmFw
-OiBicmVhay13b3JkOyAtd2Via2l0LW5ic3AtbW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6IGFmdGVy
-LXdoaXRlLXNwYWNlOyIgY2xhc3M9IiI+DQo8ZGl2IGRpcj0iYXV0byIgc3R5bGU9ImNhcmV0LWNv
-bG9yOiByZ2IoMCwgMCwgMCk7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IGxldHRlci1zcGFjaW5nOiBu
-b3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9y
-bTogbm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQt
-dGV4dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyB3b3JkLXdyYXA6
-IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0ZXIt
-d2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4NCjxkaXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29s
-b3I6IHJnYigwLCAwLCAwKTsgY29sb3I6IHJnYigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5v
-cm1hbDsgdGV4dC1hbGlnbjogc3RhcnQ7IHRleHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3Jt
-OiBub25lOyB3aGl0ZS1zcGFjZTogbm9ybWFsOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10
-ZXh0LXN0cm9rZS13aWR0aDogMHB4OyB0ZXh0LWRlY29yYXRpb246IG5vbmU7IHdvcmQtd3JhcDog
-YnJlYWstd29yZDsgLXdlYmtpdC1uYnNwLW1vZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13
-aGl0ZS1zcGFjZTsiIGNsYXNzPSIiPg0KPGRpdiBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1jb2xv
-cjogcmdiKDAsIDAsIDApOyBjb2xvcjogcmdiKDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzogbm9y
-bWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06
-IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRl
-eHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQtZGVjb3JhdGlvbjogbm9uZTsgd29yZC13cmFwOiBi
-cmVhay13b3JkOyAtd2Via2l0LW5ic3AtbW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6IGFmdGVyLXdo
-aXRlLXNwYWNlOyIgY2xhc3M9IiI+DQo8ZGl2IGRpcj0iYXV0byIgc3R5bGU9ImNhcmV0LWNvbG9y
-OiByZ2IoMCwgMCwgMCk7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IGxldHRlci1zcGFjaW5nOiBub3Jt
-YWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTog
-bm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4
-dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyB3b3JkLXdyYXA6IGJy
-ZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0ZXItd2hp
-dGUtc3BhY2U7IiBjbGFzcz0iIj4NCjxkaXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29sb3I6
-IHJnYigwLCAwLCAwKTsgY29sb3I6IHJnYigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5vcm1h
-bDsgdGV4dC1hbGlnbjogc3RhcnQ7IHRleHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3JtOiBu
-b25lOyB3aGl0ZS1zcGFjZTogbm9ybWFsOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10ZXh0
-LXN0cm9rZS13aWR0aDogMHB4OyB0ZXh0LWRlY29yYXRpb246IG5vbmU7IHdvcmQtd3JhcDogYnJl
-YWstd29yZDsgLXdlYmtpdC1uYnNwLW1vZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13aGl0
-ZS1zcGFjZTsiIGNsYXNzPSIiPg0KPGRpdj5DaGVlcnMsIEFuZHJlYXM8L2Rpdj4NCjxkaXY+LS08
-L2Rpdj4NCjxkaXY+QW5kcmVhcyBEaWxnZXI8L2Rpdj4NCjxkaXY+THVzdHJlJm5ic3A7UHJpbmNp
-cGFsIEFyY2hpdGVjdDwvZGl2Pg0KPGRpdj5XaGFtY2xvdWQ8L2Rpdj4NCjxkaXY+PGJyIGNsYXNz
-PSIiPg0KPC9kaXY+DQo8ZGl2PjxiciBjbGFzcz0iIj4NCjwvZGl2Pg0KPGRpdj48YnIgY2xhc3M9
-IiI+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8YnIg
-Y2xhc3M9IkFwcGxlLWludGVyY2hhbmdlLW5ld2xpbmUiPg0KPC9kaXY+DQo8YnIgY2xhc3M9IkFw
-cGxlLWludGVyY2hhbmdlLW5ld2xpbmUiPg0KPGJyIGNsYXNzPSJBcHBsZS1pbnRlcmNoYW5nZS1u
-ZXdsaW5lIj4NCjwvZGl2Pg0KPGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8L2JvZHk+DQo8L2h0bWw+
-DQo=
+> You cannot use debugfs to modify a mounted filesystem, no differently tha=
+n
+> you cannot replace the tire on your car while you are driving it on the
+> highway...
+>
+> If you want to inject corruption into the filesystem while it is mounted
+> (without corrupting the whole filesystem), you could use "CFS_FAIL_CHECK(=
+)"
+> to add fault injection points directly into the code, as is done by LFSCK
+> to create specific corruptions and then repair them (see
+> lustre/tests/sanity-lfsck.sh).
+>
+> Cheers, Andreas
+>
+>
+> On Jan 31, 2024, at 18:41, Saisha Kamat via lustre-devel <
+> lustre-devel@lists.lustre.org> wrote:
+>
+> Hello Artem,
+>
+> I apologize for the delay in my response. I also want to thank you for
+> the suggestion.
+> However, our objective is to inject modifications while Lustre is
+> mounted, specifically targeting xattr faults such as LMA, Linkea, and
+> Lovea. Could you please advise on which debugfs utility I can use for
+> this purpose?
+>
+> We would greatly appreciate your guidance and clarity on these matters.
+>
+> Thanks and Regards,
+> Saisha
+>
+> On Fri, Jan 26, 2024 at 5:24=E2=80=AFPM Blagodarenko Artem
+> <artem.blagodarenko@gmail.com> wrote:
+>
+>
+> [Caution: Email from External Sender. Do not click or open links or
+> attachments unless you know this sender.]
+>
+>
+> Hi Saisha,
+>
+>
+>
+> Thanks for your interest in Lustre FS and research efforts.
+>
+> Regarding your question. Had MDS been mounted when there was the xattre
+> direct modification attempt?
+>
+> If yes, then xattr data consistency is not guaranteed.
+>
+> If it is possible, unmount MDS, make modifications, and mount it back.
+>
+>
+>
+> If MDS backend is LDISKFS, after unmounting MDS, you can mount it as
+>
+>
+>
+> Mount -t ldiskfs <path_to_dev> <mount_point> and modify any file.
+>
+> There is also debugfs utility which allows perform many useful
+> modifications without mounting.
+>
+>
+>
+> Best regards,
+>
+> Artem Blagodarenko
+>
+>
+>
+> Best rega
+>
+> From: lustre-devel lustre-devel-bounces@lists.lustre.org on behalf of
+> Saisha Kamat via lustre-devel lustre-devel@lists.lustre.org
+> Date: Friday, 26 January 2024 at 19:58
+> To: lustre-devel@lists.lustre.org lustre-devel@lists.lustre.org
+> Subject: [lustre-devel] Direct Modification of Lustre Metadata on Disk
+>
+> Hello,
+>
+> I am a Ph.D. student at UNC-Charlotte, focusing on research related to
+> the Lustre File System. As part of my project, I am investigating
+> scenarios involving the direct modification of xattr metadata on the
+> Lustre disk, without unmounting the Lustre servers.
+>
+> To achieve this, I have attempted to open the MDS (Metadata Server)
+> disk partition as a file descriptor, locate the target file and its
+> xattr, and write a faulty value. However, I have encountered an
+> unexpected issue where my changes appear to be saved to memory and are
+> not being synchronized with the disk.
+> After completing the write operation, when I read the same xattr
+> again, it reflects the corrupted value. Strangely, when using the
+> "getfattr" command, the original, correct value is displayed. This
+> discrepancy has raised doubts about whether Lustre permits direct
+> modifications to its metadata on the disk.
+> Furthermore, I observed that even after unmounting and remounting the
+> Lustre file system, the xattr continues to display the corrupted value
+> upon reading, whereas "getfattr" still returns the original, correct
+> value.
+>
+> Please help me understand whether Lustre allows direct modifications
+> to its metadata on the disk and if there are any inherent limitations
+> or considerations that I should be aware of.
+> Additionally, any recommendations or alternative approaches for
+> simulating faulty conditions for testing purposes would be highly
+> valuable to my research.
+>
+> Thanks and Regards,
+> Saisha
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel@lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel@lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Lustre Principal Architect
+> Whamcloud
+>
+>
+>
+>
+>
+>
+>
+>
 
---_000_1825EEACC47644ED8C88C52A713E2273ddncom_--
+--000000000000f4303c061091c2c1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
---===============2456205103445053462==
+<div dir=3D"auto">Thank you for the clarification. I am proceeding to check=
+ the CFS_FAIL_CHECK().=C2=A0</div><div><br><div class=3D"gmail_quote"><div =
+dir=3D"ltr" class=3D"gmail_attr">On Thu, Feb 1, 2024 at 3:59 PM Andreas Dil=
+ger &lt;<a href=3D"mailto:adilger@whamcloud.com">adilger@whamcloud.com</a>&=
+gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0=
+px 0px 0.8ex;border-left-width:1px;border-left-style:solid;padding-left:1ex=
+;border-left-color:rgb(204,204,204)">
+
+
+
+<div style=3D"line-break:after-white-space">
+You cannot use debugfs to modify a mounted filesystem, no differently than =
+you cannot replace the tire on your car while you are driving it on the hig=
+hway...
+<div><br>
+</div>
+<div>If you want to inject corruption into the filesystem while it is mount=
+ed (without corrupting the whole filesystem), you could use &quot;CFS_FAIL_=
+CHECK()&quot; to add fault injection points directly into the code, as is d=
+one by LFSCK to create specific corruptions
+ and then repair them (see lustre/tests/sanity-lfsck.sh).</div>
+<div><br>
+</div>
+<div>Cheers, Andreas</div></div><div style=3D"line-break:after-white-space"=
+><div><br>
+<div><br>
+<blockquote type=3D"cite">
+<div>On Jan 31, 2024, at 18:41, Saisha Kamat via lustre-devel &lt;<a href=
+=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-devel@li=
+sts.lustre.org</a>&gt; wrote:</div>
+<br>
+<div>
+<div>Hello Artem,<br>
+<br>
+I apologize for the delay in my response. I also want to thank you for<br>
+the suggestion.<br>
+However, our objective is to inject modifications while Lustre is<br>
+mounted, specifically targeting xattr faults such as LMA, Linkea, and<br>
+Lovea. Could you please advise on which debugfs utility I can use for<br>
+this purpose?<br>
+<br>
+We would greatly appreciate your guidance and clarity on these matters.<br>
+<br>
+Thanks and Regards,<br>
+Saisha<br>
+<br>
+On Fri, Jan 26, 2024 at 5:24=E2=80=AFPM Blagodarenko Artem<br>
+&lt;<a href=3D"mailto:artem.blagodarenko@gmail.com" target=3D"_blank">artem=
+.blagodarenko@gmail.com</a>&gt; wrote:<br>
+<blockquote type=3D"cite"><br>
+[Caution: Email from External Sender. Do not click or open links or attachm=
+ents unless you know this sender.]<br>
+<br>
+<br>
+Hi Saisha,<br>
+<br>
+<br>
+<br>
+Thanks for your interest in Lustre FS and research efforts.<br>
+<br>
+Regarding your question. Had MDS been mounted when there was the xattre dir=
+ect modification attempt?<br>
+<br>
+If yes, then xattr data consistency is not guaranteed.<br>
+<br>
+If it is possible, unmount MDS, make modifications, and mount it back.<br>
+<br>
+<br>
+<br>
+If MDS backend is LDISKFS, after unmounting MDS, you can mount it as<br>
+<br>
+<br>
+<br>
+Mount -t ldiskfs &lt;path_to_dev&gt; &lt;mount_point&gt; and modify any fil=
+e.<br>
+<br>
+There is also debugfs utility which allows perform many useful modification=
+s without mounting.<br>
+<br>
+<br>
+<br>
+Best regards,<br>
+<br>
+Artem Blagodarenko<br>
+<br>
+<br>
+<br>
+Best rega<br>
+<br>
+From: lustre-devel <a href=3D"mailto:lustre-devel-bounces@lists.lustre.org"=
+ target=3D"_blank">
+lustre-devel-bounces@lists.lustre.org</a> on behalf of Saisha Kamat via lus=
+tre-devel
+<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
+evel@lists.lustre.org</a><br>
+Date: Friday, 26 January 2024 at 19:58<br>
+To: <a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lust=
+re-devel@lists.lustre.org</a>
+<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
+evel@lists.lustre.org</a><br>
+Subject: [lustre-devel] Direct Modification of Lustre Metadata on Disk<br>
+<br>
+Hello,<br>
+<br>
+I am a Ph.D. student at UNC-Charlotte, focusing on research related to<br>
+the Lustre File System. As part of my project, I am investigating<br>
+scenarios involving the direct modification of xattr metadata on the<br>
+Lustre disk, without unmounting the Lustre servers.<br>
+<br>
+To achieve this, I have attempted to open the MDS (Metadata Server)<br>
+disk partition as a file descriptor, locate the target file and its<br>
+xattr, and write a faulty value. However, I have encountered an<br>
+unexpected issue where my changes appear to be saved to memory and are<br>
+not being synchronized with the disk.<br>
+After completing the write operation, when I read the same xattr<br>
+again, it reflects the corrupted value. Strangely, when using the<br>
+&quot;getfattr&quot; command, the original, correct value is displayed. Thi=
+s<br>
+discrepancy has raised doubts about whether Lustre permits direct<br>
+modifications to its metadata on the disk.<br>
+Furthermore, I observed that even after unmounting and remounting the<br>
+Lustre file system, the xattr continues to display the corrupted value<br>
+upon reading, whereas &quot;getfattr&quot; still returns the original, corr=
+ect<br>
+value.<br>
+<br>
+Please help me understand whether Lustre allows direct modifications<br>
+to its metadata on the disk and if there are any inherent limitations<br>
+or considerations that I should be aware of.<br>
+Additionally, any recommendations or alternative approaches for<br>
+simulating faulty conditions for testing purposes would be highly<br>
+valuable to my research.<br>
+<br>
+Thanks and Regards,<br>
+Saisha<br>
+_______________________________________________<br>
+lustre-devel mailing list<br>
+<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
+evel@lists.lustre.org</a><br>
+<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
+rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
+g</a><br>
+<br>
+<br>
+</blockquote>
+_______________________________________________<br>
+lustre-devel mailing list<br>
+<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
+evel@lists.lustre.org</a><br>
+<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
+rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
+g</a><br>
+</div>
+</div>
+</blockquote>
+</div>
+<br>
+<div>
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
+nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
+ion:none;line-break:after-white-space;color:rgb(0,0,0)">
+<div>Cheers, Andreas</div>
+<div>--</div>
+<div>Andreas Dilger</div>
+<div>Lustre=C2=A0Principal Architect</div>
+<div>Whamcloud</div>
+<div><br>
+</div>
+<div><br>
+</div>
+<div><br>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<br>
+</div>
+<br>
+<br>
+</div>
+<br>
+</div>
+</div>
+
+</blockquote></div></div>
+
+--000000000000f4303c061091c2c1--
+
+--===============8587270121869797978==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -427,4 +450,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============2456205103445053462==--
+--===============8587270121869797978==--
