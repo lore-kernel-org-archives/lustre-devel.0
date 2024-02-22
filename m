@@ -4,63 +4,65 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 7F369C4828F
-	for <lustre-devel@archiver.kernel.org>; Sun,  4 Feb 2024 17:35:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id D7211C48BF8
+	for <lustre-devel@archiver.kernel.org>; Thu, 22 Feb 2024 21:13:07 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4TSc8d0JZmz1y6q;
-	Sun,  4 Feb 2024 09:34:57 -0800 (PST)
-Received: from mail-yb1-f182.google.com (mail-yb1-f182.google.com
- [209.85.219.182])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Tgm3K1txQz22W6;
+	Thu, 22 Feb 2024 13:09:01 -0800 (PST)
+Received: from mail-pl1-f174.google.com (mail-pl1-f174.google.com
+ [209.85.214.174])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4TSc8T2hyMz1wLM
- for <lustre-devel@lists.lustre.org>; Sun,  4 Feb 2024 09:34:49 -0800 (PST)
-Received: by mail-yb1-f182.google.com with SMTP id
- 3f1490d57ef6-dc6cbe1ac75so1717703276.1
- for <lustre-devel@lists.lustre.org>; Sun, 04 Feb 2024 09:34:49 -0800 (PST)
+ 4Tgm2k20c5z22VH
+ for <lustre-devel@lists.lustre.org>; Thu, 22 Feb 2024 13:08:30 -0800 (PST)
+Received: by mail-pl1-f174.google.com with SMTP id
+ d9443c01a7336-1dc1ff3ba1aso598115ad.3
+ for <lustre-devel@lists.lustre.org>; Thu, 22 Feb 2024 13:08:30 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=charlotte.edu; s=google; t=1707068087; x=1707672887; darn=lists.lustre.org; 
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=MSIgjcHaAs9SKAzX+8tL/TX3x/MO3eUrcguo+RFko+I=;
- b=VtFWaOimPT8q1ClZHci7GmHRze/cazaZPUrkR/EzLD2zvNvRi4Eg2IeyOElLtRkryR
- k6IC9lUGY5DoOzVApVEXKr494l11RXJmhge06bMiWuO44YzAu6FZ+8cjpJDApII/FQ4g
- cW260rO1SHpzvj2jorOpDulnv3hcK/f5ELUmggttKpiGnFpXZAHEv+fSjCAenREan1dO
- AKBQxTYqyHKXCYr4nbssDn8AZGa08SItV6AoPIt7zG4KEeCNcaZW/kd95o7g271JRY4Q
- giW9/MGHoPNvVIfkFxbBN2Wo81OKJ61YXAatnbe7SvPrUiRI1itqvTjO1maD210qENeo
- avdg==
+ d=dilger-ca.20230601.gappssmtp.com; s=20230601; t=1708636021; x=1709240821;
+ darn=lists.lustre.org; 
+ h=message-id:to:references:subject:date:mime-version:from:from:to:cc
+ :subject:date:message-id:reply-to;
+ bh=Hchs7sUXILEGsXc6IyiGD4lcEwu8ot4RAD0tbA5+E9o=;
+ b=Pzv+ZQLQKTKkqqWFz+6j2bIXvUtQApK655YETOaiK7mK1/ubGFf26q9p9pu7/k9qYk
+ Q4N75sHiXC/Mia96leU0JrQu3wyPKkomFovgxfZKeaxQlkhgoiB+zGTC55O3FVhAgob1
+ AWctT5u7HDy8+SicHpO7Ky9/1AKD49a4gzonyGmMuJyBusRY4uGK+5k/Of+Fr/2SWaCj
+ Mo7tKgeT3lbQ6OfEs9PvmYFwjZmjTehL4HlTQR7RYPqtFqN7Dt+82V9vLzVBZLC35M9M
+ omgCi4ZDtGz7fQVR4K7EfS0XClqRsVVsTJxZN/4QdsvxsyjtN9Zmtbg+zN+KfzR7VQSA
+ wuCQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1707068087; x=1707672887;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
- :reply-to;
- bh=MSIgjcHaAs9SKAzX+8tL/TX3x/MO3eUrcguo+RFko+I=;
- b=ppLTl0kHvWE5aPRoQ272yz3oWWIF7/EUc1ztryj87nx/iZ2NhuyKb3hCKO6LvJCPe6
- 3/hLWv7ElRffYGhiajdmagzpV1lDc1OZoTtXPzg11tSkzUDDtZskaqnBkERU/mDNU9h+
- 0R6QMuvPC6ujuFxEv3i8JlUGn6hRACkpuQnRxH1XogZbSR2f5SecrMAza7oxHhl8MFfY
- w9n9QA2K7hW9kbroTQyKLK9k9cInMysJbZz4KkY/5DErKIQwEuvpP1ZnpuJi5lNw4KI/
- KUoPe2m2w6EKdgLyFG3FqhhTSqE01eBdn94E30CatCfc5ua1hxsSoem4IPRvCAwiMc3j
- xAQQ==
-X-Gm-Message-State: AOJu0YzG9Tg/7H7/jRDE8CTR4nAT9Q7raN2AhT6IdMF7aTfA8rLj4tRY
- taaypsq1zAyMapKAo9uDbjzpb2CBi9q6isf4Z5Pu4suWBqqR0JlOdh2cmFU89kPdPjhBSne7X7I
- qQCvir5Dy+GBwYjoiU7SYpX/uX5ODTsZsW9ijTQ==
-X-Google-Smtp-Source: AGHT+IG0IgETAt8JZSxwTKNoX/vwA4wpORzGHgIEm3ko6uKP4MMieA34BHPuh47zvEhbB3ArmBlQiu8t58etgVBbaIE=
-X-Received: by 2002:a05:6902:1345:b0:dc6:b1ab:b400 with SMTP id
- g5-20020a056902134500b00dc6b1abb400mr2668291ybu.18.1707068087340; Sun, 04 Feb
- 2024 09:34:47 -0800 (PST)
-MIME-Version: 1.0
-References: <CACyzrcQosBre=vRYDN+VeB=o=9bB-mJGT=NrQBhJi_59Eqe7jw@mail.gmail.com>
- <LO2P265MB7274C2E5806D5C1E9655B5B4AB792@LO2P265MB7274.GBRP265.PROD.OUTLOOK.COM>
- <CACyzrcQEW_R2byC5AzvF7GwbD1z9o25MgnY2DS8yRd8ePrUz6g@mail.gmail.com>
- <1825EEAC-C476-44ED-8C88-C52A713E2273@ddn.com>
-In-Reply-To: <1825EEAC-C476-44ED-8C88-C52A713E2273@ddn.com>
-Date: Sun, 4 Feb 2024 12:34:36 -0500
-Message-ID: <CACyzrcQ6iaPE0_BxPRZTBZLrZD_WvunmawVnvvQkwBVjm9mu3w@mail.gmail.com>
-To: Andreas Dilger <adilger@whamcloud.com>
-Subject: Re: [lustre-devel] [EXTERNAL] Re: Direct Modification of Lustre
- Metadata on Disk
+ d=1e100.net; s=20230601; t=1708636021; x=1709240821;
+ h=message-id:to:references:subject:date:mime-version:from
+ :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
+ bh=Hchs7sUXILEGsXc6IyiGD4lcEwu8ot4RAD0tbA5+E9o=;
+ b=ZA2mFI8Sd2JlzpiRH/hpotopHM2P+uFNRsPlkk/gMZOMEsDZCt2KDOUZ4ITCLZqzMx
+ jZJJhXJpdul07xWNbOcXU/uR622MHVFF2OL+AoJAeG2/UWsmJv05+VTJhdvbCQw+1H4H
+ FPeRB+yXzDzJY0p/bbu6/J+G8oxcAtcWfiY82GGDL8u5yb9twSQydoiASjfkEHU4UfoP
+ PtKkHFj3cEThO0jxQmqaOIRrFkdyPR26u7HnAwiX8C9POzWf8dpjgRVbyj9CwHTtwFEH
+ CzD9igkhEyEI9H+QEnkl9yqm7/nhpsgQksy0lkBa/xnALU00NAaqslgCOdZ1/rlmW6Qu
+ +6tA==
+X-Gm-Message-State: AOJu0YwIHouLk307Xxo5WEStxyYON/JAq5XfD/gosTaGhrrtlyY+5kqy
+ NnU5m3Yx7FaPUNY+WFQeI8S1Kwq44czExcGWP1AtWSdlAB+qoaRYwjWmzSGEMYPYLMLg02cci/D
+ j
+X-Google-Smtp-Source: AGHT+IGzpN0PTwt69IIXAmIZY+4LSE2SHKEgiRGjFtETDINbSzdl6klQVjKCHfKidcCjfYK74bIU5A==
+X-Received: by 2002:a17:902:d503:b0:1db:c84c:3549 with SMTP id
+ b3-20020a170902d50300b001dbc84c3549mr51349plg.11.1708636021354; 
+ Thu, 22 Feb 2024 13:07:01 -0800 (PST)
+Received: from cabot.adilger.int (S01068c763f81ca4b.cg.shawcable.net.
+ [70.77.200.158]) by smtp.gmail.com with ESMTPSA id
+ lk15-20020a17090308cf00b001db40c0ed23sm10343608plb.62.2024.02.22.13.07.00
+ (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 22 Feb 2024 13:07:00 -0800 (PST)
+From: Andreas Dilger <adilger@dilger.ca>
+Mime-Version: 1.0 (Mac OS X Mail 10.3 \(3273\))
+Date: Thu, 22 Feb 2024 14:04:34 -0700
+References: <20240222203726.1101861-1-willy@infradead.org>
+To: lustre-devel@lists.lustre.org
+Message-Id: <A0C6099B-2E8F-49A9-9E6C-6A36DFF7DAC3@dilger.ca>
+X-Mailer: Apple Mail (2.3273)
+Subject: [lustre-devel] Fwd: [PATCH 0/1] Rosebush, a new hash table
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -73,373 +75,379 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Saisha Kamat via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Saisha Kamat <skamat1@charlotte.edu>
-Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============8587270121869797978=="
+Content-Type: multipart/mixed; boundary="===============6727254634505109017=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8587270121869797978==
-Content-Type: multipart/alternative; boundary="000000000000f4303c061091c2c1"
 
---000000000000f4303c061091c2c1
-Content-Type: text/plain; charset="UTF-8"
+--===============6727254634505109017==
+Content-Type: multipart/signed;
+ boundary="Apple-Mail=_4B6DE069-3094-4F95-8FAF-62F40BE60737";
+ protocol="application/pgp-signature"; micalg=pgp-sha256
+
+
+--Apple-Mail=_4B6DE069-3094-4F95-8FAF-62F40BE60737
+Content-Type: multipart/alternative;
+	boundary="Apple-Mail=_68182F8D-B727-4450-A8F2-ECCAAE238BCB"
+
+
+--Apple-Mail=_68182F8D-B727-4450-A8F2-ECCAAE238BCB
 Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain;
+	charset=us-ascii
 
-Thank you for the clarification. I am proceeding to check the
-CFS_FAIL_CHECK().
+Time to start replacing the use of rhashtable in the code? :-)
 
-On Thu, Feb 1, 2024 at 3:59 PM Andreas Dilger <adilger@whamcloud.com> wrote=
-:
-
-> You cannot use debugfs to modify a mounted filesystem, no differently tha=
-n
-> you cannot replace the tire on your car while you are driving it on the
-> highway...
->
-> If you want to inject corruption into the filesystem while it is mounted
-> (without corrupting the whole filesystem), you could use "CFS_FAIL_CHECK(=
-)"
-> to add fault injection points directly into the code, as is done by LFSCK
-> to create specific corruptions and then repair them (see
-> lustre/tests/sanity-lfsck.sh).
->
-> Cheers, Andreas
->
->
-> On Jan 31, 2024, at 18:41, Saisha Kamat via lustre-devel <
-> lustre-devel@lists.lustre.org> wrote:
->
-> Hello Artem,
->
-> I apologize for the delay in my response. I also want to thank you for
-> the suggestion.
-> However, our objective is to inject modifications while Lustre is
-> mounted, specifically targeting xattr faults such as LMA, Linkea, and
-> Lovea. Could you please advise on which debugfs utility I can use for
-> this purpose?
->
-> We would greatly appreciate your guidance and clarity on these matters.
->
-> Thanks and Regards,
-> Saisha
->
-> On Fri, Jan 26, 2024 at 5:24=E2=80=AFPM Blagodarenko Artem
-> <artem.blagodarenko@gmail.com> wrote:
->
->
-> [Caution: Email from External Sender. Do not click or open links or
-> attachments unless you know this sender.]
->
->
-> Hi Saisha,
->
->
->
-> Thanks for your interest in Lustre FS and research efforts.
->
-> Regarding your question. Had MDS been mounted when there was the xattre
-> direct modification attempt?
->
-> If yes, then xattr data consistency is not guaranteed.
->
-> If it is possible, unmount MDS, make modifications, and mount it back.
->
->
->
-> If MDS backend is LDISKFS, after unmounting MDS, you can mount it as
->
->
->
-> Mount -t ldiskfs <path_to_dev> <mount_point> and modify any file.
->
-> There is also debugfs utility which allows perform many useful
-> modifications without mounting.
->
->
->
-> Best regards,
->
-> Artem Blagodarenko
->
->
->
-> Best rega
->
-> From: lustre-devel lustre-devel-bounces@lists.lustre.org on behalf of
-> Saisha Kamat via lustre-devel lustre-devel@lists.lustre.org
-> Date: Friday, 26 January 2024 at 19:58
-> To: lustre-devel@lists.lustre.org lustre-devel@lists.lustre.org
-> Subject: [lustre-devel] Direct Modification of Lustre Metadata on Disk
->
-> Hello,
->
-> I am a Ph.D. student at UNC-Charlotte, focusing on research related to
-> the Lustre File System. As part of my project, I am investigating
-> scenarios involving the direct modification of xattr metadata on the
-> Lustre disk, without unmounting the Lustre servers.
->
-> To achieve this, I have attempted to open the MDS (Metadata Server)
-> disk partition as a file descriptor, locate the target file and its
-> xattr, and write a faulty value. However, I have encountered an
-> unexpected issue where my changes appear to be saved to memory and are
-> not being synchronized with the disk.
-> After completing the write operation, when I read the same xattr
-> again, it reflects the corrupted value. Strangely, when using the
-> "getfattr" command, the original, correct value is displayed. This
-> discrepancy has raised doubts about whether Lustre permits direct
-> modifications to its metadata on the disk.
-> Furthermore, I observed that even after unmounting and remounting the
-> Lustre file system, the xattr continues to display the corrupted value
-> upon reading, whereas "getfattr" still returns the original, correct
-> value.
->
-> Please help me understand whether Lustre allows direct modifications
-> to its metadata on the disk and if there are any inherent limitations
-> or considerations that I should be aware of.
-> Additionally, any recommendations or alternative approaches for
-> simulating faulty conditions for testing purposes would be highly
-> valuable to my research.
->
-> Thanks and Regards,
-> Saisha
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel@lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
->
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel@lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
->
-> Cheers, Andreas
+> Begin forwarded message:
+>=20
+> From: "Matthew Wilcox (Oracle)" <willy@infradead.org>
+> Subject: [PATCH 0/1] Rosebush, a new hash table
+> Date: February 22, 2024 at 1:37:23 PM MST
+> To: linux-kernel@vger.kernel.org
+> Cc: "Matthew Wilcox (Oracle)" <willy@infradead.org>, Thomas Graf =
+<tgraf@suug.ch>, Herbert Xu <herbert@gondor.apana.org.au>, =
+netdev@vger.kernel.org, linux-fsdevel@vger.kernel.org, =
+maple-tree@lists.infradead.org, rcu@vger.kernel.org
+>=20
+> Rosebush is a resizing, scalable, cache-aware, RCU optimised hash =
+table.
+> I've written a load of documentation about how it works, mostly in
+> Documentation/core-api/rosebush.rst but some is dotted through the
+> rosebush.c file too.
+>=20
+> You can see this code as a further exploration of the "Linked lists =
+are
+> evil" design space.  For the workloads which a hashtable is suited to,
+> it has lower overhead than either the maple tree or the rhashtable.
+> It cannot support ranges (so is not a replacement for the maple tree),
+> but it does have per-bucket locks so is more scalable for write-heavy
+> workloads.  I suspect one could reimplement the rhashtable API on top
+> of the rosebush, but I am not interested in doing that work myself.
+>=20
+> The per-object overhead is 12 bytes, as opposed to 16 bytes for the
+> rhashtable and 32 bytes for the maple tree.  The constant overhead is =
+also
+> small, being just 16 bytes for the struct rosebush.  The exact amount
+> of memory consumed for a given number of objects is going to depend on
+> the distribution of hashes; here are some estimated consumptions for
+> power-of-ten entries distributed evenly over a 32-bit hash space in =
+the
+> various data structures:
+>=20
+> number	xarray	maple	rhash	rosebush
+> 1	3472	272	280	256
+> 10	32272	784	424	256
+> 100	262kB	3600	1864	2080
+> 1000	[1]	34576	17224	16432
+> 10k	[1]	343k	168392	131344
+> 100k	[1]	3.4M	1731272	2101264
+>=20
+> As you can see, rosebush and rhashtable are close the whole way.
+> Rosebush moves in larger chunks because it doubles each time; there's
+> no actual need to double the bucket size, but that works well with
+> the slab allocator's existing slabs.  As noted in the documentation,
+> we could create our own slabs and get closer to the 12 bytes per =
+object
+> minimum consumption. [2]
+>=20
+> Where I expect rosebush to shine is on dependent cache misses.
+> I've assumed an average chain length of 10 for rhashtable in the above
+> memory calculations.  That means on average a lookup would take five =
+cache
+> misses that can't be speculated.  Rosebush does a linear walk of =
+4-byte
+> hashes looking for matches, so the CPU can usefully speculate the =
+entire
+> array of hash values (indeed, we tell it exactly how many we're going =
+to
+> look at) and then take a single cache miss fetching the correct =
+pointer.
+> Add that to the cache miss to fetch the bucket and that's just two =
+cache
+> misses rather than five.
+>=20
+> I have not yet converted any code to use the rosebush.  The API is
+> designed for use by the dcache, and I expect it will evolve as it =
+actually
+> gets used.  I think there's probably some more refactoring to be done.
+> I am not aware of any bugs, but the test suite is pitifully small.
+> The current algorithm grows the buckets more aggressively than the =
+table;
+> that's probably exactly the wrong thing to do for good performance.
+>=20
+> This version is full of debugging printks.  You should probably take
+> them out if you're going to try to benchmark it.  The regex '^print'
+> should find them all.  Contributions welcome; I really want to get =
+back
+> to working on folios, but this felt like an urgent problem to be =
+fixed.
+>=20
+> [1] I stopped trying to estimate the memory costs for xarray; I =
+couldn't
+> be bothered to as it's not a serious competitor for this use case.
+>=20
+> [2] We have ideas for improving the maple tree memory consumption for
+> this kind of workload; a new node type for pivots that fit in 4 bytes =
+and
+> sparse nodes to avoid putting a NULL entry after each occupied entry.
+> The maple tree really is optimised for densely packed ranges at the
+> moment.
+>=20
+> Matthew Wilcox (Oracle) (1):
+>  rosebush: Add new data structure
+>=20
+> Documentation/core-api/index.rst    |   1 +
+> Documentation/core-api/rosebush.rst | 135 ++++++
+> MAINTAINERS                         |   8 +
+> include/linux/rosebush.h            |  41 ++
+> lib/Kconfig.debug                   |   3 +
+> lib/Makefile                        |   3 +-
+> lib/rosebush.c                      | 707 ++++++++++++++++++++++++++++
+> lib/test_rosebush.c                 | 135 ++++++
+> 8 files changed, 1032 insertions(+), 1 deletion(-)
+> create mode 100644 Documentation/core-api/rosebush.rst
+> create mode 100644 include/linux/rosebush.h
+> create mode 100644 lib/rosebush.c
+> create mode 100644 lib/test_rosebush.c
+>=20
 > --
-> Andreas Dilger
-> Lustre Principal Architect
-> Whamcloud
->
->
->
->
->
->
->
->
+> 2.43.0
+>=20
+>=20
 
---000000000000f4303c061091c2c1
-Content-Type: text/html; charset="UTF-8"
+
+Cheers, Andreas
+
+
+
+
+
+
+--Apple-Mail=_68182F8D-B727-4450-A8F2-ECCAAE238BCB
 Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html;
+	charset=us-ascii
 
-<div dir=3D"auto">Thank you for the clarification. I am proceeding to check=
- the CFS_FAIL_CHECK().=C2=A0</div><div><br><div class=3D"gmail_quote"><div =
-dir=3D"ltr" class=3D"gmail_attr">On Thu, Feb 1, 2024 at 3:59 PM Andreas Dil=
-ger &lt;<a href=3D"mailto:adilger@whamcloud.com">adilger@whamcloud.com</a>&=
-gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0=
-px 0px 0.8ex;border-left-width:1px;border-left-style:solid;padding-left:1ex=
-;border-left-color:rgb(204,204,204)">
+<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html =
+charset=3Dus-ascii"></head><body style=3D"word-wrap: break-word; =
+-webkit-nbsp-mode: space; -webkit-line-break: after-white-space;" =
+class=3D"">Time to start replacing the use of rhashtable in the code? =
+:-)<br class=3D""><div><br class=3D""><blockquote type=3D"cite" =
+class=3D""><div class=3D"">Begin forwarded message:</div><br =
+class=3D"Apple-interchange-newline"><div style=3D"margin-top: 0px; =
+margin-right: 0px; margin-bottom: 0px; margin-left: 0px;" class=3D""><span=
+ style=3D"font-family: -webkit-system-font, Helvetica Neue, Helvetica, =
+sans-serif; color:rgba(0, 0, 0, 1.0);" class=3D""><b class=3D"">From: =
+</b></span><span style=3D"font-family: -webkit-system-font, Helvetica =
+Neue, Helvetica, sans-serif;" class=3D"">"Matthew Wilcox (Oracle)" =
+&lt;<a href=3D"mailto:willy@infradead.org" =
+class=3D"">willy@infradead.org</a>&gt;<br class=3D""></span></div><div =
+style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; =
+margin-left: 0px;" class=3D""><span style=3D"font-family: =
+-webkit-system-font, Helvetica Neue, Helvetica, sans-serif; =
+color:rgba(0, 0, 0, 1.0);" class=3D""><b class=3D"">Subject: =
+</b></span><span style=3D"font-family: -webkit-system-font, Helvetica =
+Neue, Helvetica, sans-serif;" class=3D""><b class=3D"">[PATCH 0/1] =
+Rosebush, a new hash table</b><br class=3D""></span></div><div =
+style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; =
+margin-left: 0px;" class=3D""><span style=3D"font-family: =
+-webkit-system-font, Helvetica Neue, Helvetica, sans-serif; =
+color:rgba(0, 0, 0, 1.0);" class=3D""><b class=3D"">Date: =
+</b></span><span style=3D"font-family: -webkit-system-font, Helvetica =
+Neue, Helvetica, sans-serif;" class=3D"">February 22, 2024 at 1:37:23 PM =
+MST<br class=3D""></span></div><div style=3D"margin-top: 0px; =
+margin-right: 0px; margin-bottom: 0px; margin-left: 0px;" class=3D""><span=
+ style=3D"font-family: -webkit-system-font, Helvetica Neue, Helvetica, =
+sans-serif; color:rgba(0, 0, 0, 1.0);" class=3D""><b class=3D"">To: =
+</b></span><span style=3D"font-family: -webkit-system-font, Helvetica =
+Neue, Helvetica, sans-serif;" class=3D""><a =
+href=3D"mailto:linux-kernel@vger.kernel.org" =
+class=3D"">linux-kernel@vger.kernel.org</a><br =
+class=3D""></span></div><div style=3D"margin-top: 0px; margin-right: =
+0px; margin-bottom: 0px; margin-left: 0px;" class=3D""><span =
+style=3D"font-family: -webkit-system-font, Helvetica Neue, Helvetica, =
+sans-serif; color:rgba(0, 0, 0, 1.0);" class=3D""><b class=3D"">Cc: =
+</b></span><span style=3D"font-family: -webkit-system-font, Helvetica =
+Neue, Helvetica, sans-serif;" class=3D"">"Matthew Wilcox (Oracle)" =
+&lt;<a href=3D"mailto:willy@infradead.org" =
+class=3D"">willy@infradead.org</a>&gt;, Thomas Graf &lt;<a =
+href=3D"mailto:tgraf@suug.ch" class=3D"">tgraf@suug.ch</a>&gt;, Herbert =
+Xu &lt;<a href=3D"mailto:herbert@gondor.apana.org.au" =
+class=3D"">herbert@gondor.apana.org.au</a>&gt;, <a =
+href=3D"mailto:netdev@vger.kernel.org" =
+class=3D"">netdev@vger.kernel.org</a>, <a =
+href=3D"mailto:linux-fsdevel@vger.kernel.org" =
+class=3D"">linux-fsdevel@vger.kernel.org</a>, <a =
+href=3D"mailto:maple-tree@lists.infradead.org" =
+class=3D"">maple-tree@lists.infradead.org</a>, <a =
+href=3D"mailto:rcu@vger.kernel.org" class=3D"">rcu@vger.kernel.org</a><br =
+class=3D""></span></div><br class=3D""><div class=3D""><div =
+class=3D"">Rosebush is a resizing, scalable, cache-aware, RCU optimised =
+hash table.<br class=3D"">I've written a load of documentation about how =
+it works, mostly in<br class=3D"">Documentation/core-api/rosebush.rst =
+but some is dotted through the<br class=3D"">rosebush.c file too.<br =
+class=3D""><br class=3D"">You can see this code as a further exploration =
+of the "Linked lists are<br class=3D"">evil" design space. &nbsp;For the =
+workloads which a hashtable is suited to,<br class=3D"">it has lower =
+overhead than either the maple tree or the rhashtable.<br class=3D"">It =
+cannot support ranges (so is not a replacement for the maple tree),<br =
+class=3D"">but it does have per-bucket locks so is more scalable for =
+write-heavy<br class=3D"">workloads. &nbsp;I suspect one could =
+reimplement the rhashtable API on top<br class=3D"">of the rosebush, but =
+I am not interested in doing that work myself.<br class=3D""><br =
+class=3D"">The per-object overhead is 12 bytes, as opposed to 16 bytes =
+for the<br class=3D"">rhashtable and 32 bytes for the maple tree. =
+&nbsp;The constant overhead is also<br class=3D"">small, being just 16 =
+bytes for the struct rosebush. &nbsp;The exact amount<br class=3D"">of =
+memory consumed for a given number of objects is going to depend on<br =
+class=3D"">the distribution of hashes; here are some estimated =
+consumptions for<br class=3D"">power-of-ten entries distributed evenly =
+over a 32-bit hash space in the<br class=3D"">various data =
+structures:<br class=3D""><br class=3D"">number<span =
+class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>xarray<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>maple<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>rhash<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>rosebush<br class=3D"">1<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>3472<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>272<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>280<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>256<br class=3D"">10<span =
+class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>32272<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>784<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>424<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>256<br class=3D"">100<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>262kB<span class=3D"Apple-tab-span"=
+ style=3D"white-space:pre">	</span>3600<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>1864<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>2080<br class=3D"">1000<span =
+class=3D"Apple-tab-span" style=3D"white-space:pre">	</span>[1]<span =
+class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>34576<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>17224<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>16432<br class=3D"">10k<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>[1]<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>343k<span class=3D"Apple-tab-span" =
+style=3D"white-space:pre">	</span>168392<span =
+class=3D"Apple-tab-span" style=3D"white-space:pre">	</span>131344<br =
+class=3D"">100k<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>[1]<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>3.4M<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>1731272<span class=3D"Apple-tab-span" style=3D"white-space:pre">	=
+</span>2101264<br class=3D""><br class=3D"">As you can see, rosebush and =
+rhashtable are close the whole way.<br class=3D"">Rosebush moves in =
+larger chunks because it doubles each time; there's<br class=3D"">no =
+actual need to double the bucket size, but that works well with<br =
+class=3D"">the slab allocator's existing slabs. &nbsp;As noted in the =
+documentation,<br class=3D"">we could create our own slabs and get =
+closer to the 12 bytes per object<br class=3D"">minimum consumption. =
+[2]<br class=3D""><br class=3D"">Where I expect rosebush to shine is on =
+dependent cache misses.<br class=3D"">I've assumed an average chain =
+length of 10 for rhashtable in the above<br class=3D"">memory =
+calculations. &nbsp;That means on average a lookup would take five =
+cache<br class=3D"">misses that can't be speculated. &nbsp;Rosebush does =
+a linear walk of 4-byte<br class=3D"">hashes looking for matches, so the =
+CPU can usefully speculate the entire<br class=3D"">array of hash values =
+(indeed, we tell it exactly how many we're going to<br class=3D"">look =
+at) and then take a single cache miss fetching the correct pointer.<br =
+class=3D"">Add that to the cache miss to fetch the bucket and that's =
+just two cache<br class=3D"">misses rather than five.<br class=3D""><br =
+class=3D"">I have not yet converted any code to use the rosebush. =
+&nbsp;The API is<br class=3D"">designed for use by the dcache, and I =
+expect it will evolve as it actually<br class=3D"">gets used. &nbsp;I =
+think there's probably some more refactoring to be done.<br class=3D"">I =
+am not aware of any bugs, but the test suite is pitifully small.<br =
+class=3D"">The current algorithm grows the buckets more aggressively =
+than the table;<br class=3D"">that's probably exactly the wrong thing to =
+do for good performance.<br class=3D""><br class=3D"">This version is =
+full of debugging printks. &nbsp;You should probably take<br =
+class=3D"">them out if you're going to try to benchmark it. &nbsp;The =
+regex '^print'<br class=3D"">should find them all. &nbsp;Contributions =
+welcome; I really want to get back<br class=3D"">to working on folios, =
+but this felt like an urgent problem to be fixed.<br class=3D""><br =
+class=3D"">[1] I stopped trying to estimate the memory costs for xarray; =
+I couldn't<br class=3D"">be bothered to as it's not a serious competitor =
+for this use case.<br class=3D""><br class=3D"">[2] We have ideas for =
+improving the maple tree memory consumption for<br class=3D"">this kind =
+of workload; a new node type for pivots that fit in 4 bytes and<br =
+class=3D"">sparse nodes to avoid putting a NULL entry after each =
+occupied entry.<br class=3D"">The maple tree really is optimised for =
+densely packed ranges at the<br class=3D"">moment.<br class=3D""><br =
+class=3D"">Matthew Wilcox (Oracle) (1):<br class=3D""> &nbsp;rosebush: =
+Add new data structure<br class=3D""><br class=3D""> =
+Documentation/core-api/index.rst &nbsp;&nbsp;&nbsp;| &nbsp;&nbsp;1 +<br =
+class=3D""> Documentation/core-api/rosebush.rst | 135 ++++++<br =
+class=3D""> MAINTAINERS =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| =
+&nbsp;&nbsp;8 +<br class=3D""> include/linux/rosebush.h =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| =
+&nbsp;41 ++<br class=3D""> lib/Kconfig.debug =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| &nbsp;&nbsp;3 +<br class=3D""> =
+lib/Makefile =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| =
+&nbsp;&nbsp;3 +-<br class=3D""> lib/rosebush.c =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| 707 =
+++++++++++++++++++++++++++++<br class=3D""> lib/test_rosebush.c =
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;| 135 ++++++<br class=3D""> 8 files changed, 1032 =
+insertions(+), 1 deletion(-)<br class=3D""> create mode 100644 =
+Documentation/core-api/rosebush.rst<br class=3D""> create mode 100644 =
+include/linux/rosebush.h<br class=3D""> create mode 100644 =
+lib/rosebush.c<br class=3D""> create mode 100644 lib/test_rosebush.c<br =
+class=3D""><br class=3D"">-- <br class=3D"">2.43.0<br class=3D""><br =
+class=3D""><br class=3D""></div></div></blockquote></div><br =
+class=3D""><div class=3D"">
+<span class=3D"Apple-style-span" style=3D"border-collapse: separate; =
+color: rgb(0, 0, 0); font-family: Helvetica; font-style: normal; =
+font-variant: normal; font-weight: normal; letter-spacing: normal; =
+line-height: normal; orphans: 2; text-align: -webkit-auto; text-indent: =
+0px; text-transform: none; white-space: normal; widows: 2; word-spacing: =
+0px; -webkit-border-horizontal-spacing: 0px; =
+-webkit-border-vertical-spacing: 0px; =
+-webkit-text-decorations-in-effect: none; -webkit-text-size-adjust: =
+auto; -webkit-text-stroke-width: 0px;  "><br class=3D"">Cheers, =
+Andreas<br class=3D""><br class=3D""><br class=3D""><br class=3D""><br =
+class=3D""></span>
 
+</div>
+<br class=3D""></body></html>=
 
+--Apple-Mail=_68182F8D-B727-4450-A8F2-ECCAAE238BCB--
 
-<div style=3D"line-break:after-white-space">
-You cannot use debugfs to modify a mounted filesystem, no differently than =
-you cannot replace the tire on your car while you are driving it on the hig=
-hway...
-<div><br>
-</div>
-<div>If you want to inject corruption into the filesystem while it is mount=
-ed (without corrupting the whole filesystem), you could use &quot;CFS_FAIL_=
-CHECK()&quot; to add fault injection points directly into the code, as is d=
-one by LFSCK to create specific corruptions
- and then repair them (see lustre/tests/sanity-lfsck.sh).</div>
-<div><br>
-</div>
-<div>Cheers, Andreas</div></div><div style=3D"line-break:after-white-space"=
-><div><br>
-<div><br>
-<blockquote type=3D"cite">
-<div>On Jan 31, 2024, at 18:41, Saisha Kamat via lustre-devel &lt;<a href=
-=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-devel@li=
-sts.lustre.org</a>&gt; wrote:</div>
-<br>
-<div>
-<div>Hello Artem,<br>
-<br>
-I apologize for the delay in my response. I also want to thank you for<br>
-the suggestion.<br>
-However, our objective is to inject modifications while Lustre is<br>
-mounted, specifically targeting xattr faults such as LMA, Linkea, and<br>
-Lovea. Could you please advise on which debugfs utility I can use for<br>
-this purpose?<br>
-<br>
-We would greatly appreciate your guidance and clarity on these matters.<br>
-<br>
-Thanks and Regards,<br>
-Saisha<br>
-<br>
-On Fri, Jan 26, 2024 at 5:24=E2=80=AFPM Blagodarenko Artem<br>
-&lt;<a href=3D"mailto:artem.blagodarenko@gmail.com" target=3D"_blank">artem=
-.blagodarenko@gmail.com</a>&gt; wrote:<br>
-<blockquote type=3D"cite"><br>
-[Caution: Email from External Sender. Do not click or open links or attachm=
-ents unless you know this sender.]<br>
-<br>
-<br>
-Hi Saisha,<br>
-<br>
-<br>
-<br>
-Thanks for your interest in Lustre FS and research efforts.<br>
-<br>
-Regarding your question. Had MDS been mounted when there was the xattre dir=
-ect modification attempt?<br>
-<br>
-If yes, then xattr data consistency is not guaranteed.<br>
-<br>
-If it is possible, unmount MDS, make modifications, and mount it back.<br>
-<br>
-<br>
-<br>
-If MDS backend is LDISKFS, after unmounting MDS, you can mount it as<br>
-<br>
-<br>
-<br>
-Mount -t ldiskfs &lt;path_to_dev&gt; &lt;mount_point&gt; and modify any fil=
-e.<br>
-<br>
-There is also debugfs utility which allows perform many useful modification=
-s without mounting.<br>
-<br>
-<br>
-<br>
-Best regards,<br>
-<br>
-Artem Blagodarenko<br>
-<br>
-<br>
-<br>
-Best rega<br>
-<br>
-From: lustre-devel <a href=3D"mailto:lustre-devel-bounces@lists.lustre.org"=
- target=3D"_blank">
-lustre-devel-bounces@lists.lustre.org</a> on behalf of Saisha Kamat via lus=
-tre-devel
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-Date: Friday, 26 January 2024 at 19:58<br>
-To: <a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lust=
-re-devel@lists.lustre.org</a>
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-Subject: [lustre-devel] Direct Modification of Lustre Metadata on Disk<br>
-<br>
-Hello,<br>
-<br>
-I am a Ph.D. student at UNC-Charlotte, focusing on research related to<br>
-the Lustre File System. As part of my project, I am investigating<br>
-scenarios involving the direct modification of xattr metadata on the<br>
-Lustre disk, without unmounting the Lustre servers.<br>
-<br>
-To achieve this, I have attempted to open the MDS (Metadata Server)<br>
-disk partition as a file descriptor, locate the target file and its<br>
-xattr, and write a faulty value. However, I have encountered an<br>
-unexpected issue where my changes appear to be saved to memory and are<br>
-not being synchronized with the disk.<br>
-After completing the write operation, when I read the same xattr<br>
-again, it reflects the corrupted value. Strangely, when using the<br>
-&quot;getfattr&quot; command, the original, correct value is displayed. Thi=
-s<br>
-discrepancy has raised doubts about whether Lustre permits direct<br>
-modifications to its metadata on the disk.<br>
-Furthermore, I observed that even after unmounting and remounting the<br>
-Lustre file system, the xattr continues to display the corrupted value<br>
-upon reading, whereas &quot;getfattr&quot; still returns the original, corr=
-ect<br>
-value.<br>
-<br>
-Please help me understand whether Lustre allows direct modifications<br>
-to its metadata on the disk and if there are any inherent limitations<br>
-or considerations that I should be aware of.<br>
-Additionally, any recommendations or alternative approaches for<br>
-simulating faulty conditions for testing purposes would be highly<br>
-valuable to my research.<br>
-<br>
-Thanks and Regards,<br>
-Saisha<br>
-_______________________________________________<br>
-lustre-devel mailing list<br>
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
-rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
-g</a><br>
-<br>
-<br>
-</blockquote>
-_______________________________________________<br>
-lustre-devel mailing list<br>
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
-rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
-g</a><br>
-</div>
-</div>
-</blockquote>
-</div>
-<br>
-<div>
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div dir=3D"auto" style=3D"letter-spacing:normal;text-align:start;text-inde=
-nt:0px;text-transform:none;white-space:normal;word-spacing:0px;text-decorat=
-ion:none;line-break:after-white-space;color:rgb(0,0,0)">
-<div>Cheers, Andreas</div>
-<div>--</div>
-<div>Andreas Dilger</div>
-<div>Lustre=C2=A0Principal Architect</div>
-<div>Whamcloud</div>
-<div><br>
-</div>
-<div><br>
-</div>
-<div><br>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<br>
-</div>
-<br>
-<br>
-</div>
-<br>
-</div>
-</div>
+--Apple-Mail=_4B6DE069-3094-4F95-8FAF-62F40BE60737
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+	filename=signature.asc
+Content-Type: application/pgp-signature;
+	name=signature.asc
+Content-Description: Message signed with OpenPGP
 
-</blockquote></div></div>
+-----BEGIN PGP SIGNATURE-----
+Comment: GPGTools - http://gpgtools.org
 
---000000000000f4303c061091c2c1--
+iQIzBAEBCAAdFiEEDb73u6ZejP5ZMprvcqXauRfMH+AFAmXXtuIACgkQcqXauRfM
+H+CbwBAAlTkcRsZZFO6ctZftlnXIL22GxfPi1cS13G7/sAVO83cbddxtpzh5DSWu
+l7yw9cM+uUFiu2t64vlgztd5V9XdKbrxst0d3xItLoI/HSECWoKiky94ROIINKCa
+7ar6rcamj5/qWrcsxcIdUk/a9q9umxMzmLm1MYeGpHK5RvxjaJQOR627gbZiCtLe
+8E7lH11LhfnmkpHT9L7prML9ZRwc/Yc1bGUp0nk8g9il/JN4FE0u1kLf4mzCyRWr
+Cl2a2DU2jGXsDYva6xZfIeWAuWCho32bXgGwJbiVI2t2FjGyYau8ZR1DbdRYOkGr
+kfUishBPTnm5DFJaR1PoW9bvzoTWq6BCjzaaBkbB3gY69Nlwe6kMH7Tm7H00E6DH
+oUDPu1TyykaF8E6691X9mJV4tott2SsJ7jfgRIrNqOC7RODfjgtJe+zlLXzpeg92
+k8dsHWlEFN4mRVf1L8Ao+wnOR1ARmQuP821vUVToFY8kxGz6suAsForZ15enLvpo
+mcDF7R1rsHDPHGrTGWwptTpJNwSZ+Hztf4TmHuPgga9aZKlwFpqfhMKgq3+egM3w
+XMc6/zxqirv2e9NdzpLowtIBafP7x7vQt+NRvBuHFwhb2ujYdpiQfLaqMGu/tdi5
+bIc2I/3ip2UVzKuHHR+pxTAI/WxCRDILpNY3NAmYT3lQ8FwLRo4=
+=87Yy
+-----END PGP SIGNATURE-----
 
---===============8587270121869797978==
+--Apple-Mail=_4B6DE069-3094-4F95-8FAF-62F40BE60737--
+
+--===============6727254634505109017==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -450,4 +458,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============8587270121869797978==--
+--===============6727254634505109017==--
