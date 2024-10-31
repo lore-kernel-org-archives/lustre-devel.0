@@ -4,173 +4,71 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 36577D6B6D4
-	for <lustre-devel@archiver.kernel.org>; Wed, 30 Oct 2024 20:51:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 19C46D5CC91
+	for <lustre-devel@archiver.kernel.org>; Thu, 31 Oct 2024 00:36:52 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Xdzm91lt1z1xFL;
-	Wed, 30 Oct 2024 13:50:33 -0700 (PDT)
-Received: from outbound-ip191a.ess.barracuda.com
- (outbound-ip191a.ess.barracuda.com [209.222.82.58])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Xf4nJ1R9Xz1xPX;
+	Wed, 30 Oct 2024 17:36:52 -0700 (PDT)
+Received: from mail-il1-f169.google.com (mail-il1-f169.google.com
+ [209.85.166.169])
+ (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
+ key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Xdzlk22P9z1wLF
- for <lustre-devel@lists.lustre.org>; Wed, 30 Oct 2024 13:50:10 -0700 (PDT)
-Received: from NAM12-MW2-obe.outbound.protection.outlook.com
- (mail-mw2nam12lp2040.outbound.protection.outlook.com [104.47.66.40]) by
- mx-outbound47-246.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Wed, 30 Oct 2024 20:50:06 +0000
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=uVst3qbKM9SC2XtO7PKJNLdvASdhayELWU2+k/84wjoICfojAgszBHbx2typhdpYxJVuxsX5tR/tqXrbsk2cJ0byyP7RW8DML051tohcQbqZbw59xtXBnEUt2KoyFzsC5q3Ycclw63lq7accgp07MKth4LnVJuP7s3YlwFWL0VM85x9QvPpgptxse65SBoXto6sz8fa3s9DEBQ4qWJkJwlnb873Y21icWRS3QcUxaaADK9SMWIMRlzmDSMt0j8/Vw7Uqpk0h6e9JgdqXC7z05wCS4epSOJuClpKzeKYp8oejkPCwCvmjvWiu5CL7KLZT1zpSCHXmKqVGHtkRSmjgbQ==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector10001;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=r2M4v3Lvn5cfMMS6fn4zrznT4uYEa8qk9AO8BxB/uPk=;
- b=S6kZ+gkrXCZrBrDXwmwV8IWTX0JrXrUFNqB6GVOXWMP2Wbq/ShdAUKMCx2S59VENK7O8CbAFkzTjftJL6C9ZhU1u+yeTufUTei1QjEY5aTqPYXba95tBFYKl7gluwEEe8ss734wasEWDGmNNV1NwFsSvQH7B4FFdSkAaENCd7VWiidhQerEiSw27Lntvwr/cPWVtztYV9SeCT1WKLvpnu41zx4Q4CGORCZlxzjpxivJu/APk+HO9QhNO1e+30ms1Yuq/j4WF/hneKjUZGYKUdGguzWbTHubWJqxuUb7VrqPDiJ7gKAWgCfSYGr8+WxjsEzUfxOtsPngRy7579pgy6Q==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=r2M4v3Lvn5cfMMS6fn4zrznT4uYEa8qk9AO8BxB/uPk=;
- b=r49jvzp5kr+b3mDnXLkAIwqs2dQFYIiXtowROG+XsqZVX/TYFxl02hbxY9sCBY1KSwERFWbqGIy5n11u3wXcZZAC4z2pdzj0fFHXYMRlhQ4es75p7myqm4BRZHtktFKuu6oEGoCFfM0jOoHYp6l9hdP3hMht6swNbQMFSVU4Q3Y=
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
- by BN0PR19MB5328.namprd19.prod.outlook.com (2603:10b6:408:15b::19)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8093.32; Wed, 30 Oct
- 2024 20:50:03 +0000
-Received: from MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::92fd:9b94:d9cd:81d2]) by MW4PR19MB5630.namprd19.prod.outlook.com
- ([fe80::92fd:9b94:d9cd:81d2%4]) with mapi id 15.20.8093.025; Wed, 30 Oct 2024
- 20:50:02 +0000
-From: Andreas Dilger <adilger@whamcloud.com>
-To: "Defazio, Gian-Carlo" <defazio1@llnl.gov>
-CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: [lustre-devel] make fs ro for migration
-Thread-Index: AQHbKkv0BxY5+iSvpUmFp4NYJ2Mg0bKfqroA
-Date: Wed, 30 Oct 2024 20:50:02 +0000
-Message-ID: <3A7486FD-421D-4199-881E-6DDB64470D0D@whamcloud.com>
-References: <SA0PR09MB6377DECA6DCD98AF2F176D2CE34B2@SA0PR09MB6377.namprd09.prod.outlook.com>
-In-Reply-To: <SA0PR09MB6377DECA6DCD98AF2F176D2CE34B2@SA0PR09MB6377.namprd09.prod.outlook.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: Apple Mail (2.3445.104.21)
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|BN0PR19MB5328:EE_
-x-ms-office365-filtering-correlation-id: 3e2ab5e4-d512-481e-0399-08dcf9246d5a
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0;
- ARA:13230040|376014|366016|1800799024|8096899003|38070700018; 
-x-microsoft-antispam-message-info: =?utf-8?B?UWdiVW12V2pLdW9UMmRMYUxiR2pidWQ3dnN6WWpWOFBWSUdaczg3MUtZcUJJ?=
- =?utf-8?B?aFhqbDh4eVBndHpmTnVmOTAvSFp0SE5jY2I1bmhwcW5lSUFTTk85TFdrU0gz?=
- =?utf-8?B?K0RDZC9VUjB2WFlpVFNtRDh2bXg1bjNhcll0SFpYeTNKUnV0VWtnYzV2b1VB?=
- =?utf-8?B?TFZ6ZFcyOWU1cDQxMm4vUW1PZkJMWnpZeTE1anQyVEJrUlkrTVNKZytXaFpn?=
- =?utf-8?B?TEgrYUFHc1UwSHZqRVE2Z1p3ZHV2bnZDNVFJSGY0UFhGNlJld2hzQnJOUzZV?=
- =?utf-8?B?VHRKREhHZjQxYTFXcUh4MU4rQXJKTzlONzVWelRpTmd1R0hhc3BQR3Z1VUZ5?=
- =?utf-8?B?L2xlR2NiZGcvWmRTNUk0eXNmUGwzQzRDM3R4cXFQREdhM1VJbnZTYWI2QVBU?=
- =?utf-8?B?Wlg5K0FVNERzOHNRb0piM3RyWG5HbjZsak9WaU96dzMxaE4wY3BibFRUcFBm?=
- =?utf-8?B?RDcvVENSWldQaVBKcWJrQlF3Z01MTmhmL0t4d0JHZE1VNWlqRWFzek1TMTRt?=
- =?utf-8?B?NnJWM2EvSVBZZ2JlU0xPenJ1ZDdoamg1ZXpzMGJkcUo4OXhNOTMzZkIwb3FX?=
- =?utf-8?B?ejlYdHRrS01QNHdIQkY0V29EcEFjM3hMdXd5TFM3aCtFVWZ2TWI5amphUFZv?=
- =?utf-8?B?cWg3TS9MR0lPK2JTcTJ5NURWWGU1cG1IdGlaWGNLRkdMcGtPN05QeFBsZnhm?=
- =?utf-8?B?M3hxaEVPRy8rNnorUHloaGJrNXA1czUyNlBTMmNVU3lJbGt1Um1kYyt0Z0hh?=
- =?utf-8?B?MjlUYzlWeFhTRUNKNmhRdVJYNWpRWWFBcit3dlowUTJzQVBUcHhJemtDSXNC?=
- =?utf-8?B?dS96VHg5Ym5vTlF6NWNXQXphUGQ3SXZTYzBkaXRkY0ZERlpyaEtlb2RWVXg5?=
- =?utf-8?B?NUQ0SnpaYW1DNS92TUQ3UTBKV2ZvS0doempiOVRwcVluNHRKaG50VlBlbkVz?=
- =?utf-8?B?MFRxSDkrUXdEYm50ZlBSNm9qd2Rnd0t0QXNuVFZYbG5XZFVNU2JnQmYvTWVE?=
- =?utf-8?B?Nk1ZZlJYQVZUUTFlamduN25tTEJZVk9TZEFqSTdUOEZHRkdpNGYxYVlpY1Bu?=
- =?utf-8?B?SmRzbTNYWGZ2bWw1RnR3RzM2eVRvbm1EaWxTYTRReW9VSmVBTnRsaVVaaHVO?=
- =?utf-8?B?djc3SWU4amN0aDNpUlJ5NW5DeXowSVVzREs3RXU5UmlrbjVyL01lT3VlK1Yy?=
- =?utf-8?B?ZytFLy9rRmthemxKUHZSNERkNmFCbjNxREFBaHVXTkJhckNrTzF0c3BnNjQx?=
- =?utf-8?B?QVRRc0dQazZQTzBwa0VQK3BDUnBDK0dxakc0VHNhT29jN0w5ZVFVRVR3clV2?=
- =?utf-8?B?SnUzN25td2JpZFJ0OGVlL1M0L1ViMW13WmdHRXdmOWdHcm1qZ0tSamViUllG?=
- =?utf-8?B?U2p3Sk5mUGZ2OFZ6OW5uaGVzS1JGaXE2NVphOEoxUTVOZVVDWXhhRHcxWUhx?=
- =?utf-8?B?OTJ1cGl0S0xBOWkxR3BwZ3RHOU1keFozT3puRWs0L0wzSDZmVGtCK1o3aGVT?=
- =?utf-8?B?ZzdtQ3FsUXRjdDgxaE1xK2V2eU1PQ3lydForNHZhekVNRTI1RE1IdXZ6cmtz?=
- =?utf-8?B?L2t1M21nT05yNnNJNjdmUFBOYUxaTnVYNzFuTlNvYzFaNEYybWVUMXpQcjdF?=
- =?utf-8?B?empNYnNjbWZSNVpZenpnbk4zcXJTbGhtc1FIYkZUa29NUXp0VnpCcm5FRWpi?=
- =?utf-8?B?MHVoSGh4ZjREU3dRS2xFNUxqK3VaR2lIeGJ4dWx2b1FnR21SQTBtRDJFN3Zh?=
- =?utf-8?Q?V64anJQCUPqkomhKjvRSF3PzLXXMNA1S+R27P1k?=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(376014)(366016)(1800799024)(8096899003)(38070700018); DIR:OUT;
- SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?Y2IrZ0RnZWdsN3o5VlM4K0xLTjB1UzlWcUN3TjA1cnBYMldKdW03aE1kVEw5?=
- =?utf-8?B?NTlLLzc1dVJSbTBxODdlcndVZXhMM0ZWN2tpU3BSM2N3YjdGWFRVSUVyemhS?=
- =?utf-8?B?SHRyNzNKT0J2YnZKNStCd3VSVEpYNldZaDZSR2F5c3RXRDFvNGtJcFNUUU9E?=
- =?utf-8?B?cDdYNnZjSjRiNGlDWWtqektqQzVKK0xuMUFmM01VYWg2eVVhWVpCNzNCOEtp?=
- =?utf-8?B?d0xEVFV6VXRlQTl5RTBkQ3NCb25hV1RwK1ZVSDdpSy94bDMvRVV6ZDdkM3dL?=
- =?utf-8?B?amVwd3l2N1FVRlU3VHpLSXlzdWtLWFdXbVRMNXBpdXlGRlhtNFNwckxuZUpT?=
- =?utf-8?B?OWpNdzdxZ2lNVzBHMC9QdG9LalE4L3h3NGJVSVp4WkMxaFVraDE4c3pxTHFa?=
- =?utf-8?B?OXhOSWJIM29sSkNRMlcxWWp4cTdQSlRCQVcySDg4eFBFUEEydTNNbTVBRWhP?=
- =?utf-8?B?MVlNRzVJRjh4SEo4SXhUek5JUDAyUTMzcklPZFVRWHd1aStTMzl5aVArbDhz?=
- =?utf-8?B?SnNJOE1jakxVa1lWVnUxbHVvc0E1aUVmTkNTL25pTmRmZ1NzZ2xMVTViMW1o?=
- =?utf-8?B?U042VzVpcUdEc2FYVHYvQTQ4NEhlQy9UckM5aTRIcTlLUXpUM0RqejNVMkxK?=
- =?utf-8?B?dERVWWpHT3JDTVdBUEtDZTFValppSVR1NEVVZHFjTzNGcGVGdStPWmJVQmNM?=
- =?utf-8?B?cWFxVFBieGs5Tkt2MStBbXQ3SHhZK3RnV2tyWDNNenN5SGFVa0FiaWp6d01R?=
- =?utf-8?B?RzN2ZXR2aTJEWkF1c0t0N3BCTzFmQlE1bmR6SHhlenlsdC9TcE5UckpJK3JM?=
- =?utf-8?B?L2pTRnoyWTFNbGdkdlpncUdBZzhDanJGYTJrdXljNmY0VEhneUF6MWdSMkJu?=
- =?utf-8?B?UVQ4ZUJqN2RjRDlnTnV2ai94YlpOWTJiVGlDajFCclZCWWpIN0tEV2l6T3dV?=
- =?utf-8?B?Ym1ac3dOUkFIaytXMGd6WGZydWxCdjE0dk1hcDVvemtLTCtxNThabUlEVHhF?=
- =?utf-8?B?Tnlma3JYdktuYkpJWGo5QlFVVTdOd3JzMDdqeGpUeStHNXl1L0M3R2p0VHVw?=
- =?utf-8?B?Vjl3cW9nK2pRdnJVTS9HMDhxMGFEL1ZhTVdRNmxGYy9lTXVmM3BZOXQ3VHFo?=
- =?utf-8?B?SUVFQ3pyWEZXNjEvTzR2cmExMVhDZDBaV214QnRXcVVMaGxjdFl1alhEMlJU?=
- =?utf-8?B?NDFOT2tIWUZqOVpnNnlsbVFXZFgzS1QrVTF4VjZHNTJESnFmbEtUNEZPdkx1?=
- =?utf-8?B?S0Y4SkZHVWM4OVB4bHY0RFFmNldVd1RVeENGZ1NxRVJFMzBzNkM3Rk1ZSDlo?=
- =?utf-8?B?bFU1S2ZRSU9XYitBcWZLbnIrWmErOElhS2twcUZ4RUtTdnFLbzBoVWRDRWQv?=
- =?utf-8?B?TWdySitXbklmMCtTNUY0NGcvZ3d2ZXNteCt5YVRpcFUxN3pVVnkxcVFWdzhL?=
- =?utf-8?B?MVJjNUtrU1JmUjYwUlhud01heHJMV1ZJejVVYWJKWlJWZlRwZTFDRWJIRU5q?=
- =?utf-8?B?eFB4RVMxQkRnYndRQnNSUjdHUnBNNXNWOUhYSVVXNjFGU2hWZUxyY09FYUlQ?=
- =?utf-8?B?bjhzcGZmMDlqR2REYVJ3TXp4djBqOVpNa0JHM1pjUUR2am1SQUpaZm0rSFM3?=
- =?utf-8?B?MWVVOVQ5V0x4T2l1bG1jUVhDOW1xcWRjQjF6VVFtZDg3cHdVRUdqZ2l3S3do?=
- =?utf-8?B?U2g4WlZjOGhYOW1icmdjZm1scWVUc0VmUDVjRER2emdRSW1lTkxKelNqKzhQ?=
- =?utf-8?B?YU9IMytaTDhJTmVBVnRyVFY2MGFvMU9mQ0tpTkFocUg0ODZwL0wxVWhNbVZN?=
- =?utf-8?B?Z3J5TnBMb0VZVW0yWDR1M1RUK2dBbjBvVHAzMXBkWVZrS0hBSzdwV1cwNURD?=
- =?utf-8?B?dDlROW1RV1ZLR0VqOEQvTmZKS2JwcXp2RmpZZlRWb0IwWUtBRCsyVVhKK3F6?=
- =?utf-8?B?UURDNzJpOGpVOFBEQWoxQUsvdC9qUVcvSFBIeEFGTEZhWmE3NVNFM2hmMjc0?=
- =?utf-8?B?MmFEVGQ4ckMzcnVvcHhUd2ZvWVNIUkpjaTB4N3VMZ0c2c0x5UFVqcC9LU3Ay?=
- =?utf-8?B?WkVtL2JXSVcyZlRORHk2VXZRcTBFMlI3N0FLbm5NcDBKd29NZ2JzT085YnVZ?=
- =?utf-8?Q?00E+k3g0X4zhiCdZjjzxgA8kQ?=
+ 4Xf4nC3HYKz1xFd; Wed, 30 Oct 2024 17:36:47 -0700 (PDT)
+Received: by mail-il1-f169.google.com with SMTP id
+ e9e14a558f8ab-3a4e5401636so1582645ab.3; 
+ Wed, 30 Oct 2024 17:36:47 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=gmail.com; s=20230601; t=1730335006; x=1730939806; darn=lists.lustre.org;
+ h=mime-version:subject:references:in-reply-to:message-id:cc:to:from
+ :date:from:to:cc:subject:date:message-id:reply-to;
+ bh=0WWYuHAPCxTiRqEft7qtuCijPQTtBk7tcsireFSQwrE=;
+ b=LpGWg1QMBocw3RcuEwVLMtb0dD2f0ymFgrTh4SuYWzvlH9lvZuRXKARqQ3b/zhwOK+
+ KXXleW11AF3GTMLqgx/Obl82DFLuivSJt+hu8EW/SlmOPU1d9Hgeg+9lvCJIUV5qPonN
+ 4sXHZVdkEMUE6XXIK7IuBxn10k90Ui0FskZ0kEEsAbW3uBcgnPqoeoaub8I7eAhFl9Cf
+ gsO33BIgCfUzrd6MVh7tkvmJk9uBjEtrb2ziRLWDVOYz7/B9EC2OhW5pdyx7g92W9lFG
+ 9WohK6SOPRwrgKdNsaYp7ToOFEu9D9Ffl0lmvDk/lqkMgq+xXWI4RAFxViEfPLtZaBD6
+ 8YQw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20230601; t=1730335006; x=1730939806;
+ h=mime-version:subject:references:in-reply-to:message-id:cc:to:from
+ :date:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
+ bh=0WWYuHAPCxTiRqEft7qtuCijPQTtBk7tcsireFSQwrE=;
+ b=WMYDhPELKL5OWms8dbGKWCvKB7CXniefgeb9c6Qicj7UA8PGioWcufmSUGSTlE55cb
+ vzVlRnB6EKqgkSZchMVrGihZ6oPVdviGnvrZI/V1HongGfs+jV0RdD+LkDA6QWNK6awQ
+ LrS3TfnAEot1Ew1+MUrfAF3kZ0AnNP+BlsjVh0G7V2eqwK15KNCXkoaeCAtdGja6l7JK
+ B4xs/R8cIMxMdH7RMst6UWALudI1K8FBdRRU/BQYz+15UlHEzzMy2gCs9ouZ44Wq/NY2
+ I9wNITvY9JhbmGiaQPYodLuy1RNK7TQYchsy+jPmCDKWrv4HOKvMZdkUwM8Ax0u06PbM
+ UPqw==
+X-Forwarded-Encrypted: i=1;
+ AJvYcCWeHh+4oWiauG+hCi5JQrxurqZmoSPF4rtur1U2VQc33a/hp98O3e73AqMV6H61j2DzuaCtzADhVInqad9WnQ==@lists.lustre.org
+X-Gm-Message-State: AOJu0YwvxBasNWFN71RLD+Gy/5sPCBYt1bnLSQgA2sQlBCKi8e3W7qfT
+ ccrEP/+UvkpYdMYb9MkMZKgk8Ltc2Nv35x4XyvG/beaY1sYgzeCe
+X-Google-Smtp-Source: AGHT+IHIS1/khScKgP+I5QfEATarAtVicCGBjCyak2Ss1fD+iNMWpcrBqEhTqelF4q/UjhqguwmUYg==
+X-Received: by 2002:a05:6e02:1a22:b0:3a0:bd91:3842 with SMTP id
+ e9e14a558f8ab-3a4ed3628d7mr162361335ab.24.1730335006344; 
+ Wed, 30 Oct 2024 17:36:46 -0700 (PDT)
+Received: from [192.168.86.58] (97-115-66-118.ptld.qwest.net. [97.115.66.118])
+ by smtp.gmail.com with ESMTPSA id
+ 41be03b00d2f7-7ee455a74e1sm189843a12.48.2024.10.30.17.36.45
+ (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 30 Oct 2024 17:36:45 -0700 (PDT)
+Date: Wed, 30 Oct 2024 17:36:36 -0700
+From: Nathan Rutman <nrutman@gmail.com>
+To: Andreas Dilger <adilger@ddn.com>
+Cc: "=?utf-8?Q?lustre-devel=40lists.lustre.org?="
+ <lustre-devel@lists.lustre.org>, 
+ "=?utf-8?Q?lustre-discuss=40lists.lustre.org?="
+ <lustre-discuss@lists.lustre.org>
+Message-ID: <8119cc42-97a0-4780-9235-ec73d6c01241@Spark>
+In-Reply-To: <F5B513AE-FD55-40FF-A28A-0CC4BBE00F1B@ddn.com>
+References: <8c491303-89e9-439e-a39b-0cab2dbd8e66@Spark>
+ <250f2f80-76dc-4f59-92c7-fc5e4465b753@Spark>
+ <F5B513AE-FD55-40FF-A28A-0CC4BBE00F1B@ddn.com>
+X-Readdle-Message-ID: 8119cc42-97a0-4780-9235-ec73d6c01241@Spark
 MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: mcC/CK20TijM4aopBEaMTd3T6rYq/8qCZYb66W9z26j0bXdQAK6PVagyKl9BIAAaUlGstQubH+OT3BieauGCgvrBvcEdaPoLGilVT8/2g/PcsSx4b5QhVfRjpttbzdnnLU+4bzQTxu7gc7G/y93wmAlvZU9yk1WxfBimHsOEGwvD6jyml8vw2ZxWoKO1y7YvltYdeBymLPVRdRgVsI7Jv58BQXRU55beI2X3iWLm8GnwU6cbAqOOYR6B6L6BXgVGV3VnXzwfXtllOoKItx1cF6nBAE0yHYQyZOlf+PuIzcFrwjBDDJIm4RJMpDp+o1+ohy3l2kJNV254yQNdehIr0gwDAZRri5fX4HSL+RKG6EXC7GuklhrMXpyQLHpSLINp0av3M4y/B0M1o0KpJmrSV8qz8hWrLMg6SCCBij1W9QhPwweZ7eWCI9iAi6Dg0zNRkmNykeaaj+yikEDM/ikAFxDnv8ZKxaMDNSjxCfPriOnm/2mO8DMbYVUf2sVhzV9L5bWvF+TmducOmKtLark9BstWmBVrfr6OOXTFTebQ9N99lZXjKnmt1gI0jvasOr7pkpiybRMnk9+2Rjgmffca2Sz+e8CnUodi01qF8qBHm4f41L2UYs+Aq9uMGHCNhZbYEaXNrZ5BwCOXWjDTWgeXJ/Ax6hYXML8dx1vT15uWaYs=
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3e2ab5e4-d512-481e-0399-08dcf9246d5a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Oct 2024 20:50:02.7960 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: jdCp/zwtwI5tBL2FX72IS4i1SNOiKEVp6iXfQGSMi+PxmUYgTbIX2cGeegdBBYzu
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN0PR19MB5328
-X-BESS-ID: 1730321406-112278-12747-6797-1
-X-BESS-VER: 2019.1_20241018.1852
-X-BESS-Apparent-Source-IP: 104.47.66.40
-X-BESS-Parts: H4sIAAAAAAACAzXLMQ7DIAyF4bt4zoAxNiRXqToYsJUlylCGSlXuXoZkefr1pO
- /1A/sO2GDMXeD8wIalhFn7PAVXFY6xKhmjUkuhdXcvPSNzIriWx+/juD2vKd0+s+WIxT
- F4rS2SGlURE5WeW+QO1/sPD3RY7oEAAAA=
-X-BESS-Outbound-Spam-Score: 0.00
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.260090 [from 
- cloudscan15-58.us-east-2a.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 HTML_MESSAGE           BODY: HTML included in message 
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
-Subject: Re: [lustre-devel] make fs ro for migration
+Subject: Re: [lustre-devel] Stripe visualization tool
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -183,169 +81,174 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============1366954058145093807=="
+Content-Type: multipart/mixed; boundary="===============8358769722761898015=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1366954058145093807==
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_3A7486FD421D4199881E6DDB64470D0Dwhamcloudcom_"
+--===============8358769722761898015==
+Content-Type: multipart/alternative; boundary="6722d11a_31fede0a_2520"
 
---_000_3A7486FD421D4199881E6DDB64470D0Dwhamcloudcom_
+--6722d11a_31fede0a_2520
 Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
 
-T24gT2N0IDI5LCAyMDI0LCBhdCAxNjo0OCwgRGVmYXppbywgR2lhbi1DYXJsbyA8ZGVmYXppbzFA
-bGxubC5nb3Y8bWFpbHRvOmRlZmF6aW8xQGxsbmwuZ292Pj4gd3JvdGU6DQoNCldl4oCZcmUgZG9p
-bmcgYW5vdGhlciBmaWxlIHN5c3RlbSBtaWdyYXRpb24uIFdl4oCZZCBsaWtlIHVzZXJzIHRvIGhh
-dmUgcmVhZC1vbmx5IGFjY2VzcyB0byB0aGUgZXhpc3RpbmcgZmlsZXN5c3RlbSBkdXJpbmcgYW5k
-IHRoZW4gZm9yIGEgd2hpbGUgYWZ0ZXIgdGhlIGZpbmFsIHN5bmMuDQoNClRoZSAyIG1lY2hhbmlz
-bXMgd2XigJlyZSBsb29raW5nIGF0IGFyZSBzZXR0aW5nIHRoZSBNRFRzIHJlYWQtb25seSB1c2lu
-ZyDigJxsY3RsIHNldF9wYXJhbSBtZHQuKi5yZWFkb25seT0x4oCdIGFuZCByZW1vdW50aW5nIHRo
-ZSBmaWxlc3lzdGVtIG9uIGFsbCB0aGUgY2xpZW50cyB1c2luZyDigJxtb3VudCAtbyByZW1vdW50
-LHJv4oCdLg0KDQpNeSBpbXByZXNzaW9uIGlzIHRoYXQgaW4gdGhlIGNhc2Ugb2Ygc2V0dGluZyB0
-aGUgTURUcyByZWFkLW9ubHksIGZpbGVzIGFscmVhZHkgb3BlbmVkIGluIHdyaXRlIG1vZGUgd2ls
-bCBzdGlsbCBiZSB3cml0YWJsZS4gRm9yIHJlbW91bnRpbmcsIGlmIGZpbGVzIGFyZSBvcGVuZWQg
-aW4gd3JpdGUgbW9kZSB0aGUgcmVtb3VudCB3aWxsIGZhaWwgYW5kIGNvbXBsYWluIHRoYXQgdGhl
-IGZpbGUgc3lzdGVtIGlzIGJ1c3kuIE91ciBjdXJyZW50IHBsYW4gaXMgdG8gZG8gdGhlIHJlbW91
-bnRpbmcgb2YgYWxsIGNsaWVudHMgYmVjYXVzZSBpdOKAmXMgZWFzaWVyIHRvIHNlZSBpZiBzb21l
-IHVzZXIgaGFzIHNvbWUgZmlsZSBvcGVuIGluIHdyaXRlIG1vZGUuDQoNCklzIHRoZXJlIGEgd2F5
-IHRvIG1ha2UgdGhlIGZpbGUgc3lzdGVtIHJlYWQtb25seSB0aGF04oCZcyBtaW5pbWFsbHkgZGlz
-cnVwdGl2ZSB0byB1c2VycyBidXQgZG9lc27igJl0IGhhdmUgdGhlIHBvdGVudGlhbCBwcm9ibGVt
-IG9mIGhhdmluZyB0byBjaGFzZSBkb3duIGV2ZXJ5IHByb2Nlc3Mgd3JpdGluZyB0byB0aGUgZmls
-ZXN5c3RlbT8NCg0KSW4gMi4xNSB0aGUgbWR0LioucmVhZG9ubHk9MSBwYXJhbWV0ZXIgaXMgdGhl
-IG9ubHkgb3B0aW9uLiAgVGhlcmUgaXMgcGF0Y2ggaHR0cHM6Ly9yZXZpZXcud2hhbWNsb3VkLmNv
-bS81NjMwNCAoIkxVLTEyNTE1PGh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jyb3dzZS9MVS0x
-MjUxNT4gb2ZkOiBhbGxvdyBzZXR0aW5nIGEgdGFyZ2V0IHRvIHJlYWRvbmx5Iikgd2hpY2ggbWlz
-c2VkIHRoZSBjdXRvZmYgZm9yIDIuMTYuMCB0aGF0IGNhbiBhbHNvIHNldCB0aGUgT1NUcyByZWFk
-LW9ubHkuDQoNCk15IHN1Z2dlc3Rpb24gd291bGQgYmUgdG8gc2V0IHRoZSBtZHQuKi5yZWFkb25s
-eT0xIHBhcmFtZXRlciBzb29uZXIgcmF0aGVyIHRoYW4gbGF0ZXIsIHRoZW4gbGV0IHRoZSBvcGVu
-IHdyaXRlIGhhbmRsZXMgInBldGVyIG91dCIgb3ZlciBzb21lIGRheXMgYmVmb3JlIG9yIGR1cmlu
-ZyBhbiBpbml0aWFsIGRhdGEgbWlncmF0aW9uIHBhc3MgKHdoaWNoIHdpbGwgbGlrZWx5IHRha2Ug
-c29tZSBkYXlzIGl0c2VsZikuICBZb3UgY2FuIHRoZW4gbGlrZWx5IHJlbW91bnQgYWxsL21vc3Qg
-b2YgdGhlIGNsaWVudHMgcmVhZC1vbmx5IHNpbmNlIHRoZSBydW5uaW5nIGpvYnMgd2lsbCBoYXZl
-IGZpbmlzaGVkIGFuZC9vciBkZWFsIHdpdGggdGhlIGZldyByZW1haW5pbmcgY2xpZW50cyBwcm9j
-ZXNzZXMgdGhhdCBoYXZlIG9wZW4tZm9yLXdyaXRlIGhhbmRsZXMgYW5kIHRoZW4gZG8gYSBmaW5h
-bCByZXN5bmMgcGFzcyB0byBjYXRjaCBhbnkgY2hhbmdlcyBhZnRlcndhcmQuDQoNCkNoZWVycywg
-QW5kcmVhcw0KLS0NCkFuZHJlYXMgRGlsZ2VyDQpMdXN0cmUgUHJpbmNpcGFsIEFyY2hpdGVjdA0K
-V2hhbWNsb3VkDQoNCg0KDQoNCg0KDQoNCg==
+Sorry, added to the docs, hopefully this would do it for you:
+pip install --upgrade numpy matplotlib seaborn yaml scipy
+On Oct 29, 2024 at 8:16 PM -0700, Andreas Dilger <adilger=40ddn.com>, wro=
+te:
+> Nathan,
+> I had a try at using this, but it seems to have a number of external de=
+pendencies. =C2=A0 I installed the python3-pyyaml and python3-matplotlib,=
+ but I couldn't figure out what package =22seaborn=22 is part of=3F =C2=A0=
+=22yum search seaborn=22 doesn't find anything on my el8 system, nor does=
+ =22rpmfind=22 return any packages for this.
+>
+> It would be good to include a description of the package requirements i=
+nto the README.md file.
+>
+> It looks like =22sns=22 is only used for picking colors, so the utility=
+ would be more easily used if a more standard mechanism was doing this=3F=
+ =C2=A0While not as pretty, I expect just picking colors by a 3-byte hash=
+ of the component ID and stripe index would get you something usable if =22=
+seaborn=22 was not installed, or a hash of the object ID, or similar=3F
+>
+> Cheers, Andreas
+>
+> > On Oct 29, 2024, at 13:38, Nathan Rutman <nrutman=40gmail.com> wrote:=
 
---_000_3A7486FD421D4199881E6DDB64470D0Dwhamcloudcom_
+> >
+> > In the =46WIW category, I've got a tool to graphically display a file=
+'s striping pattern for arbitrary Lustre files. It takes in the yaml from=
+ =22getstripe -y=22 and will generate a jpeg. Handles DoM, P=46L, overstr=
+iping, mirroring, pools. Available at=C2=A0https://github.com/HewlettPack=
+ard/lustre-stripe-plotter
+> >
+> >
+> > Example of mirrored DoM P=46L file:
+> > <Attachment.jpeg>
+> > =5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=
+=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F
+> > lustre-devel mailing list
+> > lustre-devel=40lists.lustre.org
+> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+> Cheers, Andreas
+> =E2=80=94
+> Andreas Dilger
+> Lustre Principal Architect
+> Whamcloud/DDN
+>
+>
+>
+>
+
+--6722d11a_31fede0a_2520
 Content-Type: text/html; charset="utf-8"
-Content-ID: <3DE796C0754D3D4AAF3D7745D4ACF445@namprd19.prod.outlook.com>
-Content-Transfer-Encoding: base64
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
 
-PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
-dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IHN0eWxlPSJ3b3JkLXdy
-YXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0
-ZXItd2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4NCk9uIE9jdCAyOSwgMjAyNCwgYXQgMTY6NDgsIERl
-ZmF6aW8sIEdpYW4tQ2FybG8gJmx0OzxhIGhyZWY9Im1haWx0bzpkZWZhemlvMUBsbG5sLmdvdiIg
-Y2xhc3M9IiI+ZGVmYXppbzFAbGxubC5nb3Y8L2E+Jmd0OyB3cm90ZToNCjxkaXY+DQo8YmxvY2tx
-dW90ZSB0eXBlPSJjaXRlIiBjbGFzcz0iIj4NCjxkaXYgY2xhc3M9IldvcmRTZWN0aW9uMSIgc3R5
-bGU9InBhZ2U6IFdvcmRTZWN0aW9uMTsgY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1m
-YW1pbHk6IEhlbHZldGljYTsgZm9udC1zaXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZv
-bnQtdmFyaWFudC1jYXBzOiBub3JtYWw7IGZvbnQtd2VpZ2h0OiBub3JtYWw7IGxldHRlci1zcGFj
-aW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRy
-YW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13
-ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyI+DQo8
-ZGl2IHN0eWxlPSJtYXJnaW46IDBpbjsgZm9udC1zaXplOiAxMXB0OyBmb250LWZhbWlseTogQXB0
-b3MsIHNhbnMtc2VyaWY7IiBjbGFzcz0iIj4NCjxvOnAgY2xhc3M9IiI+Jm5ic3A7PC9vOnA+PC9k
-aXY+DQo8ZGl2IHN0eWxlPSJtYXJnaW46IDBpbjsgZm9udC1zaXplOiAxMXB0OyBmb250LWZhbWls
-eTogQXB0b3MsIHNhbnMtc2VyaWY7IiBjbGFzcz0iIj4NCldl4oCZcmUgZG9pbmcgYW5vdGhlciBm
-aWxlIHN5c3RlbSBtaWdyYXRpb24uIFdl4oCZZCBsaWtlIHVzZXJzIHRvIGhhdmUgcmVhZC1vbmx5
-IGFjY2VzcyB0byB0aGUgZXhpc3RpbmcgZmlsZXN5c3RlbSBkdXJpbmcgYW5kIHRoZW4gZm9yIGEg
-d2hpbGUgYWZ0ZXIgdGhlIGZpbmFsIHN5bmMuPC9kaXY+DQo8ZGl2IHN0eWxlPSJtYXJnaW46IDBp
-bjsgZm9udC1zaXplOiAxMXB0OyBmb250LWZhbWlseTogQXB0b3MsIHNhbnMtc2VyaWY7IiBjbGFz
-cz0iIj4NCjxvOnAgY2xhc3M9IiI+Jm5ic3A7PC9vOnA+PC9kaXY+DQo8ZGl2IHN0eWxlPSJtYXJn
-aW46IDBpbjsgZm9udC1zaXplOiAxMXB0OyBmb250LWZhbWlseTogQXB0b3MsIHNhbnMtc2VyaWY7
-IiBjbGFzcz0iIj4NClRoZSAyIG1lY2hhbmlzbXMgd2XigJlyZSBsb29raW5nIGF0IGFyZSBzZXR0
-aW5nIHRoZSBNRFRzIHJlYWQtb25seSB1c2luZyDigJxsY3RsIHNldF9wYXJhbSBtZHQuKi5yZWFk
-b25seT0x4oCdIGFuZCByZW1vdW50aW5nIHRoZSBmaWxlc3lzdGVtIG9uIGFsbCB0aGUgY2xpZW50
-cyB1c2luZyDigJxtb3VudCAtbyByZW1vdW50LHJv4oCdLjwvZGl2Pg0KPGRpdiBzdHlsZT0ibWFy
-Z2luOiAwaW47IGZvbnQtc2l6ZTogMTFwdDsgZm9udC1mYW1pbHk6IEFwdG9zLCBzYW5zLXNlcmlm
-OyIgY2xhc3M9IiI+DQo8bzpwIGNsYXNzPSIiPiZuYnNwOzwvbzpwPjwvZGl2Pg0KPGRpdiBzdHls
-ZT0ibWFyZ2luOiAwaW47IGZvbnQtc2l6ZTogMTFwdDsgZm9udC1mYW1pbHk6IEFwdG9zLCBzYW5z
-LXNlcmlmOyIgY2xhc3M9IiI+DQpNeSBpbXByZXNzaW9uIGlzIHRoYXQgaW4gdGhlIGNhc2Ugb2Yg
-c2V0dGluZyB0aGUgTURUcyByZWFkLW9ubHksIGZpbGVzIGFscmVhZHkgb3BlbmVkIGluIHdyaXRl
-IG1vZGUgd2lsbCBzdGlsbCBiZSB3cml0YWJsZS4gRm9yIHJlbW91bnRpbmcsIGlmIGZpbGVzIGFy
-ZSBvcGVuZWQgaW4gd3JpdGUgbW9kZSB0aGUgcmVtb3VudCB3aWxsIGZhaWwgYW5kIGNvbXBsYWlu
-IHRoYXQgdGhlIGZpbGUgc3lzdGVtIGlzIGJ1c3kuIE91ciBjdXJyZW50IHBsYW4gaXMNCiB0byBk
-byB0aGUgcmVtb3VudGluZyBvZiBhbGwgY2xpZW50cyBiZWNhdXNlIGl04oCZcyBlYXNpZXIgdG8g
-c2VlIGlmIHNvbWUgdXNlciBoYXMgc29tZSBmaWxlIG9wZW4gaW4gd3JpdGUgbW9kZS48L2Rpdj4N
-CjxkaXYgc3R5bGU9Im1hcmdpbjogMGluOyBmb250LXNpemU6IDExcHQ7IGZvbnQtZmFtaWx5OiBB
-cHRvcywgc2Fucy1zZXJpZjsiIGNsYXNzPSIiPg0KPG86cCBjbGFzcz0iIj4mbmJzcDs8L286cD48
-L2Rpdj4NCjxkaXYgc3R5bGU9Im1hcmdpbjogMGluOyBmb250LXNpemU6IDExcHQ7IGZvbnQtZmFt
-aWx5OiBBcHRvcywgc2Fucy1zZXJpZjsiIGNsYXNzPSIiPg0KSXMgdGhlcmUgYSB3YXkgdG8gbWFr
-ZSB0aGUgZmlsZSBzeXN0ZW0gcmVhZC1vbmx5IHRoYXTigJlzIG1pbmltYWxseSBkaXNydXB0aXZl
-IHRvIHVzZXJzIGJ1dCBkb2VzbuKAmXQgaGF2ZSB0aGUgcG90ZW50aWFsIHByb2JsZW0gb2YgaGF2
-aW5nIHRvIGNoYXNlIGRvd24gZXZlcnkgcHJvY2VzcyB3cml0aW5nIHRvIHRoZSBmaWxlc3lzdGVt
-PzwvZGl2Pg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8YnIgY2xhc3M9IiI+DQo8L2Rpdj4NCjxk
-aXY+SW4gMi4xNSB0aGUgbWR0LioucmVhZG9ubHk9MSBwYXJhbWV0ZXIgaXMgdGhlIG9ubHkgb3B0
-aW9uLiAmbmJzcDtUaGVyZSBpcyBwYXRjaCA8YSBocmVmPSJodHRwczovL3Jldmlldy53aGFtY2xv
-dWQuY29tLzU2MzA0IiBjbGFzcz0iIj4NCmh0dHBzOi8vcmV2aWV3LndoYW1jbG91ZC5jb20vNTYz
-MDQ8L2E+Jm5ic3A7KCZxdW90OzxhIGhyZWY9Imh0dHBzOi8vamlyYS53aGFtY2xvdWQuY29tL2Jy
-b3dzZS9MVS0xMjUxNSIgY2xhc3M9IiI+TFUtMTI1MTU8L2E+IG9mZDogYWxsb3cgc2V0dGluZyBh
-IHRhcmdldCB0byByZWFkb25seSZxdW90Oykgd2hpY2ggbWlzc2VkIHRoZSBjdXRvZmYgZm9yIDIu
-MTYuMCB0aGF0IGNhbiBhbHNvIHNldCB0aGUgT1NUcyByZWFkLW9ubHkuPC9kaXY+DQo8ZGl2Pjxi
-ciBjbGFzcz0iIj4NCjwvZGl2Pg0KPGRpdj5NeSBzdWdnZXN0aW9uIHdvdWxkIGJlIHRvIHNldCB0
-aGUgbWR0LioucmVhZG9ubHk9MSBwYXJhbWV0ZXIgc29vbmVyIHJhdGhlciB0aGFuIGxhdGVyLCB0
-aGVuIGxldCB0aGUgb3BlbiB3cml0ZSBoYW5kbGVzICZxdW90O3BldGVyIG91dCZxdW90OyBvdmVy
-IHNvbWUgZGF5cyBiZWZvcmUgb3IgZHVyaW5nIGFuIGluaXRpYWwgZGF0YSBtaWdyYXRpb24gcGFz
-cyAod2hpY2ggd2lsbCBsaWtlbHkgdGFrZSBzb21lIGRheXMgaXRzZWxmKS4gJm5ic3A7WW91IGNh
-biB0aGVuIGxpa2VseQ0KIHJlbW91bnQgYWxsL21vc3Qgb2YgdGhlIGNsaWVudHMgcmVhZC1vbmx5
-IHNpbmNlIHRoZSBydW5uaW5nIGpvYnMgd2lsbCBoYXZlIGZpbmlzaGVkIGFuZC9vciBkZWFsIHdp
-dGggdGhlIGZldyByZW1haW5pbmcgY2xpZW50cyBwcm9jZXNzZXMgdGhhdCBoYXZlIG9wZW4tZm9y
-LXdyaXRlIGhhbmRsZXMgYW5kIHRoZW4gZG8gYSBmaW5hbCByZXN5bmMgcGFzcyB0byBjYXRjaCBh
-bnkgY2hhbmdlcyBhZnRlcndhcmQuPC9kaXY+DQo8YnIgY2xhc3M9IiI+DQo8ZGl2IGNsYXNzPSIi
-Pg0KPGRpdiBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApOyBjb2xv
-cjogcmdiKDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFy
-dDsgdGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBu
-b3JtYWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7
-IHRleHQtZGVjb3JhdGlvbjogbm9uZTsgd29yZC13cmFwOiBicmVhay13b3JkOyAtd2Via2l0LW5i
-c3AtbW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6IGFmdGVyLXdoaXRlLXNwYWNlOyIgY2xhc3M9IiI+
-DQo8ZGl2IGRpcj0iYXV0byIgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7IGNvbG9y
-OiByZ2IoMCwgMCwgMCk7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0
-OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6IG5v
-cm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDsg
-dGV4dC1kZWNvcmF0aW9uOiBub25lOyB3b3JkLXdyYXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJz
-cC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0ZXItd2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4N
-CjxkaXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgY29sb3I6
-IHJnYigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5vcm1hbDsgdGV4dC1hbGlnbjogc3RhcnQ7
-IHRleHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3JtOiBub25lOyB3aGl0ZS1zcGFjZTogbm9y
-bWFsOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4OyB0
-ZXh0LWRlY29yYXRpb246IG5vbmU7IHdvcmQtd3JhcDogYnJlYWstd29yZDsgLXdlYmtpdC1uYnNw
-LW1vZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13aGl0ZS1zcGFjZTsiIGNsYXNzPSIiPg0K
-PGRpdiBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApOyBjb2xvcjog
-cmdiKDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsg
-dGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3Jt
-YWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRl
-eHQtZGVjb3JhdGlvbjogbm9uZTsgd29yZC13cmFwOiBicmVhay13b3JkOyAtd2Via2l0LW5ic3At
-bW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6IGFmdGVyLXdoaXRlLXNwYWNlOyIgY2xhc3M9IiI+DQo8
-ZGl2IGRpcj0iYXV0byIgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7IGNvbG9yOiBy
-Z2IoMCwgMCwgMCk7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0
-ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1h
-bDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4
-dC1kZWNvcmF0aW9uOiBub25lOyB3b3JkLXdyYXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1t
-b2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0ZXItd2hpdGUtc3BhY2U7IiBjbGFzcz0iIj4NCjxk
-aXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgY29sb3I6IHJn
-YigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5vcm1hbDsgdGV4dC1hbGlnbjogc3RhcnQ7IHRl
-eHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3JtOiBub25lOyB3aGl0ZS1zcGFjZTogbm9ybWFs
-OyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4OyB0ZXh0
-LWRlY29yYXRpb246IG5vbmU7IHdvcmQtd3JhcDogYnJlYWstd29yZDsgLXdlYmtpdC1uYnNwLW1v
-ZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13aGl0ZS1zcGFjZTsiIGNsYXNzPSIiPg0KPGRp
-dj5DaGVlcnMsIEFuZHJlYXM8L2Rpdj4NCjxkaXY+LS08L2Rpdj4NCjxkaXY+QW5kcmVhcyBEaWxn
-ZXI8L2Rpdj4NCjxkaXY+THVzdHJlJm5ic3A7UHJpbmNpcGFsIEFyY2hpdGVjdDwvZGl2Pg0KPGRp
-dj5XaGFtY2xvdWQ8L2Rpdj4NCjxkaXY+PGJyIGNsYXNzPSIiPg0KPC9kaXY+DQo8ZGl2PjxiciBj
-bGFzcz0iIj4NCjwvZGl2Pg0KPGRpdj48YnIgY2xhc3M9IiI+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9k
-aXY+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8YnIgY2xhc3M9IkFwcGxlLWludGVyY2hhbmdl
-LW5ld2xpbmUiPg0KPC9kaXY+DQo8YnIgY2xhc3M9IkFwcGxlLWludGVyY2hhbmdlLW5ld2xpbmUi
-Pg0KPGJyIGNsYXNzPSJBcHBsZS1pbnRlcmNoYW5nZS1uZXdsaW5lIj4NCjwvZGl2Pg0KPGJyIGNs
-YXNzPSIiPg0KPC9ib2R5Pg0KPC9odG1sPg0K
+<html xmlns=3D=22http://www.w3.org/1999/xhtml=22>
+<head>
+<title></title>
+</head>
+<body>
+<div name=3D=22messageBodySection=22>
+<div dir=3D=22auto=22><span style=3D=22font-family:S=46 Pro=22>Sorry, add=
+ed to the docs, hopefully this would do it for you:</span><span style=3D=22=
+font-size: 13.6px=22><br /></span><span style=3D=22color:=231f2328;backgr=
+ound-color:rgba(129, 139, 152, 0.12);font-family:ui-monospace, S=46Mono-R=
+egular, S=46 Mono, Menlo, Consolas, Liberation Mono, monospace;font-size:=
+ 13.6px=22>pip install --upgrade numpy matplotlib seaborn yaml scipy</spa=
+n></div>
+</div>
+<div name=3D=22messageReplySection=22>On Oct 29, 2024 at 8:16 PM -0700, A=
+ndreas Dilger &lt;adilger=40ddn.com&gt;, wrote:<br />
+<blockquote type=3D=22cite=22 style=3D=22border-left-color: grey; border-=
+left-width: thin; border-left-style: solid; margin: 5px 5px;padding-left:=
+ 10px;=22>Nathan,
+<div>I had a try at using this, but it seems to have a number of external=
+ dependencies. &=23160; I installed the python3-pyyaml and python3-matplo=
+tlib, but I couldn't figure out what package =22seaborn=22 is part of=3F =
+&=23160;=22yum search seaborn=22 doesn't find anything on my el8 system, =
+nor does =22rpmfind=22 return any packages for this.&=23160;</div>
+<div><br /></div>
+<div>It would be good to include a description of the package requirement=
+s into the README.md file.&=23160;</div>
+<div><br /></div>
+<div><span style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);=22>=
+It looks like =22sns=22 is only used for picking colors, so the utility w=
+ould be more easily used if a more standard mechanism was doing this=3F &=
+=23160;While not as pretty, I expect just picking colors by a 3-byte hash=
+ of the component ID and stripe index would get you something usable if =22=
+seaborn=22 was not installed, or a hash of the object ID, or similar=3F</=
+span></div>
+<div><font color=3D=22=23000000=22><span style=3D=22caret-color: rgb(0, 0=
+, 0);=22><br /></span></font></div>
+<div><font color=3D=22=23000000=22><span style=3D=22caret-color: rgb(0, 0=
+, 0);=22>Cheers, Andreas<br id=3D=22lineBreakAtBeginningOfMessage=22 /></=
+span></font>
+<div><br />
+<blockquote type=3D=22cite=22>
+<div>On Oct 29, 2024, at 13:38, Nathan Rutman &lt;nrutman=40gmail.com&gt;=
+ wrote:</div>
+<br class=3D=22Apple-interchange-newline=22 />
+<div>
+<div>
+<div name=3D=22messageBodySection=22>
+<div dir=3D=22auto=22>In the =46WIW category, I've got a tool to graphica=
+lly display a file's striping pattern for arbitrary Lustre files. It take=
+s in the yaml from =22getstripe -y=22 and will generate a jpeg. Handles D=
+oM, P=46L, overstriping, mirroring, pools. Available at&=23160;<a href=3D=
+=22https://github.com/HewlettPackard/lustre-stripe-plotter=22 target=3D=22=
+=5Fblank=22>https://github.com/HewlettPackard/lustre-stripe-plotter</a><s=
+pan style=3D=22font-size: 16px=22><br /></span> <span style=3D=22font-siz=
+e: 16px=22><br /></span> <span style=3D=22font-size: 16px=22><br /></span=
+> <span style=3D=22color:=231f2328;font-family:-apple-system, system-ui, =
+Segoe UI, Noto Sans, Helvetica, Arial, sans-serif, Apple Color Emoji, Seg=
+oe UI Emoji;font-size: 16px=22>Example of mirrored DoM P=46L file:</span>=
+<span style=3D=22font-size: 16px=22><br /></span> <span id=3D=22cid:D8E0A=
+A=4621B7746BEA216C2150A875126=22>&lt;Attachment.jpeg&gt;</span></div>
+</div>
+</div>
+=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=
+=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F<br />
+lustre-devel mailing list<br />
+lustre-devel=40lists.lustre.org<br />
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org<br /></div>
+</blockquote>
+</div>
+<br />
+<div>
+<div dir=3D=22auto=22 style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0,=
+ 0, 0); letter-spacing: normal; text-align: start; text-indent: 0px; text=
+-transform: none; white-space: normal; word-spacing: 0px; -webkit-text-st=
+roke-width: 0px; text-decoration: none; overflow-wrap: break-word; -webki=
+t-nbsp-mode: space; line-break: after-white-space;=22>
+<div dir=3D=22auto=22 style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0,=
+ 0, 0); letter-spacing: normal; text-align: start; text-indent: 0px; text=
+-transform: none; white-space: normal; word-spacing: 0px; -webkit-text-st=
+roke-width: 0px; text-decoration: none; overflow-wrap: break-word; -webki=
+t-nbsp-mode: space; line-break: after-white-space;=22>
+<div>Cheers, Andreas</div>
+<div>=E2=80=94</div>
+<div>Andreas Dilger</div>
+<div>Lustre Principal Architect</div>
+<div>Whamcloud/DDN</div>
+</div>
+<br class=3D=22Apple-interchange-newline=22 /></div>
+<br class=3D=22Apple-interchange-newline=22 />
+<br class=3D=22Apple-interchange-newline=22 /></div>
+<br /></div>
+</blockquote>
+</div>
+</body>
+</html>
 
---_000_3A7486FD421D4199881E6DDB64470D0Dwhamcloudcom_--
+--6722d11a_31fede0a_2520--
 
---===============1366954058145093807==
+
+--===============8358769722761898015==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -356,4 +259,5 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============1366954058145093807==--
+--===============8358769722761898015==--
+
