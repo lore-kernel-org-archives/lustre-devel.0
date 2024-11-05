@@ -4,71 +4,60 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 19C46D5CC91
-	for <lustre-devel@archiver.kernel.org>; Thu, 31 Oct 2024 00:36:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 6F413D3176B
+	for <lustre-devel@archiver.kernel.org>; Tue,  5 Nov 2024 17:35:00 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Xf4nJ1R9Xz1xPX;
-	Wed, 30 Oct 2024 17:36:52 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Xjb7Z5H77z1wsW;
+	Tue, 05 Nov 2024 09:34:50 -0800 (PST)
 Received: from mail-il1-f169.google.com (mail-il1-f169.google.com
  [209.85.166.169])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Xf4nC3HYKz1xFd; Wed, 30 Oct 2024 17:36:47 -0700 (PDT)
+ 4Xjb7Y2Cn2z1wY0; Tue, 05 Nov 2024 09:34:49 -0800 (PST)
 Received: by mail-il1-f169.google.com with SMTP id
- e9e14a558f8ab-3a4e5401636so1582645ab.3; 
- Wed, 30 Oct 2024 17:36:47 -0700 (PDT)
+ e9e14a558f8ab-3a3b463e9b0so20160715ab.3; 
+ Tue, 05 Nov 2024 09:34:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20230601; t=1730335006; x=1730939806; darn=lists.lustre.org;
- h=mime-version:subject:references:in-reply-to:message-id:cc:to:from
- :date:from:to:cc:subject:date:message-id:reply-to;
- bh=0WWYuHAPCxTiRqEft7qtuCijPQTtBk7tcsireFSQwrE=;
- b=LpGWg1QMBocw3RcuEwVLMtb0dD2f0ymFgrTh4SuYWzvlH9lvZuRXKARqQ3b/zhwOK+
- KXXleW11AF3GTMLqgx/Obl82DFLuivSJt+hu8EW/SlmOPU1d9Hgeg+9lvCJIUV5qPonN
- 4sXHZVdkEMUE6XXIK7IuBxn10k90Ui0FskZ0kEEsAbW3uBcgnPqoeoaub8I7eAhFl9Cf
- gsO33BIgCfUzrd6MVh7tkvmJk9uBjEtrb2ziRLWDVOYz7/B9EC2OhW5pdyx7g92W9lFG
- 9WohK6SOPRwrgKdNsaYp7ToOFEu9D9Ffl0lmvDk/lqkMgq+xXWI4RAFxViEfPLtZaBD6
- 8YQw==
+ d=gmail.com; s=20230601; t=1730828088; x=1731432888; darn=lists.lustre.org;
+ h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+ :date:message-id:reply-to;
+ bh=s/rhYTFaXP3Dh+7hwLcaAA/f6wFylNETvCvMZV+1+jw=;
+ b=D1xHydOBihB6oRUnUri6+H/WsxcmqDtz0xqpKcB54660mswtqrJodTX9DcEb7aIDf1
+ NWsXDPPqRI21I/Mzx2GHnbfZ0TjKGKiS3t//ij+YDQgEQyftmbb8ML8k4qOVhjDKUTZd
+ 1IHSmlVqiWPrinmOdLyu3CIZOSgITlxxxCfOvJLUqbYE+wEAd4XdLxJ7kwfSglOSvRDL
+ gju9yYoTISZU9XlmdaKW2N/MuRlsvncUxMhUpQn3GDfgQ4k51U1S0cZ74hLNjQJeVMVQ
+ EbnvZkEr5NacsjRa+JxYx0VvzOU9dtHtZXXPSRLayuu8uN/DPZHuebIKlgmJgdRpsWGQ
+ LTug==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1730335006; x=1730939806;
- h=mime-version:subject:references:in-reply-to:message-id:cc:to:from
- :date:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
- bh=0WWYuHAPCxTiRqEft7qtuCijPQTtBk7tcsireFSQwrE=;
- b=WMYDhPELKL5OWms8dbGKWCvKB7CXniefgeb9c6Qicj7UA8PGioWcufmSUGSTlE55cb
- vzVlRnB6EKqgkSZchMVrGihZ6oPVdviGnvrZI/V1HongGfs+jV0RdD+LkDA6QWNK6awQ
- LrS3TfnAEot1Ew1+MUrfAF3kZ0AnNP+BlsjVh0G7V2eqwK15KNCXkoaeCAtdGja6l7JK
- B4xs/R8cIMxMdH7RMst6UWALudI1K8FBdRRU/BQYz+15UlHEzzMy2gCs9ouZ44Wq/NY2
- I9wNITvY9JhbmGiaQPYodLuy1RNK7TQYchsy+jPmCDKWrv4HOKvMZdkUwM8Ax0u06PbM
- UPqw==
+ d=1e100.net; s=20230601; t=1730828088; x=1731432888;
+ h=to:subject:message-id:date:from:mime-version:x-gm-message-state
+ :from:to:cc:subject:date:message-id:reply-to;
+ bh=s/rhYTFaXP3Dh+7hwLcaAA/f6wFylNETvCvMZV+1+jw=;
+ b=Y9CwHDs9tTwTNjrNuWcECI3hX4cLIBqLPUnt4BbonMA8hlfR5uuEALQDt4WXY1Bd5L
+ /Ho+11kmaclfBImBz1Bl6vqHfZJMxj0Hbt5oOY75KjbFHAp3V1EiH3SC1ippLWQUSpzn
+ lTvwAuqVgy6gqLCHyrjNVYJgHHqLXEfCX2puEgwLjWIPbuUtrhvqIZ5Qg7HCc9rTKl3P
+ MAIMR2KAjo3HVmLVM/NoZuqkt6tUojdtsDa7n4BUc58eNql+sRmyElSrUHgg+qYNx6MP
+ oC17SYOwm1OCYWcmjG34w2h80GLz9WPbzi8ZDaa/V3mYH700VRD2rH0oCJHC+f0f02h+
+ ZY+Q==
 X-Forwarded-Encrypted: i=1;
- AJvYcCWeHh+4oWiauG+hCi5JQrxurqZmoSPF4rtur1U2VQc33a/hp98O3e73AqMV6H61j2DzuaCtzADhVInqad9WnQ==@lists.lustre.org
-X-Gm-Message-State: AOJu0YwvxBasNWFN71RLD+Gy/5sPCBYt1bnLSQgA2sQlBCKi8e3W7qfT
- ccrEP/+UvkpYdMYb9MkMZKgk8Ltc2Nv35x4XyvG/beaY1sYgzeCe
-X-Google-Smtp-Source: AGHT+IHIS1/khScKgP+I5QfEATarAtVicCGBjCyak2Ss1fD+iNMWpcrBqEhTqelF4q/UjhqguwmUYg==
-X-Received: by 2002:a05:6e02:1a22:b0:3a0:bd91:3842 with SMTP id
- e9e14a558f8ab-3a4ed3628d7mr162361335ab.24.1730335006344; 
- Wed, 30 Oct 2024 17:36:46 -0700 (PDT)
-Received: from [192.168.86.58] (97-115-66-118.ptld.qwest.net. [97.115.66.118])
- by smtp.gmail.com with ESMTPSA id
- 41be03b00d2f7-7ee455a74e1sm189843a12.48.2024.10.30.17.36.45
- (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Oct 2024 17:36:45 -0700 (PDT)
-Date: Wed, 30 Oct 2024 17:36:36 -0700
-From: Nathan Rutman <nrutman@gmail.com>
-To: Andreas Dilger <adilger@ddn.com>
-Cc: "=?utf-8?Q?lustre-devel=40lists.lustre.org?="
- <lustre-devel@lists.lustre.org>, 
- "=?utf-8?Q?lustre-discuss=40lists.lustre.org?="
- <lustre-discuss@lists.lustre.org>
-Message-ID: <8119cc42-97a0-4780-9235-ec73d6c01241@Spark>
-In-Reply-To: <F5B513AE-FD55-40FF-A28A-0CC4BBE00F1B@ddn.com>
-References: <8c491303-89e9-439e-a39b-0cab2dbd8e66@Spark>
- <250f2f80-76dc-4f59-92c7-fc5e4465b753@Spark>
- <F5B513AE-FD55-40FF-A28A-0CC4BBE00F1B@ddn.com>
-X-Readdle-Message-ID: 8119cc42-97a0-4780-9235-ec73d6c01241@Spark
+ AJvYcCUmknRKcRqyvwOT0zQwGZze1lW7Vy6W+LsiEVqJIXxGpD5H+EH8O+cZMhtp0UJGTlt4QhK4fKnQADe/B8Q=@lists.lustre.org
+X-Gm-Message-State: AOJu0Yy0mkM/Cpl/BKGmLCzemNzS+DXoCePJrM/v/PzVhMjjeQ8wyPwB
+ Lc5Af/CzCqvcB15p3deDOmeZU31N7ur3YeqmXkc4ZtWOAZ0WPAnHTMMUH2MlOXzbmTOfG0oF2/4
+ 3qBt77kVAwmjh6xjuY5f2yPdyjSTbr0TW
+X-Google-Smtp-Source: AGHT+IHfKiH5SxZLYSSGKNCZ+ReM2RPtYcIhppa7fBECanrKiA0vMuVXp2sTW8C4HGliBlhqFfkklOWSh8BIEB4uXDk=
+X-Received: by 2002:a05:6e02:1c87:b0:3a6:c27a:6383 with SMTP id
+ e9e14a558f8ab-3a6c27a665amr117081895ab.19.1730828087812; Tue, 05 Nov 2024
+ 09:34:47 -0800 (PST)
 MIME-Version: 1.0
-Subject: Re: [lustre-devel] Stripe visualization tool
+From: Backer <backer.kolo@gmail.com>
+Date: Tue, 5 Nov 2024 12:34:36 -0500
+Message-ID: <CAPq+oA+JR=CxnOQ-ERto7DMW7QuyMo6xuqa5CxGjPUE2xZwb+g@mail.gmail.com>
+To: Backer via lustre-discuss <lustre-discuss@lists.lustre.org>,
+ lustre-devel@lists.lustre.org
+Subject: [lustre-devel] Lustre switching to loop back lnet interface when it
+ is not desired
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -81,174 +70,234 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============8358769722761898015=="
+Content-Type: multipart/mixed; boundary="===============3948452406150143387=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8358769722761898015==
-Content-Type: multipart/alternative; boundary="6722d11a_31fede0a_2520"
+--===============3948452406150143387==
+Content-Type: multipart/alternative; boundary="00000000000057710e06262dd16f"
 
---6722d11a_31fede0a_2520
-Content-Type: text/plain; charset="utf-8"
+--00000000000057710e06262dd16f
+Content-Type: text/plain; charset="UTF-8"
+
+Hi,
+
+Mounting the Lustre file file system on the OSS. Some of the OSTs are
+locally attached to the OSS.
+
+The failover IP on the OST is "10.99.100.152". It is a local lnet on the
+OSS. However, when the client mounts it, the import automatically changes
+to 0@lo. It is undesirable here because when this OST fails over to another
+server, the client is still trying to connect to 0@lo while it is no longer
+on the same host. This makes the client fs mount hangs for ever.
+
+Here the failover is designed in such a way that the IP address moves
+(fails over) with OST and becomes active on the other server.
+
+How can I make the import pointing to the real IP and not the loopback? (so
+that the failover works)
+
+
+[oss000 ~]$ lfs df
+UUID                   1K-blocks        Used   Available Use% Mounted on
+fs-MDT0000_UUID     29068444       25692    26422344   1% /mnt/fs[MDT:0]
+fs-OST0000_UUID     50541812    30160292    17743696  63% /mnt/fs[OST:0]
+fs-OST0001_UUID     50541812    29301740    18602248  62% /mnt/fs[OST:1]
+fs-OST0002_UUID     50541812    29356508    18547480  62% /mnt/fs[OST:2]
+fs-OST0003_UUID     50541812     8822980    39081008  19% /mnt/fs[OST:3]
+
+filesystem_summary:    202167248    97641520    93974432  51% /mnt/fs
+
+[oss000 ~]$ df -h
+Filesystem                  Size  Used Avail Use% Mounted on
+devtmpfs                     30G     0   30G   0% /dev
+tmpfs                        30G  8.1M   30G   1% /dev/shm
+tmpfs                        30G   25M   30G   1% /run
+tmpfs                        30G     0   30G   0% /sys/fs/cgroup
+/dev/mapper/ocivolume-root   36G   17G   19G  48% /
+/dev/sdc2                  1014M  637M  378M  63% /boot
+/dev/mapper/ocivolume-oled   10G  2.5G  7.6G  25% /var/oled
+/dev/sdc1                   100M  5.1M   95M   6% /boot/efi
+tmpfs                       5.9G     0  5.9G   0% /run/user/987
+tmpfs                       5.9G     0  5.9G   0% /run/user/0
+/dev/sdb                     49G   28G   18G  62% /fs-OST0001
+/dev/sda                     49G   29G   17G  63% /fs-OST0000
+tmpfs                       5.9G     0  5.9G   0% /run/user/1000
+10.99.100.221@tcp1:/fs  193G   94G   90G  51% /mnt/fs
+
+[oss000 ~]$ sudo tunefs.lustre --dryrun /dev/sda
+checking for existing Lustre data: found
+
+   Read previous values:
+Target:     fs-OST0000
+Index:      0
+Lustre FS:  fs
+Mount type: ldiskfs
+Flags:      0x1002
+              (OST no_primnode )
+Persistent mount opts: ,errors=remount-ro
+Parameters: mgsnode=10.99.100.221@tcp1 failover.node=10.99.100.152@tcp1
+,10.99.100.152@tcp1
+
+
+   Permanent disk data:
+Target:     fs-OST0000
+Index:      0
+Lustre FS:  fs
+Mount type: ldiskfs
+Flags:      0x1002
+              (OST no_primnode )
+Persistent mount opts: ,errors=remount-ro
+Parameters: mgsnode=10.99.100.221@tcp1 failover.node=10.99.100.152@tcp1
+,10.99.100.152@tcp1
+
+exiting before disk write.
+
+
+[oss000 proc]# cat
+/proc/fs/lustre/osc/fs-OST0000-osc-ffff89c57672e000/import
+import:
+    name: fs-OST0000-osc-ffff89c57672e000
+    target: fs-OST0000_UUID
+    state: IDLE
+    connect_flags: [ write_grant, server_lock, version, request_portal,
+max_byte_per_rpc, early_lock_cancel, adaptive_timeouts, lru_resize,
+alt_checksum_algorithm, fid_is_enabled, version_recovery, grant_shrink,
+full20, layout_lock, 64bithash, object_max_bytes, jobstats, einprogress,
+grant_param, lvb_type, short_io, lfsck, bulk_mbits, second_flags,
+lockaheadv2, increasing_xid, client_encryption, lseek, reply_mbits ]
+    connect_data:
+       flags: 0xa0425af2e3440078
+       instance: 39
+       target_version: 2.15.3.0
+       initial_grant: 8437760
+       max_brw_size: 4194304
+       grant_block_size: 4096
+       grant_inode_size: 32
+       grant_max_extent_size: 67108864
+       grant_extent_tax: 24576
+       cksum_types: 0xf7
+       max_object_bytes: 17592186040320
+    import_flags: [ replayable, pingable, connect_tried ]
+    connection:
+       failover_nids: [ 0@lo, 0@lo ]
+       current_connection: 0@lo
+       connection_attempts: 1
+       generation: 1
+       in-progress_invalidations: 0
+       idle: 36 sec
+    rpcs:
+       inflight: 0
+       unregistering: 0
+       timeouts: 0
+       avg_waittime: 2627 usec
+    service_estimates:
+       services: 1 sec
+       network: 1 sec
+    transactions:
+       last_replay: 0
+       peer_committed: 0
+       last_checked: 0
+
+--00000000000057710e06262dd16f
+Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
-Content-Disposition: inline
 
-Sorry, added to the docs, hopefully this would do it for you:
-pip install --upgrade numpy matplotlib seaborn yaml scipy
-On Oct 29, 2024 at 8:16 PM -0700, Andreas Dilger <adilger=40ddn.com>, wro=
-te:
-> Nathan,
-> I had a try at using this, but it seems to have a number of external de=
-pendencies. =C2=A0 I installed the python3-pyyaml and python3-matplotlib,=
- but I couldn't figure out what package =22seaborn=22 is part of=3F =C2=A0=
-=22yum search seaborn=22 doesn't find anything on my el8 system, nor does=
- =22rpmfind=22 return any packages for this.
->
-> It would be good to include a description of the package requirements i=
-nto the README.md file.
->
-> It looks like =22sns=22 is only used for picking colors, so the utility=
- would be more easily used if a more standard mechanism was doing this=3F=
- =C2=A0While not as pretty, I expect just picking colors by a 3-byte hash=
- of the component ID and stripe index would get you something usable if =22=
-seaborn=22 was not installed, or a hash of the object ID, or similar=3F
->
-> Cheers, Andreas
->
-> > On Oct 29, 2024, at 13:38, Nathan Rutman <nrutman=40gmail.com> wrote:=
+<div dir=3D"ltr">Hi,<div><br></div>Mounting the Lustre file file system on =
+the OSS. Some of the OSTs are locally attached to the OSS. <br><br>The fail=
+over IP on the OST is &quot;10.99.100.152&quot;. It is a local lnet on the =
+OSS. However, when the client mounts it, the import automatically changes t=
+o 0@lo. It is undesirable here because when this OST fails over to another =
+server, the client is still trying to connect to 0@lo while it is no longer=
+ on the same host. This makes the client fs mount hangs for ever. =C2=A0<br=
+><br>Here the failover is designed in such a way that the IP address moves =
+(fails over) with OST and becomes active on the other server. <br><br>How c=
+an I make the import pointing to the real IP and not the loopback? (so that=
+ the failover works)<div><span style=3D"font-family:monospace"></span></div=
+><div><span style=3D"font-family:monospace"><br></span></div><div><br></div=
+><font face=3D"monospace">[oss000 ~]$ lfs df<br>UUID =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 1K-blocks =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0Used =C2=A0 Available Use% Mounted on<br>fs-MDT0000_UUID =C2=A0 =C2=
+=A0 29068444 =C2=A0 =C2=A0 =C2=A0 25692 =C2=A0 =C2=A026422344 =C2=A0 1% /mn=
+t/fs[MDT:0]<br>fs-OST0000_UUID =C2=A0 =C2=A0 50541812 =C2=A0 =C2=A030160292=
+ =C2=A0 =C2=A017743696 =C2=A063% /mnt/fs[OST:0]<br>fs-OST0001_UUID =C2=A0 =
+=C2=A0 50541812 =C2=A0 =C2=A029301740 =C2=A0 =C2=A018602248 =C2=A062% /mnt/=
+fs[OST:1]<br>fs-OST0002_UUID =C2=A0 =C2=A0 50541812 =C2=A0 =C2=A029356508 =
+=C2=A0 =C2=A018547480 =C2=A062% /mnt/fs[OST:2]<br>fs-OST0003_UUID =C2=A0 =
+=C2=A0 50541812 =C2=A0 =C2=A0 8822980 =C2=A0 =C2=A039081008 =C2=A019% /mnt/=
+fs[OST:3]<br><br>filesystem_summary: =C2=A0 =C2=A0202167248 =C2=A0 =C2=A097=
+641520 =C2=A0 =C2=A093974432 =C2=A051% /mnt/fs<br><br>[oss000 ~]$ df -h<br>=
+Filesystem =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0Si=
+ze =C2=A0Used Avail Use% Mounted on<br>devtmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0=
+ =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 30G =C2=A0 =C2=A0 0 =C2=A0 30G =
+=C2=A0 0% /dev<br>tmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A030G =C2=A08.1M =C2=A0 30G =C2=A0 1% /dev/=
+shm<br>tmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0=
+ =C2=A0 =C2=A0 =C2=A030G =C2=A0 25M =C2=A0 30G =C2=A0 1% /run<br>tmpfs =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A030G =C2=A0 =C2=A0 0 =C2=A0 30G =C2=A0 0% /sys/fs/cgroup<br>/dev/mappe=
+r/ocivolume-root =C2=A0 36G =C2=A0 17G =C2=A0 19G =C2=A048% /<br>/dev/sdc2 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A01014M =C2=A06=
+37M =C2=A0378M =C2=A063% /boot<br>/dev/mapper/ocivolume-oled =C2=A0 10G =C2=
+=A02.5G =C2=A07.6G =C2=A025% /var/oled<br>/dev/sdc1 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 100M =C2=A05.1M =C2=A0 95M =C2=A0=
+ 6% /boot/efi<br>tmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 5.9G =C2=A0 =C2=A0 0 =C2=A05.9G =C2=A0 0% /run/use=
+r/987<br>tmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 5.9G =C2=A0 =C2=A0 0 =C2=A05.9G =C2=A0 0% /run/user/0<br>=
+/dev/sdb =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 49G =C2=A0 28G =C2=A0 18G =C2=A062% /fs-OST0001<br>/dev/sda =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 49G =C2=A0 29G =
+=C2=A0 17G =C2=A063% /fs-OST0000<br>tmpfs =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 5.9G =C2=A0 =C2=A0 0 =C2=A05.=
+9G =C2=A0 0% /run/user/1000<br>10.99.100.221@tcp1:/fs =C2=A0193G =C2=A0 94G=
+ =C2=A0 90G =C2=A051% /mnt/fs<br><br>[oss000 ~]$ sudo tunefs.lustre --dryru=
+n /dev/sda<br>checking for existing Lustre data: found<br><br>=C2=A0 =C2=A0=
+Read previous values:<br>Target: =C2=A0 =C2=A0 fs-OST0000<br>Index: =C2=A0 =
+=C2=A0 =C2=A00<br>Lustre FS: =C2=A0fs<br>Mount type: ldiskfs<br>Flags: =C2=
+=A0 =C2=A0 =C2=A00x1002<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0=
+ (OST no_primnode )<br>Persistent mount opts: ,errors=3Dremount-ro<br>Param=
+eters: mgsnode=3D10.99.100.221@tcp1 failover.node=3D10.99.100.152@tcp1,10.9=
+9.100.152@tcp1<br><br><br>=C2=A0 =C2=A0Permanent disk data:<br>Target: =C2=
+=A0 =C2=A0 fs-OST0000<br>Index: =C2=A0 =C2=A0 =C2=A00<br>Lustre FS: =C2=A0f=
+s<br>Mount type: ldiskfs<br>Flags: =C2=A0 =C2=A0 =C2=A00x1002<br>=C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 (OST no_primnode )<br>Persistent mou=
+nt opts: ,errors=3Dremount-ro<br>Parameters: mgsnode=3D10.99.100.221@tcp1 f=
+ailover.node=3D10.99.100.152@tcp1,10.99.100.152@tcp1<br><br>exiting before =
+disk write.<br><br><br>[oss000 proc]# cat /proc/fs/lustre/osc/fs-OST0000-os=
+c-ffff89c57672e000/import<br>import:<br>=C2=A0 =C2=A0 name: fs-OST0000-osc-=
+ffff89c57672e000<br>=C2=A0 =C2=A0 target: fs-OST0000_UUID<br>=C2=A0 =C2=A0 =
+state: IDLE<br>=C2=A0 =C2=A0 connect_flags: [ write_grant, server_lock, ver=
+sion, request_portal, max_byte_per_rpc, early_lock_cancel, adaptive_timeout=
+s, lru_resize, alt_checksum_algorithm, fid_is_enabled, version_recovery, gr=
+ant_shrink, full20, layout_lock, 64bithash, object_max_bytes, jobstats, ein=
+progress, grant_param, lvb_type, short_io, lfsck, bulk_mbits, second_flags,=
+ lockaheadv2, increasing_xid, client_encryption, lseek, reply_mbits ]<br>=
+=C2=A0 =C2=A0 connect_data:<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0flags: 0xa0425af2=
+e3440078<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0instance: 39<br>=C2=A0 =C2=A0 =C2=A0=
+ =C2=A0target_version: 2.15.3.0<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0initial_grant=
+: 8437760<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0max_brw_size: 4194304<br>=C2=A0 =C2=
+=A0 =C2=A0 =C2=A0grant_block_size: 4096<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0grant=
+_inode_size: 32<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0grant_max_extent_size: 671088=
+64<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0grant_extent_tax: 24576<br>=C2=A0 =C2=A0 =
+=C2=A0 =C2=A0cksum_types: 0xf7<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0max_object_byt=
+es: 17592186040320<br>=C2=A0 =C2=A0 import_flags: [ replayable, pingable, c=
+onnect_tried ]<br>=C2=A0 =C2=A0 connection:<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0f=
+ailover_nids: [ 0@lo, 0@lo ]<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0current_connecti=
+on: 0@lo<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0connection_attempts: 1<br>=C2=A0 =C2=
+=A0 =C2=A0 =C2=A0generation: 1<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0in-progress_in=
+validations: 0<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0idle: 36 sec<br>=C2=A0 =C2=A0 =
+rpcs:<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0inflight: 0<br>=C2=A0 =C2=A0 =C2=A0 =C2=
+=A0unregistering: 0<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0timeouts: 0<br>=C2=A0 =C2=
+=A0 =C2=A0 =C2=A0avg_waittime: 2627 usec<br>=C2=A0 =C2=A0 service_estimates=
+:<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0services: 1 sec<br>=C2=A0 =C2=A0 =C2=A0 =C2=
+=A0network: 1 sec<br>=C2=A0 =C2=A0 transactions:<br>=C2=A0 =C2=A0 =C2=A0 =
+=C2=A0last_replay: 0<br>=C2=A0 =C2=A0 =C2=A0 =C2=A0peer_committed: 0<br>=C2=
+=A0 =C2=A0 =C2=A0 =C2=A0last_checked: 0</font></div>
 
-> >
-> > In the =46WIW category, I've got a tool to graphically display a file=
-'s striping pattern for arbitrary Lustre files. It takes in the yaml from=
- =22getstripe -y=22 and will generate a jpeg. Handles DoM, P=46L, overstr=
-iping, mirroring, pools. Available at=C2=A0https://github.com/HewlettPack=
-ard/lustre-stripe-plotter
-> >
-> >
-> > Example of mirrored DoM P=46L file:
-> > <Attachment.jpeg>
-> > =5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=
-=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F
-> > lustre-devel mailing list
-> > lustre-devel=40lists.lustre.org
-> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
-> Cheers, Andreas
-> =E2=80=94
-> Andreas Dilger
-> Lustre Principal Architect
-> Whamcloud/DDN
->
->
->
->
+--00000000000057710e06262dd16f--
 
---6722d11a_31fede0a_2520
-Content-Type: text/html; charset="utf-8"
-Content-Transfer-Encoding: quoted-printable
-Content-Disposition: inline
-
-<html xmlns=3D=22http://www.w3.org/1999/xhtml=22>
-<head>
-<title></title>
-</head>
-<body>
-<div name=3D=22messageBodySection=22>
-<div dir=3D=22auto=22><span style=3D=22font-family:S=46 Pro=22>Sorry, add=
-ed to the docs, hopefully this would do it for you:</span><span style=3D=22=
-font-size: 13.6px=22><br /></span><span style=3D=22color:=231f2328;backgr=
-ound-color:rgba(129, 139, 152, 0.12);font-family:ui-monospace, S=46Mono-R=
-egular, S=46 Mono, Menlo, Consolas, Liberation Mono, monospace;font-size:=
- 13.6px=22>pip install --upgrade numpy matplotlib seaborn yaml scipy</spa=
-n></div>
-</div>
-<div name=3D=22messageReplySection=22>On Oct 29, 2024 at 8:16 PM -0700, A=
-ndreas Dilger &lt;adilger=40ddn.com&gt;, wrote:<br />
-<blockquote type=3D=22cite=22 style=3D=22border-left-color: grey; border-=
-left-width: thin; border-left-style: solid; margin: 5px 5px;padding-left:=
- 10px;=22>Nathan,
-<div>I had a try at using this, but it seems to have a number of external=
- dependencies. &=23160; I installed the python3-pyyaml and python3-matplo=
-tlib, but I couldn't figure out what package =22seaborn=22 is part of=3F =
-&=23160;=22yum search seaborn=22 doesn't find anything on my el8 system, =
-nor does =22rpmfind=22 return any packages for this.&=23160;</div>
-<div><br /></div>
-<div>It would be good to include a description of the package requirement=
-s into the README.md file.&=23160;</div>
-<div><br /></div>
-<div><span style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);=22>=
-It looks like =22sns=22 is only used for picking colors, so the utility w=
-ould be more easily used if a more standard mechanism was doing this=3F &=
-=23160;While not as pretty, I expect just picking colors by a 3-byte hash=
- of the component ID and stripe index would get you something usable if =22=
-seaborn=22 was not installed, or a hash of the object ID, or similar=3F</=
-span></div>
-<div><font color=3D=22=23000000=22><span style=3D=22caret-color: rgb(0, 0=
-, 0);=22><br /></span></font></div>
-<div><font color=3D=22=23000000=22><span style=3D=22caret-color: rgb(0, 0=
-, 0);=22>Cheers, Andreas<br id=3D=22lineBreakAtBeginningOfMessage=22 /></=
-span></font>
-<div><br />
-<blockquote type=3D=22cite=22>
-<div>On Oct 29, 2024, at 13:38, Nathan Rutman &lt;nrutman=40gmail.com&gt;=
- wrote:</div>
-<br class=3D=22Apple-interchange-newline=22 />
-<div>
-<div>
-<div name=3D=22messageBodySection=22>
-<div dir=3D=22auto=22>In the =46WIW category, I've got a tool to graphica=
-lly display a file's striping pattern for arbitrary Lustre files. It take=
-s in the yaml from =22getstripe -y=22 and will generate a jpeg. Handles D=
-oM, P=46L, overstriping, mirroring, pools. Available at&=23160;<a href=3D=
-=22https://github.com/HewlettPackard/lustre-stripe-plotter=22 target=3D=22=
-=5Fblank=22>https://github.com/HewlettPackard/lustre-stripe-plotter</a><s=
-pan style=3D=22font-size: 16px=22><br /></span> <span style=3D=22font-siz=
-e: 16px=22><br /></span> <span style=3D=22font-size: 16px=22><br /></span=
-> <span style=3D=22color:=231f2328;font-family:-apple-system, system-ui, =
-Segoe UI, Noto Sans, Helvetica, Arial, sans-serif, Apple Color Emoji, Seg=
-oe UI Emoji;font-size: 16px=22>Example of mirrored DoM P=46L file:</span>=
-<span style=3D=22font-size: 16px=22><br /></span> <span id=3D=22cid:D8E0A=
-A=4621B7746BEA216C2150A875126=22>&lt;Attachment.jpeg&gt;</span></div>
-</div>
-</div>
-=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=
-=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F=5F<br />
-lustre-devel mailing list<br />
-lustre-devel=40lists.lustre.org<br />
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org<br /></div>
-</blockquote>
-</div>
-<br />
-<div>
-<div dir=3D=22auto=22 style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0,=
- 0, 0); letter-spacing: normal; text-align: start; text-indent: 0px; text=
--transform: none; white-space: normal; word-spacing: 0px; -webkit-text-st=
-roke-width: 0px; text-decoration: none; overflow-wrap: break-word; -webki=
-t-nbsp-mode: space; line-break: after-white-space;=22>
-<div dir=3D=22auto=22 style=3D=22caret-color: rgb(0, 0, 0); color: rgb(0,=
- 0, 0); letter-spacing: normal; text-align: start; text-indent: 0px; text=
--transform: none; white-space: normal; word-spacing: 0px; -webkit-text-st=
-roke-width: 0px; text-decoration: none; overflow-wrap: break-word; -webki=
-t-nbsp-mode: space; line-break: after-white-space;=22>
-<div>Cheers, Andreas</div>
-<div>=E2=80=94</div>
-<div>Andreas Dilger</div>
-<div>Lustre Principal Architect</div>
-<div>Whamcloud/DDN</div>
-</div>
-<br class=3D=22Apple-interchange-newline=22 /></div>
-<br class=3D=22Apple-interchange-newline=22 />
-<br class=3D=22Apple-interchange-newline=22 /></div>
-<br /></div>
-</blockquote>
-</div>
-</body>
-</html>
-
---6722d11a_31fede0a_2520--
-
-
---===============8358769722761898015==
+--===============3948452406150143387==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -259,5 +308,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============8358769722761898015==--
-
+--===============3948452406150143387==--
