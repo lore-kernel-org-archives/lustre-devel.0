@@ -4,55 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id B214FD43FE6
-	for <lustre-devel@archiver.kernel.org>; Mon, 18 Nov 2024 08:12:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 72894D44157
+	for <lustre-devel@archiver.kernel.org>; Tue, 19 Nov 2024 13:04:25 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4XsL2202ynz1xPS;
-	Mon, 18 Nov 2024 00:11:53 -0800 (PST)
-Received: from mail-pg1-f176.google.com (mail-pg1-f176.google.com
- [209.85.215.176])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Xt4T23SLdz1xP6;
+	Tue, 19 Nov 2024 05:04:22 -0800 (PST)
+Received: from mail-lj1-f169.google.com (mail-lj1-f169.google.com
+ [209.85.208.169])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4XsL1y4PLnz1xFH
- for <lustre-devel@lists.lustre.org>; Mon, 18 Nov 2024 00:11:50 -0800 (PST)
-Received: by mail-pg1-f176.google.com with SMTP id
- 41be03b00d2f7-7edb6879196so2777454a12.3
- for <lustre-devel@lists.lustre.org>; Mon, 18 Nov 2024 00:11:50 -0800 (PST)
+ 4Xt4T05S2Cz1wcc
+ for <lustre-devel@lists.lustre.org>; Tue, 19 Nov 2024 05:04:20 -0800 (PST)
+Received: by mail-lj1-f169.google.com with SMTP id
+ 38308e7fff4ca-2ff550d37a6so11273751fa.0
+ for <lustre-devel@lists.lustre.org>; Tue, 19 Nov 2024 05:04:20 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20230601; t=1731917510; x=1732522310; darn=lists.lustre.org;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=leFHWvkGTwEcIaepSH8v2+25Lb7IbW/ied0L9WPf0qE=;
- b=h6GC3Zj3L1y9AI12KS0M82RDR80vQ5kul7dF4ZYWcmz6w8PYgOwHJnQoEQ+3Oi+LYf
- tcVnpjE80vR12j5qX8fOGwVgGCWZUJK3CqUuG7kk3HZyRptRwGKno3Ky42TjtSO747GR
- 0NDDFN76GneEzQUAUcIYgukY4nTVEd+p6G9iv8xHrAOa42ozp9vxhWFn7eBaEnyajQ2T
- VJi32zyn18jvntW/VsytnAFxdyiHaKq+pf9SiMlZfxpyc6t1O8R73UX4mbvR+jWF4YPV
- pQTFiSKEvII8pv8XA6yTuwb1XKdiJza2Cj4Wi3GjMpDpzhR4xrz7WlmOg4tiMHR/pWV2
- DdVg==
+ d=gmail.com; s=20230601; t=1732021458; x=1732626258; darn=lists.lustre.org;
+ h=content-transfer-encoding:to:subject:message-id:date:from
+ :in-reply-to:references:mime-version:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=OQDNFfVI0K3yy3upDVdu4MEA82G4YNlYZkYhdAAaip4=;
+ b=bcIg6lRU2UFGsRUgmC6VQOoGu2NwPryHuwgj9bAyLwyEpFzqhegExrJBxF9MVBBGE+
+ Zsqg3LydDBWUFqDjiS/t1ZbZMqr4bgBIsPbhq5WtLMMFgYGOEhZhcvbshZRHgKo3/ZyL
+ XtEqcotlI67L0dc2XWTqxTblNK+X4sQxygfKJFcExd1fvroWKi18c4xUVmxnY9DHvTUO
+ xQJbCiqNiyzYqQu1jws40GswhcttN1r7Ly+2dAwEqZ3E750lxCZCLHiQqpApz3lGg4wi
+ 8+Q2f+Wr0bDWgbjExLLMAwYftf4FQPRmomoEIq1OQM1Cf51nh4bZbrsk579Mjxh36UIK
+ wV7w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1731917510; x=1732522310;
- h=to:subject:message-id:date:from:mime-version:x-gm-message-state
- :from:to:cc:subject:date:message-id:reply-to;
- bh=leFHWvkGTwEcIaepSH8v2+25Lb7IbW/ied0L9WPf0qE=;
- b=QPcJtxPkGf6THxq20MU0umgNRL6GP/y6O7KcLWWE1iWKyE35FQKQ0SHH3KngTjmo7w
- YX3Q6hFDalOzXBQQ2R+kp8fax6FmTd1T7oEuZIJ4x8rmVwDA5n5uMNLM19A1EShiczao
- xpLy0boODvYMWArIrWwYHsurkchw2UKa6wpSehvMEFnw4VBpDo/Fy5p6jdJ4IlQs2S/B
- mMHYMQSB1csrVfCO5IlrlQReUKf4YO5PeA8aio5KHJEH/2ekdrLuTN1SWiz4+co4gb3Y
- PrVgRsEUhqoKGMur+bjs4dg1em018eDGlyUjYYGur98ues0T6IYDvHLwcYodnEVbYP//
- NCcA==
-X-Gm-Message-State: AOJu0YyHI0uDAHp0b5zVxxmZQhVnybuEvgmOlyeCRyDINYNKcZB6r8/p
- CaZy+JjytOXdpZG1snsdBH4ROT56ZLHf1kXoE3WBgcoZ/tiaLFYy7fEmVL/zCxVISh9BKdARrDA
- OMwkKKLklpOhTeFTnL/AMOD+B6q378LSA
-X-Google-Smtp-Source: AGHT+IGKPMp1vWGAx12qRn2bb2v/WKSuka4PwSPMprSBf8i66JjdMnLQ1KWilN87yGQJkj1W/JH629pyDv7M+vl1IPA=
-X-Received: by 2002:a17:90b:1dc2:b0:2ea:3a13:4916 with SMTP id
- 98e67ed59e1d1-2ea3a134bb6mr8898414a91.6.1731917509549; Mon, 18 Nov 2024
- 00:11:49 -0800 (PST)
+ d=1e100.net; s=20230601; t=1732021458; x=1732626258;
+ h=content-transfer-encoding:to:subject:message-id:date:from
+ :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
+ :subject:date:message-id:reply-to;
+ bh=OQDNFfVI0K3yy3upDVdu4MEA82G4YNlYZkYhdAAaip4=;
+ b=c8rfg9yz7TH9xR0PsVxY7G2BB+WxMDmXFFmAbIM2bt0KNQtX5RdTI8kZ5etrI5fWrt
+ 3RlXhSV6xBlj3P14l4Hg3sgj5rhX4J+1RBBdeiPTl/ixJJUPM/Hmhx8CjOPS352+F2/p
+ 33kxcwMe8d1lLsHYn9KyJZLiu2IoHf30aqUrMiNrqpE2wfIZsHW/is5cKksxnsBM3grc
+ +DkshhLm26iyI7CUmb3jbONAcz1XqII+Dmx5H4+d3o2cL+vYaMM9JFvnLnzLzK+AMahk
+ lLayZ8F+zsfvnXi3w2w4Ebl4wwjGXojF+foTMIQYkJQQOLm0nhKA69T9aOKwkGqRRpV4
+ BXew==
+X-Gm-Message-State: AOJu0YybjTpQ9ZymMKv0/zpEpxheDfwDRLQYGLMuIT/3hkmycNrmpZ0f
+ uF/PBYjFGW7Z6nagcjYLJCycNSFotymBY3VgAaQ+4ffJWpIWPbssFGMUBcJ33XiJxfw9+60FEhB
+ fzTXtlfic8vthCQ+cR57DJLobeQpPQRs9
+X-Google-Smtp-Source: AGHT+IFdH0guqc5S2X7bRfx4UOVB6B8cqVBao+aDAHvvIYqEevOmSEHVRNvwiNFA+lBk5y45pVUUOjFOL7uiXVg407I=
+X-Received: by 2002:a05:651c:54f:b0:2fb:70a0:91e7 with SMTP id
+ 38308e7fff4ca-2ff60916f3cmr58201681fa.10.1732021457686; Tue, 19 Nov 2024
+ 05:04:17 -0800 (PST)
 MIME-Version: 1.0
-From: keguang xu <squalfof@gmail.com>
-Date: Mon, 18 Nov 2024 16:11:38 +0800
-Message-ID: <CAF83deS+MC_ZKr9vXix_Js63ZyJ2KkXsSwLg5FeBs-+NziYf3Q@mail.gmail.com>
+References: <mailman.1.1731963762.2191728.lustre-devel-lustre.org@lists.lustre.org>
+In-Reply-To: <mailman.1.1731963762.2191728.lustre-devel-lustre.org@lists.lustre.org>
+From: arshad hussain <arshad.super@gmail.com>
+Date: Tue, 19 Nov 2024 18:34:05 +0530
+Message-ID: <CAKsu7qypKG2h38VD7GaruSaF+=iD9o6T29m+trE33vkK4jDoYA@mail.gmail.com>
 To: lustre-devel@lists.lustre.org
 Subject: [lustre-devel] HELP: difference between fallocate and truncate
  implementation
@@ -68,68 +72,71 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============1304818495506167088=="
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1304818495506167088==
-Content-Type: multipart/alternative; boundary="000000000000efe64806272b771a"
-
---000000000000efe64806272b771a
-Content-Type: text/plain; charset="UTF-8"
-
-Hi Lustre devs,
-
-I came across the code and noticed an implementation difference between
-fallocate and truncate/punch operations under the lustre/osd-ldiskfs/.
-While *osd_fallocate*() is handled in the Lustre OSD layer, *osd_punch*()
-remains in the ldiskfs layer, both of which may relate to multiple
-transactions as their comments suggested.
-- from LU-13765 <https://review.whamcloud.com/c/fs/lustre-release/+/39342>,
-it explains why move fallocate() from ldiskfs upto OSD layer (due to
-unpredictable credits ahead), however truncate() resides in ldiskfs layer
-instead of moving upto OSD layer?
-- LU-10048 <https://review.whamcloud.com/c/fs/lustre-release/+/27488>
-claims to "avoids restarting truncate transaction handles in main
-transaction", while in osd_fallocate_preallocate() it seems there's no such
-concern? Besides, why should we avoid restarting?
-
-Correct me if I misunderstood the code above...Thank you for your input.
-
-Best Regards,
-kg.xu
-
---000000000000efe64806272b771a
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">Hi Lustre devs,<br><br>I came across the code and noticed =
-an implementation difference between fallocate and truncate/punch operation=
-s under the lustre/osd-ldiskfs/. While <b>osd_fallocate</b>() is handled in=
- the Lustre OSD layer, <b>osd_punch</b>() remains in the ldiskfs layer, bot=
-h of which may relate=C2=A0to multiple transactions as their comments sugge=
-sted.<br>- from <a href=3D"https://review.whamcloud.com/c/fs/lustre-release=
-/+/39342">LU-13765</a>, it explains why move fallocate() from ldiskfs upto =
-OSD layer (due to unpredictable credits ahead), however truncate() resides =
-in ldiskfs layer instead of moving upto OSD layer?<br>- <a href=3D"https://=
-review.whamcloud.com/c/fs/lustre-release/+/27488">LU-10048</a> claims to &q=
-uot;avoids restarting truncate transaction handles in main transaction&quot=
-;, while in osd_fallocate_preallocate() it seems there&#39;s no such concer=
-n? Besides, why should we avoid restarting?<br><br>Correct me if I misunder=
-stood the code above...Thank you for your input.<br><br>Best Regards,<br>kg=
-.xu</div>
-
---000000000000efe64806272b771a--
-
---===============1304818495506167088==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============1304818495506167088==--
+SGkgS2cuWHUsCgo+IC0gZnJvbSBMVS0xMzc2NSA8aHR0cHM6Ly9yZXZpZXcud2hhbWNsb3VkLmNv
+bS9jL2ZzL2x1c3RyZS1yZWxlYXNlLysvMzkzNDI+LAo+IGl0IGV4cGxhaW5zIHdoeSBtb3ZlIGZh
+bGxvY2F0ZSgpIGZyb20gbGRpc2tmcyB1cHRvIE9TRCBsYXllciAoZHVlIHRvCj4gdW5wcmVkaWN0
+YWJsZSBjcmVkaXRzIGFoZWFkKSwgaG93ZXZlciB0cnVuY2F0ZSgpIHJlc2lkZXMgaW4gbGRpc2tm
+cyBsYXllcgoKV2hlbiBmYWxsb2NhdGUgd2FzIGZpcnN0IGludHJvZHVjZWQgKExVLTM2MDYpIGl0
+IGRpZCBjYWxsZWQgaW50bwpsZGlza2ZzX2ZhbGxvY2F0ZSgpLiBEdXJpbmcgTFUtMTM3NjUsIGl0
+IHdhcyBtb3ZlZCB0byB0aGUgT1NEIGxheWVyCndpdGggdGhlIGRpZmZlcmVuY2UgYmVpbmcgY3Jl
+ZGl0cyBleHRlbmQgKG9zZF9leHRlbmRfcmVzdGFydF90cmFucygpKS4KVGhlc2UgY2hhbmdlcyBj
+b3VsZCBoYXZlIGJlZW4gZG9uZSB1bmRlciBsZGlza2ZzIGJ1dCAgaXQgaXMgbXVjaCBtb3JlCnN0
+cmFpZ2h0Zm9yd2FyZCBhbmQgdW5jb21wbGljYXRlZCB0byBpbXBsZW1lbnQgaXQgdW5kZXIgT1NE
+LiBUaG91Z2ggaXQKaXMgbm90IGEgbGF5ZXJpbmcgaGFjay4KClRoYW5rcywKQXJzaGFkCgpPbiBU
+dWUsIE5vdiAxOSwgMjAyNCBhdCAyOjM44oCvQU0gPGx1c3RyZS1kZXZlbC1yZXF1ZXN0QGxpc3Rz
+Lmx1c3RyZS5vcmc+IHdyb3RlOgo+Cj4gU2VuZCBsdXN0cmUtZGV2ZWwgbWFpbGluZyBsaXN0IHN1
+Ym1pc3Npb25zIHRvCj4gICAgICAgICBsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwo+Cj4g
+VG8gc3Vic2NyaWJlIG9yIHVuc3Vic2NyaWJlIHZpYSB0aGUgV29ybGQgV2lkZSBXZWIsIHZpc2l0
+Cj4gICAgICAgICBodHRwOi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRl
+dmVsLWx1c3RyZS5vcmcKPiBvciwgdmlhIGVtYWlsLCBzZW5kIGEgbWVzc2FnZSB3aXRoIHN1Ympl
+Y3Qgb3IgYm9keSAnaGVscCcgdG8KPiAgICAgICAgIGx1c3RyZS1kZXZlbC1yZXF1ZXN0QGxpc3Rz
+Lmx1c3RyZS5vcmcKPgo+IFlvdSBjYW4gcmVhY2ggdGhlIHBlcnNvbiBtYW5hZ2luZyB0aGUgbGlz
+dCBhdAo+ICAgICAgICAgbHVzdHJlLWRldmVsLW93bmVyQGxpc3RzLmx1c3RyZS5vcmcKPgo+IFdo
+ZW4gcmVwbHlpbmcsIHBsZWFzZSBlZGl0IHlvdXIgU3ViamVjdCBsaW5lIHNvIGl0IGlzIG1vcmUg
+c3BlY2lmaWMKPiB0aGFuICJSZTogQ29udGVudHMgb2YgbHVzdHJlLWRldmVsIGRpZ2VzdC4uLiIK
+Pgo+Cj4gVG9kYXkncyBUb3BpY3M6Cj4KPiAgICAxLiBIRUxQOiBkaWZmZXJlbmNlIGJldHdlZW4g
+ZmFsbG9jYXRlIGFuZCB0cnVuY2F0ZQo+ICAgICAgIGltcGxlbWVudGF0aW9uIChrZWd1YW5nIHh1
+KQo+Cj4KPiAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4KPiBNZXNzYWdlOiAxCj4gRGF0ZTogTW9uLCAxOCBOb3Yg
+MjAyNCAxNjoxMTozOCArMDgwMAo+IEZyb206IGtlZ3VhbmcgeHUgPHNxdWFsZm9mQGdtYWlsLmNv
+bT4KPiBUbzogbHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmcKPiBTdWJqZWN0OiBbbHVzdHJl
+LWRldmVsXSBIRUxQOiBkaWZmZXJlbmNlIGJldHdlZW4gZmFsbG9jYXRlIGFuZAo+ICAgICAgICAg
+dHJ1bmNhdGUgaW1wbGVtZW50YXRpb24KPiBNZXNzYWdlLUlEOgo+ICAgICAgICAgPENBRjgzZGVT
+K01DX1pLcjl2WGl4X0pzNjNaeUoyS2tYc1N3TGc1RmVCcy0rTnppWWYzUUBtYWlsLmdtYWlsLmNv
+bT4KPiBDb250ZW50LVR5cGU6IHRleHQvcGxhaW47IGNoYXJzZXQ9InV0Zi04Igo+Cj4gSGkgTHVz
+dHJlIGRldnMsCj4KPiBJIGNhbWUgYWNyb3NzIHRoZSBjb2RlIGFuZCBub3RpY2VkIGFuIGltcGxl
+bWVudGF0aW9uIGRpZmZlcmVuY2UgYmV0d2Vlbgo+IGZhbGxvY2F0ZSBhbmQgdHJ1bmNhdGUvcHVu
+Y2ggb3BlcmF0aW9ucyB1bmRlciB0aGUgbHVzdHJlL29zZC1sZGlza2ZzLy4KPiBXaGlsZSAqb3Nk
+X2ZhbGxvY2F0ZSooKSBpcyBoYW5kbGVkIGluIHRoZSBMdXN0cmUgT1NEIGxheWVyLCAqb3NkX3B1
+bmNoKigpCj4gcmVtYWlucyBpbiB0aGUgbGRpc2tmcyBsYXllciwgYm90aCBvZiB3aGljaCBtYXkg
+cmVsYXRlIHRvIG11bHRpcGxlCj4gdHJhbnNhY3Rpb25zIGFzIHRoZWlyIGNvbW1lbnRzIHN1Z2dl
+c3RlZC4KPiAtIGZyb20gTFUtMTM3NjUgPGh0dHBzOi8vcmV2aWV3LndoYW1jbG91ZC5jb20vYy9m
+cy9sdXN0cmUtcmVsZWFzZS8rLzM5MzQyPiwKPiBpdCBleHBsYWlucyB3aHkgbW92ZSBmYWxsb2Nh
+dGUoKSBmcm9tIGxkaXNrZnMgdXB0byBPU0QgbGF5ZXIgKGR1ZSB0bwo+IHVucHJlZGljdGFibGUg
+Y3JlZGl0cyBhaGVhZCksIGhvd2V2ZXIgdHJ1bmNhdGUoKSByZXNpZGVzIGluIGxkaXNrZnMgbGF5
+ZXIKPiBpbnN0ZWFkIG9mIG1vdmluZyB1cHRvIE9TRCBsYXllcj8KPiAtIExVLTEwMDQ4IDxodHRw
+czovL3Jldmlldy53aGFtY2xvdWQuY29tL2MvZnMvbHVzdHJlLXJlbGVhc2UvKy8yNzQ4OD4KPiBj
+bGFpbXMgdG8gImF2b2lkcyByZXN0YXJ0aW5nIHRydW5jYXRlIHRyYW5zYWN0aW9uIGhhbmRsZXMg
+aW4gbWFpbgo+IHRyYW5zYWN0aW9uIiwgd2hpbGUgaW4gb3NkX2ZhbGxvY2F0ZV9wcmVhbGxvY2F0
+ZSgpIGl0IHNlZW1zIHRoZXJlJ3Mgbm8gc3VjaAo+IGNvbmNlcm4/IEJlc2lkZXMsIHdoeSBzaG91
+bGQgd2UgYXZvaWQgcmVzdGFydGluZz8KPgo+IENvcnJlY3QgbWUgaWYgSSBtaXN1bmRlcnN0b29k
+IHRoZSBjb2RlIGFib3ZlLi4uVGhhbmsgeW91IGZvciB5b3VyIGlucHV0Lgo+Cj4gQmVzdCBSZWdh
+cmRzLAo+IGtnLnh1Cj4gLS0tLS0tLS0tLS0tLS0gbmV4dCBwYXJ0IC0tLS0tLS0tLS0tLS0tCj4g
+QW4gSFRNTCBhdHRhY2htZW50IHdhcyBzY3J1YmJlZC4uLgo+IFVSTDogPGh0dHA6Ly9saXN0cy5s
+dXN0cmUub3JnL3BpcGVybWFpbC9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZy9hdHRhY2htZW50cy8y
+MDI0MTExOC8wYzEyYjhlNy9hdHRhY2htZW50LTAwMDEuaHRtPgo+Cj4gLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tCj4KPiBTdWJqZWN0OiBEaWdlc3QgRm9vdGVyCj4KPiBfX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwo+IGx1c3RyZS1kZXZlbCBtYWls
+aW5nIGxpc3QKPiBsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwo+IGh0dHA6Ly9saXN0cy5s
+dXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZwo+Cj4KPiAtLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KPgo+IEVuZCBvZiBsdXN0cmUtZGV2ZWwgRGlnZXN0
+LCBWb2wgMjA1LCBJc3N1ZSAxMgo+ICoqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioq
+KioqKioqKioqKgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+XwpsdXN0cmUtZGV2ZWwgbWFpbGluZyBsaXN0Cmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3Jn
+Cmh0dHA6Ly9saXN0cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJl
+Lm9yZwo=
