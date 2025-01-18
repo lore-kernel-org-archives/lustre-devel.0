@@ -4,64 +4,66 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id CB564C02185
-	for <lustre-devel@archiver.kernel.org>; Sat, 18 Jan 2025 17:51:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E08A9C02185
+	for <lustre-devel@archiver.kernel.org>; Sat, 18 Jan 2025 21:46:18 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Yb41B3sSBz1xsk;
-	Sat, 18 Jan 2025 09:51:58 -0800 (PST)
-Received: from smtp-fw-6001.amazon.com (smtp-fw-6001.amazon.com [52.95.48.154])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Yb9CX0y0Qz1xPm;
+	Sat, 18 Jan 2025 13:46:16 -0800 (PST)
+Received: from smtp-fw-80008.amazon.com (smtp-fw-80008.amazon.com
+ [99.78.197.219])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Yb4184JVGz1whY
- for <lustre-devel@lists.lustre.org>; Sat, 18 Jan 2025 09:51:56 -0800 (PST)
+ 4Yb9CN1mJjz1wl2
+ for <lustre-devel@lists.lustre.org>; Sat, 18 Jan 2025 13:46:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
- t=1737222716; x=1768758716;
+ t=1737236768; x=1768772768;
  h=from:to:cc:date:message-id:references:in-reply-to:
  content-id:content-transfer-encoding:mime-version:subject;
- bh=yZU/ArKs1zg5p8XELgPmLaCXk0PAB9MsdqjU5il/e68=;
- b=jrNsnLO1r07D/RV8MzKoAWFoqezb9Pa9TzDGBBqmzSz8NBObKRLecw2B
- gUpIZp4nv4dE/dHhO6h4IkAmx9H3QSdZ3DrStWBN9GYAZCAJOjhUTotTy
- 1oc2f7fHyR2f8YVb15OR6CiHomLm0VTMODCYq/lAQCp/HictoJBrCYRLV A=;
-X-IronPort-AV: E=Sophos;i="6.13,215,1732579200"; d="scan'208";a="455258700"
-Thread-Topic: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
+ bh=IKtmVcJwgEqYRmD07ICSzpn6mqEqsVKtOCcnWl2jyAo=;
+ b=o+J1VJHOIfCTHeXzYQ8O3v5ZiUpSSMdfoXjeO0eONWXHWk2wHzsHCu0p
+ P3IW1Wb/IZMlLZ95c3dFy3Ea0BwXZWgpEdkYp5OrRL4l74Sf2/fvbawSz
+ /ohrWt81H6Z81UCxUWmKZ3CJGTSqZ1EUsXlb7U+W9OZD7a/kKjpyoaAvo Y=;
+X-IronPort-AV: E=Sophos;i="6.13,216,1732579200"; d="scan'208";a="162477979"
+Thread-Topic: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
  upstreaming
-Received: from iad12-co-svc-p1-lb1-vlan2.amazon.com (HELO
- smtpout.prod.us-east-1.prod.farcaster.email.amazon.dev) ([10.43.8.2])
- by smtp-border-fw-6001.iad6.amazon.com with
- ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 18 Jan 2025 17:51:55 +0000
-Received: from EX19MTAUEA002.ant.amazon.com [10.0.29.78:26948]
- by smtpin.naws.us-east-1.prod.farcaster.email.amazon.dev [10.0.18.219:2525]
+Received: from pdx4-co-svc-p1-lb2-vlan3.amazon.com (HELO
+ smtpout.prod.us-east-1.prod.farcaster.email.amazon.dev) ([10.25.36.214])
+ by smtp-border-fw-80008.pdx80.corp.amazon.com with
+ ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 18 Jan 2025 21:46:07 +0000
+Received: from EX19MTAUEC002.ant.amazon.com [10.0.29.78:45299]
+ by smtpin.naws.us-east-1.prod.farcaster.email.amazon.dev [10.0.25.228:2525]
  with esmtp (Farcaster)
- id 497ec6b4-3754-4e6b-b3e6-e8cc5ccf84c0; Sat, 18 Jan 2025 17:51:55 +0000 (UTC)
-X-Farcaster-Flow-ID: 497ec6b4-3754-4e6b-b3e6-e8cc5ccf84c0
-Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
- EX19MTAUEA002.ant.amazon.com (10.252.134.9) with Microsoft SMTP Server
+ id 5a0fb688-c698-44b9-8f54-98d6c8ade817; Sat, 18 Jan 2025 21:46:06 +0000 (UTC)
+X-Farcaster-Flow-ID: 5a0fb688-c698-44b9-8f54-98d6c8ade817
+Received: from EX19D017UEA004.ant.amazon.com (10.252.134.70) by
+ EX19MTAUEC002.ant.amazon.com (10.252.135.253) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
- Sat, 18 Jan 2025 17:51:55 +0000
+ Sat, 18 Jan 2025 21:46:03 +0000
 Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
- EX19D017UEA001.ant.amazon.com (10.252.134.93) with Microsoft SMTP Server
+ EX19D017UEA004.ant.amazon.com (10.252.134.70) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
- Sat, 18 Jan 2025 17:51:54 +0000
+ Sat, 18 Jan 2025 21:46:02 +0000
 Received: from EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed]) by
  EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed%3]) with
- mapi id 15.02.1258.039; Sat, 18 Jan 2025 17:51:54 +0000
+ mapi id 15.02.1258.039; Sat, 18 Jan 2025 21:46:02 +0000
 From: "Day, Timothy" <timday@amazon.com>
-To: NeilBrown <neilb@suse.de>
+To: Oleg Drokin <green@whamcloud.com>, "neilb@suse.de" <neilb@suse.de>
 CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Index: AQHbaF06daQEbe3e/kelMir67rT0hbMbs8GAgADLA4A=
-Date: Sat, 18 Jan 2025 17:51:54 +0000
-Message-ID: <78EDC1C6-0669-410A-9DCF-4CDCCA3324ED@amazon.com>
+Thread-Index: AQHbaVeRqC+vmvhDK0+DNl/PAi9AJbMcvjsA
+Date: Sat, 18 Jan 2025 21:46:02 +0000
+Message-ID: <A2A33C79-3467-4E93-952D-9646346E0349@amazon.com>
 References: <3139EEF5-91BF-4F8E-A112-1D66455AE3D2@amazon.com>
  <173716111777.22054.8452560203667698532@noble.neil.brown.name>
-In-Reply-To: <173716111777.22054.8452560203667698532@noble.neil.brown.name>
+ <785a407c987a57ddf6bbfbed05230981af66cd26.camel@whamcloud.com>
+In-Reply-To: <785a407c987a57ddf6bbfbed05230981af66cd26.camel@whamcloud.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
 x-originating-ip: [10.106.179.18]
-Content-ID: <88968D46C154A543A3DCEC61962755B0@amazon.com>
+Content-ID: <B505E8F401C64C48923BD78BE40EFD21@amazon.com>
 MIME-Version: 1.0
 Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
  upstreaming
@@ -77,159 +79,159 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-DQoNCj4gT24gMS8xNy8yNSwgNzo0NiBQTSwgIk5laWxCcm93biIgPG5laWxiQHN1c2UuZGUgPG1h
-aWx0bzpuZWlsYkBzdXNlLmRlPj4gd3JvdGU6DQo+ID4gT24gRnJpLCAxNyBKYW4gMjAyNSwgRGF5
-LCBUaW1vdGh5IHdyb3RlOg0KPiA+IFRoZSBmb2xsb3dpbmcgaXMgYSBkcmFmdCB0b3BpYyBmb3Ig
-dGhlIHVwY29taW5nIExTRi9NTSBjb25mZXJlbmNlLg0KPiA+DQo+ID4gSSB3YW50ZWQgdG8gc29s
-aWNpdCBmZWVkYmFjayBmcm9tIHRoZSB3aWRlciBMdXN0cmUgZGV2ZWxvcG1lbnQNCj4gPg0KPiA+
-IGNvbW11bml0eSBiZWZvcmUgc3VibWl0dGluZyB0aGlzIHRvIGZzZGV2ZWwuIElmIEnigJl2ZSBv
-bWl0dGVkIGFueXRoaW5nLA0KPiA+DQo+ID4gc29tZXRoaW5nIGRvZXNu4oCZdCBzZWVtIHJpZ2h0
-LCBvciB5b3Uga25vdyBvZiBzb21ldGhpbmcgdGhhdCBzdHJlbmd0aGVucw0KPiA+DQo+ID4gdGhl
-IGFyZ3VtZW50LCBwbGVhc2UgbGV0IG1lIGtub3chDQo+ID4NCj4gPg0KPiA+DQo+ID4gLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KPiA+DQo+ID4N
-Cj4gPg0KPiA+IEx1c3RyZSBpcyBhIGhpZ2gtcGVyZm9ybWFuY2UgcGFyYWxsZWwgZmlsZXN5c3Rl
-bSB1c2VkIGZvciBIUEMgYW5kIEFJL01MDQo+ID4NCj4gPiBjb21wdXRlIGNsdXN0ZXJzIGF2YWls
-YWJsZSB1bmRlciBHUEx2Mi4gTHVzdHJlIGhhcyBhY2hpZXZlZCB3aWRlc3ByZWFkDQo+ID4NCj4g
-PiBhZG9wdGlvbiBpbiB0aGUgSFBDIGFuZCBBSS9NTCBhbmQgaXMgY29tbWVyY2lhbGx5IHN1cHBv
-cnRlZCBieSBudW1lcm91cw0KPiA+DQo+ID4gdmVuZG9ycyBhbmQgY2xvdWQgc2VydmljZSBwcm92
-aWRlcnMgWzFdLg0KPiA+DQo+ID4NCj4gPg0KPiA+IEFmdGVyIDIxIHllYXJzIGFuZCBhbiBpbGwt
-ZmF0ZWQgc3RpbnQgaW4gc3RhZ2luZywgTHVzdHJlIGlzIHN0aWxsDQo+ID4gbWFpbnRhaW5lZCBh
-cw0KPiA+DQo+ID4gYW4gb3V0LW9mLXRyZWUgbW9kdWxlIFs2XS4gVGhlIHByZXZpb3VzIHVwc3Ry
-ZWFtaW5nIGVmZm9ydCBzdWZmZXJlZA0KPiA+IGZyb20gYQ0KPiA+DQo+ID4gbGFjayBvZiBkZXZl
-bG9wZXIgZm9jdXMgYW5kIHVzZXIgYWRvcHRpb24sIHdoaWNoIGV2ZW50dWFsbHkgbGVkIHRvDQo+
-ID4gTHVzdHJlDQo+ID4NCj4gPiBiZWluZyByZW1vdmVkIGZyb20gc3RhZ2luZyBhbHRvZ2V0aGVy
-IFsyXS4NCj4gPg0KPiA+DQo+ID4NCj4gPiBIb3dldmVyLCB0aGUgd29yayB0byBpbXByb3ZlIEx1
-c3RyZSBoYXMgbm90IHN0b3BwZWQuIEluIHRoZSBpbnRlcnZlbmluZw0KPiA+DQo+ID4geWVhcnMs
-IHRoZSBjb2RlIGltcHJvdmVtZW50cyB0aGF0IHdvdWxkIHByZWVtcHQgYSByZXR1cm4gdG8gbWFp
-bmxpbmUNCj4gPg0KPiA+IGhhdmUgYmVlbiBzdGVhZGlseSBwcm9ncmVzc2luZy4gQXQgbGVhc3Qg
-MjUlIG9mIHBhdGNoZXMgYWNjZXB0ZWQgZm9yDQo+ID4NCj4gPiBMdXN0cmUgMi4xNiB3ZXJlIHJl
-bGF0ZWQgdG8gdGhlIHVwc3RyZWFtaW5nIGVmZm9ydCBbM10uIEFuZCBhbGwgb2YgdGhlDQo+ID4N
-Cj4gPiByZW1haW5pbmcgd29yayBpcyBpbi1mbGlnaHQgWzRdWzVdLiBPdXIgZXZlbnR1YWwgZ29h
-bCBpcyB0byBhIGdldCBhDQo+ID4gbWluaW1hbA0KPiA+DQo+ID4gVENQL0lQLW9ubHkgTHVzdHJl
-IGNsaWVudCB0byBhbiBhY2NlcHRhYmxlIHF1YWxpdHkgYmVmb3JlIHN1Ym1pdHRpbmcgdG8NCj4g
-Pg0KPiA+IG1haW5saW5lLg0KPg0KPg0KPiAiR28gYmlnLCBvciBnbyBob21lIiEhDQo+DQo+DQo+
-IElmIG91ciBldmVudHVhbCBnb2FsIGlzIG5vdCAiR2V0IGx1c3RyZSwgYm90aCBjbGllbnQgYW5k
-IHNlcnZlciwgaW50bw0KPiBtYWlubGluZSBsaW51eCB3aXRoIHN1cHBvcnQgZm9yIFRDUC9JUCBh
-bmQgaW5maW5pYmFuZCB0cmFuc3BvcnRzIChhdA0KPiBsZWFzdCkiDQo+IHRoZW4gd2UgcmVhbGx5
-IHNob3VsZG4ndCBib3RoZXIuDQo+DQo+DQo+IFRoZXJlIGlzIG5vIGZvcm1hbCwgb3IgZXZlbiBz
-ZW1pLWZvcm1hbCwgc3BlY2lmaWNhdGlvbiBvZiB0aGUgTHVzdHJlDQo+IHByb3RvY29sLiBUaGUg
-bHVzdHJlIHByb3RvY29sIGlzICJ3aGF0IHRoZSBjb2RlIGRvZXMiIHNvIGl0IGNhbm5vdCB3b3Jr
-DQo+IHRvIGRldmVsb3AgY2xpZW50IGFuZCBzZXJ2ZXIgc2VwYXJhdGVseSBsaWtlIGl0IGNhbiBm
-b3IsIGUuZy4sIE5GUy4NCj4NCj4NCj4gVGhlIGdvYWwgeW91IGRlc2NyaWJlIGlzIGFuIGludGVy
-aW0gZ29hbC4gQSBmaXJzdCBzdGVwIChmcm9tIHRoZQ0KPiB1cHN0cmVhbSBjb21tdW5pdHkgcGVy
-c3BlY3RpdmUpLg0KDQpHZXR0aW5nIGV2ZXJ5dGhpbmcgdXBzdHJlYW0gaXMgZGVmaW5pdGVseSB0
-aGUgZ29hbC4gVGhlIG5lYXIgdGVybSBnb2FsDQppcyBtdWNoIHNtYWxsZXIsIG9mIGNvdXJzZSAt
-IGdldHRpbmcgYW55dGhpbmcgYXQgYWxsIEx1c3RyZSB1cHN0cmVhbS4gSSd2ZQ0KZXZlbiB3b25k
-ZXJlZCBhdCB0aW1lcyBpZiB3ZSBjb3VsZCBzdGFydCB3aXRoIG9ubHkgTE5FVCAtIHN0YW5kYWxv
-bmUgTE5FVA0KaXMgcHJldHR5IG1hbmFnZWFibGUgYW5kIGNhbiBiZSB1c2VkIGFzIGEgc3RhbmRh
-bG9uZSBMTkVUIHJvdXRlci4gU28gaXQgY2FuDQpiZSB1c2VkIGZvciBzb21ldGhpbmcgYmVzaWRl
-cyBvdXQtb2YtdHJlZSBMdXN0cmUuIEJ1dCBJJ20gc2tlcHRpY2FsIHVwc3RyZWFtDQp3b3VsZCBi
-ZSBpbiBmYXZvciBvZiB0aGF0IGFwcHJvYWNoLCBzaW5jZSB0aGUgcHJpbWFyeSB1c2VycyB3b3Vs
-ZCBiZSBvdXQtb2YtdHJlZQ0KTHVzdHJlIHJlZ2FyZGxlc3MuDQoNCkxpa2UgQW5kcmVhcyBzYWlk
-IGluIGFub3RoZXIgdGhyZWFkLCBJIHRoaW5rIHRoZSBMdXN0cmUgcHJvdG9jb2wgaXMgZmFpcmx5
-IHN0YWJsZS4NClNvIHdlIHdvdWxkbid0IGhhdmUgdG9vIG11Y2ggdHJvdWJsZSBtYWludGFpbmlu
-ZyBhbiBpbmRlcGVuZGVudCBjbGllbnQNCmluIG1haW5saW5lLiBBbHRob3VnaCwgaWRlYWxseSB0
-aGUgc2VydmVyIHdvdWxkIGZvbGxvdyBhZnRlcndhcmRzLg0KDQpPbiB0aGUgb3RoZXIgaGFuZCwg
-SSB3b25kZXIgaWYgd2UgdXBzdHJlYW0gdGhlIHdob2xlIHRoaW5nIGFsbCBhdCBvbmNlLiBCZXNp
-ZGUNCnRoZSBjb2RlIGJlaW5nIGEgYml0IG5pY2VyLCB0aGUgY2xpZW50IGlzbid0IHJlYWxseSB0
-aGF0IG11Y2ggY2xvc2VyIHRvIGJlaW5nIHVwc3RyZWFtDQp0aGFuIHRoZSBzZXJ2ZXIgaXMuIEFu
-ZCBubyBvbmUgZWxzZSBjYW4gdGVzdCB0aGUgY2xpZW50IHdpdGhvdXQgaGF2aW5nIGEgTHVzdHJl
-DQpzZXJ2ZXIgb24taGFuZC4gU28gbm8tb25lIGNhbiBlYXNpbHkgcnVuIHhmc3Rlc3RzIG9yIHNp
-bWlsYXIuIEFuZCBkb2luZyBldmVyeXRoaW5nDQphbGwgYXQgb25jZSB3b3VsZCBwcmVlbXB0IHF1
-ZXN0aW9ucyBvZiBjbGllbnQvc2VydmVyIHNwbGl0IG9yIHRoZSBzZXJ2ZXIgdXBzdHJlYW1pbmcN
-CnRpbWVsaW5lLiBCdXQgdXBzdHJlYW1pbmcgc28gbXVjaCBhbGwgYXQgb25jZSBpcyBwcm9iYWJs
-eSBtb3JlIHVucmVhbGlzdGljLg0KDQo+ID4gSSBwcm9wb3NlIHRvIGRpc2N1c3M6DQo+ID4NCj4g
-Pg0KPiA+DQo+ID4gLSBFeHBlY3RhdGlvbnMgZm9yIGEgbmV3IGZpbGVzeXN0ZW0gdG8gYmUgYWNj
-ZXB0ZWQgdG8gbWFpbmxpbmUNCj4gPg0KPiA+IC0gV2Vha25lc3NlcyBpbiB0aGUgcHJldmlvdXMg
-dXBzdHJlYW1pbmcgZWZmb3J0IGluIHN0YWdpbmcNCj4gPg0KPg0KPg0KPiBJIHRoaW5rIHdlIGtu
-b3cgYXQgbGVhc3Qgb25lIHBlcnNwZWN0aXZlIG9uIHRoZSB3ZWFrbmVzc2VzIGluIHRoZQ0KPiBw
-cmV2aW91cyB1cHN0cmVhbWluZyBlZmZvcnQgYW5kIHdlIG5lZWQgdG8gZGVtb25zdHJhdGUgdGhh
-dCB3ZSB3aWxsIGRvDQo+IGJldHRlci4NCj4NCj4NCj4gaHR0cHM6Ly9sb3JlLmtlcm5lbC5vcmcv
-YWxsLzIwMTgwNjAxMDkxMTMzLkdBMjc1MjFAa3JvYWguY29tIDxtYWlsdG86MjAxODA2MDEwOTEx
-MzMuR0EyNzUyMUBrcm9haC5jb20+Lw0KPg0KPg0KPiBUaGVyZSBpcyBhIHdob2xlIHNlcGFyYXRl
-IG91dC1vZi10cmVlIGNvcHkgb2YgdGhpcyBjb2RlYmFzZSB3aGVyZSB0aGUNCj4gZGV2ZWxvcGVy
-cyB3b3JrIG9uIGl0LCBhbmQgdGhlbiByYW5kb20gY2hhbmdlcyBhcmUgdGhyb3duIG92ZXIgdGhl
-DQo+IHdhbGwgYXQgc3RhZ2luZyBhdCBzb21lIGxhdGVyIHBvaW50IGluIHRpbWUuIFRoaXMgZHVh
-bC10cmVlDQo+IGRldmVsb3BtZW50IG1vZGVsIGhhcyBuZXZlciB3b3JrZWQsIGFuZCB0aGUgc3Rh
-dGUgb2YgdGhpcyBjb2RlYmFzZSBpcw0KPiBwcm9vZiBvZiB0aGF0Lg0KPg0KPg0KPiBXZSBuZWVk
-IHRvIGRlbW9uc3RyYXRlIGEgcHJvY2VzcyBmb3IsIGFuZCBjb21taXRtZW50IHRvLCBtb3Zpbmcg
-YXdheQ0KPiBmcm9tIHRoZSBkdWFsLXRyZWUgbW9kZWwuIFdlIG5lZWQgcGF0Y2hlcyB0byB0aG9z
-ZSBwYXJ0cyBvZiBMdXN0cmUNCj4gdGhhdCBhcmUgdXBzdHJlYW0gdG8gbGFuZCBpbiB1cHN0cmVh
-bSBmaXJzdCAobW9zdGx5KS4NCj4NCj4NCj4gVGhhdCBtZWFucyB3ZSBuZWVkIHRoZSBtb2RlbCBm
-b3Igc3VwcG9ydGluZyBvbGRlciBrZXJuZWxzIHRvIGJlIGNvbXBsZXRlbHkNCj4gYmFzZWQgb24g
-bGliY2ZzIGhvbGRpbmcgY29tcGF0aWJpbGl0eSBjb2RlIHdpdGggbm8ga2VybmVsLXZlcnNpb24N
-Cj4gI2lmZGVmcyBpbiB0aGUgY29kZS4NCj4NCj4NCj4gV2UgbmVlZCBhIHN0cm9uZyBzZXBhcmF0
-aW9uIGJldHdlZW4gc2VydmVyIGFuZCBjbGllbnQgc28gdGhhdCB3ZSBjYW4NCj4ganVzdGlmeSBl
-dmVyeXRoaW5nIHRoYXQgZ29lcyB1cHN0cmVhbSBhcyBiZWluZyB0byBzdXBwb3J0IHRoZSBjbGll
-bnQsDQo+IGFuZCB3aGVuIHdlIGFkZCBzZXJ2ZXIgc3VwcG9ydCB0byB0aGF0LCBpdCBqdXN0IGFk
-ZHMgZmlsZXMuIFBvc3NpYmx5IHdlDQo+IGNvdWxkIHBhdGNoIGEgZmV3IGZpbGVzIHRvIGFkZCBz
-ZXJ2ZXIgc3VwcG9ydCwgYnV0IHdlIG5lZWQgdG8gbWFpbnRhaW4NCj4gdGhvc2UgYXMgcGF0Y2hl
-cywgbm90IGFzIGFsdGVybmF0ZSB2ZXJzaW9ucyBvZiB1cHN0cmVhbSBmaWxlcy4NCj4NCj4NCj4g
-V2UgbmVlZCB0byBxdWlja2x5IHJlYWNoIGEgcG9pbnQgd2hlcmUgYSBsdXN0cmUgcmVsZWFzZSBp
-czoNCj4NCj4NCj4gLSBhIHZlcmJhdGltIGNvcHkgb2YgcmVsZXZhbnQgZmlsZXMgZnJvbSBhIGNo
-b3NlbiB1cHN0cmVhbSByZWxlYXNlLA0KPiBvciBqdXN0IGEgZGVwZW5kZW5jeSBvbiB0aGF0IGtl
-cm5lbCBzb3VyY2UuDQo+IC0gYSBidW5jaCBvZiBleHRyYSBmaWxlcyB0aGF0IG1pZ2h0IG9uZSBk
-YXkgZ28gdXBzdHJlYW06IHNlcnZlciBjb2RlDQo+IGFuZCBMTmV0IHByb3RvY29sIGNvZGUNCj4g
-LSBhICpmZXcqIHBhdGNoZXMgdG8gaW50ZWdyYXRlIHRoYXQgY29kZQ0KPiAtIHNvbWUgbnVtYmVy
-IG9mIHBhdGNoZXMgd2hpY2ggaGF2ZSBzaW5jZSBnb25lIHVwc3RyZWFtIC0gYnVnZml4ZXMgZXRj
-Lg0KPiAtIGxpYmNmcyB3aGljaCBjb250YWlucyBhIGNvbXBhdCBsYXllciBmb3Igb2xkZXIga2Vy
-bmVscy4NCj4gLSB1c2VyLXNwYWNlIGNvZGUsIGRvY3VtZW50YXRpb24sIHRlc3Qgc2NyaXB0cywg
-ZXRjIGZvciB3aGljaCB0aGVyZQ0KPiBpcyBubyBleHBlY3RhdGlvbiBvZiB1cHN0cmVhbWluZyB0
-byBsaW51eCBrZXJuZWwuDQo+DQo+DQo+IE1heWJlIHRoZSBxdWVzdGlvbiBmb3IgTFNGIGlzIDog
-d2hhdCBpcyBhIHN1ZmZpY2llbnQgZGVtb25zdHJhdGlvbiBvZiBjb21taXRtZW50Pw0KPg0KPg0K
-PiBUaGUgYmlnIHF1ZXN0aW9uIGZvciB1cyBpcyA6IGhvdyBhcmUgd2UgZ29pbmcgdG8gdHJhbnNp
-dGlvbiBvdXINCj4gaW5mcmFzdHJ1Y3R1cmUgdG8gdGhpcyBtb2RlbD8NCj4NCj4NCj4gSXQgd291
-bGQgYmUgbmljZSB0byBoYXZlIGEgdGltZWxpbmUgZm9yIGdldHRpbmcgdGhlIHNlY29uZCBhbmQg
-dGhpcmQNCj4gYnVsbGV0IHBvaW50cyBkb3duIHRvIHplcm8uIE9idmlvdXNseSBpdCB3b3VsZCBi
-ZSBhc3BpcmF0aW9uYWwgYXQgYmVzdCwNCj4gYnV0IGEgbGlzdCBvZiBzdGVwcyBjb3VsZCBiZSB1
-c2VmdWwuDQoNCkkgYWdyZWUgdGhhdCB0aGUgZGV2ZWxvcG1lbnQgbW9kZWwgbmVlZHMgdG8gYWRh
-cHQgLSBvdGhlcndpc2UsIHdlJ2QgaGF2ZSB0bw0Kc29mdC1mb3JrIHdoYXRldmVyIGNvZGUgZ29l
-cyB1cHN0cmVhbS4gS2VlcGluZyB0aGUgdHdvIHRyZWVzIGluLXN5bmMgd2hpbGUNCmFsc28gZG9p
-bmcgZmVhdHVyZSBkZXZlbG9wbWVudCBpcyB1bndvcmthYmxlLg0KDQpUaGUgdHJpY2t5IHBhcnQg
-aXM6IGhvdyBkbyB3ZSBzdXBwb3J0IG1vc3QgTHVzdHJlIGRldmVsb3BlcnMgY3VycmVudA0Kd29y
-a2Zsb3dzPyBNb3N0IGRldmVsb3BlcnMgYW5kIHZlbmRvcnMgb25seSBjYXJlIGFib3V0IGhhdmlu
-ZyBhDQpmdW5jdGlvbmFsIGNsaWVudCBmb3Igb2xkZXIgZGlzdHJvIGtlcm5lbHMuIEFuZCBhbGwg
-ZGV2ZWxvcGVycyBzdWJtaXQNCnBhdGNoZXMgdmlhIFdoYW1jbG91ZC9ERE4gR2Vycml0IGFuZCBD
-SS9DRC4gU28gZXZlcnlvbmUgYWxpZ25zIHRoZWlyDQp3b3JrZmxvd3MgdG8gd2hhdGV2ZXIgdGhh
-dCBzeXN0ZW0gZW5mb3JjZXMgKGFzc3VtaW5nIGl0IGlzbid0IHRvbyBhcmR1b3VzKS4NCg0KWW91
-ciBwcm9wb3NlZCBtb2RlbCAoYXMgSSB1bmRlcnN0YW5kKSBpcyB0byB1c2UgdGhlIHVwc3RyZWFt
-IGNsaWVudCBhcw0KYSBidWlsdCBkZXBlbmRlbmN5IG9mIHRoZSBjb21wbGV0ZSBMdXN0cmUgcGFj
-a2FnZT8gSSB0aGluayB0aGF0IGNvdWxkIGJlDQp3b3JrYWJsZS4gQnV0IHdoYXRldmVyIHdlIGRv
-LCB3ZSBuZWVkIHRvIGZpbmQgYSB3YXkgdG8gbW92ZSB0byB0aGF0DQpkZXZlbG9wbWVudCBtb2Rl
-bCBiZWZvcmUgYW55dGhpbmcgbGFuZHMgdXBzdHJlYW0uIEkgdGhpbmsgdGhhdCB3b3VsZA0KYmUg
-ZW5vdWdoIHRvIGRlbW9uc3RyYXRlIGNvbW1pdG1lbnQsIElNSE8uDQoNCkkgd29uZGVyIGhvdyBB
-TURHUFUgZG9lcyB0aGlzPyBBTURHUFUgaXMgc2lnbmlmaWNhbnRseSBtb3JlIGNvbXBsZXgNCnRo
-YW4gTHVzdHJlIGFuZCBpdCdzIHN1cHBvcnRlZCBvbiBvbGRlciBrZXJuZWxzIHZpYSBES01TLiBJ
-J2xsIGhhdmUgdG8gbG9vaw0KaW50byB0aGlzLg0KDQo+IFRoYW5rcywNCj4gTmVpbEJyb3duDQo+
-DQo+DQo+ID4gTHVzdHJlIGhhcyBhbHJlYWR5IHJlY2VpdmVkIGEgcGxldGhvcmEgb2YgZmVlZGJh
-Y2sgaW4gdGhlIHBhc3QuIFdoaWxlDQo+ID4gbXVjaA0KPiA+IG9mIHRoYXQgaGFzIGJlZW4gYWRk
-cmVzc2VkIHNpbmNlIC0gdGhlIGtlcm5lbCBpcyBhIG1vdmluZyB0YXJnZXQuDQo+ID4gU2V2ZXJh
-bA0KPiA+IGZpbGVzeXN0ZW1zIGhhdmUgYmVlbiBtZXJnZWQgKGFuZCByZW1vdmVkKSBzaW5jZSBM
-dXN0cmUgbGVmdCBzdGFnaW5nLg0KPiA+IFdlJ3JlDQo+ID4gYWltaW5nIHRvIGF2b2lkIHRoZSBt
-aXN0YWtlcyBvZiB0aGUgcGFzdCBhbmQgaG9wZSB0byBhZGRyZXNzIGFzIG1hbnkNCj4gPiBjb25j
-ZXJucyBhcyBwb3NzaWJsZSBiZWZvcmUgc3VibWl0dGluZyBmb3IgaW5jbHVzaW9uLg0KPiA+DQo+
-ID4NCj4gVGhhbmtzIQ0KPiA+DQo+ID4NCj4gPiBUaW1vdGh5IERheSAoQW1hem9uIFdlYiBTZXJ2
-aWNlcyAtIEFXUykNCj4gPiBKYW1lcyBTaW1tb25zIChPYWsgUmlkZ2UgTmF0aW9uYWwgTGFicyAt
-IE9STkwpDQo+ID4NCj4gPg0KPiA+IFsxXSBMdXN0cmUgQ29tbXVuaXR5IFVwZGF0ZTogaHR0cHM6
-Ly95b3V0dS5iZS9CRS0teVNWUWIyTT9zaT0gPGh0dHBzOi8veW91dHUuYmUvQkUtLXlTVlFiMk0/
-c2k9Pg0KPiA+IFlNSGl0SmZjRTRBU1dRY0UmdD05NjANCj4gPiBbMl0gS2lja2VkIG91dCBvZiBz
-dGFnaW5nOiBodHRwczovL2x3bi5uZXQvQXJ0aWNsZXMvNzU2NTY1LyA8aHR0cHM6Ly9sd24ubmV0
-L0FydGljbGVzLzc1NjU2NS8+DQo+ID4gWzNdIE9STkwsIEFlb24sIFN1U2UsIEFXUywgYW5kIG1v
-cmU6IGh0dHBzOi8veW91dHUuYmUvQkUtLXlTVlFiMk0/c2k9IDxodHRwczovL3lvdXR1LmJlL0JF
-LS15U1ZRYjJNP3NpPT4NCj4gPiBZTUhpdEpmY0U0QVNXUWNFJnQ9OTYwDQo+ID4gWzRdIExVRzI0
-IFVwc3RyZWFtaW5nIFVwZGF0ZTogaHR0cHM6Ly93d3cuZGVwdHMudHR1LmVkdS9ocGNjL2V2ZW50
-cy8gPGh0dHBzOi8vd3d3LmRlcHRzLnR0dS5lZHUvaHBjYy9ldmVudHMvPg0KPiA+IExVRzI0L3Ns
-aWRlcy9EYXkxL0xVR18yMDI0X1RhbGtfMDItTmF0aXZlX0xpbnV4X2NsaWVudF9zdGF0dXMucGRm
-DQo+ID4gWzVdIEx1c3RyZSBKaXJhIFVwc3RyZWFtIFByb2dyZXNzOiBodHRwczovL2ppcmEud2hh
-bWNsb3VkLmNvbS9icm93c2UvIDxodHRwczovL2ppcmEud2hhbWNsb3VkLmNvbS9icm93c2UvPg0K
-PiA+IExVLTEyNTExDQo+ID4gWzZdIE91dC1vZi10cmVlIGNvZGViYXNlOiBodHRwczovL2dpdC53
-aGFtY2xvdWQuY29tLz9wPWZzLyA8aHR0cHM6Ly9naXQud2hhbWNsb3VkLmNvbS8/cD1mcy8+DQo+
-ID4gbHVzdHJlLXJlbGVhc2UuZ2l0O2E9dHJlZQ0KDQpUaW0gRGF5DQoNCg0KDQoNCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmx1c3RyZS1kZXZlbCBtYWls
-aW5nIGxpc3QKbHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmcKaHR0cDovL2xpc3RzLmx1c3Ry
-ZS5vcmcvbGlzdGluZm8uY2dpL2x1c3RyZS1kZXZlbC1sdXN0cmUub3JnCg==
+
+
+> On 1/17/25, 10:17 PM, "Oleg Drokin" <green@whamcloud.com <mailto:green@whamcloud.com>> wrote:
+> > On Sat, 2025-01-18 at 11:45 +1100, NeilBrown wrote:
+> > We need to demonstrate a process for, and commitment to, moving away
+> > from the dual-tree model. We need patches to those parts of Lustre
+> > that are upstream to land in upstream first (mostly).
+>
+>
+> I think this is not very realistic.
+> Large chunk (100%?) of users do not run not only the latest kernel
+> release, they don't run the latest LTS either.
+>
+>
+> When we were in staging last this manifested in random patches being
+> landed and breaking the client completely and nobody noticing for
+> months.
+>
+>
+> Of course some automatic infrastructure could be built up to make it
+> somewhat better, but it does not remove the problem of "nobody would
+> run this mainline tree", I am afraid.
+
+I think there's a decent chunk of users on newer kernels. Ubuntu 22/24 is
+on (a bit past latest) LTS 6.8 kernel [1], AL2023 is on previous LTS 6.1 [2], and
+working on upcoming LTS 6.12 [3].
+
+When a patch lands in lustre-release/master, it could be around 1 - 1.5 years
+before it lands in a proper Lustre release. At that point, it might see real
+production usage.
+
+If a patch landed in a hypothetical upstream client, it might be around 6
+months until a production kernel is using that client.
+
+So I think it's mostly a matter of convincing people to use an upstream
+client. I don't think people wanted to use the staging client because it
+didn't work well and wasn't stable. And vendors don't want to work on
+something that no one uses. It the client is "good enough" and people
+are confident it'll continue to be updated, I think they will use it. The
+staging client was neither of those things.
+
+So I think the problem at hand is molding the existing development
+practices to allow us to deliver an upstream client that has a baseline of
+functionality and stability. And at the same time, supporting older vendor
+kernels. I don't think it'd be a quick transition, but I think it's a tractable
+problem.
+
+[1] Ubuntu kernels - https://ubuntu.com/kernel/lifecycle
+[2] AL2023 6.1 - https://github.com/amazonlinux/linux/commit/ef9660091712fa9edd137180b8925ea6316c8043
+[3] AL2023 6.12 - https://github.com/amazonlinux/linux/commits/amazon-6.12.y/mainline/
+
+> It does not hep that there are what 3? 4? trees, not "dual-tree" by any
+> stretch of imagination.
+>
+>
+> There's DDN/whamcloud (that's really two trees), there's HPE, LLNL
+> keeps their fork still I think (thought it's mostly backports?). There
+> are likely others I am less exposed to.
+
+I think most non-community Lustre release are derived from the
+community release and periodically rebased. I think AWS,
+Whamcloud, LLNL, Microsoft would fall into that bucket. And I
+doubt DDN and HPE significantly diverge from community Lustre. But
+if someone is diverging significantly from community Lustre, I think
+they are opting into a significant maintenance burden regardless of
+what we do with lustre-release/master.
+
+> Sure, only one of those trees is considered "community Lustre", but if
+> it will detach too much from what majority of developers really runs
+> and gets paid to do - the "community Lustre" contributions probably
+> would diminish greatly, I am afraid.
+
+As long as the community Lustre development process is sane, I think
+most organizations will opt to continue deriving their releases from
+it and opt to continue contributing releases upstream. We just need
+to make sure we get buy-in from the people contributing to Lustre.
+
+> The past situation of "oh, this new enterprise linux comes with a
+> community lustre version, so the first step to get something usable is
+> to rip it entirely off and then apply the new good version" is not
+> exactly desirable either I am afraid.
+>
+>
+> And solving this problem is mostly outside of hands of individual
+> developers no matter how cool I think it would be to actually have an
+> up to date Lustre in the mainline linux kernel.
+>
+> > That means we need the model for supporting older kernels to be
+> > completely
+> > based on libcfs holding compatibility code with no kernel-version
+> > #ifdefs in the code.
+> >
+> > We need a strong separation between server and client so that we can
+> > justify everything that goes upstream as being to support the client,
+> > and when we add server support to that, it just adds files. Possibly
+> > we
+> > could patch a few files to add server support, but we need to
+> > maintain
+> > those as patches, not as alternate versions of upstream files.
+> >
+> > We need to quickly reach a point where a lustre release is:
+> >
+> > - a verbatim copy of relevant files from a chosen upstream release,
+> > or just a dependency on that kernel source.
+> > - a bunch of extra files that might one day go upstream: server code
+> > and LNet protocol code
+> > - a *few* patches to integrate that code
+> > - some number of patches which have since gone upstream - bugfixes
+> > etc.
+> > - libcfs which contains a compat layer for older kernels.
+> > - user-space code, documentation, test scripts, etc for which there
+> > is no expectation of upstreaming to linux kernel.
+>
+>
+> All these sound like an awful lot of dedicated developer-hours.
+>
+>
+> > Maybe the question for LSF is : what is a sufficient demonstration of
+> > commitment?
+> >
+> > The big question for us is : how are we going to transition our
+> > infrastructure to this model?
+>
+>
+> and who would pay for it.
+>
+>
+> This in the end was the downfall of the previous attempt. There never
+> was any serious funding behind the effort so it became an afterthought
+> for most.
+>
+>
+> > It would be nice to have a timeline for getting the second and third
+> > bullet points down to zero. Obviously it would be aspirational at
+> > best,
+> > but a list of steps could be useful.
+> >
+> > Thanks,
+> > NeilBrown
+> >
+>
+>
+> Bye,
+> Oleg
+>
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel@lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
