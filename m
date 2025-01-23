@@ -4,70 +4,76 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 9E7BEC02182
-	for <lustre-devel@archiver.kernel.org>; Thu, 23 Jan 2025 04:51:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 50B01C02182
+	for <lustre-devel@archiver.kernel.org>; Thu, 23 Jan 2025 09:01:14 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YdpSh72lvz1xNr;
-	Wed, 22 Jan 2025 20:51:48 -0800 (PST)
-Received: from mail-wm1-f51.google.com (mail-wm1-f51.google.com
- [209.85.128.51])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Ydvzw3fcFz1xNx;
+	Thu, 23 Jan 2025 01:00:44 -0800 (PST)
+Received: from mail-wm1-f42.google.com (mail-wm1-f42.google.com
+ [209.85.128.42])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YdpSH6Srwz1whs
- for <lustre-devel@lists.lustre.org>; Wed, 22 Jan 2025 20:51:27 -0800 (PST)
-Received: by mail-wm1-f51.google.com with SMTP id
- 5b1f17b1804b1-436ce2ab251so2764875e9.1
- for <lustre-devel@lists.lustre.org>; Wed, 22 Jan 2025 20:51:27 -0800 (PST)
+ 4Ydvzm70hCz1wPx
+ for <lustre-devel@lists.lustre.org>; Thu, 23 Jan 2025 01:00:36 -0800 (PST)
+Received: by mail-wm1-f42.google.com with SMTP id
+ 5b1f17b1804b1-43625c4a50dso4016015e9.0
+ for <lustre-devel@lists.lustre.org>; Thu, 23 Jan 2025 01:00:36 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20230601; t=1737607879; x=1738212679; darn=lists.lustre.org;
- h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
- :from:from:to:cc:subject:date:message-id:reply-to;
- bh=YSvYdpJD8OwV4zsqBCyhzH6BVVd0Ri4YXrMfnZRJT4s=;
- b=f/QC69QUqR0mEFlaGueedR2eVAFrb0U1An1VhjmnzB3YiWh9V7BTS+ZZjxQ4Slcnkp
- jVwOtGIviAlnZYab5w/yjsRXmIDXlHoVgx2/wVinpl1Tbgv2HZzT9LVqdy4qsedGgGpX
- LDs6aOkImja7v0B8AyxnF2r+p+Wgu940p6YWHB+byvcRUYfZP2ber3btLR1Ve2MngH0N
- Nt1OUcIDQSmQ2lv3LD7WJp1iYIiOH7+eSZB9L4TRMamSWYSlpSWgPg0szkVM+JqkeP76
- IWnqQR2rL4f9PzpC0An6uyxl8MuEfXA3zbQ8tTlfm0M3TZUm+Ahs+GsGBvkVL2Tm/sDA
- IAaw==
+ d=gmail.com; s=20230601; t=1737622834; x=1738227634; darn=lists.lustre.org;
+ h=to:references:message-id:content-transfer-encoding:cc:date
+ :in-reply-to:from:subject:mime-version:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=FSvXsP7hApnMQBdmmKzwtD2UmzmUgRzdj1DCmywpnP4=;
+ b=Aoi2ElY2bJ8PLAo+ZPaBbkYpY+uwKLVUWp9k7hQWrb/DHN5UnkHGNdSOgtfF2QEZVB
+ I3C0rqHzSTRgDH01XerDrQYDNtXcO7x1BIVSXdDIwhlu+qfVW4zlMkzdg5Y/0eKL1A/N
+ kHoHiEZUnruDZPmQleD5No9BUk6aLhr5+hq39hax3Fne+WoZiqXwwzJlY3AIMZGb7qTk
+ gDHn3UGe3xl2j1SgsszWCxkN3tXdvtoTFQgvziH9p4tedyhvIQiuj6y+jAH/48836cj9
+ WDYtxMBLthTo8nF3JO9KJUBBEAG/qZssAD7mSZrg0ZTWgLJUnMiRvMdAbZaryX18qsKk
+ kFyA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1737607879; x=1738212679;
- h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
- :from:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
- bh=YSvYdpJD8OwV4zsqBCyhzH6BVVd0Ri4YXrMfnZRJT4s=;
- b=psW74Dq+4ug28ZDPQiW7zWld0YBE8RxdpJkQaC2pZwk9EyYKLVBIxmyyGjA+sAYx6v
- Zrgss9dEwsCm3kgP5oG5d2jOclNgAlua/nrODbiZwcIP2qf6AtePCKn9P4EadQ3wJlbS
- T9B82XHrSZ+VZWG+m3HylyCnSYHKePH0EyP/z9QIUP7FkdrYrWEZCvdZw2nd0l59LihQ
- XBmGnryspunExHK50aIGTxlkrJXPGj9fUnF44gHk06zl9HVlyKHsG0lCybluvdXCbwOD
- vzrSW6du+nXeVkXi2Jr0dINnANMS20ESVyQKWc2M8zqVoVup4fQL6HoYVsIKJAz4UKWP
- IwOA==
+ d=1e100.net; s=20230601; t=1737622834; x=1738227634;
+ h=to:references:message-id:content-transfer-encoding:cc:date
+ :in-reply-to:from:subject:mime-version:x-gm-message-state:from:to:cc
+ :subject:date:message-id:reply-to;
+ bh=FSvXsP7hApnMQBdmmKzwtD2UmzmUgRzdj1DCmywpnP4=;
+ b=sqCx4MwnV1r291NbLy2JBWxGvzKj3aMlLKBiH0vf/iCJcxLNEnFKzvLfOGMh09lriR
+ m0tAia/5ycFRmwMAePF8hWTTJw2u48KuwovoLHxQo6cc8RhxkBVNPJMrcu1wCPrMW8hy
+ 4ekJErzy70yZ48e4XFFOLRXzQJSLzt9PqhB1IteNDrFBmtFJqOVvIXKDa7laiaAHR0wL
+ HSHFfI/JvoTODNrCdrCOtB3fF4r4Li+g5JxyUrigXkKAbnrPT3cUt7YMjbAKisTtnFva
+ AfycqT/TxG0wUHAEqm2e/g/KsHFaXzHDKDOJNhpt5SoHiY7V7A/+9rC/6UTG4kawNidU
+ 1MYA==
 X-Forwarded-Encrypted: i=1;
- AJvYcCUROEkVrTIpMFpawQgsrvEgh6DH+HCUYN606dpNx6uXD4rUtjxQp3OkuDrdbhgOB74kUXNbyZ7w7QIF1PU=@lists.lustre.org
-X-Gm-Message-State: AOJu0Yz2kbAlvAsm61uBjZH+Mj2F/gr9B1KkSfQyuvb1Wsbgb09s3PCM
- rE/96iYA39XOzT+/ll7gnYQ5kYsHsGg77XUppP/jEHkFhx7lJglr
-X-Gm-Gg: ASbGncvjS4z4nJaVnTIuhCpptTqa1FSZws9OhHmRzGH2NfuIc/Kw4oHF2aFaH+LqM4Q
- sl2+Muqn2w7G8d64To1rBd0b6SUu4FkUJIqZCqRHf8SaBfVCX6iE14nc0uIWX9+ad4tmMPqsyPi
- pAaXhvjwVsVzEEHzMNsMJYaAFOhzhbcLgbO/D9I/R7jkOpvlmR1EUX5nsiofP0Kmzt8So2Q9Y+k
- yx31CdkalBjV5JAaNazEa84/3Ri9QSSCKSeJkKX7hvH16yx8S+kWVHXX1wC2HYJx2xOJKRgNScN
- IBZnV0gd6rJcmdE+Z+TtQBwBowJW2TlLkIiJNx+sB7uQ1co8QcOuY7obE6AZzA==
-X-Google-Smtp-Source: AGHT+IHNqHaS8Bhjk1v/IHeVXWpLrjFZYfhowRi1Q+UvvF3/Bf1iChT1RETE/Ph0JqnYE85ggmzxrA==
+ AJvYcCUheHfqerFvRchvNkUFh8tv+icm0Eavac+NMXDSg2hW1ooIT8uZI1BRlfS0ETBzuwEQQ/l9I2KwxaA/yUo=@lists.lustre.org
+X-Gm-Message-State: AOJu0YzSqp26IEzkMVkxIcg05Qmy/i1W1Dcz/nz8CS6Rf/tO3UXwlPJa
+ g3HrnhSzvn8JZQASLEorik9a/mKuv8qU1doeLWYHG+QegzXqm9jm
+X-Gm-Gg: ASbGncvay4RZsBxIFQ/3wxRMoZvXPvNfPMUDCtlMmC2ui6mfiO426lyjI0Nz90Hniks
+ GkBXD91ZXm9u7a4NY3fs3SuLACPCkK1wwYGPTJw2+hS588h2xUjHlBXS4RWQKA9P9yF26vX4s0p
+ uIR0E6y3lahlKskxDnUePQykNEPyH9KO19E66IAnGgV+z+C+u1FDUQaApJjR+AOJ3M7RNhJ4J0Y
+ 1pI49teXV/tDWQIngudzGu5IRPOX0D36jsqCDEXAqrcgZxMGiO7ZRWSYLhAiemKpNtnGdkgAnwn
+ Rwhsyo1cmagVEYFyLUob8aAoUos=
+X-Google-Smtp-Source: AGHT+IEJkCAIrvJ4o3DAUa50wE7fd1x5WfKn27T7Ym9SxidiSPwz4nvALImW7Ek3Mn+gqEMhz89ycA==
 X-Received: by 2002:a7b:c00f:0:b0:434:f5c0:32b1 with SMTP id
- 5b1f17b1804b1-4389eecb1f5mr208221435e9.15.1737607879304; 
- Wed, 22 Jan 2025 20:51:19 -0800 (PST)
-Received: from smtpclient.apple (vps-b708d385.vps.ovh.net. [57.129.16.80])
+ 5b1f17b1804b1-4389eecb1f5mr215246935e9.15.1737622834274; 
+ Thu, 23 Jan 2025 01:00:34 -0800 (PST)
+Received: from smtpclient.apple ([178.19.96.90])
  by smtp.gmail.com with ESMTPSA id
- 5b1f17b1804b1-438b31b78aasm47457855e9.29.2025.01.22.20.51.16
+ 5b1f17b1804b1-438b31de036sm53860365e9.33.2025.01.23.01.00.31
  (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 22 Jan 2025 20:51:18 -0800 (PST)
-From: Alexey Lyahkov <alexey.lyashkov@gmail.com>
-Message-Id: <339AF895-36E5-4FAF-B1E1-E69B2AB130EF@gmail.com>
+ Thu, 23 Jan 2025 01:00:33 -0800 (PST)
 Mime-Version: 1.0 (Mac OS X Mail 16.0 \(3776.700.51.11.1\))
-Date: Thu, 23 Jan 2025 07:51:04 +0300
-In-Reply-To: <173757925141.22054.738723965751021240@noble.neil.brown.name>
-To: NeilBrown <neilb@suse.de>
-References: <7459DF85-7A0F-4DC8-9EC3-CA6F3C86234E@gmail.com>
- <173757925141.22054.738723965751021240@noble.neil.brown.name>
+From: Alexey Lyahkov <alexey.lyashkov@gmail.com>
+In-Reply-To: <F0CBB79F-37D7-4786-979D-70B34EEACA81@amazon.com>
+Date: Thu, 23 Jan 2025 12:00:19 +0300
+Message-Id: <381E2DB4-0766-41F0-821E-32C3C724B2FA@gmail.com>
+References: <3139EEF5-91BF-4F8E-A112-1D66455AE3D2@amazon.com>
+ <173716111777.22054.8452560203667698532@noble.neil.brown.name>
+ <785a407c987a57ddf6bbfbed05230981af66cd26.camel@whamcloud.com>
+ <A2A33C79-3467-4E93-952D-9646346E0349@amazon.com>
+ <e5dea863089af0d377beb7f5d9c5d735d192bd94.camel@whamcloud.com>
+ <F0CBB79F-37D7-4786-979D-70B34EEACA81@amazon.com>
+To: "Day, Timothy" <timday@amazon.com>
 X-Mailer: Apple Mail (2.3776.700.51.11.1)
 Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
  upstreaming
@@ -84,236 +90,47 @@ List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============0153671108843781672=="
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-
---===============0153671108843781672==
-Content-Type: multipart/alternative;
-	boundary="Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88"
-
-
---Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/plain;
-	charset=utf-8
-
-
-
-> On 22 Jan 2025, at 23:54, NeilBrown <neilb@suse.de> wrote:
->=20
-> On Mon, 20 Jan 2025, Alexey Lyahkov wrote:
->>=20
->>> On 19 Jan 2025, at 11:03, NeilBrown <neilb@suse.de> wrote:
->>>=20
->>> On Sun, 19 Jan 2025, Alexey Lyahkov wrote:
->>>> Neil,
->>>>>=20
->>>>>=20
->>>>>>=20
->>>>>> It does not hep that there are what 3? 4? trees, not "dual-tree" =
-by any
->>>>>> stretch of imagination.
->>>>>>=20
->>>>>> There's DDN/whamcloud (that's really two trees), there's HPE, =
-LLNL
->>>>>> keeps their fork still I think (thought it's mostly backports?). =
-There
->>>>>> are likely others I am less exposed to.
->>>>>=20
->>>>> "dual-tree" maybe isn't the best way of describing what was wrong =
-with
->>>>> the previous approach.  "upstream-first" is one way of describing =
-how it
->>>>> should be run, though that needs to be in understood correctly.
->>>>>=20
->>>>> Patches should always flow upstream first, then flow downstream =
-into
->>>>> distro.  So I write a patch in my own devel tree.  I post it or =
-submit a
->>>>> pull request and eventually it is accepted into the maintainers
->>>>> "testing" tree (upsream from me).  There it gets more testing and =
-moves
->>>>> to the maintainers "next" tree from which it is pulled into =
-linux-next
->>>>> for integration testing.  Then it goes upstream to Linus (possibly
->>>>> through an intermediary).  =46rom Linus it goes to -stable and to =
-various
->>>>> distros etc.  Individual patches are selected for further =
-backporting to
->>>>> all sorts of different LTS tree.
->>>>>=20
->>>>> Occasionally there are short-cuts.  I might submit a patch from my =
-tree
->>>>> to a SUSE kernel before it is accepted upstream, or maybe even =
-before it
->>>>> is sent if it is urgent.  But these are not the norm.
->>>>>=20
->>>>> But you know all this I expect.  It isn't about the total number =
-of
->>>>> trees. It is about the flow of patches which must all flow through =
-Linus.
->>>>> And developers must develop against current linus, or something =
-very
->>>>> close to that.  Developing against an older kernel is simply =
-making more
->>>>> work for yourself.
->>>>=20
->>>> This will don=E2=80=99t work. Let explain situation in past.
->>>=20
->>> No.  I'm not at all interested in explanations of why it won't work.
->>>=20
->>> I'm only interested in suggestions of how to make it work, and =
-offers of
->>> help.
->>>=20
->> If you have a good way how to solve such situation, which had crazy =
-brain in past.
->> Please share a way how to avoid lustre source code fragmentation =
-because of freeze a code at the different stage in different =
-distributions.
->> Ubuntu might have a modern lustre with 6.5 kernel, but Redhat had =
-frozen a lustre version in 3 releases in past and these clients not =
-compatible each other.
->> And not compatible with installed server.
->> So question - who will do such support ? Did you have an ideas how to =
-solve this problem?
->>=20
->=20
-> sorry - I didn't mean to go quite on you - I've been busy :-)
->=20
-> It's not entirely clear to me what the problem is.
-> You talk about clients not being compatible with each other or with =
-the
-> server, but Andreas has said that there is good compatibility between
-> different versions so I wonder if that is really (still) an issue.
-
-Lustre have good compatibility, but not at all cases. It have tested =
-with +/-1 release only.
-I remember a several cases then it caused a probles with clients more =
-than one release old.
-As about Andreas, Andreas don=E2=80=99t work with client support for =
-long time so don=E2=80=99t know about all problems in this area.
-
->=20
-> Keeping different kernels up to date with new updates is something =
-that
-> the linux-stable team does all the time.  We do it at SUSE to.  It =
-isn't
-> that hard.
-> You identify which patches *need* to be backported (ideally when the
-> patch is created but that isn't always easy) and you use tools to help
-> you backport them.
-So Lustre developers needs control all stable kernels and think which =
-patch needs back ported and send it to Distro owner=20
-And for each LTS kernels on the kernel.org <http://kernel.org/>.. I =
-think it increase a work dramatically.
-
->=20
-> Certainly there is effort involved, but maintaining a package that =
-works
-> on a large set of kernels also involves effort.  It isn't clear to me
-> that it is *more* effort, just *different* effort.
->=20
-> NeilBrown
-
-Alex=
-
---Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/html;
-	charset=utf-8
-
-<html><head><meta http-equiv=3D"content-type" content=3D"text/html; =
-charset=3Dutf-8"></head><body style=3D"overflow-wrap: break-word; =
--webkit-nbsp-mode: space; line-break: after-white-space;"><br =
-id=3D"lineBreakAtBeginningOfMessage"><div><br><blockquote =
-type=3D"cite"><div>On 22 Jan 2025, at 23:54, NeilBrown =
-&lt;neilb@suse.de&gt; wrote:</div><br =
-class=3D"Apple-interchange-newline"><div><div>On Mon, 20 Jan 2025, =
-Alexey Lyahkov wrote:<br><blockquote type=3D"cite"><br><blockquote =
-type=3D"cite">On 19 Jan 2025, at 11:03, NeilBrown &lt;neilb@suse.de&gt; =
-wrote:<br><br>On Sun, 19 Jan 2025, Alexey Lyahkov wrote:<br><blockquote =
-type=3D"cite">Neil,<br><blockquote type=3D"cite"><br><br><blockquote =
-type=3D"cite"><br>It does not hep that there are what 3? 4? trees, not =
-"dual-tree" by any<br>stretch of imagination.<br><br>There's =
-DDN/whamcloud (that's really two trees), there's HPE, LLNL<br>keeps =
-their fork still I think (thought it's mostly backports?). There<br>are =
-likely others I am less exposed to.<br></blockquote><br>"dual-tree" =
-maybe isn't the best way of describing what was wrong with<br>the =
-previous approach. &nbsp;"upstream-first" is one way of describing how =
-it<br>should be run, though that needs to be in understood =
-correctly.<br><br>Patches should always flow upstream first, then flow =
-downstream into<br>distro. &nbsp;So I write a patch in my own devel =
-tree. &nbsp;I post it or submit a<br>pull request and eventually it is =
-accepted into the maintainers<br>"testing" tree (upsream from me). =
-&nbsp;There it gets more testing and moves<br>to the maintainers "next" =
-tree from which it is pulled into linux-next<br>for integration testing. =
-&nbsp;Then it goes upstream to Linus (possibly<br>through an =
-intermediary). &nbsp;=46rom Linus it goes to -stable and to =
-various<br>distros etc. &nbsp;Individual patches are selected for =
-further backporting to<br>all sorts of different LTS =
-tree.<br><br>Occasionally there are short-cuts. &nbsp;I might submit a =
-patch from my tree<br>to a SUSE kernel before it is accepted upstream, =
-or maybe even before it<br>is sent if it is urgent. &nbsp;But these are =
-not the norm.<br><br>But you know all this I expect. &nbsp;It isn't =
-about the total number of<br>trees. It is about the flow of patches =
-which must all flow through Linus.<br>And developers must develop =
-against current linus, or something very<br>close to that. =
-&nbsp;Developing against an older kernel is simply making more<br>work =
-for yourself.<br></blockquote><br>This will don=E2=80=99t work. Let =
-explain situation in past.<br></blockquote><br>No. &nbsp;I'm not at all =
-interested in explanations of why it won't work.<br><br>I'm only =
-interested in suggestions of how to make it work, and offers =
-of<br>help.<br><br></blockquote>If you have a good way how to solve such =
-situation, which had crazy brain in past.<br>Please share a way how to =
-avoid lustre source code fragmentation because of freeze a code at the =
-different stage in different distributions.<br>Ubuntu might have a =
-modern lustre with 6.5 kernel, but Redhat had frozen a lustre version in =
-3 releases in past and these clients not compatible each other.<br>And =
-not compatible with installed server.<br>So question - who will do such =
-support ? Did you have an ideas how to solve this =
-problem?<br><br></blockquote><br>sorry - I didn't mean to go quite on =
-you - I've been busy :-)<br><br>It's not entirely clear to me what the =
-problem is.<br>You talk about clients not being compatible with each =
-other or with the<br>server, but Andreas has said that there is good =
-compatibility between<br>different versions so I wonder if that is =
-really (still) an =
-issue.<br></div></div></blockquote><div><br></div><div>Lustre have good =
-compatibility, but not at all cases. It have tested with +/-1 release =
-only.</div><div>I remember a several cases then it caused a probles with =
-clients more than one release old.</div><div>As about Andreas, Andreas =
-don=E2=80=99t work with client support for long time so don=E2=80=99t =
-know about all problems in this area.</div><div><br></div><blockquote =
-type=3D"cite"><div><div><br>Keeping different kernels up to date with =
-new updates is something that<br>the linux-stable team does all the =
-time. &nbsp;We do it at SUSE to. &nbsp;It isn't<br>that hard.<br>You =
-identify which patches *need* to be backported (ideally when =
-the<br>patch is created but that isn't always easy) and you use tools to =
-help<br>you backport them.<br></div></div></blockquote><div>So Lustre =
-developers needs control all stable kernels and think which patch needs =
-back ported and send it to Distro owner&nbsp;</div><div>And for each LTS =
-kernels on the <a href=3D"http://kernel.org">kernel.org</a>.. I think it =
-increase a work dramatically.</div><div><br></div><blockquote =
-type=3D"cite"><div><div><br>Certainly there is effort involved, but =
-maintaining a package that works<br>on a large set of kernels also =
-involves effort. &nbsp;It isn't clear to me<br>that it is *more* effort, =
-just *different* =
-effort.<br><br>NeilBrown<br></div></div></blockquote></div><br><div>Alex</=
-div></body></html>=
-
---Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88--
-
---===============0153671108843781672==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============0153671108843781672==--
+Cgo+IDIwINGP0L3Qsi4gMjAyNeKAr9CzLiwg0LIgMDc6MzgsIERheSwgVGltb3RoeSA8dGltZGF5
+QGFtYXpvbi5jb20+INC90LDQv9C40YHQsNC7KNCwKToKPiAKPiAKPiAKPiDvu78+IE9uIDEvMTkv
+MjUsIDM6NDYgUE0sICJPbGVnIERyb2tpbiIgPGdyZWVuQHdoYW1jbG91ZC5jb20gPG1haWx0bzpn
+cmVlbkB3aGFtY2xvdWQuY29tPj4gd3JvdGU6Cj4+PiBPbiBTYXQsIDIwMjUtMDEtMTggYXQgMjE6
+NDYgKzAwMDAsIERheSwgVGltb3RoeSB3cm90ZToKPj4+IAo+Pj4gCj4+Pj4gT24gMS8xNy8yNSwg
+MTA6MTcgUE0sICJPbGVnIERyb2tpbiIKPj4+PiA8Z3JlZW5Ad2hhbWNsb3VkLmNvbSA8bWFpbHRv
+OmdyZWVuQHdoYW1jbG91ZC5jb20+IDxtYWlsdG86Z3JlZW5Ad2hhbWNsb3VkLmNvbSA8bWFpbHRv
+OmdyZWVuQHdoYW1jbG91ZC5jb20+Pj4gd3JvdGU6Cj4+Pj4+IE9uIFNhdCwgMjAyNS0wMS0xOCBh
+dCAxMTo0NSArMTEwMCwgTmVpbEJyb3duIHdyb3RlOgo+Pj4+PiBXZSBuZWVkIHRvIGRlbW9uc3Ry
+YXRlIGEgcHJvY2VzcyBmb3IsIGFuZCBjb21taXRtZW50IHRvLCBtb3ZpbmcKPj4+Pj4gYXdheQo+
+Pj4+PiBmcm9tIHRoZSBkdWFsLXRyZWUgbW9kZWwuIFdlIG5lZWQgcGF0Y2hlcyB0byB0aG9zZSBw
+YXJ0cyBvZgo+Pj4+PiBMdXN0cmUKPj4+Pj4gdGhhdCBhcmUgdXBzdHJlYW0gdG8gbGFuZCBpbiB1
+cHN0cmVhbSBmaXJzdCAobW9zdGx5KS4KPj4+PiAKPj4+PiAKPj4+PiBJIHRoaW5rIHRoaXMgaXMg
+bm90IHZlcnkgcmVhbGlzdGljLgo+Pj4+IExhcmdlIGNodW5rICgxMDAlPykgb2YgdXNlcnMgZG8g
+bm90IHJ1biBub3Qgb25seSB0aGUgbGF0ZXN0IGtlcm5lbAo+Pj4+IHJlbGVhc2UsIHRoZXkgZG9u
+J3QgcnVuIHRoZSBsYXRlc3QgTFRTIGVpdGhlci4KPj4+PiAKPj4+PiAKPj4+PiBXaGVuIHdlIHdl
+cmUgaW4gc3RhZ2luZyBsYXN0IHRoaXMgbWFuaWZlc3RlZCBpbiByYW5kb20gcGF0Y2hlcwo+Pj4+
+IGJlaW5nCj4+Pj4gbGFuZGVkIGFuZCBicmVha2luZyB0aGUgY2xpZW50IGNvbXBsZXRlbHkgYW5k
+IG5vYm9keSBub3RpY2luZyBmb3IKPj4+PiBtb250aHMuCj4+Pj4gCj4+Pj4gCj4+Pj4gT2YgY291
+cnNlIHNvbWUgYXV0b21hdGljIGluZnJhc3RydWN0dXJlIGNvdWxkIGJlIGJ1aWx0IHVwIHRvIG1h
+a2UKPj4+PiBpdAo+Pj4+IHNvbWV3aGF0IGJldHRlciwgYnV0IGl0IGRvZXMgbm90IHJlbW92ZSB0
+aGUgcHJvYmxlbSBvZiAibm9ib2R5Cj4+Pj4gd291bGQKPj4+PiBydW4gdGhpcyBtYWlubGluZSB0
+cmVlIiwgSSBhbSBhZnJhaWQuCj4+PiAKPj4+IEkgdGhpbmsgdGhlcmUncyBhIGRlY2VudCBjaHVu
+ayBvZiB1c2VycyBvbiBuZXdlciBrZXJuZWxzLiBVYnVudHUKPj4+IDIyLzI0IGlzCj4+PiBvbiAo
+YSBiaXQgcGFzdCBsYXRlc3QpIExUUyA2Ljgga2VybmVsIFsxXSwgQUwyMDIzIGlzIG9uIHByZXZp
+b3VzIExUUwo+Pj4gNi4xIFsyXSwgYW5kCj4+PiB3b3JraW5nIG9uIHVwY29taW5nIExUUyA2LjEy
+IFszXS4KPj4gCj4+IAo+PiBXZWxsLCBJIG1vc3RseSBtZWFuIGluIGNvbnRleHQgb2YgTHVzdHJl
+IGNsaWVudCB1c2UgYW5kIHN1cmUgdGhlcmUncwo+PiBzb21lIDYuOCBMVFMgaW4gdXNlIG9uIHRo
+b3NlIHVidW50dSBjbGllbnRzLCB0aG91Z2ggSSBjYW5ub3QgYXNzZXNzIHRoZQo+PiByZWFsIG51
+bWJlcnMsIG1ham9yaXR5IG9mIHJlcG9ydHMgSSBzZWUgYXJlIHN0aWxsIG9uIDUueCBldmVuIG9u
+Cj4+IFVidW50dS4KPiAKPiBZZWFoLCBJJ20gbm90IHN1cmUgb2YgdGhlIHJlYWwgbnVtYmVycy4g
+SXQncyBqdXN0IG15IHBlcnNvbmFsIGV4cGVyaWVuY2UKPiB0aGF0IG5ld2VyIGtlcm5lbHMgYXJl
+IGdldHRpbmcgYSBsb3Qgb2YgdHJhY3Rpb24uCgoKaHR0cHM6Ly93d3cuZW9mcy5ldS93cC1jb250
+ZW50L3VwbG9hZHMvMjAyNC8wMi8xLjEtY29tbXVuaXR5X3JlbGVhc2VfdXBkYXRlLnBkZgoKaHR0
+cHM6Ly93aWtpLm9wZW5zZnMub3JnL2ltYWdlcy8xLzFkL09wZW5TRlNfU3VydmV5X1Jlc3VsdHNf
+TWFyY2hfMjAyNC5wZGYKCkFuZCBzaW1pbGFyIHByZXNlbnRhdGlvbnMgZnJvbSBMQUQvTFVHLgoK
+CkFsZXgKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbHVz
+dHJlLWRldmVsIG1haWxpbmcgbGlzdApsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwpodHRw
+Oi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmcK
