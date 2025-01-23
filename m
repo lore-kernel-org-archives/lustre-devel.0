@@ -4,174 +4,71 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 3E537C02181
-	for <lustre-devel@archiver.kernel.org>; Wed, 22 Jan 2025 21:45:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 9E7BEC02182
+	for <lustre-devel@archiver.kernel.org>; Thu, 23 Jan 2025 04:51:59 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Ydd0Y0kZwz1xPn;
-	Wed, 22 Jan 2025 13:45:17 -0800 (PST)
-Received: from outbound-ip168a.ess.barracuda.com
- (outbound-ip168a.ess.barracuda.com [209.222.82.36])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YdpSh72lvz1xNr;
+	Wed, 22 Jan 2025 20:51:48 -0800 (PST)
+Received: from mail-wm1-f51.google.com (mail-wm1-f51.google.com
+ [209.85.128.51])
+ (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
+ key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Ydd0N02V3z1wPR
- for <lustre-devel@lists.lustre.org>; Wed, 22 Jan 2025 13:45:07 -0800 (PST)
-Received: from NAM10-MW2-obe.outbound.protection.outlook.com
- (mail-mw2nam10lp2049.outbound.protection.outlook.com [104.47.55.49]) by
- mx-outbound12-38.us-east-2a.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Wed, 22 Jan 2025 21:45:04 +0000
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=C32CWG1YFuvzom5zeNv8AaikMYDy5dYsaTz7iajxD7s2PbYYft9SkMU/c5fgKwf7QOkenkMmLrObCvanMaJNzl0IdrJv8uBMgS5MNd4xfBs7FIO+9VJNsGe/4JO1IUb/KVGETBty4ncDTlsKnwkRFem0EfPlHoTtMNmArDpE7c3PehwDI+ns0Z3JEhgoubeTWNIqwUyFZY32XqBK+8Sq0A0PEJzBVG+kspv9voluJNLJGx829ZBnf2cZKJ1K9CqkiLXvHRqjK4SvAa5behluy6LVEnHjnOnAwYvm/qVuv/rO4BQ+5em4LU/cMNhdMr2ZIYQttq8U4q/9Sp/9ChQZVA==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector10001;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=w+SDNVontm80nXy2AYx6B1EDjfPMQF9cSKt9ojk+fDw=;
- b=auaSpomN0kQltJixbrWPQjMPvLOKSM7De5kJlqk1rOrEsNMZgoBcZiJ2Z0x4QOI7E5se43Hlugy+ij56WUHSOU0SjKgKnWMZrx7VOtAlQxy7q81szWsy91m500fURd5ZksGdgN5SCrAKYFXbv0JU/b8XMChCkbh6WAqZxmbAZ9DB1VlVHQGHfU5gg3fh7PVhv2kM4d9AGpRg3DORot2YBOCFMpl055wtoKTxdv6x8zoHUPHIyoZMwdYmTvydP2vBvm16DjJk0IJeu1F/ckiT2GcYjMJKsiqAN0WfcdtJO7jxQSMzoMvgtAVyC3OOXETMt5+YeR8EwOJ1Hh0/r1JQ5A==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=w+SDNVontm80nXy2AYx6B1EDjfPMQF9cSKt9ojk+fDw=;
- b=r3GdQoZ1zPgnQlXDOrAaQB/JQkQCkVjyNlRLCIA78qZRoV85k7YNO0lLTBX/fOnN0y4sXDQYn2dTWv0R0OmKcuxtHTDYJC7dPPTXfgbG9Qomm9Z0mcq7JymFKPmE4rxnX9p6z0BQdVN293UI9IAMQ2y4tiOUg1GE+L3qOQCb38c=
-Received: from SN7PR19MB6567.namprd19.prod.outlook.com (2603:10b6:806:26d::11)
- by MN2PR19MB4078.namprd19.prod.outlook.com (2603:10b6:208:1e4::8)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8377.17; Wed, 22 Jan
- 2025 21:44:57 +0000
-Received: from SN7PR19MB6567.namprd19.prod.outlook.com
- ([fe80::db50:586b:7dda:cf04]) by SN7PR19MB6567.namprd19.prod.outlook.com
- ([fe80::db50:586b:7dda:cf04%6]) with mapi id 15.20.8356.017; Wed, 22 Jan 2025
- 21:44:57 +0000
-From: Oleg Drokin <green@whamcloud.com>
-To: "neilb@suse.de" <neilb@suse.de>, "alexey.lyashkov@gmail.com"
- <alexey.lyashkov@gmail.com>
-CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
- upstreaming
-Thread-Index: AQHbaF06daQEbe3e/kelMir67rT0hbMbs8GAgAAqWwCAAUdfgIAAgwkAgAAYFICAAIirAIAFBZWAgAAOLgA=
-Date: Wed, 22 Jan 2025 21:44:57 +0000
-Message-ID: <9a6b4df4e23db0255e0854c1c16bef89d9c35b02.camel@whamcloud.com>
-References: <>, <7459DF85-7A0F-4DC8-9EC3-CA6F3C86234E@gmail.com>
- <173757925141.22054.738723965751021240@noble.neil.brown.name>
+ 4YdpSH6Srwz1whs
+ for <lustre-devel@lists.lustre.org>; Wed, 22 Jan 2025 20:51:27 -0800 (PST)
+Received: by mail-wm1-f51.google.com with SMTP id
+ 5b1f17b1804b1-436ce2ab251so2764875e9.1
+ for <lustre-devel@lists.lustre.org>; Wed, 22 Jan 2025 20:51:27 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=gmail.com; s=20230601; t=1737607879; x=1738212679; darn=lists.lustre.org;
+ h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
+ :from:from:to:cc:subject:date:message-id:reply-to;
+ bh=YSvYdpJD8OwV4zsqBCyhzH6BVVd0Ri4YXrMfnZRJT4s=;
+ b=f/QC69QUqR0mEFlaGueedR2eVAFrb0U1An1VhjmnzB3YiWh9V7BTS+ZZjxQ4Slcnkp
+ jVwOtGIviAlnZYab5w/yjsRXmIDXlHoVgx2/wVinpl1Tbgv2HZzT9LVqdy4qsedGgGpX
+ LDs6aOkImja7v0B8AyxnF2r+p+Wgu940p6YWHB+byvcRUYfZP2ber3btLR1Ve2MngH0N
+ Nt1OUcIDQSmQ2lv3LD7WJp1iYIiOH7+eSZB9L4TRMamSWYSlpSWgPg0szkVM+JqkeP76
+ IWnqQR2rL4f9PzpC0An6uyxl8MuEfXA3zbQ8tTlfm0M3TZUm+Ahs+GsGBvkVL2Tm/sDA
+ IAaw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20230601; t=1737607879; x=1738212679;
+ h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
+ :from:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
+ bh=YSvYdpJD8OwV4zsqBCyhzH6BVVd0Ri4YXrMfnZRJT4s=;
+ b=psW74Dq+4ug28ZDPQiW7zWld0YBE8RxdpJkQaC2pZwk9EyYKLVBIxmyyGjA+sAYx6v
+ Zrgss9dEwsCm3kgP5oG5d2jOclNgAlua/nrODbiZwcIP2qf6AtePCKn9P4EadQ3wJlbS
+ T9B82XHrSZ+VZWG+m3HylyCnSYHKePH0EyP/z9QIUP7FkdrYrWEZCvdZw2nd0l59LihQ
+ XBmGnryspunExHK50aIGTxlkrJXPGj9fUnF44gHk06zl9HVlyKHsG0lCybluvdXCbwOD
+ vzrSW6du+nXeVkXi2Jr0dINnANMS20ESVyQKWc2M8zqVoVup4fQL6HoYVsIKJAz4UKWP
+ IwOA==
+X-Forwarded-Encrypted: i=1;
+ AJvYcCUROEkVrTIpMFpawQgsrvEgh6DH+HCUYN606dpNx6uXD4rUtjxQp3OkuDrdbhgOB74kUXNbyZ7w7QIF1PU=@lists.lustre.org
+X-Gm-Message-State: AOJu0Yz2kbAlvAsm61uBjZH+Mj2F/gr9B1KkSfQyuvb1Wsbgb09s3PCM
+ rE/96iYA39XOzT+/ll7gnYQ5kYsHsGg77XUppP/jEHkFhx7lJglr
+X-Gm-Gg: ASbGncvjS4z4nJaVnTIuhCpptTqa1FSZws9OhHmRzGH2NfuIc/Kw4oHF2aFaH+LqM4Q
+ sl2+Muqn2w7G8d64To1rBd0b6SUu4FkUJIqZCqRHf8SaBfVCX6iE14nc0uIWX9+ad4tmMPqsyPi
+ pAaXhvjwVsVzEEHzMNsMJYaAFOhzhbcLgbO/D9I/R7jkOpvlmR1EUX5nsiofP0Kmzt8So2Q9Y+k
+ yx31CdkalBjV5JAaNazEa84/3Ri9QSSCKSeJkKX7hvH16yx8S+kWVHXX1wC2HYJx2xOJKRgNScN
+ IBZnV0gd6rJcmdE+Z+TtQBwBowJW2TlLkIiJNx+sB7uQ1co8QcOuY7obE6AZzA==
+X-Google-Smtp-Source: AGHT+IHNqHaS8Bhjk1v/IHeVXWpLrjFZYfhowRi1Q+UvvF3/Bf1iChT1RETE/Ph0JqnYE85ggmzxrA==
+X-Received: by 2002:a7b:c00f:0:b0:434:f5c0:32b1 with SMTP id
+ 5b1f17b1804b1-4389eecb1f5mr208221435e9.15.1737607879304; 
+ Wed, 22 Jan 2025 20:51:19 -0800 (PST)
+Received: from smtpclient.apple (vps-b708d385.vps.ovh.net. [57.129.16.80])
+ by smtp.gmail.com with ESMTPSA id
+ 5b1f17b1804b1-438b31b78aasm47457855e9.29.2025.01.22.20.51.16
+ (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 22 Jan 2025 20:51:18 -0800 (PST)
+From: Alexey Lyahkov <alexey.lyashkov@gmail.com>
+Message-Id: <339AF895-36E5-4FAF-B1E1-E69B2AB130EF@gmail.com>
+Mime-Version: 1.0 (Mac OS X Mail 16.0 \(3776.700.51.11.1\))
+Date: Thu, 23 Jan 2025 07:51:04 +0300
 In-Reply-To: <173757925141.22054.738723965751021240@noble.neil.brown.name>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: SN7PR19MB6567:EE_|MN2PR19MB4078:EE_
-x-ms-office365-filtering-correlation-id: 1c25adea-60db-46ee-decd-08dd3b2e03a9
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0; ARA:13230040|366016|1800799024|376014|38070700018;
-x-microsoft-antispam-message-info: =?utf-8?B?aVRmS3lTRVgwU1BiOGJmMTlidDRlZlNMalVqcHQ0N21jejJFb1JRT01mVlJF?=
- =?utf-8?B?R0wvRE0zVTRQQmw0RkJtK2VmaGV4dGZwU1J6ZE54dnNIZnVvWGVodHZqVUk4?=
- =?utf-8?B?cHJUU05OYW9hU2YxM2JqZlpKUmxXcEd5S0NpZmNNSDB4MmZJak85RmNkalpH?=
- =?utf-8?B?Rjl1NU9IMzVTdzFRYXJqTHE3M00rU25neW1WRXNnbVhsUFVMcHJiNXY2TWs1?=
- =?utf-8?B?UWZRd0lkcjFGQUtKMVYwYVBhSFp0S0wzUWp6UFdvY1RNTFVzQmh6MEQ4WWJa?=
- =?utf-8?B?Zi8ySzFzRGIzelJBOVdvMWZpaVZkeGhhK3BoaUQvWVd3RVRwZlZQcW5RMW8z?=
- =?utf-8?B?eVZ2UlgxSmZ1NjBheWdWMjlCdnAzYWI3Z0pTVlYrUDlleVBNZjQwMnFPc3J4?=
- =?utf-8?B?YmdhcDlBUkljeXdGNWtFYWRzQTRlbVJrV25RSW1qR0t5UjVGZy9NbTJXMDNn?=
- =?utf-8?B?S2ZtSWpZQWlESDc2Nys0dGNTbnZOWU1uaE9xUmlnZVpqUUJIQzFhUWhIV2tP?=
- =?utf-8?B?dFI1alVQenhobXpsQ2ZiTDF2Y0FWUHNpRGo0dHI1VDJXcHROc0pGMlpVcCtD?=
- =?utf-8?B?RXRjd2lHc09FOFJEa2lWaitLaFBGVEsyOStCR01FeVlZZkJOWkRrOFVNd1hM?=
- =?utf-8?B?Y3BKeUFBbkRJL2k5STdhL3FDV0hnYUtkdDc5RXBSMEhTUGdINkttM0g1d0tI?=
- =?utf-8?B?TDI4MUpISDJ2RVZETDdKUmlZMk9MWGhkUlpKaGkxMGlBdTRTdkRualJYS2Iz?=
- =?utf-8?B?WmZXRCtjV0hpTFd0MXBhTG9pTDN2Y0NKTFVCNEovRE51OUJGb1VLQnlKQWZl?=
- =?utf-8?B?OW9XY2dLNW9uc0tSR2pQZERrYzRNUFVLZTRVbG9FVy9jRjhGcFZOamY5cXNF?=
- =?utf-8?B?Vm5USHhqMnhmQVM3QkNpaGtmWWdhbWhKdnR3dGRhNjlKa1V4K2I4MUNaNUNV?=
- =?utf-8?B?Q0RWT1hLQ3YwS3JmR01HUWVOaTNoaSs2b1ZXbk9pSXBZNmNENitYT2hyZVVm?=
- =?utf-8?B?cGwwd1pwK3FjNkFKS1Q2R0p2ak93cytPNUgvUnNqRkg1aHhQa1VCTWFQb05G?=
- =?utf-8?B?d0pPd3R2VFBmSWFaQUFTZUphcTQwYjRWcTRMeXcwMGZhakROZWt4VEVJS0Jh?=
- =?utf-8?B?T3htcm0zdEoyOEQ0ZU5BMG5nTm1wdU85OUZuWTBPamJYYTJLYzMyOXBqMHYx?=
- =?utf-8?B?RFp6REFhMzNZaXM0NndrNXhCeUF5NHhJZlFyM08wRWp3eDFaWFUzbTFBK3BU?=
- =?utf-8?B?bGpjNXlRNjU4Y1REU1hVRmRjNXUyTWNHSTRGRk1tRXRucWE0WFZJVndHclZX?=
- =?utf-8?B?aHYrTStzaDRkWDRjQUdaNnJ0YU16RFcrZ1hFemQ1clAvMzRjNFlkRFpGVlhD?=
- =?utf-8?B?dVRncUlYQkJKOVpBYmYvVCtyb29VVjUraTZZT0RNRGhGVEI4WS9xSTVtTEUr?=
- =?utf-8?B?OFVqM3g1TjhGS3FUcllvVHk2OHQ2eWJJS3cxeHdhQUZQZ1k3ZnEwcFZwQVd1?=
- =?utf-8?B?TDhySlM3UzJtai9ud3RHenNoVDFIUncxVHF1TDUxUU5KY2tHUnNQbG9VRDVG?=
- =?utf-8?B?aDQzNWhjUHVRdzJCem5xUWFYbTdVMGVqbStoUGwwbVVyQ0RwUUlMU2tQRWZy?=
- =?utf-8?B?cUJtbDRVQWdYcHhraE1GdkZSZk9vVzZpRGxpZEE4OHBncWxVU1RoL3AxUnNN?=
- =?utf-8?B?bjJRRU0yZkpxYlNaVzJGdUNUMC9XQ2tERWhjSFgrZVhIakNSbEpKdzJnQ0Z1?=
- =?utf-8?B?Mm1BaFVtRW9zaHdIZW9TYXpNYjI5RDRlRGtERkNOVVJvTXRlVU9UQkpzQ3JK?=
- =?utf-8?B?ZkliTlltUmVrdXBhN3NXNWhqaUFpeWR5d09qbWl5THh4QWllaitpQ0Q4KzJN?=
- =?utf-8?B?a1dsd0hUbjVRSTY0R2xGTFJ4cUVucC9UL0FTaXlXNWNCWkNXc0IyR0J2RVRS?=
- =?utf-8?Q?z+fQ1/OQwEJMe8OsVCUpaH1aS3RDG+Ns?=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:SN7PR19MB6567.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(366016)(1800799024)(376014)(38070700018); DIR:OUT; SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?cFkxZnNHdkJmalovMWJsbkFaQm9vU3FoQW9DcTRSanBXYlkwajZhUFp5amIw?=
- =?utf-8?B?eWwraDRUTzdENVJWbjJKWSt5SGJQWGI5amFjdlFMUW4wMlBmRG9sZWxvWjVX?=
- =?utf-8?B?SmtsUHBpMC8zMWhXb2xDSHhnUTR4LzQrQ0J6S3hDd2VHUEhvUTNnWEpHbGJw?=
- =?utf-8?B?RHBFUzQ3YllEMTJDMlhVcDdZUXJRd3JOaGU5SnRvd2tINE8xQUVqeHB3OG1F?=
- =?utf-8?B?dlZLemJsc0FDbmNWOHUyWWltU0NRaklGMVNYSkNrUkhYYUs0M0VFbnBtcDlk?=
- =?utf-8?B?cmdmRWthMzVCQUFRcHdMS0t2M2hhOWJ3SUJ5R3ZBWUFpOVRhSHA1K3BJM3hF?=
- =?utf-8?B?K05uWHg1QWdPRWIzekdzSEhnWFlJVGhMclVKK2dYWU83TjVGQUczWjgrRndq?=
- =?utf-8?B?OXVkb1ZVamtoMjBUMDg5NDJMT1dnMG0vZDJqcHV4d3NPMnBXQXprTDNYaFc1?=
- =?utf-8?B?Z1k3UVJTR1JmNm5vRHJ1TEZWMHlvQXBOZk85NHBVSzhTNERuNU5JYWpjQXJq?=
- =?utf-8?B?SVJYVEtVTzFZZGljZW53SkZrSkJXYVNPSURoWFpVU2craXM5YzZkN1htOGFp?=
- =?utf-8?B?dS95MWxTak85TmUrMDNTb0RuaGk2aUN5cmlXSWdiSUpDZFZ5NVBuWUE0NS95?=
- =?utf-8?B?ZEYvWEZUcURReUdzZXNMano1d3JMN2pmZ1RmTVRFVThhZ2ZacDh2NSs2MkR3?=
- =?utf-8?B?STlXTm5HVDROempkTTNTUXFSK1FNa05zZjVNYzdUQ2dkZUM1UUwzbHFHbHNz?=
- =?utf-8?B?M0VHME9UREZRTG5WdktMdkp1YmZNZ25yME13eUd1QTRKc1UrYm5GNHpFOVVS?=
- =?utf-8?B?NTNJUXk0ek9mTXNGQlFZYyt1aDVYNVpKTjlTbEN1NEtibFEvZ0F3VTM4TzFt?=
- =?utf-8?B?UTg0ZVpMa011UzM3L1JoNjJvcUxMN0NqY0gyRWZqd2o4Um1qV0NWMms0SUVN?=
- =?utf-8?B?U2JVVWhkdjdaMlNIUk5saFozMmpMbXBqbjNoOWZ2N1BHcmNlSUpHMkk4WHZq?=
- =?utf-8?B?ZXRRRFFpSXFKTnJWdHB1dEErRzJHZm9mSU9wV01MOUd6dEkrSHdXbkY4cjdl?=
- =?utf-8?B?c3ZJVW45aWhtcDQwSXB1UzMvYnAxTWRLclJJWk1COEptdnpWQVMveDV6ZjFL?=
- =?utf-8?B?b0toTGNUd3BDeVE2cTZucFUzVEpEbVZtRDBML0RJNml0NmlGdmV3UWU5TUdH?=
- =?utf-8?B?QU5yZmpIZlZodVU1VllYWnlMWVJqQ0xZVnRINDlDVWhyYnduWUF6K2dSeFRT?=
- =?utf-8?B?TzZPbGVpYUFSWUFBK2k0a2FOWEN0QjJ5NDIwd0lrMjZQbjM0YklnMWxNbDRn?=
- =?utf-8?B?SjNXY3lkZDVSWW5OVnlrT2kyRllvTUhERURoUXdPYm9XeHR1aENmZEJScy9B?=
- =?utf-8?B?WWhFVEs5LytOaGpUa3E5TzEveHo0aHIvOW9iTTVTYW4xdkJaWmtuamFuanoy?=
- =?utf-8?B?QVZCNWhDc0lMbnkzZk42U2lIcFZBOGhuVHVSSmJqTGJieUhpc0xlbWx0SEVw?=
- =?utf-8?B?SjFmV3BQM1MzNWlsRXVVbTVqQmJRcHdacUExU3JrK21EaW01NDE1aFZBcDQ5?=
- =?utf-8?B?QmNnSklMbW5FbUpuOThKV1lYRkQ0a083OFQ5ajJPc3daV2dOQmJ5QXpNamsz?=
- =?utf-8?B?bDZ6ZlFsZklRKzhPdVJYZXpZM3pkWmNCWnNMRFpXdEoxdGs1WW1PYXZ1dXgw?=
- =?utf-8?B?Yy9MSmpRUFl3dnVhUHJLVmVVUUgyYkgzOGVaM2ZqcEQ4WGRRZk9yblk1SmhF?=
- =?utf-8?B?RC9KODFNVmlycDhNWDZFRGFBME52RWhpaDJ0TVgvb09XZU14RktYMVJFSitK?=
- =?utf-8?B?YU1KUndYNVZIN0JhSzhteXcva3BmOTB1WWlHQm5pUDRPUk9XSWJPUkRya2NH?=
- =?utf-8?B?T2JwVmRiTUVQWjRFQXFMcnB0WGZRM2RMYTZkSzh6dldWK0R4dlNrY0tVQnlG?=
- =?utf-8?B?VXlob3VNZWNEQnlWc05LNU5UM3FlUzR5NFRlbVVFRkMyNFpuRG5tVGFacjBq?=
- =?utf-8?B?ME5URVFIUXRzMndKclhLWFVSalNNeTVIOVVmcmwxTXZHeDE5L0swaTFZUGJr?=
- =?utf-8?B?Vmk5M3BZaGJ3L2xxTGF5Wi9KUzdEcTRTdWJiQlBiWDM3Z1ZsemgzVmNmSVlv?=
- =?utf-8?Q?5e4ZiUZ0LwGDCKR2PGxE3jzRU?=
-Content-ID: <92493145FD3C424E94DCCBBCE073F7CF@namprd19.prod.outlook.com>
-MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: T+eQdrzYXxFUsW83kioRqFYmqsSQmwuNLV5sSWQTbG95wefkwvaZkZwH39yMg52t/uKBHySSCsoCqGFAtzcXnJpmjKbENFiPpRc/9RzpDjbeH3vXNOKjVc6zXykL6s8aJgTjVYBfMRMZ0HgnAGRoLwDLJeT1w201dzxUM87zD+sJrKZ7vBs1m7XJGY2+IhkZ++bBzqKHOnWfj2q8GzMUzf4r13LsRnZA/ea0w10HmqXu+CqUdJJvIbCdtZrnt5V437ynqL4U6GGah+6rp1c6JqUz3nQX/J5vEGA/gZz/4pxmrIlFa1DewT895m13g15Bp+8bF/ijUJ3/FSKehoelRCUBut0Ls/XyaYyn6qWpjwI/vitacmPMamr25NHhhzJ2zMWzqnKhe45Qgbwe4wThC+PIJas2wDUmddcXEIKkQAebhUCMCYoDrOpEJ265yBZvz0GdfZ517hiGdaPLFmizCCGsKGz1WUyHU7BvGSb9OSThD4mqJpe3DhdYu6Sk875A/4X9KEhjbTAp93NHolbZHMGXzBSbPpYgDPkLOPMXiWQnyYLL8/hOHEmH7ciRCGkj5BSJvHMGXeuMt4bVQTeZ/ZdPm3REGgKOGPQ0sO6mt+SYfPMRnad9kp9plg5nxVEAH0eqX/7dzw3IBqEaa535V3wqUVqNcV5OdayDP6EV87A=
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: SN7PR19MB6567.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 1c25adea-60db-46ee-decd-08dd3b2e03a9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2025 21:44:57.2387 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: eDN2v6BA8V1PRyGGUtPngED4qeZyI+c+BQWWdJeWIGJYF9k6HFTJMrGibJBocz2B
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MN2PR19MB4078
-X-BESS-ID: 1737582304-103110-11446-7649-1
-X-BESS-VER: 2019.1_20250122.1822
-X-BESS-Apparent-Source-IP: 104.47.55.49
-X-BESS-Parts: H4sIAAAAAAACA4uuVkqtKFGyUioBkjpK+cVKVkbGlhZAVgZQ0Dg1zdQsOdnA1C
- IpydIkMTExKdHCyMLczNzCwtTQ2DhNqTYWALlaCqtBAAAA
-X-BESS-Outbound-Spam-Score: 0.00
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.261985 [from 
- cloudscan12-61.us-east-2a.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
+To: NeilBrown <neilb@suse.de>
+References: <7459DF85-7A0F-4DC8-9EC3-CA6F3C86234E@gmail.com>
+ <173757925141.22054.738723965751021240@noble.neil.brown.name>
+X-Mailer: Apple Mail (2.3776.700.51.11.1)
 Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
  upstreaming
 X-BeenThere: lustre-devel@lists.lustre.org
@@ -186,54 +83,237 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============0153671108843781672=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-T24gVGh1LCAyMDI1LTAxLTIzIGF0IDA3OjU0ICsxMTAwLCBOZWlsQnJvd24gd3JvdGU6DQoNCj4g
-SXQncyBub3QgZW50aXJlbHkgY2xlYXIgdG8gbWUgd2hhdCB0aGUgcHJvYmxlbSBpcy4NCj4gWW91
-IHRhbGsgYWJvdXQgY2xpZW50cyBub3QgYmVpbmcgY29tcGF0aWJsZSB3aXRoIGVhY2ggb3RoZXIg
-b3Igd2l0aA0KPiB0aGUNCj4gc2VydmVyLCBidXQgQW5kcmVhcyBoYXMgc2FpZCB0aGF0IHRoZXJl
-IGlzIGdvb2QgY29tcGF0aWJpbGl0eSBiZXR3ZWVuDQo+IGRpZmZlcmVudCB2ZXJzaW9ucyBzbyBJ
-IHdvbmRlciBpZiB0aGF0IGlzIHJlYWxseSAoc3RpbGwpIGFuIGlzc3VlLg0KDQpQcm9ibGVtcyBh
-cmUgbXVsdGlmYWNldGVkLg0KT25lIGlzIHRoYXQgeWVzIHdlIGhhdmUgYWxsIHNvcnRzIG9mIGNv
-bXBhdGliaWxpdHkgaW4gdGhlIHByb3RvY29sLCBidXQNCmFzIHlvdSBwb2ludGVkIG91dCBlbHNl
-d2hlcmUsIHRoZXJlJ3Mgbm8gZm9ybWFsIHByb3RvY29sIGRlZmluaXRpb24sIHNvDQppdCdzIGp1
-c3QgIndoYXRldmVyIHRoZSBjb2RlIGRvZXMiIHdoaWNoIGRvZXMgZGlmZmVyIGZyb20gdmVyc2lv
-biB0bw0KdmVyc2lvbiBhdCB0aW1lcyBhbmQgd2UgZG8gaGF2ZSBvY2Nhc2lvbmFsIGludGVyb3Ag
-aXNzdWVzLiBXZSB0ZW5kIHRvDQpjYXRjaCB0aG9zZSBpbiB0ZXN0aW5nIChzb21ldGltZXMgbGF0
-ZSwgYW5kIHNvbWV0aW1lcyBwYXRjaCBpcyBjbGllbnQNCnNpZGUgdG9vKSwgYnV0IHRoZSBvYnZp
-b3VzIGxpbWl0YXRpb24gaGVyZSBpcyB3ZSBvbmx5IHNlZSBpdCB3aGVyZSB3ZQ0KdGVzdHMgYW5k
-IHRoZSBvZmZpY2lhbCBndWFyYW50ZWUgaXMgYSBwcmV0dHkgbmFycm93IHdpbmRvdywgYW5kIHdl
-DQpjYW5ub3QgaGF2ZSBhbiB1bmxpbWl0ZWQgdGVzdCBtYXRyaXggZXhwbG9zaW9uIHRvIHRlc3Qg
-YWdhaW5zdCBldmVyeQ0KbWFpbmxpbmUga2VybmVsIGdvaW5nIGJhY2sgNyBvciB3aGF0ZXZlciB5
-ZWFycy4NCiANClRoZW4gdGhlcmUgYXJlIGFsbCB0aGUgZmVhdHVyZXMgcGVvcGxlIHdhbnQgYW5k
-IHN0dWZmLCBhbmQgaGF2aW5nIGFuDQpvdXRkYXRlZCBpbiB0cmVlIGNsaWVudCBpbnRlcmZlcmVz
-IHdpdGggYW4gdXAgdG8gZGF0ZSBvdXQgb2YgdHJlZQ0KY2xpZW50IGJ1aWxkaW5nLiBBbmQgY3Jl
-YXRpbmcgcGF0Y2hlcyB0byByYW5kb20gb2xkIGtlcm5lbHMgdG8gYnJpbmcNCnRoZW0gdXAgdG8g
-ZGF0ZSBpcyBub3QgdmVyeSBleGNpdGluZywgYW5kIG9mIGNvdXJzZSB0aGVyZSdzIHRoZSBleHRy
-YQ0KZnVuIG9mIHRoZW4gZ2V0dGluZyBkaXN0cm8gcGVvcGxlIHRvIGV2ZW4gYWNjZXB0IHRob3Nl
-IHBhdGNoZXMuDQoNCj4gS2VlcGluZyBkaWZmZXJlbnQga2VybmVscyB1cCB0byBkYXRlIHdpdGgg
-bmV3IHVwZGF0ZXMgaXMgc29tZXRoaW5nDQo+IHRoYXQNCj4gdGhlIGxpbnV4LXN0YWJsZSB0ZWFt
-IGRvZXMgYWxsIHRoZSB0aW1lLsKgIFdlIGRvIGl0IGF0IFNVU0UgdG8uwqAgSXQNCj4gaXNuJ3QN
-Cj4gdGhhdCBoYXJkLg0KPiBZb3UgaWRlbnRpZnkgd2hpY2ggcGF0Y2hlcyAqbmVlZCogdG8gYmUg
-YmFja3BvcnRlZCAoaWRlYWxseSB3aGVuIHRoZQ0KPiBwYXRjaCBpcyBjcmVhdGVkIGJ1dCB0aGF0
-IGlzbid0IGFsd2F5cyBlYXN5KSBhbmQgeW91IHVzZSB0b29scyB0bw0KPiBoZWxwDQo+IHlvdSBi
-YWNrcG9ydCB0aGVtLg0KDQpUaGlzIHByb2JhYmx5IG1ha2VzIGJhY2twb3J0aW5nIGZlYXR1cmVz
-IG5vdCB2ZXJ5IGNvbnZlbmllbnQgKGFuZA0KZGlzdHJvIHBlb3BsZSB3b3VsZCBwdXNoIGJhY2sg
-d2l0aCAib2ggbm8sIHN0YWJpbGl0eS9idWcgZml4ZXMgb25seQ0KcGxlYXNlISINCih0aGVyZSBh
-cmUgYmVuZWZpdHMgdG9vIG9mIGNvdXJzZSwgb25jZSB5b3UgbWFuYWdlIHRvIHB1c2ggc29tZXRo
-aW5nDQp0aHJvdWdoIHRvIHRoZSBkaXN0cm8gcGVvcGxlLCBwZW9wbGUgYXJlIG9mdGVuIG11Y2gg
-YmV0dGVyIGF0IGZvbGxvd2luZw0KdGhlIGRpc3RybyBrZXJuZWwgdXBkYXRlcykNCg0KPiBDZXJ0
-YWlubHkgdGhlcmUgaXMgZWZmb3J0IGludm9sdmVkLCBidXQgbWFpbnRhaW5pbmcgYSBwYWNrYWdl
-IHRoYXQNCj4gd29ya3MNCj4gb24gYSBsYXJnZSBzZXQgb2Yga2VybmVscyBhbHNvIGludm9sdmVz
-IGVmZm9ydC7CoCBJdCBpc24ndCBjbGVhciB0byBtZQ0KPiB0aGF0IGl0IGlzICptb3JlKiBlZmZv
-cnQsIGp1c3QgKmRpZmZlcmVudCogZWZmb3J0Lg0KDQp5ZXMuDQpBbHNvICJ3b3JrcyIgaXMgc3Vj
-aCBhIG5lYnVsb3VzIHdvcmQgaW4gdGhpcyBjb250ZXh0IGFzIEkganVzdCBnb3QNCnJoZWw4LjEw
-IGFuZCByaGVsOS41IHdpdGggYWxsIHNvcnRzIG9mIGV4dHJhIGRlYnVnIG5vdCBub3JtYWxseSBl
-bmFibGVkDQpieSBkaXN0cm8gcGVvcGxlIGludG8gbXkgdGVzdCByaWdzIGFuZCBmaXJld29ya3Mg
-ZW5zdWVkIChkaWZmZXJlbnQgb25lcw0KZm9yIHRob3NlIGRpZmZlcmVudCB2ZXJzaW9ucykuDQpf
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsdXN0cmUtZGV2
-ZWwgbWFpbGluZyBsaXN0Cmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnCmh0dHA6Ly9saXN0
-cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZwo=
+
+--===============0153671108843781672==
+Content-Type: multipart/alternative;
+	boundary="Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88"
+
+
+--Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain;
+	charset=utf-8
+
+
+
+> On 22 Jan 2025, at 23:54, NeilBrown <neilb@suse.de> wrote:
+>=20
+> On Mon, 20 Jan 2025, Alexey Lyahkov wrote:
+>>=20
+>>> On 19 Jan 2025, at 11:03, NeilBrown <neilb@suse.de> wrote:
+>>>=20
+>>> On Sun, 19 Jan 2025, Alexey Lyahkov wrote:
+>>>> Neil,
+>>>>>=20
+>>>>>=20
+>>>>>>=20
+>>>>>> It does not hep that there are what 3? 4? trees, not "dual-tree" =
+by any
+>>>>>> stretch of imagination.
+>>>>>>=20
+>>>>>> There's DDN/whamcloud (that's really two trees), there's HPE, =
+LLNL
+>>>>>> keeps their fork still I think (thought it's mostly backports?). =
+There
+>>>>>> are likely others I am less exposed to.
+>>>>>=20
+>>>>> "dual-tree" maybe isn't the best way of describing what was wrong =
+with
+>>>>> the previous approach.  "upstream-first" is one way of describing =
+how it
+>>>>> should be run, though that needs to be in understood correctly.
+>>>>>=20
+>>>>> Patches should always flow upstream first, then flow downstream =
+into
+>>>>> distro.  So I write a patch in my own devel tree.  I post it or =
+submit a
+>>>>> pull request and eventually it is accepted into the maintainers
+>>>>> "testing" tree (upsream from me).  There it gets more testing and =
+moves
+>>>>> to the maintainers "next" tree from which it is pulled into =
+linux-next
+>>>>> for integration testing.  Then it goes upstream to Linus (possibly
+>>>>> through an intermediary).  =46rom Linus it goes to -stable and to =
+various
+>>>>> distros etc.  Individual patches are selected for further =
+backporting to
+>>>>> all sorts of different LTS tree.
+>>>>>=20
+>>>>> Occasionally there are short-cuts.  I might submit a patch from my =
+tree
+>>>>> to a SUSE kernel before it is accepted upstream, or maybe even =
+before it
+>>>>> is sent if it is urgent.  But these are not the norm.
+>>>>>=20
+>>>>> But you know all this I expect.  It isn't about the total number =
+of
+>>>>> trees. It is about the flow of patches which must all flow through =
+Linus.
+>>>>> And developers must develop against current linus, or something =
+very
+>>>>> close to that.  Developing against an older kernel is simply =
+making more
+>>>>> work for yourself.
+>>>>=20
+>>>> This will don=E2=80=99t work. Let explain situation in past.
+>>>=20
+>>> No.  I'm not at all interested in explanations of why it won't work.
+>>>=20
+>>> I'm only interested in suggestions of how to make it work, and =
+offers of
+>>> help.
+>>>=20
+>> If you have a good way how to solve such situation, which had crazy =
+brain in past.
+>> Please share a way how to avoid lustre source code fragmentation =
+because of freeze a code at the different stage in different =
+distributions.
+>> Ubuntu might have a modern lustre with 6.5 kernel, but Redhat had =
+frozen a lustre version in 3 releases in past and these clients not =
+compatible each other.
+>> And not compatible with installed server.
+>> So question - who will do such support ? Did you have an ideas how to =
+solve this problem?
+>>=20
+>=20
+> sorry - I didn't mean to go quite on you - I've been busy :-)
+>=20
+> It's not entirely clear to me what the problem is.
+> You talk about clients not being compatible with each other or with =
+the
+> server, but Andreas has said that there is good compatibility between
+> different versions so I wonder if that is really (still) an issue.
+
+Lustre have good compatibility, but not at all cases. It have tested =
+with +/-1 release only.
+I remember a several cases then it caused a probles with clients more =
+than one release old.
+As about Andreas, Andreas don=E2=80=99t work with client support for =
+long time so don=E2=80=99t know about all problems in this area.
+
+>=20
+> Keeping different kernels up to date with new updates is something =
+that
+> the linux-stable team does all the time.  We do it at SUSE to.  It =
+isn't
+> that hard.
+> You identify which patches *need* to be backported (ideally when the
+> patch is created but that isn't always easy) and you use tools to help
+> you backport them.
+So Lustre developers needs control all stable kernels and think which =
+patch needs back ported and send it to Distro owner=20
+And for each LTS kernels on the kernel.org <http://kernel.org/>.. I =
+think it increase a work dramatically.
+
+>=20
+> Certainly there is effort involved, but maintaining a package that =
+works
+> on a large set of kernels also involves effort.  It isn't clear to me
+> that it is *more* effort, just *different* effort.
+>=20
+> NeilBrown
+
+Alex=
+
+--Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html;
+	charset=utf-8
+
+<html><head><meta http-equiv=3D"content-type" content=3D"text/html; =
+charset=3Dutf-8"></head><body style=3D"overflow-wrap: break-word; =
+-webkit-nbsp-mode: space; line-break: after-white-space;"><br =
+id=3D"lineBreakAtBeginningOfMessage"><div><br><blockquote =
+type=3D"cite"><div>On 22 Jan 2025, at 23:54, NeilBrown =
+&lt;neilb@suse.de&gt; wrote:</div><br =
+class=3D"Apple-interchange-newline"><div><div>On Mon, 20 Jan 2025, =
+Alexey Lyahkov wrote:<br><blockquote type=3D"cite"><br><blockquote =
+type=3D"cite">On 19 Jan 2025, at 11:03, NeilBrown &lt;neilb@suse.de&gt; =
+wrote:<br><br>On Sun, 19 Jan 2025, Alexey Lyahkov wrote:<br><blockquote =
+type=3D"cite">Neil,<br><blockquote type=3D"cite"><br><br><blockquote =
+type=3D"cite"><br>It does not hep that there are what 3? 4? trees, not =
+"dual-tree" by any<br>stretch of imagination.<br><br>There's =
+DDN/whamcloud (that's really two trees), there's HPE, LLNL<br>keeps =
+their fork still I think (thought it's mostly backports?). There<br>are =
+likely others I am less exposed to.<br></blockquote><br>"dual-tree" =
+maybe isn't the best way of describing what was wrong with<br>the =
+previous approach. &nbsp;"upstream-first" is one way of describing how =
+it<br>should be run, though that needs to be in understood =
+correctly.<br><br>Patches should always flow upstream first, then flow =
+downstream into<br>distro. &nbsp;So I write a patch in my own devel =
+tree. &nbsp;I post it or submit a<br>pull request and eventually it is =
+accepted into the maintainers<br>"testing" tree (upsream from me). =
+&nbsp;There it gets more testing and moves<br>to the maintainers "next" =
+tree from which it is pulled into linux-next<br>for integration testing. =
+&nbsp;Then it goes upstream to Linus (possibly<br>through an =
+intermediary). &nbsp;=46rom Linus it goes to -stable and to =
+various<br>distros etc. &nbsp;Individual patches are selected for =
+further backporting to<br>all sorts of different LTS =
+tree.<br><br>Occasionally there are short-cuts. &nbsp;I might submit a =
+patch from my tree<br>to a SUSE kernel before it is accepted upstream, =
+or maybe even before it<br>is sent if it is urgent. &nbsp;But these are =
+not the norm.<br><br>But you know all this I expect. &nbsp;It isn't =
+about the total number of<br>trees. It is about the flow of patches =
+which must all flow through Linus.<br>And developers must develop =
+against current linus, or something very<br>close to that. =
+&nbsp;Developing against an older kernel is simply making more<br>work =
+for yourself.<br></blockquote><br>This will don=E2=80=99t work. Let =
+explain situation in past.<br></blockquote><br>No. &nbsp;I'm not at all =
+interested in explanations of why it won't work.<br><br>I'm only =
+interested in suggestions of how to make it work, and offers =
+of<br>help.<br><br></blockquote>If you have a good way how to solve such =
+situation, which had crazy brain in past.<br>Please share a way how to =
+avoid lustre source code fragmentation because of freeze a code at the =
+different stage in different distributions.<br>Ubuntu might have a =
+modern lustre with 6.5 kernel, but Redhat had frozen a lustre version in =
+3 releases in past and these clients not compatible each other.<br>And =
+not compatible with installed server.<br>So question - who will do such =
+support ? Did you have an ideas how to solve this =
+problem?<br><br></blockquote><br>sorry - I didn't mean to go quite on =
+you - I've been busy :-)<br><br>It's not entirely clear to me what the =
+problem is.<br>You talk about clients not being compatible with each =
+other or with the<br>server, but Andreas has said that there is good =
+compatibility between<br>different versions so I wonder if that is =
+really (still) an =
+issue.<br></div></div></blockquote><div><br></div><div>Lustre have good =
+compatibility, but not at all cases. It have tested with +/-1 release =
+only.</div><div>I remember a several cases then it caused a probles with =
+clients more than one release old.</div><div>As about Andreas, Andreas =
+don=E2=80=99t work with client support for long time so don=E2=80=99t =
+know about all problems in this area.</div><div><br></div><blockquote =
+type=3D"cite"><div><div><br>Keeping different kernels up to date with =
+new updates is something that<br>the linux-stable team does all the =
+time. &nbsp;We do it at SUSE to. &nbsp;It isn't<br>that hard.<br>You =
+identify which patches *need* to be backported (ideally when =
+the<br>patch is created but that isn't always easy) and you use tools to =
+help<br>you backport them.<br></div></div></blockquote><div>So Lustre =
+developers needs control all stable kernels and think which patch needs =
+back ported and send it to Distro owner&nbsp;</div><div>And for each LTS =
+kernels on the <a href=3D"http://kernel.org">kernel.org</a>.. I think it =
+increase a work dramatically.</div><div><br></div><blockquote =
+type=3D"cite"><div><div><br>Certainly there is effort involved, but =
+maintaining a package that works<br>on a large set of kernels also =
+involves effort. &nbsp;It isn't clear to me<br>that it is *more* effort, =
+just *different* =
+effort.<br><br>NeilBrown<br></div></div></blockquote></div><br><div>Alex</=
+div></body></html>=
+
+--Apple-Mail=_F03CB6D3-EFC1-46AA-A0C2-8CAD7CD86C88--
+
+--===============0153671108843781672==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel@lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============0153671108843781672==--
