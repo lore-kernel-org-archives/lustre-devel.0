@@ -4,71 +4,99 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id CF1F3C0218C
-	for <lustre-devel@archiver.kernel.org>; Sat, 25 Jan 2025 09:10:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id CA190C0218D
+	for <lustre-devel@archiver.kernel.org>; Sat, 25 Jan 2025 23:26:00 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Yg86G5L9xz1xPC;
-	Sat, 25 Jan 2025 01:10:30 -0800 (PST)
-Received: from mail-wm1-f45.google.com (mail-wm1-f45.google.com
- [209.85.128.45])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YgW5B29pRz20xv;
+	Sat, 25 Jan 2025 15:25:50 -0800 (PST)
+Received: from smtp-out1.suse.de (smtp-out1.suse.de [195.135.223.130])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Yg85k5mSmz1wcc
- for <lustre-devel@lists.lustre.org>; Sat, 25 Jan 2025 01:10:02 -0800 (PST)
-Received: by mail-wm1-f45.google.com with SMTP id
- 5b1f17b1804b1-43621d27adeso18976765e9.2
- for <lustre-devel@lists.lustre.org>; Sat, 25 Jan 2025 01:10:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20230601; t=1737796194; x=1738400994; darn=lists.lustre.org;
- h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
- :from:from:to:cc:subject:date:message-id:reply-to;
- bh=5Is2MTi/bT3t3jqbSigi4zCl6e7+zDELGWffXTsQv2A=;
- b=JkKXHauy6sWD9bpPT1om7fHM58W0HJJ19WB0NXwR4M+IbKtL+2phPJ9HtDwG3Vr1Ju
- MkiXax3wV86WPwOKv5wz5NbFASLVXBtSvxs0JybFgE5D7E9Vi4hzQzvBoDuygWQah7xK
- pKFM3M/kx7snDlqtO8c4DaeW84fLX2EFDlCXL4gkiVgKb5bAwUzrBrokmkVCiO38GY5B
- olBcN1A85Iv6Xu/l/iNSUCmBUOBjLElYDGAyrFxsWvkayF0KlrKiIgOpXcyJrRKdRj5F
- k2+h+a4yQRK+oAdlQTPKH50E+8OvB+DxAQPRAIg0IjhFdMpRKC6D9EtjG6eBU+lwNJg2
- 2YvQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1737796194; x=1738400994;
- h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
- :from:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
- bh=5Is2MTi/bT3t3jqbSigi4zCl6e7+zDELGWffXTsQv2A=;
- b=T7HsekstCX/CCvRUwgSONwi4sk2Wn2ByGfG2QnAZoGnrMuNVaz5TU3g7Gf62ZpxVMa
- Pp8odxYFemMuGfkiaulGzpkuuj+7DMCkum3p43/dHnKWo9DumtcDGT6dI8Ukql9IsqkX
- DZ/7tVf3FETBrxG+zAN2qTfBoSYq6V0XAFHfiPx9xvlpkR2ABNjCY5drZrSa11EZF5r5
- Bm6oGoRydozr63HAj/bsHO/gkTkMGSGNxzKZ3ewIjzEs01/LIKpRzuZ/kpNTw6ORAgoB
- 5xv4QCkPkCMqAoBQa6TBCsh/WJCgH1FiECWFLM6eCbTY7eWIrt5Q//DWBf02ryQ284pP
- pisg==
-X-Forwarded-Encrypted: i=1;
- AJvYcCUJ2a61vrvxQJpr9Bg4XlQm2AFq3W58LUKHEsemudemRW96V1sT3SteJ05FHKvfivo5m9DnlM9i8x+2TWI=@lists.lustre.org
-X-Gm-Message-State: AOJu0YydfoyGFccfVae9k0IB3f8vHw2Z3NU4XpAyXTaM/Hxdq3I2KrSU
- FzWhglk66gQsMTbVwSejlsHU8Uf1Fqf8ZGpJO4jfYg8zOOS/DQEK
-X-Gm-Gg: ASbGncsJr+zGV+5nBOnptVaA+NgauyrPk0IGlGMVZGQDGGFeWPUYj6nDxK5M5JIcfib
- qPosGcm2zZNKhZvwq+Gs+8y5LO5UqRC5v8eIwHpPLUwYuMCDBXlmG77gbZbd+NS5mjG7h96QiN8
- ySCl6a3uJ0glcV3u8EpLWf8GGKeFpMaRGmfPslpPkNla4hpOd2lkqz307yZUSFfB8BZ3pQuSlRO
- D7m0j5Rsi0gkMDwPX1cneobuNbYXKuFPEfCkYQGWAIrHbhVrwnprHOlnYB/UKEPj8V5/D+7TSma
- MYb7m0MtEylmbLeiESTVsmL8VWE=
-X-Google-Smtp-Source: AGHT+IHuybsoSRi9e/breDjVLk6R9lkscXK86HaKxcTKB9OZQcAfMEU3iiL2FajZ7T0rF85IlxC+fQ==
-X-Received: by 2002:a05:600c:3b02:b0:434:a7f1:6545 with SMTP id
- 5b1f17b1804b1-43891441f27mr282680205e9.27.1737796193574; 
- Sat, 25 Jan 2025 01:09:53 -0800 (PST)
-Received: from smtpclient.apple ([178.19.96.90])
- by smtp.gmail.com with ESMTPSA id
- 5b1f17b1804b1-438bd4d2a82sm54296065e9.36.2025.01.25.01.09.52
- (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 25 Jan 2025 01:09:53 -0800 (PST)
-From: Alexey Lyahkov <alexey.lyashkov@gmail.com>
-Message-Id: <8BDA07C1-B0B5-4B3F-8F6D-3B900067C20A@gmail.com>
-Mime-Version: 1.0 (Mac OS X Mail 16.0 \(3776.700.51.11.1\))
-Date: Sat, 25 Jan 2025 12:09:40 +0300
-In-Reply-To: <173776106776.22054.6112299548499507604@noble.neil.brown.name>
-To: NeilBrown <neilb@suse.de>
-References: <339AF895-36E5-4FAF-B1E1-E69B2AB130EF@gmail.com>
- <173776106776.22054.6112299548499507604@noble.neil.brown.name>
-X-Mailer: Apple Mail (2.3776.700.51.11.1)
+ 4YgW4p35tQz20xZ
+ for <lustre-devel@lists.lustre.org>; Sat, 25 Jan 2025 15:25:30 -0800 (PST)
+Received: from imap1.dmz-prg2.suse.org (imap1.dmz-prg2.suse.org
+ [IPv6:2a07:de40:b281:104:10:150:64:97])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange X25519 server-signature RSA-PSS (4096 bits) server-digest SHA256)
+ (No client certificate requested)
+ by smtp-out1.suse.de (Postfix) with ESMTPS id 195EC21160;
+ Sat, 25 Jan 2025 23:25:26 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=suse.de; s=susede2_rsa;
+ t=1737847526; h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+ mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=Ds+wWqylrX6DFn/CrNFCfWwEpzsl7CGbTaNZ8mdwVrM=;
+ b=hG8Rtm5DbtDqIEQQ1mZBqNOhW2PbdZ8A5lWXE2w0j/fY1nGPAdgBMYwnEKI3xYsy807PmC
+ JmBdujGiSz2XtUmme9R1TPfLOxocCj5OV8aRbKMmul/rxYNj2gFpbrz7I3+1+WBvYz4GG+
+ ZVQXFlDNdE4o9zfRsg0eHZNSp/vXXR4=
+DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=suse.de;
+ s=susede2_ed25519; t=1737847526;
+ h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+ mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=Ds+wWqylrX6DFn/CrNFCfWwEpzsl7CGbTaNZ8mdwVrM=;
+ b=cgaPOkwwFWpR7wsjtOOrAHgubazZssvwh37sYDLYxsHdX8mUGccxlDjteqXHmycwC7KIXa
+ 9+USjToXAuuuFOCw==
+Authentication-Results: smtp-out1.suse.de;
+ dkim=pass header.d=suse.de header.s=susede2_rsa header.b=hG8Rtm5D;
+ dkim=pass header.d=suse.de header.s=susede2_ed25519 header.b=cgaPOkww
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=suse.de; s=susede2_rsa;
+ t=1737847526; h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+ mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=Ds+wWqylrX6DFn/CrNFCfWwEpzsl7CGbTaNZ8mdwVrM=;
+ b=hG8Rtm5DbtDqIEQQ1mZBqNOhW2PbdZ8A5lWXE2w0j/fY1nGPAdgBMYwnEKI3xYsy807PmC
+ JmBdujGiSz2XtUmme9R1TPfLOxocCj5OV8aRbKMmul/rxYNj2gFpbrz7I3+1+WBvYz4GG+
+ ZVQXFlDNdE4o9zfRsg0eHZNSp/vXXR4=
+DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=suse.de;
+ s=susede2_ed25519; t=1737847526;
+ h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+ mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=Ds+wWqylrX6DFn/CrNFCfWwEpzsl7CGbTaNZ8mdwVrM=;
+ b=cgaPOkwwFWpR7wsjtOOrAHgubazZssvwh37sYDLYxsHdX8mUGccxlDjteqXHmycwC7KIXa
+ 9+USjToXAuuuFOCw==
+Received: from imap1.dmz-prg2.suse.org (localhost [127.0.0.1])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange X25519 server-signature RSA-PSS (4096 bits) server-digest SHA256)
+ (No client certificate requested)
+ by imap1.dmz-prg2.suse.org (Postfix) with ESMTPS id 961F2137DB;
+ Sat, 25 Jan 2025 23:25:24 +0000 (UTC)
+Received: from dovecot-director2.suse.de ([2a07:de40:b281:106:10:150:64:167])
+ by imap1.dmz-prg2.suse.org with ESMTPSA id pIyeDuRylWfwDgAAD6G6ig
+ (envelope-from <neilb@suse.de>); Sat, 25 Jan 2025 23:25:24 +0000
+MIME-Version: 1.0
+From: "NeilBrown" <neilb@suse.de>
+To: "Alexey Lyahkov" <alexey.lyashkov@gmail.com>
+In-reply-to: <8BDA07C1-B0B5-4B3F-8F6D-3B900067C20A@gmail.com>
+References: <>, <8BDA07C1-B0B5-4B3F-8F6D-3B900067C20A@gmail.com>
+Date: Sun, 26 Jan 2025 10:25:20 +1100
+Message-id: <173784752079.22054.3143079741988346111@noble.neil.brown.name>
+X-Rspamd-Queue-Id: 195EC21160
+X-Spamd-Result: default: False [-4.51 / 50.00]; BAYES_HAM(-3.00)[100.00%];
+ NEURAL_HAM_LONG(-1.00)[-1.000];
+ R_DKIM_ALLOW(-0.20)[suse.de:s=susede2_rsa,suse.de:s=susede2_ed25519];
+ NEURAL_HAM_SHORT(-0.20)[-1.000]; MIME_GOOD(-0.10)[text/plain];
+ MX_GOOD(-0.01)[]; TAGGED_RCPT(0.00)[];
+ RCVD_VIA_SMTP_AUTH(0.00)[]; TO_DN_SOME(0.00)[];
+ TO_DN_EQ_ADDR_SOME(0.00)[]; FREEMAIL_TO(0.00)[gmail.com];
+ MIME_TRACE(0.00)[0:+]; MISSING_XM_UA(0.00)[]; ARC_NA(0.00)[];
+ FREEMAIL_ENVRCPT(0.00)[gmail.com];
+ FUZZY_BLOCKED(0.00)[rspamd.com]; RCVD_TLS_ALL(0.00)[];
+ FROM_EQ_ENVFROM(0.00)[]; FROM_HAS_DN(0.00)[];
+ RCPT_COUNT_THREE(0.00)[3]; RCVD_COUNT_TWO(0.00)[2];
+ TO_MATCH_ENVRCPT_ALL(0.00)[];
+ DBL_BLOCKED_OPENRESOLVER(0.00)[imap1.dmz-prg2.suse.org:helo,imap1.dmz-prg2.suse.org:rdns];
+ DKIM_SIGNED(0.00)[suse.de:s=susede2_rsa,suse.de:s=susede2_ed25519];
+ DKIM_TRACE(0.00)[suse.de:+]
+X-Rspamd-Server: rspamd2.dmz-prg2.suse.org
+X-Rspamd-Action: no action
 Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
  upstreaming
 X-BeenThere: lustre-devel@lists.lustre.org
@@ -84,221 +112,131 @@ List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============7050565830297564441=="
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-
---===============7050565830297564441==
-Content-Type: multipart/alternative;
-	boundary="Apple-Mail=_69DA8A8C-0B44-4A58-9781-E91B70840763"
-
-
---Apple-Mail=_69DA8A8C-0B44-4A58-9781-E91B70840763
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/plain;
-	charset=utf-8
-
-
-
-> 25 =D1=8F=D0=BD=D0=B2. 2025=E2=80=AF=D0=B3., =D0=B2 02:24, NeilBrown =
-<neilb@suse.de> =D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BB(=D0=B0):
->=20
-> On Thu, 23 Jan 2025, Alexey Lyahkov wrote:
->>=20
->>=20
->>=20
->>    Keeping different kernels up to date with new updates is something
->>    that
->>    the linux-stable team does all the time.  We do it at SUSE to.  It
->>    isn't
->>    that hard.
->>    You identify which patches *need* to be backported (ideally when
->>    the
->>    patch is created but that isn't always easy) and you use tools to
->>    help
->>    you backport them.
->>=20
->> So Lustre developers needs control all stable kernels and think which
->> patch needs back ported and send it to Distro owner=20
->> And for each LTS kernels on the kernel.org.. I think it increase a =
-work
->> dramatically.
->=20
-> No.  Lustre developers don't need to care about the stable kernels at
-> all.  The stable team does that an explicitly say they don't want it =
-to
-> be a burden on maintainers.
-Lustre maintainers don=E2=80=99t needs review code which affects a =
-Lustre? It=E2=80=99s something new for me.
-I understand a drivers changes should don=E2=80=99t reviewed by lustre =
-team.
-But arch/=E2=80=A6 fs/ .. mm/... kernel/ needs attention.
-Lack to review will cause a very large quality degradation after short =
-time.
-As I point early - I think none of linux maintainers have a lustre =
-cluster to test a patches before land.
-They can do test own part and how to build at all. But how it affects a =
-Lustre? A specially in performance area.
-Small examples from past.
-Small optimisation for page_accessed() and LRU lists fixes a problem =
-with ext4 bitmap in memory and improve lustre performace for 10%. Due =
-lack of read during write. (https://lwn.net/Articles/548830/)
-Small change in jbd2 code - like replace list_add to list_add_tail - =
-improve performance for 5-15% due journal handle starvation solved.
-(https://www.spinics.net/lists/linux-ext4/msg84888.html)
-
-So yes, Lustre developers can move  LTS kernels as unsupported area and =
-if it=E2=80=99s broken just suggest to install an out-of-tree module =
-with supported kernel. But did linux kernel needs a broken code in tree =
-really?
-
-
-> The lustre team *can* decide to have some involvement - adding Fixes
-> tags, adding Cc: stable, even submitting backports which don't apply
-> trivially.  But there is no requirement from anywhere.
->=20
-> The lustre community only need to focus on one upstream.
-And have a broken lustre client once it don=E2=80=99t tested. Or lustre =
-client will hit a performance degradation.
-
-
-Neil, Tim,=20
-
-> Lustre develops who work for employers who sell support for older
-> kernels might need to handle backports to those kernels and it is in
-> everybody's interest not to make that unduly different e.g.  by
-> separating bug fixes from features etc.
->=20
-Lustre primary area is =E2=80=98older=E2=80=99 kernels. As I point early =
-half of customers uses a RHEL7, second 30% is RHEL8.
-And just 2% uses a modern kernels.
-
-
-> The lustre community may well choose to host and share those =
-backports,
-> and maybe even include them in testing.  But I suspect that would be
-> driven by vendors who sell support.  It certainly wouldn't be imposed =
-by
-> the upstream community.
->=20
-> Exactly how we work with distros like Redhat, SUSE, Ubuntu would =
-depend
-> on what can be negotiated with them.
-> Some might be willing to accept backports and release them in
-> maintenance updates.  Some might not.
-> In that case the way to support their kernel for your customers would =
-be
-> to start with the source for a particular maint update, add the =
-missing
-> patches, build, and distribute the result.
-> You probably would only need to do this for each servie-pack, not for
-> each update.
->=20
-> It isn't really different from what it done today, but it would be =
-done
-> in a different way.
->=20
-> Thanks,
-> NeilBrown
-
-
---Apple-Mail=_69DA8A8C-0B44-4A58-9781-E91B70840763
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/html;
-	charset=utf-8
-
-<html><head><meta http-equiv=3D"content-type" content=3D"text/html; =
-charset=3Dutf-8"></head><body style=3D"overflow-wrap: break-word; =
--webkit-nbsp-mode: space; line-break: after-white-space;"><br =
-id=3D"lineBreakAtBeginningOfMessage"><div><br><blockquote =
-type=3D"cite"><div>25 =D1=8F=D0=BD=D0=B2. 2025=E2=80=AF=D0=B3., =D0=B2 =
-02:24, NeilBrown &lt;neilb@suse.de&gt; =D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=
-=D0=BB(=D0=B0):</div><br class=3D"Apple-interchange-newline"><div><div>On =
-Thu, 23 Jan 2025, Alexey Lyahkov wrote:<br><blockquote =
-type=3D"cite"><br><br><br> &nbsp;&nbsp;&nbsp;Keeping different kernels =
-up to date with new updates is something<br> &nbsp;&nbsp;&nbsp;that<br> =
-&nbsp;&nbsp;&nbsp;the linux-stable team does all the time. &nbsp;We do =
-it at SUSE to. &nbsp;It<br> &nbsp;&nbsp;&nbsp;isn't<br> =
-&nbsp;&nbsp;&nbsp;that hard.<br> &nbsp;&nbsp;&nbsp;You identify which =
-patches *need* to be backported (ideally when<br> =
-&nbsp;&nbsp;&nbsp;the<br> &nbsp;&nbsp;&nbsp;patch is created but that =
-isn't always easy) and you use tools to<br> &nbsp;&nbsp;&nbsp;help<br> =
-&nbsp;&nbsp;&nbsp;you backport them.<br><br>So Lustre developers needs =
-control all stable kernels and think which<br>patch needs back ported =
-and send it to Distro owner <br>And for each LTS kernels on the =
-kernel.org.. I think it increase a =
-work<br>dramatically.<br></blockquote><br>No. &nbsp;Lustre developers =
-don't need to care about the stable kernels at<br>all. &nbsp;The stable =
-team does that an explicitly say they don't want it to<br>be a burden on =
-maintainers.<br></div></div></blockquote><div>Lustre maintainers don=E2=80=
-=99t needs review code which affects a Lustre? It=E2=80=99s something =
-new for me.</div><div>I understand a drivers changes should don=E2=80=99t =
-reviewed by lustre team.</div><div>But arch/=E2=80=A6 fs/ .. mm/... =
-kernel/ needs attention.</div><div>Lack to review will cause a very =
-large quality degradation after short time.</div><div>As I point early - =
-I think none of linux maintainers have a lustre cluster to test a =
-patches before land.</div><div>They can do test own part and how to =
-build at all. But how it affects a Lustre? A specially in performance =
-area.</div><div>Small examples from past.</div><div>Small optimisation =
-for page_accessed() and LRU lists fixes a problem with ext4 bitmap in =
-memory and improve lustre performace for 10%. Due lack of read during =
-write. (<a =
-href=3D"https://lwn.net/Articles/548830/">https://lwn.net/Articles/548830/=
-</a>)</div><div>Small change in jbd2 code - like replace list_add to =
-list_add_tail - improve performance for 5-15% due journal handle =
-starvation solved.</div><div>(<a =
-href=3D"https://www.spinics.net/lists/linux-ext4/msg84888.html">https://ww=
-w.spinics.net/lists/linux-ext4/msg84888.html</a>)</div><div><br></div><div=
->So yes, Lustre developers can move &nbsp;LTS kernels as unsupported =
-area and if it=E2=80=99s broken just suggest to install an out-of-tree =
-module with supported kernel. But did linux kernel needs a broken code =
-in tree really?</div><div><br></div><div><br></div><blockquote =
-type=3D"cite"><div><div>The lustre team *can* decide to have some =
-involvement - adding Fixes<br>tags, adding Cc: stable, even submitting =
-backports which don't apply<br>trivially. &nbsp;But there is no =
-requirement from anywhere.<br><br></div></div></blockquote><blockquote =
-type=3D"cite"><div><div>The lustre community only need to focus on one =
-upstream.<br></div></div></blockquote><div>And have a broken lustre =
-client once it don=E2=80=99t tested. Or lustre client will hit a =
-performance degradation.</div><div><br></div><div><br></div><div>Neil, =
-Tim,&nbsp;</div><div><br></div><blockquote type=3D"cite"><div><div>Lustre =
-develops who work for employers who sell support for older<br>kernels =
-might need to handle backports to those kernels and it is =
-in<br>everybody's interest not to make that unduly different e.g. =
-&nbsp;by<br>separating bug fixes from features =
-etc.<br><br></div></div></blockquote><div>Lustre primary area is =
-=E2=80=98older=E2=80=99 kernels. As I point early half of customers uses =
-a RHEL7, second 30% is RHEL8.</div><div>And just 2% uses a modern =
-kernels.</div><div><br></div><br><blockquote type=3D"cite"><div><div>The =
-lustre community may well choose to host and share those =
-backports,<br>and maybe even include them in testing. &nbsp;But I =
-suspect that would be<br>driven by vendors who sell support. &nbsp;It =
-certainly wouldn't be imposed by<br>the upstream =
-community.<br><br>Exactly how we work with distros like Redhat, SUSE, =
-Ubuntu would depend<br>on what can be negotiated with them.<br>Some =
-might be willing to accept backports and release them in<br>maintenance =
-updates. &nbsp;Some might not.<br>In that case the way to support their =
-kernel for your customers would be<br>to start with the source for a =
-particular maint update, add the missing<br>patches, build, and =
-distribute the result.<br>You probably would only need to do this for =
-each servie-pack, not for<br>each update.<br><br>It isn't really =
-different from what it done today, but it would be done<br>in a =
-different =
-way.<br><br>Thanks,<br>NeilBrown<br></div></div></blockquote></div><br></b=
-ody></html>=
-
---Apple-Mail=_69DA8A8C-0B44-4A58-9781-E91B70840763--
-
---===============7050565830297564441==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============7050565830297564441==--
+T24gU2F0LCAyNSBKYW4gMjAyNSwgQWxleGV5IEx5YWhrb3Ygd3JvdGU6Cj4gCj4gCj4gICAgIDI1
+INGP0L3Qsi4gMjAyNeKAr9CzLiwg0LIgMDI6MjQsIE5laWxCcm93biA8bmVpbGJAc3VzZS5kZT4g
+0L3QsNC/0LjRgdCw0Lso0LApOgo+ICAgIAo+ICAgICBPbiBUaHUsIDIzIEphbiAyMDI1LCBBbGV4
+ZXkgTHlhaGtvdiB3cm90ZToKPiAgICAKPiAgICAgICAgCj4gICAgICAgIAo+ICAgICAgICAKPiAg
+ICAgICAgICAgIEtlZXBpbmcgZGlmZmVyZW50IGtlcm5lbHMgdXAgdG8gZGF0ZSB3aXRoIG5ldyB1
+cGRhdGVzIGlzCj4gICAgICAgICBzb21ldGhpbmcKPiAgICAgICAgICAgIHRoYXQKPiAgICAgICAg
+ICAgIHRoZSBsaW51eC1zdGFibGUgdGVhbSBkb2VzIGFsbCB0aGUgdGltZS4gIFdlIGRvIGl0IGF0
+IFNVU0UKPiAgICAgICAgIHRvLiAgSXQKPiAgICAgICAgICAgIGlzbid0Cj4gICAgICAgICAgICB0
+aGF0IGhhcmQuCj4gICAgICAgICAgICBZb3UgaWRlbnRpZnkgd2hpY2ggcGF0Y2hlcyAqbmVlZCog
+dG8gYmUgYmFja3BvcnRlZCAoaWRlYWxseQo+ICAgICAgICAgd2hlbgo+ICAgICAgICAgICAgdGhl
+Cj4gICAgICAgICAgICBwYXRjaCBpcyBjcmVhdGVkIGJ1dCB0aGF0IGlzbid0IGFsd2F5cyBlYXN5
+KSBhbmQgeW91IHVzZQo+ICAgICAgICAgdG9vbHMgdG8KPiAgICAgICAgICAgIGhlbHAKPiAgICAg
+ICAgICAgIHlvdSBiYWNrcG9ydCB0aGVtLgo+ICAgICAgICAKPiAgICAgICAgIFNvIEx1c3RyZSBk
+ZXZlbG9wZXJzIG5lZWRzIGNvbnRyb2wgYWxsIHN0YWJsZSBrZXJuZWxzIGFuZCB0aGluawo+ICAg
+ICAgICAgd2hpY2gKPiAgICAgICAgIHBhdGNoIG5lZWRzIGJhY2sgcG9ydGVkIGFuZCBzZW5kIGl0
+IHRvIERpc3RybyBvd25lcgo+ICAgICAgICAgQW5kIGZvciBlYWNoIExUUyBrZXJuZWxzIG9uIHRo
+ZSBrZXJuZWwub3JnLi4gSSB0aGluayBpdAo+ICAgICAgICAgaW5jcmVhc2UgYSB3b3JrCj4gICAg
+ICAgICBkcmFtYXRpY2FsbHkuCj4gICAgCj4gICAgCj4gICAgIE5vLiAgTHVzdHJlIGRldmVsb3Bl
+cnMgZG9uJ3QgbmVlZCB0byBjYXJlIGFib3V0IHRoZSBzdGFibGUga2VybmVscwo+ICAgICBhdAo+
+ICAgICBhbGwuICBUaGUgc3RhYmxlIHRlYW0gZG9lcyB0aGF0IGFuIGV4cGxpY2l0bHkgc2F5IHRo
+ZXkgZG9uJ3Qgd2FudAo+ICAgICBpdCB0bwo+ICAgICBiZSBhIGJ1cmRlbiBvbiBtYWludGFpbmVy
+cy4KPiAKPiBMdXN0cmUgbWFpbnRhaW5lcnMgZG9u4oCZdCBuZWVkcyByZXZpZXcgY29kZSB3aGlj
+aCBhZmZlY3RzIGEgTHVzdHJlPyBJdOKAmXMKPiBzb21ldGhpbmcgbmV3IGZvciBtZS4KCkl0IG1h
+eSBiZSBuZXcsIGJ1dCBpdCBpcyBzdGlsbCB0cnVlIC0gcGFydGx5LgpUaGUgc3RhYmxlIHRlYW0g
+b25seSBhcHBseSBwYXRjaGVzIHdoaWNoIGhhdmUgYWxyZWFkeSBsYW5kZWQgaW4KdXBzdHJlYW0s
+IHNvIHRoZXkgaGF2ZSBhbHJlYWR5IGJlIHJldmlld2VkIGJ5IHVwc3RyZWFtIG1haW50YWluZXJz
+LgpUaGV5IGRvIHNvbWV0aW1lcyBhcHBseSBvdGhlciBwYXRjaGVzIHdoZW4gYSBmaXggaXMgbmVl
+ZGVkIGJ1dCBpdCBjYW5ub3QKYmUgYWNoaWV2ZWQgd2l0aCBhIHNpbXBsZSBiYWNrcG9ydCAtIGJ1
+dCB0aG9zZSB3aWxsIG9ubHkgYmUgYWNjZXB0ZWQKZnJvbSBtYWludGFpbmVycy4KClNvIHRoZSBw
+YXRjaGVzICpoYXZlKiBiZWVuIHJldmlld2VkLiAgVGhleSd2ZSBiZWVuIHJldmlld2VkIGluIGEg
+ZGlmZmVyZW50CmNvbnRleHQgc28gdGhlIHJldmlldyBtaWdodCBub3Qgc3RpbGwgYXBwbHkgYW5k
+IGNlcnRhaW5seSBwYXRjaGVzIGRvCmxhbmQgaW4gLXN0YWJsZSB3aGljaCBicmVhayB0aGluZ3Mg
+aW4gYWxsIHNvcnRzIG9mIGRpZmZlcmVudCB3YXlzLiAgSXQKaXMgZ2VuZXJhbGx5IHRob3VnaHQg
+dGhhdCB0aGlzIGNvc3QgaXMgc21hbGwgY29tcGFyZWQgdG8gdGhlIGJlbmVmaXQKb2YgZ2V0dGlu
+ZyBsb3RzIG9mIGZpeGVzLgoKPiBJIHVuZGVyc3RhbmQgYSBkcml2ZXJzIGNoYW5nZXMgc2hvdWxk
+IGRvbuKAmXQgcmV2aWV3ZWQgYnkgbHVzdHJlIHRlYW0uCj4gQnV0IGFyY2gv4oCmIGZzLyAuLiBt
+bS8uLi4ga2VybmVsLyBuZWVkcyBhdHRlbnRpb24uCj4gTGFjayB0byByZXZpZXcgd2lsbCBjYXVz
+ZSBhIHZlcnkgbGFyZ2UgcXVhbGl0eSBkZWdyYWRhdGlvbiBhZnRlciBzaG9ydAo+IHRpbWUuCj4g
+QXMgSSBwb2ludCBlYXJseSAtIEkgdGhpbmsgbm9uZSBvZiBsaW51eCBtYWludGFpbmVycyBoYXZl
+IGEgbHVzdHJlCj4gY2x1c3RlciB0byB0ZXN0IGEgcGF0Y2hlcyBiZWZvcmUgbGFuZC4KClRoZXkg
+ZG9uJ3QgdG9kYXksIHBhcnRseSBiZWNhdXNlIGx1c3RyZSBpcyBub3QgbWFpbmxpbmUuICBUaGVy
+ZSBhcmUgYQpudW1iZXIgb2YgdGVzdGluZyBlZmZvcnRzIGFyb3VuZCB0aGUga2VybmVsIHdoaWNo
+IHJ1biBhbGwgc29ydCBvZgpkaWZmZXJlbnQgdGVzdHMuICBJZiB3ZSBtYWRlIGl0IGVhc3kgdG8g
+c3BpbiB1cCBhIHZpcnR1YWwgbHVzdHJlIGNsdXN0ZXIKZm9yIHRlc3RpbmcgYW5kIHB1YmxpY2lz
+ZWQgdGhhdCwgSSB0aGluayB0aGVyZSBpcyBhIHJlYXNvbmFibGUgY2hhbmNlCnRoYXQgc29tZSBw
+ZW9wbGUgd2lsbCBydW4gaXQuICBJdCBkb2Vzbid0IG5lZWQgdG8gYmUgdGhlIHVwc3RyZWFtCm1h
+aW50YWluZXJzLiAgSXQgY2FuIGJlIGFueW9uZSB3aXRoIHRoZSByZWxldmFudCByZXNvdXJjZXMu
+Cgo+IFRoZXkgY2FuIGRvIHRlc3Qgb3duIHBhcnQgYW5kIGhvdyB0byBidWlsZCBhdCBhbGwuIEJ1
+dCBob3cgaXQgYWZmZWN0cyBhCj4gTHVzdHJlPyBBIHNwZWNpYWxseSBpbiBwZXJmb3JtYW5jZSBh
+cmVhLgo+IFNtYWxsIGV4YW1wbGVzIGZyb20gcGFzdC4KPiBTbWFsbCBvcHRpbWlzYXRpb24gZm9y
+IHBhZ2VfYWNjZXNzZWQoKSBhbmQgTFJVIGxpc3RzIGZpeGVzIGEgcHJvYmxlbQo+IHdpdGggZXh0
+NCBiaXRtYXAgaW4gbWVtb3J5IGFuZCBpbXByb3ZlIGx1c3RyZSBwZXJmb3JtYWNlIGZvciAxMCUu
+IER1ZQo+IGxhY2sgb2YgcmVhZCBkdXJpbmcgd3JpdGUuIChodHRwczovL2x3bi5uZXQvQXJ0aWNs
+ZXMvNTQ4ODMwLykKPiBTbWFsbCBjaGFuZ2UgaW4gamJkMiBjb2RlIC0gbGlrZSByZXBsYWNlIGxp
+c3RfYWRkIHRvIGxpc3RfYWRkX3RhaWwgLQo+IGltcHJvdmUgcGVyZm9ybWFuY2UgZm9yIDUtMTUl
+IGR1ZSBqb3VybmFsIGhhbmRsZSBzdGFydmF0aW9uIHNvbHZlZC4KPiAoaHR0cHM6Ly93d3cuc3Bp
+bmljcy5uZXQvbGlzdHMvbGludXgtZXh0NC9tc2c4NDg4OC5odG1sKQo+IAo+IFNvIHllcywgTHVz
+dHJlIGRldmVsb3BlcnMgY2FuIG1vdmUgIExUUyBrZXJuZWxzIGFzIHVuc3VwcG9ydGVkIGFyZWEg
+YW5kCj4gaWYgaXTigJlzIGJyb2tlbiBqdXN0IHN1Z2dlc3QgdG8gaW5zdGFsbCBhbiBvdXQtb2Yt
+dHJlZSBtb2R1bGUgd2l0aAo+IHN1cHBvcnRlZCBrZXJuZWwuIEJ1dCBkaWQgbGludXgga2VybmVs
+IG5lZWRzIGEgYnJva2VuIGNvZGUgaW4gdHJlZQo+IHJlYWxseT8KCklmIHNvbWVvbmUgcmVwb3J0
+cyB0aGF0IGFuIExUUyBrZXJuZWwgaXMgYnJva2VuIHRoZXkgc2hvdWxkIGJlIGRpcmVjdGVkCnRv
+IHdob2V2ZXIgc3VwcG9ydHMgaXQsIG5vdCBqdXN0IHRvbGQgdG8gcmlwIG91dCB0aGUgY29kZS4K
+SWYgdGhleSBjYW5ub3QgZmluZCBhbnlvbmUgdG8gc3VwcG9ydCBpdCB0aGV5IGNvdWxkIGJlIGd1
+aWRlZCB0byB1c2UgYQpkaWZmZXJlbnQga2VybmVsIHRoYXQgZG9lcyBoYXZlIHN1cHBvcnQuCgo+
+IAo+IAo+IAo+ICAgICBUaGUgbHVzdHJlIHRlYW0gKmNhbiogZGVjaWRlIHRvIGhhdmUgc29tZSBp
+bnZvbHZlbWVudCAtIGFkZGluZwo+ICAgICBGaXhlcwo+ICAgICB0YWdzLCBhZGRpbmcgQ2M6IHN0
+YWJsZSwgZXZlbiBzdWJtaXR0aW5nIGJhY2twb3J0cyB3aGljaCBkb24ndAo+ICAgICBhcHBseQo+
+ICAgICB0cml2aWFsbHkuICBCdXQgdGhlcmUgaXMgbm8gcmVxdWlyZW1lbnQgZnJvbSBhbnl3aGVy
+ZS4KPiAgICAKPiAKPiAgICAgVGhlIGx1c3RyZSBjb21tdW5pdHkgb25seSBuZWVkIHRvIGZvY3Vz
+IG9uIG9uZSB1cHN0cmVhbS4KPiAKPiBBbmQgaGF2ZSBhIGJyb2tlbiBsdXN0cmUgY2xpZW50IG9u
+Y2UgaXQgZG9u4oCZdCB0ZXN0ZWQuIE9yIGx1c3RyZSBjbGllbnQKPiB3aWxsIGhpdCBhIHBlcmZv
+cm1hbmNlIGRlZ3JhZGF0aW9uLgoKWWVzLCBjb2RlIHRoYXQgaXMgbm90IG1haW50YWluZWQgd2ls
+bCBzdWZmZXIgcmVncmVzc2lvbnMuICBUaGlzIGlzIGhvdwp2YXJpb3VzIHZlbmRvcnMgbWFrZSBt
+b25leSAtIGJ5IHNlbGxpbmcgc3VwcG9ydCBhbmQgaGF2aW5nIGV4cGVydGlzZSB0bwpmaXggcmVn
+cmVzc2lvbnMuCgo+IAo+IAo+IE5laWwsIFRpbSwgCj4gCj4gCj4gICAgIEx1c3RyZSBkZXZlbG9w
+cyB3aG8gd29yayBmb3IgZW1wbG95ZXJzIHdobyBzZWxsIHN1cHBvcnQgZm9yIG9sZGVyCj4gICAg
+IGtlcm5lbHMgbWlnaHQgbmVlZCB0byBoYW5kbGUgYmFja3BvcnRzIHRvIHRob3NlIGtlcm5lbHMg
+YW5kIGl0IGlzCj4gICAgIGluCj4gICAgIGV2ZXJ5Ym9keSdzIGludGVyZXN0IG5vdCB0byBtYWtl
+IHRoYXQgdW5kdWx5IGRpZmZlcmVudCBlLmcuICBieQo+ICAgICBzZXBhcmF0aW5nIGJ1ZyBmaXhl
+cyBmcm9tIGZlYXR1cmVzIGV0Yy4KPiAgICAKPiAKPiBMdXN0cmUgcHJpbWFyeSBhcmVhIGlzIOKA
+mG9sZGVy4oCZIGtlcm5lbHMuIEFzIEkgcG9pbnQgZWFybHkgaGFsZiBvZgo+IGN1c3RvbWVycyB1
+c2VzIGEgUkhFTDcsIHNlY29uZCAzMCUgaXMgUkhFTDguCj4gQW5kIGp1c3QgMiUgdXNlcyBhIG1v
+ZGVybiBrZXJuZWxzLgoKUkhFTCdzIHByaW1hcnkgYXJlYSBpcyBvbGRlciBrZXJuZWxzLiAgU0xF
+UydzIHByaW1hcnkgYXJlYSBpcyBvbGRlciBrZXJuZWxzLgpXZSBzdGlsbCBjb250cmlidXRlIHBy
+aW1hcmlseSB1cHN0cmVhbS4gIApXZSBrbm93IHVwc3RyZWFtIGlzIG5vdCBzdWl0YWJsZSBmb3Ig
+b3VyIGN1c3RvbWVycy4gIEJlZm9yZSB3ZSBjaG9vc2UgYQprZXJuZWwgZm9yIGEgbmV3IHJlbGVh
+c2Ugd2UgcnVuIGEgbG90IG9mIHRlc3Rpbmcgb24gYSByYW5nZSBvZgpjYW5kaWRhdGVzIGFuZCBw
+aWNrIHRoZSBvbmUgdGhhdCBzZWVtcyB0byBoYXZlIHRoZSBsZWFzdCBwcm9ibGVtcy4gIFRoZW4K
+d2Ugd29yayBpdCBpZGVudGlmeSBhbmQgZml4IHRoZSBwcm9ibGVtcyB0aGF0IGFyZSBtb3N0IGxp
+a2VseSB0byBhZmZlY3QKb3VyIGN1c3RvbWVycy4KClRoZXJlIGlzIG5vIHJlYXNvbiB0aGF0IGx1
+c3RyZSB2ZW5kb3JzIGNvdWxkbid0IHVzZSBhbmQgYmVuZWZpdCBmcm9tIHRoZQpzYW1lIG1vZGVs
+LiAgTmV3IHdvcmsgZ29lcyB1cHN0cmVhbSwgQmFja3BvcnQgdGhlIGJpdHMgbmVlZGVkIGJ5IHlv
+dXIKY3VzdG9tZXJzIHRvIHRoZSBrZXJuZWxzIHRoYXQgeW91ciBjdXN0b21lcnMgYXJlIHVzaW5n
+LgoKSXQgaXNuJ3QgY2xlYXIgdG8gbWUgdGhhdCB0aGUgIkNvbW11bml0eSBlZGl0aW9uIiBvZiBs
+dXN0cmUgbmVlZHMgdG8Kc3VwcG9ydCBvbGRlciBrZXJuZWxzIGF0IGFsbCAodGhvdWdoIEkgZG9u
+J3Qgb2JqZWN0IHRvIHRoYXQpLiAgRWFjaAp2ZW5kb3IgY2FuIGNob29zZSB0aGUga2VybmVsIG9y
+IGtlcm5lbHMgdGhhdCB0aGV5IHdhbnQgdG8gc3VwcG9ydCBhbmQKc2VsZWN0IHRoZSByZWxldmFu
+dCBwYXRjaGVzIGZyb20gdXBzdHJlYW0gdG8gbWFrZSBpdCBmaXQgdGhlaXIgbmVlZHMuCkJ1Z2Zp
+eGVzIHNob3VsZCBiZSBlYXN5IGFzIHRoZXkgc2hvdWxkIGJlIHRhZ2dlZCBhcyBidWcgZml4ZXMu
+ICBGZWF0dXJlcwptaWdodCBiZSBhIGxpdHRsZSBoYXJkZXIgYnV0IG5vdCBlbm9ybW91c2x5IHNv
+LgoKVGhhbmtzLApOZWlsQnJvd24KCgo+IAo+IAo+IAo+ICAgICBUaGUgbHVzdHJlIGNvbW11bml0
+eSBtYXkgd2VsbCBjaG9vc2UgdG8gaG9zdCBhbmQgc2hhcmUgdGhvc2UKPiAgICAgYmFja3BvcnRz
+LAo+ICAgICBhbmQgbWF5YmUgZXZlbiBpbmNsdWRlIHRoZW0gaW4gdGVzdGluZy4gIEJ1dCBJIHN1
+c3BlY3QgdGhhdCB3b3VsZAo+ICAgICBiZQo+ICAgICBkcml2ZW4gYnkgdmVuZG9ycyB3aG8gc2Vs
+bCBzdXBwb3J0LiAgSXQgY2VydGFpbmx5IHdvdWxkbid0IGJlCj4gICAgIGltcG9zZWQgYnkKPiAg
+ICAgdGhlIHVwc3RyZWFtIGNvbW11bml0eS4KPiAgICAKPiAgICAgRXhhY3RseSBob3cgd2Ugd29y
+ayB3aXRoIGRpc3Ryb3MgbGlrZSBSZWRoYXQsIFNVU0UsIFVidW50dSB3b3VsZAo+ICAgICBkZXBl
+bmQKPiAgICAgb24gd2hhdCBjYW4gYmUgbmVnb3RpYXRlZCB3aXRoIHRoZW0uCj4gICAgIFNvbWUg
+bWlnaHQgYmUgd2lsbGluZyB0byBhY2NlcHQgYmFja3BvcnRzIGFuZCByZWxlYXNlIHRoZW0gaW4K
+PiAgICAgbWFpbnRlbmFuY2UgdXBkYXRlcy4gIFNvbWUgbWlnaHQgbm90Lgo+ICAgICBJbiB0aGF0
+IGNhc2UgdGhlIHdheSB0byBzdXBwb3J0IHRoZWlyIGtlcm5lbCBmb3IgeW91ciBjdXN0b21lcnMK
+PiAgICAgd291bGQgYmUKPiAgICAgdG8gc3RhcnQgd2l0aCB0aGUgc291cmNlIGZvciBhIHBhcnRp
+Y3VsYXIgbWFpbnQgdXBkYXRlLCBhZGQgdGhlCj4gICAgIG1pc3NpbmcKPiAgICAgcGF0Y2hlcywg
+YnVpbGQsIGFuZCBkaXN0cmlidXRlIHRoZSByZXN1bHQuCj4gICAgIFlvdSBwcm9iYWJseSB3b3Vs
+ZCBvbmx5IG5lZWQgdG8gZG8gdGhpcyBmb3IgZWFjaCBzZXJ2aWUtcGFjaywgbm90Cj4gICAgIGZv
+cgo+ICAgICBlYWNoIHVwZGF0ZS4KPiAgICAKPiAgICAgSXQgaXNuJ3QgcmVhbGx5IGRpZmZlcmVu
+dCBmcm9tIHdoYXQgaXQgZG9uZSB0b2RheSwgYnV0IGl0IHdvdWxkIGJlCj4gICAgIGRvbmUKPiAg
+ICAgaW4gYSBkaWZmZXJlbnQgd2F5Lgo+ICAgIAo+ICAgICBUaGFua3MsCj4gICAgIE5laWxCcm93
+bgo+IAo+IAo+IAo+IAo+IAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX18KbHVzdHJlLWRldmVsIG1haWxpbmcgbGlzdApsdXN0cmUtZGV2ZWxAbGlzdHMubHVz
+dHJlLm9yZwpodHRwOi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5mby5jZ2kvbHVzdHJlLWRldmVs
+LWx1c3RyZS5vcmcK
