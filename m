@@ -4,34 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id F17D2C0218F
-	for <lustre-devel@archiver.kernel.org>; Thu, 30 Jan 2025 14:50:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 6E7C7C0218A
+	for <lustre-devel@archiver.kernel.org>; Thu, 30 Jan 2025 14:51:42 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YkLn52lVXz22Td;
-	Thu, 30 Jan 2025 06:21:45 -0800 (PST)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YkLnX6kYTz22V4;
+	Thu, 30 Jan 2025 06:22:08 -0800 (PST)
+Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YkLdJ0zSSz214t
+ 4YkLdJ3wrvz214y
  for <lustre-devel@lists.lustre.org>; Thu, 30 Jan 2025 06:15:00 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm-e204-208.ccs.ornl.gov [160.91.203.12])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 46B11899ADE;
+Received: from star2.ccs.ornl.gov (ltm3-e204-208.ccs.ornl.gov [160.91.203.26])
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 32EAB18236F;
  Thu, 30 Jan 2025 09:11:33 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 44B89106BE14; Thu, 30 Jan 2025 09:11:33 -0500 (EST)
+ id 2FE38106BE18; Thu, 30 Jan 2025 09:11:33 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Thu, 30 Jan 2025 09:11:15 -0500
-Message-ID: <20250130141115.950749-26-jsimmons@infradead.org>
+Date: Thu, 30 Jan 2025 09:11:10 -0500
+Message-ID: <20250130141115.950749-21-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250130141115.950749-1-jsimmons@infradead.org>
 References: <20250130141115.950749-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 25/25] Revert "lustre: llite: access
- lli_lsm_md with lock in all places"
+Subject: [lustre-devel] [PATCH 20/25] lustre: ptlrpc: retry mechanism for
+ overflowed batched RPCs
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,199 +44,266 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Vitaly Fertman <vitaly.fertman@hpe.com>,
- Lai Siyao <lai.siyao@whamcloud.com>,
+Cc: Mikhail Pershin <mpershin@whamcloud.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Vitaly Fertman <vitaly.fertman@hpe.com>
+From: Qian Yingjin <qian@ddn.com>
 
-This reverts commit f0c0d38c855f186b37844c4d92e24e44f1879fab.
-as a prerequisite of a larger fix in this ticket which covers
-this problem as well.
+Before send the batched RPC, the client has no idea about the
+actual reply buffer size. The reply buffer size prepared by a
+client may be smalller than the reply buffer buffer size in need.
+We already have the patch to grow the reply buffer properly in
+most cases.
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-15535
-Lustre-commit: be278f82efa736035 ("LU-15535 revert: "LU-15284 llite: access lli_lsm_md with lock in all places")
-Signed-off-by: Vitaly Fertman <vitaly.fertman@hpe.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50488
+However, when the reply buffer size is growing larger than
+BUT_MAXREPSIZE (1000 * 1024), the server will return -EOVERFLOW
+error code. At this time, the server only executed the partial
+sub requests in the batched RPC. The overflowed sub requests are
+not handled.
+
+In this patch, it adds a retry mechanism for overflowed batched
+RPC. When found that the reply buffer overflowed, the client will
+rebuild the batched RPC for the unhandled sub requests, and use
+work queue mechanism to resend the new batched RPC to the server
+to re-execute then again.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15550
+Lustre-commit: 668f48f87bec39998 ("LU-15550 ptlrpc: retry mechanism for overflowed batched RPCs")
+Signed-off-by: Qian Yingjin <qian@ddn.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/46540
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Mikhail Pershin <mpershin@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/llite/dir.c            |  6 +++---
- fs/lustre/llite/file.c           |  8 +++-----
- fs/lustre/llite/llite_internal.h | 17 ++---------------
- fs/lustre/llite/llite_lib.c      | 20 +++++++++-----------
- fs/lustre/llite/namei.c          |  7 ++-----
- fs/lustre/llite/statahead.c      |  2 --
- fs/lustre/lmv/lmv_obd.c          |  3 +--
- 7 files changed, 20 insertions(+), 43 deletions(-)
+ fs/lustre/ptlrpc/batch.c | 146 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 140 insertions(+), 6 deletions(-)
 
-diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
-index 2e44f9bb3895..98da2c95ca37 100644
---- a/fs/lustre/llite/dir.c
-+++ b/fs/lustre/llite/dir.c
-@@ -162,11 +162,11 @@ void ll_release_page(struct inode *inode, struct page *page, bool remove)
- {
- 	kunmap(page);
+diff --git a/fs/lustre/ptlrpc/batch.c b/fs/lustre/ptlrpc/batch.c
+index 83342c7b3605..77e3261862e0 100644
+--- a/fs/lustre/ptlrpc/batch.c
++++ b/fs/lustre/ptlrpc/batch.c
+@@ -43,6 +43,17 @@
  
--	/* Always remove the page for striped dir, because the page is
-+	/*
-+	 * Always remove the page for striped dir, because the page is
- 	 * built from temporarily in LMV layer
- 	 */
--	if (inode && S_ISDIR(inode->i_mode) &&
--	    lmv_dir_striped(ll_i2info(inode)->lli_lsm_md)) {
-+	if (inode && ll_dir_striped(inode)) {
- 		__free_page(page);
- 		return;
- 	}
-diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
-index 11006682be1a..c99e9c01bc65 100644
---- a/fs/lustre/llite/file.c
-+++ b/fs/lustre/llite/file.c
-@@ -5330,14 +5330,12 @@ static int ll_merge_md_attr(struct inode *inode)
- 	struct cl_attr attr = { 0 };
- 	int rc;
+ #define OUT_UPDATE_REPLY_SIZE          4096
  
--	if (!lli->lli_lsm_md)
-+	LASSERT(lli->lli_lsm_md);
++static inline struct lustre_msg *
++batch_update_reqmsg_next(struct batch_update_request *bur,
++			 struct lustre_msg *reqmsg)
++{
++	if (reqmsg)
++		return (struct lustre_msg *)((char *)reqmsg +
++					     lustre_packed_msg_size(reqmsg));
++	else
++		return &bur->burq_reqmsg[0];
++}
 +
-+	if (!lmv_dir_striped(lli->lli_lsm_md))
- 		return 0;
+ static inline struct lustre_msg *
+ batch_update_repmsg_next(struct batch_update_reply *bur,
+ 			 struct lustre_msg *repmsg)
+@@ -65,6 +76,12 @@ struct batch_update_args {
+ 	struct batch_update_head	*ba_head;
+ };
  
- 	down_read(&lli->lli_lsm_sem);
--	if (!lmv_dir_striped(lli->lli_lsm_md)) {
--		up_read(&lli->lli_lsm_sem);
--		return 0;
--	}
- 	rc = md_merge_attr(ll_i2mdexp(inode), lli->lli_lsm_md, &attr,
- 			   ll_md_blocking_ast);
- 	up_read(&lli->lli_lsm_sem);
-diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
-index e86d700a182b..42f991ea9a7e 100644
---- a/fs/lustre/llite/llite_internal.h
-+++ b/fs/lustre/llite/llite_internal.h
-@@ -1469,22 +1469,9 @@ static inline struct lu_fid *ll_inode2fid(struct inode *inode)
- 
- static inline bool ll_dir_striped(struct inode *inode)
- {
--	struct ll_inode_info *lli;
--	bool rc;
--
- 	LASSERT(inode);
--	if (!S_ISDIR(inode->i_mode))
--		return false;
--
--	lli = ll_i2info(inode);
--	if (!lli->lli_lsm_md)
--		return false;
--
--	down_read(&lli->lli_lsm_sem);
--	rc = lmv_dir_striped(lli->lli_lsm_md);
--	up_read(&lli->lli_lsm_sem);
--
--	return rc;
-+	return S_ISDIR(inode->i_mode) &&
-+	       lmv_dir_striped(ll_i2info(inode)->lli_lsm_md);
++struct batch_work_resend {
++	struct work_struct		 bwr_work;
++	struct batch_update_head	*bwr_head;
++	int				 bwr_index;
++};
++
+ /**
+  * Prepare inline update request
+  *
+@@ -325,6 +342,8 @@ static void batch_update_request_destroy(struct batch_update_head *head)
+ 	kfree(head);
  }
  
- static inline loff_t ll_file_maxbytes(struct inode *inode)
-diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
-index 751886b47445..37327be5be66 100644
---- a/fs/lustre/llite/llite_lib.c
-+++ b/fs/lustre/llite/llite_lib.c
-@@ -1702,25 +1702,23 @@ static int ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
- 	}
- 
- 	rc = ll_init_lsm_md(inode, md);
--	if (rc) {
--		up_write(&lli->lli_lsm_sem);
--		return rc;
--	}
-+	up_write(&lli->lli_lsm_sem);
- 
--	/* md_merge_attr() may take long, since lsm is already set, switch to
--	 * read lock.
--	 */
--	downgrade_write(&lli->lli_lsm_sem);
-+	if (rc)
-+		return rc;
- 
- 	/* set md->lmv to NULL, so the following free lustre_md will not free
- 	 * this lsm.
- 	 */
- 	md->lmv = NULL;
- 
--	if (!lmv_dir_striped(lli->lli_lsm_md)) {
--		rc = 0;
-+	/* md_merge_attr() may take long, since lsm is already set, switch to
-+	 * read lock.
-+	 */
-+	down_read(&lli->lli_lsm_sem);
++static void cli_batch_resend_work(struct work_struct *data);
 +
-+	if (!lmv_dir_striped(lli->lli_lsm_md))
- 		goto unlock;
--	}
+ static int batch_update_request_fini(struct batch_update_head *head,
+ 				     struct ptlrpc_request *req,
+ 				     struct batch_update_reply *reply, int rc)
+@@ -340,8 +359,6 @@ static int batch_update_request_fini(struct batch_update_head *head,
+ 	list_for_each_entry_safe(ouc, next, &head->buh_cb_list, ouc_item) {
+ 		int rc1 = 0;
  
- 	attr = kzalloc(sizeof(*attr), GFP_NOFS);
- 	if (!attr) {
-diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
-index 920b592489ab..59a7bbb7a99f 100644
---- a/fs/lustre/llite/namei.c
-+++ b/fs/lustre/llite/namei.c
-@@ -746,17 +746,14 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 			.it_op = IT_GETATTR,
- 			.it_lock_handle = 0
- 		};
--		struct ll_inode_info *lli = ll_i2info(parent);
--		struct lu_fid fid = lli->lli_fid;
-+		struct lu_fid fid = ll_i2info(parent)->lli_fid;
- 
- 		/* If it is striped directory, get the real stripe parent */
- 		if (unlikely(ll_dir_striped(parent))) {
--			down_read(&lli->lli_lsm_sem);
- 			rc = md_get_fid_from_lsm(ll_i2mdexp(parent),
--						 lli->lli_lsm_md,
-+						 ll_i2info(parent)->lli_lsm_md,
- 						 (*de)->d_name.name,
- 						 (*de)->d_name.len, &fid);
--			up_read(&lli->lli_lsm_sem);
- 			if (rc)
- 				return rc;
- 		}
-diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
-index 59688b4d7c7f..c820455cc3af 100644
---- a/fs/lustre/llite/statahead.c
-+++ b/fs/lustre/llite/statahead.c
-@@ -1211,10 +1211,8 @@ static int ll_statahead_thread(void *arg)
+-		list_del_init(&ouc->ouc_item);
+-
+ 		/*
+ 		 * The peer may only have handled some requests (indicated by
+ 		 * @count) in the packaged OUT PRC, we can only get results
+@@ -364,8 +381,24 @@ static int batch_update_request_fini(struct batch_update_head *head,
+ 			 * TODO: resend the unfinished sub request when the
+ 			 * return code is -EOVERFLOW.
+ 			 */
++			if (rc == -EOVERFLOW) {
++				struct batch_work_resend *work;
++
++				work = kmalloc(sizeof(*work), GFP_ATOMIC);
++				if (!work) {
++					rc1 = -ENOMEM;
++				} else {
++					INIT_WORK(&work->bwr_work,
++						  cli_batch_resend_work);
++					work->bwr_head = head;
++					work->bwr_index = index;
++					schedule_work(&work->bwr_work);
++					return 0;
++				}
++			}
  		}
  
- 		pos = le64_to_cpu(dp->ldp_hash_end);
--		down_read(&lli->lli_lsm_sem);
- 		ll_release_page(dir, page,
- 				le32_to_cpu(dp->ldp_flags) & LDF_COLLIDE);
--		up_read(&lli->lli_lsm_sem);
++		list_del_init(&ouc->ouc_item);
+ 		if (ouc->ouc_interpret)
+ 			ouc->ouc_interpret(req, repmsg, ouc, rc1);
  
- 		if (sa_low_hit(sai)) {
- 			rc = -EFAULT;
-diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
-index 98ee902d8cb5..27345a2a65b0 100644
---- a/fs/lustre/lmv/lmv_obd.c
-+++ b/fs/lustre/lmv/lmv_obd.c
-@@ -3730,8 +3730,7 @@ lmv_get_fid_from_lsm(struct obd_export *exp,
+@@ -413,6 +446,7 @@ static int batch_send_update_req(const struct lu_env *env,
+ 	struct ptlrpc_request *req = NULL;
+ 	struct batch_update_args *aa;
+ 	struct lu_batch *bh;
++	u32 flags = 0;
+ 	int rc;
+ 
+ 	if (!head)
+@@ -420,6 +454,9 @@ static int batch_send_update_req(const struct lu_env *env,
+ 
+ 	obd = class_exp2obd(head->buh_exp);
+ 	bh = head->buh_batch;
++	if (bh)
++		flags = bh->lbt_flags;
++
+ 	rc = batch_prep_update_req(head, &req);
+ 	if (rc) {
+ 		rc = batch_update_request_fini(head, NULL, NULL, rc);
+@@ -434,16 +471,16 @@ static int batch_send_update_req(const struct lu_env *env,
+ 	 * Only acquire modification RPC slot for the batched RPC
+ 	 * which contains metadata updates.
+ 	 */
+-	if (!(bh->lbt_flags & BATCH_FL_RDONLY))
++	if (!(flags & BATCH_FL_RDONLY))
+ 		ptlrpc_get_mod_rpc_slot(req);
+ 
+-	if (bh->lbt_flags & BATCH_FL_SYNC) {
++	if (flags & BATCH_FL_SYNC) {
+ 		rc = ptlrpc_queue_wait(req);
+ 	} else {
+-		if ((bh->lbt_flags & (BATCH_FL_RDONLY | BATCH_FL_RQSET)) ==
++		if ((flags & (BATCH_FL_RDONLY | BATCH_FL_RQSET)) ==
+ 		    BATCH_FL_RDONLY) {
+ 			ptlrpcd_add_req(req);
+-		} else if (bh->lbt_flags & BATCH_FL_RQSET) {
++		} else if (flags & BATCH_FL_RQSET) {
+ 			ptlrpc_set_add_req(bh->lbt_rqset, req);
+ 			ptlrpc_check_set(env, bh->lbt_rqset);
+ 		} else {
+@@ -522,6 +559,103 @@ static int batch_update_request_add(struct batch_update_head **headp,
+ 	return rc;
+ }
+ 
++static void cli_batch_resend_work(struct work_struct *data)
++{
++	struct batch_work_resend *work = container_of(data,
++					struct batch_work_resend, bwr_work);
++	struct batch_update_head *obuh = work->bwr_head;
++	struct object_update_callback *ouc;
++	struct batch_update_head *head;
++	struct batch_update_buffer *buf;
++	struct batch_update_buffer *tmp;
++	int index = work->bwr_index;
++	int rc = 0;
++	int i = 0;
++
++	head = batch_update_request_create(obuh->buh_exp, NULL);
++	if (!head) {
++		rc = -ENOMEM;
++		goto err_up;
++	}
++
++	list_for_each_entry_safe(buf, tmp, &obuh->buh_buf_list, bub_item) {
++		struct batch_update_request *bur = buf->bub_req;
++		struct batch_update_buffer *newbuf;
++		struct lustre_msg *reqmsg = NULL;
++		size_t max_len;
++		int j;
++
++		if (i + bur->burq_count < index) {
++			i += bur->burq_count;
++			continue;
++		}
++
++		/* reused the allocated buffer */
++		if (i >= index) {
++			list_move_tail(&buf->bub_item, &head->buh_buf_list);
++			head->buh_update_count += buf->bub_req->burq_count;
++			head->buh_buf_count++;
++			continue;
++		}
++
++		for (j = 0; j < bur->burq_count; j++) {
++			struct lustre_msg *newmsg;
++			u32 msgsz;
++
++			reqmsg = batch_update_reqmsg_next(bur, reqmsg);
++			if (i + j < index)
++				continue;
++repeat:
++			newbuf = current_batch_update_buffer(head);
++			LASSERT(newbuf);
++			max_len = newbuf->bub_size - newbuf->bub_end;
++			newmsg = (struct lustre_msg *)((char *)newbuf->bub_req +
++						       newbuf->bub_end);
++			msgsz = lustre_packed_msg_size(reqmsg);
++			if (msgsz >= max_len) {
++				int rc2;
++
++				/* Create new batch update buffer */
++				rc2 = batch_update_buffer_create(head, msgsz +
++					offsetof(struct batch_update_request,
++						 burq_reqmsg[0]) + 1);
++				if (rc2 != 0) {
++					rc = rc2;
++					goto err_up;
++				}
++				goto repeat;
++			}
++
++			memcpy(newmsg, reqmsg, msgsz);
++			newbuf->bub_end += msgsz;
++			newbuf->bub_req->burq_count++;
++			head->buh_update_count++;
++		}
++
++		i = index;
++	}
++
++	list_splice_init(&obuh->buh_cb_list, &head->buh_cb_list);
++	list_for_each_entry(ouc, &head->buh_cb_list, ouc_item)
++		ouc->ouc_head = head;
++
++	head->buh_repsize = BUT_MAXREPSIZE - SPTLRPC_MAX_PAYLOAD;
++	rc = batch_send_update_req(NULL, head);
++	if (rc)
++		goto err_up;
++
++	batch_update_request_destroy(obuh);
++	kfree(work);
++	return;
++
++err_up:
++	batch_update_request_fini(obuh, NULL, NULL, rc);
++	if (head)
++		batch_update_request_fini(head, NULL, NULL, rc);
++
++	kfree(work);
++}
++
+ struct lu_batch *cli_batch_create(struct obd_export *exp,
+ 				  enum lu_batch_flags flags, u32 max_count)
  {
- 	const struct lmv_oinfo *oinfo;
- 
--	if (!lmv_dir_striped(lsm))
--		return -ESTALE;
-+	LASSERT(lmv_dir_striped(lsm));
- 
- 	oinfo = lsm_name_to_stripe_info(lsm, name, namelen, false);
- 	if (IS_ERR(oinfo))
 -- 
 2.39.3
 
