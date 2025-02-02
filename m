@@ -4,34 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id E4CFCC0218F
-	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:13:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 781A3C0218F
+	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:14:35 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMKC5fhYz228J;
-	Sun, 02 Feb 2025 12:53:03 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMKZ4Q4Tz228x;
+	Sun, 02 Feb 2025 12:53:22 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YmMFp5yWVz213T
- for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:50:06 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm5-e204-208.ccs.ornl.gov [160.91.203.29])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 1B3C2881AA1;
+ 4YmMGC4q0Cz214b
+ for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:50:27 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm2-e204-208.ccs.ornl.gov [160.91.203.3])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 22852881AA2;
  Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 17E92106BE18; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
+ id 1F670106BE17; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  2 Feb 2025 15:46:30 -0500
-Message-ID: <20250202204633.1148872-31-jsimmons@infradead.org>
+Date: Sun,  2 Feb 2025 15:46:32 -0500
+Message-ID: <20250202204633.1148872-33-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250202204633.1148872-1-jsimmons@infradead.org>
 References: <20250202204633.1148872-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 30/33] lnet: libcfs: move cfs_expr_list_print
- to nidstrings.c
+Subject: [lustre-devel] [PATCH 32/33] lnet: ksocklnd:
+ ksocklnd_ni_get_eth_intf_speed() must use only rtnl lock
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,202 +44,73 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Chris Horn <chris.horn@hpe.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+A kernel with debug enable is reporting the following:
 
-cfs_expr_list_print() is only called from nidstrings.c
-so move it there and make it static.
+include/linux/inetdevice.h:221 suspicious rcu_dereference_check() usage!
+other info that might help us debug this:
+rcu_scheduler_active = 2, debug_locks = 1
+5 locks held by lctl/42289:
+ #0: ffffffffa04263f8 ((libcfs_ioctl_list).rwsem){++++}-{3:3}, at: __blocking_notifier_call_chain+0x44/0xa0
+ #1: ffffffffa04fa7b0 (lnet_config_mutex){+.+.}-{3:3}, at: lnet_configure+0x1d/0xc0 [lnet]
+ #2: ffffffffa04f06e8 (the_lnet.ln_api_mutex){+.+.}-{3:3}, at: LNetNIInit+0x4c/0x960 [lnet]
+ #3: ffffffffa04f0788 (&the_lnet.ln_lnd_mutex){+.+.}-{3:3}, at: lnet_startup_lndnet+0x11e/0xa90 [lnet]
+ #4: ffffffff834a0cd0 (rtnl_mutex){+.+.}-{3:3}, at: rtnl_lock+0x1b/0x30
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9859
-Lustre-commit: 531d7b630e962a33f ("LU-9859 libcfs: move cfs_expr_list_print to nidstrings.c")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50834
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+stack backtrace:
+CPU: 2 PID: 42289 Comm: lctl Kdump: loaded Tainted: G        W  O     --------- -  - 4.18.0rh8.5-debug #2
+Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
+  Call Trace:
+  ? dump_stack+0x119/0x18e
+  ? lockdep_rcu_suspicious+0x141/0x14f
+  ? ksocklnd_ni_get_eth_intf_speed.isra.1+0x308/0x360 [ksocklnd]
+  ? mark_held_locks+0x6a/0xc0
+  ? ktime_get_with_offset+0x233/0x2b0
+  ? trace_hardirqs_on+0x4e/0x220
+  ? ksocknal_tunables_setup+0xed/0x200 [ksocklnd]
+  ? ksocknal_startup+0x4ff/0x1180 [ksocklnd]
+
+The function __ethtool_get_link_ksettings() has a hard requirement
+to have the in_dev device protected by the rtnl mutex. At the
+same time we are aquiring in_dev using the rcu lock. The in_dev
+needs to be stabilized by the same lock. So use rtnl functions
+instead.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16807
+Lustre-commit: 65d664bff40590366 ("LU-16807 ksocklnd: ksocklnd_ni_get_eth_intf_speed() must use only rtnl lock")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/51028
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Chris Horn <chris.horn@hpe.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
 ---
- include/linux/libcfs/libcfs_string.h |  2 -
- net/lnet/libcfs/libcfs_string.c      | 68 ----------------------------
- net/lnet/lnet/nidstrings.c           | 68 ++++++++++++++++++++++++++++
- 3 files changed, 68 insertions(+), 70 deletions(-)
+ net/lnet/klnds/socklnd/socklnd_modparams.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/libcfs/libcfs_string.h b/include/linux/libcfs/libcfs_string.h
-index a8bd44dc33d9..7673a2fecf7e 100644
---- a/include/linux/libcfs/libcfs_string.h
-+++ b/include/linux/libcfs/libcfs_string.h
-@@ -79,8 +79,6 @@ int cfs_gettok(struct cfs_lstr *next, char delim, struct cfs_lstr *res);
- int cfs_str2num_check(char *str, int nob, unsigned int *num,
- 		      unsigned int min, unsigned int max);
- int cfs_expr_list_match(u32 value, struct cfs_expr_list *expr_list);
--int cfs_expr_list_print(char *buffer, int count,
--			struct cfs_expr_list *expr_list);
- int cfs_expr_list_values(struct cfs_expr_list *expr_list,
- 			 int max, u32 **values);
- void cfs_expr_list_free(struct cfs_expr_list *expr_list);
-diff --git a/net/lnet/libcfs/libcfs_string.c b/net/lnet/libcfs/libcfs_string.c
-index 672b8591c50f..811b16d0f48d 100644
---- a/net/lnet/libcfs/libcfs_string.c
-+++ b/net/lnet/libcfs/libcfs_string.c
-@@ -305,74 +305,6 @@ cfs_range_expr_parse(struct cfs_lstr *src, unsigned int min, unsigned int max,
- 	return -EINVAL;
- }
+diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
+index 5eb58ca97c06..031fe13d2a38 100644
+--- a/net/lnet/klnds/socklnd/socklnd_modparams.c
++++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
+@@ -183,11 +183,11 @@ static int ksocklnd_ni_get_eth_intf_speed(struct lnet_ni *ni)
+ 		if (!(flags & IFF_UP))
+ 			continue;
  
--/**
-- * Print the range expression @expr into specified @buffer.
-- * If @bracketed is true, expression does not need additional
-- * brackets.
-- *
-- * Return:	number of characters written
-- */
--static int
--cfs_range_expr_print(char *buffer, int count, struct cfs_range_expr *expr,
--		     bool bracketed)
--{
--	int i;
--	char s[] = "[";
--	char e[] = "]";
--
--	if (bracketed) {
--		s[0] = '\0';
--		e[0] = '\0';
--	}
--
--	if (expr->re_lo == expr->re_hi)
--		i = scnprintf(buffer, count, "%u", expr->re_lo);
--	else if (expr->re_stride == 1)
--		i = scnprintf(buffer, count, "%s%u-%u%s",
--			      s, expr->re_lo, expr->re_hi, e);
--	else
--		i = scnprintf(buffer, count, "%s%u-%u/%u%s",
--			      s, expr->re_lo, expr->re_hi, expr->re_stride, e);
--	return i;
--}
--
--/**
-- * Print a list of range expressions (@expr_list) into specified @buffer.
-- * If the list contains several expressions, separate them with comma
-- * and surround the list with brackets.
-- *
-- * Return:	number of characters written
-- */
--int
--cfs_expr_list_print(char *buffer, int count, struct cfs_expr_list *expr_list)
--{
--	struct cfs_range_expr *expr;
--	int i = 0, j = 0;
--	int numexprs = 0;
--
--	if (count <= 0)
--		return 0;
--
--	list_for_each_entry(expr, &expr_list->el_exprs, re_link)
--		numexprs++;
--
--	if (numexprs > 1)
--		i += scnprintf(buffer + i, count - i, "[");
--
--	list_for_each_entry(expr, &expr_list->el_exprs, re_link) {
--		if (j++)
--			i += scnprintf(buffer + i, count - i, ",");
--		i += cfs_range_expr_print(buffer + i, count - i, expr,
--					  numexprs > 1);
--	}
--
--	if (numexprs > 1)
--		i += scnprintf(buffer + i, count - i, "]");
--
--	return i;
--}
--EXPORT_SYMBOL(cfs_expr_list_print);
--
- /**
-  * Matches value (@value) against ranges expression list @expr_list.
-  *
-diff --git a/net/lnet/lnet/nidstrings.c b/net/lnet/lnet/nidstrings.c
-index 05a9b3275624..893eaa4c48ef 100644
---- a/net/lnet/lnet/nidstrings.c
-+++ b/net/lnet/lnet/nidstrings.c
-@@ -591,6 +591,74 @@ cfs_ip_addr_parse(char *str, int len, struct list_head *list)
- 	return rc;
- }
+-		in_dev = __in_dev_get_rcu(dev);
++		in_dev = __in_dev_get_rtnl(dev);
+ 		if (!in_dev)
+ 			continue;
  
-+/**
-+ * Print the range expression @expr into specified @buffer.
-+ * If @bracketed is true, expression does not need additional
-+ * brackets.
-+ *
-+ * Return	number of characters written
-+ */
-+static int
-+cfs_range_expr_print(char *buffer, int count, struct cfs_range_expr *expr,
-+		     bool bracketed)
-+{
-+	int i;
-+	char s[] = "[";
-+	char e[] = "]";
-+
-+	if (bracketed) {
-+		s[0] = '\0';
-+		e[0] = '\0';
-+	}
-+
-+	if (expr->re_lo == expr->re_hi)
-+		i = scnprintf(buffer, count, "%u", expr->re_lo);
-+	else if (expr->re_stride == 1)
-+		i = scnprintf(buffer, count, "%s%u-%u%s",
-+			      s, expr->re_lo, expr->re_hi, e);
-+	else
-+		i = scnprintf(buffer, count, "%s%u-%u/%u%s",
-+			      s, expr->re_lo, expr->re_hi,
-+			      expr->re_stride, e);
-+	return i;
-+}
-+
-+/**
-+ * Print a list of range expressions (\a expr_list) into specified \a buffer.
-+ * If the list contains several expressions, separate them with comma
-+ * and surround the list with brackets.
-+ *
-+ * Return	number of characters written
-+ */
-+static int
-+cfs_expr_list_print(char *buffer, int count, struct cfs_expr_list *expr_list)
-+{
-+	struct cfs_range_expr *expr;
-+	int i = 0, j = 0;
-+	int numexprs = 0;
-+
-+	if (count <= 0)
-+		return 0;
-+
-+	list_for_each_entry(expr, &expr_list->el_exprs, re_link)
-+		numexprs++;
-+
-+	if (numexprs > 1)
-+		i += scnprintf(buffer + i, count - i, "[");
-+
-+	list_for_each_entry(expr, &expr_list->el_exprs, re_link) {
-+		if (j++ != 0)
-+			i += scnprintf(buffer + i, count - i, ",");
-+		i += cfs_range_expr_print(buffer + i, count - i, expr,
-+					  numexprs > 1);
-+	}
-+
-+	if (numexprs > 1)
-+		i += scnprintf(buffer + i, count - i, "]");
-+
-+	return i;
-+}
-+
- static int
- libcfs_ip_addr_range_print(char *buffer, int count, struct list_head *list)
- {
+-		in_dev_for_each_ifa_rcu(ifa, in_dev) {
++		in_dev_for_each_ifa_rtnl(ifa, in_dev) {
+ 			if (strcmp(ifa->ifa_label, ni->ni_interface) == 0)
+ 				intf_idx = dev->ifindex;
+ 		}
 -- 
 2.39.3
 
