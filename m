@@ -4,34 +4,33 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 73FDDC0218F
-	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:01:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 2CD61C0218F
+	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:03:51 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMFn4lvYz213M;
-	Sun, 02 Feb 2025 12:50:05 -0800 (PST)
-Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMFz18t7z20tk;
+	Sun, 02 Feb 2025 12:50:15 -0800 (PST)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YmMFW4Dnbz2127
- for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:49:51 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm3-e204-208.ccs.ornl.gov [160.91.203.26])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 258AA182375;
+ 4YmMFX6bqpz212T
+ for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:49:52 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm5-e204-208.ccs.ornl.gov [160.91.203.29])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 07765881A9D;
  Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 24414106BE15; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
+ id 04568106BE15; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  2 Feb 2025 15:46:33 -0500
-Message-ID: <20250202204633.1148872-34-jsimmons@infradead.org>
+Date: Sun,  2 Feb 2025 15:46:25 -0500
+Message-ID: <20250202204633.1148872-26-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250202204633.1148872-1-jsimmons@infradead.org>
 References: <20250202204633.1148872-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 33/33] lustre: ldlm: convert ldlm extent
- locks to linux extent-tree
+Subject: [lustre-devel] [PATCH 25/33] lnet: libcfs: use round_up directly
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,413 +43,289 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Yang Sheng <ys@whamcloud.com>,
+Cc: Arshad Hussain <arshad.hussain@aeoncomputing.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+The macro cfs_size_round() is just round_up(val, 8). Replace
+cfs_size_round() with the Linux standard round_up().
 
-The original work for coverting ldlm_extent locks to the
-standard linux extent tree has some bugs which could lead
-to kernel crashes such as:
-
-LustreError: 10543:0:(osc_cache.c:1141:osc_extent_make_ready()) ASSERTION( last_oap_count > 0 ) failed: last_oap_count 0
-LustreError: 10543:0:(osc_cache.c:1141:osc_extent_make_ready()) LBUG
-Pid: 10543, comm: ldlm_bl_05 3.10.0-7.9-debug #1 SMP Mon Feb 1 17:33:41 EST 2021
-Call Trace:
-[<0>] libcfs_call_trace+0x90/0xf0 [libcfs]
-[<0>] lbug_with_loc+0x4c/0xa0 [libcfs]
-[<0>] osc_extent_make_ready+0xb66/0xe60 [osc]
-[<0>] osc_cache_writeback_range+0x4d3/0xfd0 [osc]
-[<0>] osc_lock_flush+0x195/0x290 [osc]
-[<0>] osc_ldlm_blocking_ast+0x2f8/0x3e0 [osc]
-[<0>] ldlm_cancel_callback+0x84/0x320 [ptlrpc]
-[<0>] ldlm_cli_cancel_local+0xd1/0x420 [ptlrpc]
-[<0>] ldlm_cli_cancel+0x10c/0x560 [ptlrpc]
-[<0>] osc_ldlm_blocking_ast+0x17a/0x3e0 [osc]
-[<0>] ldlm_handle_bl_callback+0xc5/0x3e0 [ptlrpc]
-[<0>] ldlm_bl_thread_main+0x5bf/0xae0 [ptlrpc]
-[<0>] kthread+0xe4/0xf0
-
-This work fixes up the kms handling code and brings us into sync
-with later work on the interval tree cleanup done.
-
-Fixes: d5aaf4d1355 ("lustre: convert ldlm extent locks to linux extent-tree")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11085
-Lustre-commit: d2ff746a997395e6a ("LU-11085 ldlm: convert ldlm extent locks to linux extent-tree")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Signed-off-by: Yang Sheng <ys@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/41792
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9859
+Lustre-commit: 20683c0d6c3e7d042 ("LU-9859 libcfs: use round_up directly")
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50545
+Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 ---
- fs/lustre/include/lustre_dlm.h | 22 ++++++++++-----
- fs/lustre/ldlm/ldlm_extent.c   | 47 ++++++++++++++++++++++----------
- fs/lustre/ldlm/ldlm_lock.c     | 49 ++++++++++++++++------------------
- fs/lustre/ldlm/ldlm_lockd.c    |  5 ++--
- 4 files changed, 75 insertions(+), 48 deletions(-)
+ fs/lustre/include/cl_object.h         |  2 +-
+ fs/lustre/llite/vvp_object.c          |  2 +-
+ fs/lustre/mdc/mdc_request.c           |  9 ++++-----
+ fs/lustre/obdclass/class_obd.c        |  6 +++---
+ fs/lustre/obdecho/echo_client.c       |  2 +-
+ fs/lustre/osc/osc_cache.c             |  2 +-
+ fs/lustre/ptlrpc/batch.c              |  6 ++----
+ fs/lustre/ptlrpc/layout.c             |  8 +++++---
+ fs/lustre/ptlrpc/pack_generic.c       | 13 ++++++-------
+ include/linux/libcfs/libcfs_private.h |  4 ----
+ net/lnet/libcfs/module.c              |  8 ++++----
+ 11 files changed, 28 insertions(+), 34 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_dlm.h b/fs/lustre/include/lustre_dlm.h
-index a3a339f82d1a..4217a8ad4501 100644
---- a/fs/lustre/include/lustre_dlm.h
-+++ b/fs/lustre/include/lustre_dlm.h
-@@ -48,6 +48,7 @@
- #include <lustre_net.h>
- #include <lustre_import.h>
- #include <lustre_handles.h>
-+#include <linux/interval_tree_generic.h>
- #include <lu_ref.h>
+diff --git a/fs/lustre/include/cl_object.h b/fs/lustre/include/cl_object.h
+index 9d940cbdb249..b8ac31960a2f 100644
+--- a/fs/lustre/include/cl_object.h
++++ b/fs/lustre/include/cl_object.h
+@@ -2162,7 +2162,7 @@ static inline int cl_object_same(struct cl_object *o0, struct cl_object *o1)
+ static inline void cl_object_page_init(struct cl_object *clob, int size)
+ {
+ 	clob->co_slice_off = cl_object_header(clob)->coh_page_bufsize;
+-	cl_object_header(clob)->coh_page_bufsize += cfs_size_round(size);
++	cl_object_header(clob)->coh_page_bufsize += round_up(size, 8);
+ 	WARN_ON(cl_object_header(clob)->coh_page_bufsize > 512);
+ }
  
- #include "lustre_dlm_flags.h"
-@@ -574,7 +575,7 @@ struct ldlm_glimpse_work {
-  * Interval tree for extent locks.
-  * The interval tree must be accessed under the resource lock.
-  * Interval trees are used for granted extent locks to speed up conflicts
-- * lookup. See ldlm/interval_tree.c for more details.
-+ * lookup.
-  */
- struct ldlm_interval_tree {
- 	/** Tree size. */
-@@ -666,11 +667,14 @@ struct ldlm_lock {
- 	 * Protected by lr_lock in struct ldlm_resource.
- 	 */
- 	struct list_head		l_res_link;
-+
- 	/**
--	 * Interval-tree node for ldlm_extent.
-+	 * Internal structure per lock type..
- 	 */
-+	/* LDLM_EXTENT locks only */
-+	struct ldlm_extent		l_req_extent;
- 	struct rb_node			l_rb;
--	u64				__subtree_last;
-+	u64				l_subtree_last;
+diff --git a/fs/lustre/llite/vvp_object.c b/fs/lustre/llite/vvp_object.c
+index 5120ec095862..f4b2f8921b6c 100644
+--- a/fs/lustre/llite/vvp_object.c
++++ b/fs/lustre/llite/vvp_object.c
+@@ -316,7 +316,7 @@ struct lu_object *vvp_object_alloc(const struct lu_env *env,
+ 		obj = &vob->vob_cl.co_lu;
+ 		hdr = &vob->vob_header;
+ 		cl_object_header_init(hdr);
+-		hdr->coh_page_bufsize = cfs_size_round(sizeof(struct cl_page));
++		hdr->coh_page_bufsize = round_up(sizeof(struct cl_page), 8);
  
- 	/**
- 	 * Requested mode.
-@@ -750,9 +754,6 @@ struct ldlm_lock {
- 	 */
- 	ktime_t				l_last_used;
+ 		lu_object_init(obj, &hdr->coh_lu, dev);
+ 		lu_object_add_top(&hdr->coh_lu, obj);
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index 5919e5952c0e..2b8386661a31 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -1712,15 +1712,14 @@ static int mdc_ioc_fid2path(struct obd_export *exp, struct getinfo_fid2path *gf)
+ 		return -EOVERFLOW;
  
--	/** Originally requested extent for the extent lock. */
--	struct ldlm_extent		l_req_extent;
+ 	/* Key is KEY_FID2PATH + getinfo_fid2path description */
+-	keylen = cfs_size_round(sizeof(KEY_FID2PATH)) + sizeof(*gf) +
+-				sizeof(struct lu_fid);
++	keylen = round_up(sizeof(KEY_FID2PATH) + sizeof(*gf) +
++			  sizeof(struct lu_fid), 8);
+ 	key = kzalloc(keylen, GFP_NOFS);
+ 	if (!key)
+ 		return -ENOMEM;
+ 	memcpy(key, KEY_FID2PATH, sizeof(KEY_FID2PATH));
+-	memcpy(key + cfs_size_round(sizeof(KEY_FID2PATH)), gf, sizeof(*gf));
 -
- 	/*
- 	 * Client-side-only members.
- 	 */
-@@ -858,6 +859,15 @@ enum ldlm_match_flags {
- 	LDLM_MATCH_GROUP	= BIT(4),
- };
+-	memcpy(key + cfs_size_round(sizeof(KEY_FID2PATH)) + sizeof(*gf),
++	memcpy(key + round_up(sizeof(KEY_FID2PATH), 8), gf, sizeof(*gf));
++	memcpy(key + round_up(sizeof(KEY_FID2PATH), 8) + sizeof(*gf),
+ 	       gf->gf_root_fid, sizeof(struct lu_fid));
+ 	CDEBUG(D_IOCTL, "path get " DFID " from %llu #%d\n",
+ 	       PFID(&gf->gf_fid), gf->gf_recno, gf->gf_linkno);
+diff --git a/fs/lustre/obdclass/class_obd.c b/fs/lustre/obdclass/class_obd.c
+index ab27cf23ca9a..a6e256484800 100644
+--- a/fs/lustre/obdclass/class_obd.c
++++ b/fs/lustre/obdclass/class_obd.c
+@@ -278,17 +278,17 @@ int obd_ioctl_getdata(struct obd_ioctl_data **datap, int *len, void __user *arg)
  
-+#define extent_last(tree) rb_entry_safe(rb_last(&tree->lit_root.rb_root),\
-+					struct ldlm_lock, l_rb)
-+#define extent_first(tree) rb_entry_safe(rb_first(&tree->lit_root.rb_root),\
-+					 struct ldlm_lock, l_rb)
-+#define extent_top(tree) rb_entry_safe(tree->lit_root.rb_root.rb_node, \
-+				       struct ldlm_lock, l_rb)
-+#define extent_prev(lock) rb_entry_safe(rb_prev(&lock->l_rb),		\
-+					struct ldlm_lock, l_rb)
-+
- /**
-  * Describe the overlap between two locks.  itree_overlap_cb data.
-  */
-diff --git a/fs/lustre/ldlm/ldlm_extent.c b/fs/lustre/ldlm/ldlm_extent.c
-index 15ce512cf10c..489de60822bb 100644
---- a/fs/lustre/ldlm/ldlm_extent.c
-+++ b/fs/lustre/ldlm/ldlm_extent.c
-@@ -63,7 +63,7 @@
+ 	if (data->ioc_inllen1) {
+ 		data->ioc_inlbuf1 = &data->ioc_bulk[0];
+-		offset += cfs_size_round(data->ioc_inllen1);
++		offset += round_up(data->ioc_inllen1, 8);
+ 	}
  
- #define START(node) ISTART((node)->l_policy_data.l_extent.end)
- #define LAST(node) IEND((node)->l_policy_data.l_extent.start)
--INTERVAL_TREE_DEFINE(struct ldlm_lock, l_rb, u64, __subtree_last,
-+INTERVAL_TREE_DEFINE(struct ldlm_lock, l_rb, u64, l_subtree_last,
- 		     START, LAST, static, extent);
+ 	if (data->ioc_inllen2) {
+ 		data->ioc_inlbuf2 = &data->ioc_bulk[0] + offset;
+-		offset += cfs_size_round(data->ioc_inllen2);
++		offset += round_up(data->ioc_inllen2, 8);
+ 	}
  
- /* When a lock is cancelled by a client, the KMS may undergo change if this
-@@ -81,7 +81,7 @@ u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, u64 old_kms)
- 	struct ldlm_lock *lck;
- 	u64 kms = 0;
- 	int idx = 0;
--	bool complete;
-+	bool complete = false;
+ 	if (data->ioc_inllen3) {
+ 		data->ioc_inlbuf3 = &data->ioc_bulk[0] + offset;
+-		offset += cfs_size_round(data->ioc_inllen3);
++		offset += round_up(data->ioc_inllen3, 8);
+ 	}
  
- 	/* don't let another thread in ldlm_extent_shift_kms race in
- 	 * just after we finish and take our lock into account in its
-@@ -90,22 +90,27 @@ u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, u64 old_kms)
- 	ldlm_set_kms_ignore(lock);
+ 	if (data->ioc_inllen4)
+diff --git a/fs/lustre/obdecho/echo_client.c b/fs/lustre/obdecho/echo_client.c
+index 220ceae89150..654bc3b7d351 100644
+--- a/fs/lustre/obdecho/echo_client.c
++++ b/fs/lustre/obdecho/echo_client.c
+@@ -294,7 +294,7 @@ static struct lu_object *echo_object_alloc(const struct lu_env *env,
  
- 	/* We iterate over the lock trees, looking for the largest kms
--	 * smaller than the current one.  Note that each tree is
--	 * iterated starting a largest end, because the interval tree
--	 * is stored last-to-first order.
-+	 * smaller than the current one.
- 	 */
- 	for (idx = 0; idx < LCK_MODE_NUM; idx++) {
- 		tree = &res->lr_itree[idx];
+ 		obj = &echo_obj2cl(eco)->co_lu;
+ 		cl_object_header_init(hdr);
+-		hdr->coh_page_bufsize = cfs_size_round(sizeof(struct cl_page));
++		hdr->coh_page_bufsize = round_up(sizeof(struct cl_page), 8);
  
--		for (lck = extent_iter_first(&tree->lit_root, 0, U64_MAX);
-+		/* If our already known kms is >= than the highest 'end' in
-+		 * this tree, we don't need to check this tree, because
-+		 * the kms from a tree can be lower than in_max_high (due to
-+		 * kms_ignore), but it can never be higher.
-+		 */
-+		lck = extent_top(tree);
-+		if (!lck || kms >= lck->l_subtree_last)
+ 		lu_object_init(obj, &hdr->coh_lu, dev);
+ 		lu_object_add_top(&hdr->coh_lu, obj);
+diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
+index 691ebc0ad46a..f1f21c28765e 100644
+--- a/fs/lustre/osc/osc_cache.c
++++ b/fs/lustre/osc/osc_cache.c
+@@ -2302,7 +2302,7 @@ int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
+ 	struct osc_async_page *oap = &ops->ops_oap;
+ 
+ 	if (!page)
+-		return cfs_size_round(sizeof(*oap));
++		return round_up(sizeof(*oap), 8);
+ 
+ 	oap->oap_obj = osc;
+ 	oap->oap_page = page->cp_vmpage;
+diff --git a/fs/lustre/ptlrpc/batch.c b/fs/lustre/ptlrpc/batch.c
+index 77e3261862e0..753dfe3c15e8 100644
+--- a/fs/lustre/ptlrpc/batch.c
++++ b/fs/lustre/ptlrpc/batch.c
+@@ -132,14 +132,12 @@ static int batch_prep_update_req(struct batch_update_head *head,
+ 	struct batch_update_buffer *buf;
+ 	struct but_update_header *buh;
+ 	struct but_update_buffer *bub;
++	int repsize = head->buh_repsize;
+ 	int page_count = 0;
+ 	int total = 0;
+-	int repsize;
+ 	int rc;
+ 
+-	repsize = head->buh_repsize +
+-		  cfs_size_round(offsetof(struct batch_update_reply,
+-					  burp_repmsg[0]));
++	repsize += round_up(offsetof(struct batch_update_reply, burp_repmsg[0]), 8);
+ 	if (repsize < OUT_UPDATE_REPLY_SIZE)
+ 		repsize = OUT_UPDATE_REPLY_SIZE;
+ 
+diff --git a/fs/lustre/ptlrpc/layout.c b/fs/lustre/ptlrpc/layout.c
+index 3a9e83f5262b..64e0224ce496 100644
+--- a/fs/lustre/ptlrpc/layout.c
++++ b/fs/lustre/ptlrpc/layout.c
+@@ -2404,9 +2404,11 @@ u32 req_capsule_fmt_size(u32 magic, const struct req_format *fmt,
+ 	if (!size)
+ 		return size;
+ 
+-	for (; i < fmt->rf_fields[loc].nr; ++i)
+-		if (fmt->rf_fields[loc].d[i]->rmf_size != -1)
+-			size += cfs_size_round(fmt->rf_fields[loc].d[i]->rmf_size);
++	for (; i < fmt->rf_fields[loc].nr; ++i) {
++		if (fmt->rf_fields[loc].d[i]->rmf_size == -1)
 +			continue;
-+
-+		for (lck = extent_last(tree);
- 		     lck;
--		     lck = extent_iter_next(lck, 0, U64_MAX)) {
-+		     lck = extent_prev(lck)) {
- 			if (ldlm_is_kms_ignore(lck))
- 				continue;
- 
--			/* This is the last lock-end that doesn't ignore
--			 * kms.
--			 * If it has a greater or equal kms, we are not
-+			/* If this lock has a greater or equal kms, we are not
- 			 * the highest lock (or we share that distinction
- 			 * with another lock), and don't need to update KMS.
- 			 * Record old_kms and stop looking.
-@@ -114,9 +119,21 @@ u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, u64 old_kms)
- 			    lck->l_policy_data.l_extent.end + 1 >= old_kms) {
- 				kms = old_kms;
- 				complete = true;
--			} else
-+				break;
-+			}
-+			if (lck->l_policy_data.l_extent.end + 1 > kms)
- 				kms = lck->l_policy_data.l_extent.end + 1;
--			break;
-+
-+			/* Since we start with the highest lock and work
-+			 * down, for PW locks, we only need to check if we
-+			 * should update the kms, then stop walking the tree.
-+			 * PR locks are not exclusive, so the highest start
-+			 * does not imply the highest end and we must
-+			 * continue.  (Only one group lock is allowed per
-+			 * resource, so this is irrelevant for group locks.)
-+			 */
-+			if (lck->l_granted_mode == LCK_PW)
-+				break;
- 		}
- 
- 		/* this tells us we're not the highest lock, so we don't need
-@@ -126,8 +143,7 @@ u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, u64 old_kms)
- 			break;
- 	}
- 
--	LASSERTF(kms <= old_kms, "kms %llu old_kms %llu\n", kms,
--		 old_kms);
-+	LASSERTF(kms <= old_kms, "kms %llu old_kms %llu\n", kms, old_kms);
- 
- 	return kms;
++		size += round_up(fmt->rf_fields[loc].d[i]->rmf_size, 8);
++	}
+ 	return size;
  }
-@@ -204,8 +220,11 @@ void ldlm_extent_unlink_lock(struct ldlm_lock *lock)
- 	LASSERT(lock->l_granted_mode == BIT(idx));
- 	tree = &res->lr_itree[idx];
+ EXPORT_SYMBOL(req_capsule_fmt_size);
+diff --git a/fs/lustre/ptlrpc/pack_generic.c b/fs/lustre/ptlrpc/pack_generic.c
+index 61fd122e8e3f..cb7a8a39a380 100644
+--- a/fs/lustre/ptlrpc/pack_generic.c
++++ b/fs/lustre/ptlrpc/pack_generic.c
+@@ -55,8 +55,7 @@
  
-+	LASSERT(!RB_EMPTY_ROOT(&tree->lit_root.rb_root));
-+
- 	tree->lit_size--;
- 	extent_remove(lock, &tree->lit_root);
-+	RB_CLEAR_NODE(&lock->l_rb);
+ static inline u32 lustre_msg_hdr_size_v2(u32 count)
+ {
+-	return cfs_size_round(offsetof(struct lustre_msg_v2,
+-				       lm_buflens[count]));
++	return round_up(offsetof(struct lustre_msg_v2, lm_buflens[count]), 8);
  }
  
- void ldlm_extent_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
-diff --git a/fs/lustre/ldlm/ldlm_lock.c b/fs/lustre/ldlm/ldlm_lock.c
-index 5fcae3864483..739798bd95d9 100644
---- a/fs/lustre/ldlm/ldlm_lock.c
-+++ b/fs/lustre/ldlm/ldlm_lock.c
-@@ -182,8 +182,6 @@ void ldlm_lock_put(struct ldlm_lock *lock)
- 		lprocfs_counter_decr(ldlm_res_to_ns(res)->ns_stats,
- 				     LDLM_NSS_LOCKS);
- 		lu_ref_del(&res->lr_reference, "lock", lock);
--		ldlm_resource_putref(res);
--		lock->l_resource = NULL;
- 		if (lock->l_export) {
- 			class_export_lock_put(lock->l_export, lock);
- 			lock->l_export = NULL;
-@@ -191,6 +189,8 @@ void ldlm_lock_put(struct ldlm_lock *lock)
+ u32 lustre_msg_hdr_size(u32 magic, u32 count)
+@@ -91,7 +90,7 @@ u32 lustre_msg_size_v2(int count, u32 *lengths)
+ 	LASSERT(count > 0);
+ 	size = lustre_msg_hdr_size_v2(count);
+ 	for (i = 0; i < count; i++)
+-		size += cfs_size_round(lengths[i]);
++		size += round_up(lengths[i], 8);
  
- 		kvfree(lock->l_lvb_data);
+ 	return size;
+ }
+@@ -164,7 +163,7 @@ void lustre_init_msg_v2(struct lustre_msg_v2 *msg, int count, u32 *lens,
  
-+		ldlm_resource_putref(res);
-+		lock->l_resource = NULL;
- 		lu_ref_fini(&lock->l_reference);
- 		call_rcu(&lock->l_handle.h_rcu, lock_handle_free);
+ 		if (tmp)
+ 			memcpy(ptr, tmp, lens[i]);
+-		ptr += cfs_size_round(lens[i]);
++		ptr += round_up(lens[i], 8);
  	}
-@@ -399,6 +399,7 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- 	lock->l_blocking_lock = NULL;
- 	INIT_LIST_HEAD(&lock->l_sl_mode);
- 	INIT_LIST_HEAD(&lock->l_sl_policy);
-+	/* LDLM_EXTENT */
- 	RB_CLEAR_NODE(&lock->l_rb);
+ }
+ EXPORT_SYMBOL(lustre_init_msg_v2);
+@@ -376,7 +375,7 @@ void *lustre_msg_buf_v2(struct lustre_msg_v2 *m, u32 n, u32 min_size)
  
- 	lprocfs_counter_incr(ldlm_res_to_ns(resource)->ns_stats,
-@@ -1042,6 +1043,8 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
-  *
-  * @lock	test-against this lock
-  * @data	parameters
-+ *
-+ * RETURN	returns true if @lock matches @data, false otherwise
-  */
- static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- {
-@@ -1052,15 +1055,13 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	if (lock == data->lmd_old)
- 		return true;
+ 	offset = lustre_msg_hdr_size_v2(bufcount);
+ 	for (i = 0; i < n; i++)
+-		offset += cfs_size_round(m->lm_buflens[i]);
++		offset += round_up(m->lm_buflens[i], 8);
  
--	/*
--	 * Check if this lock can be matched.
-+	/* Check if this lock can be matched.
- 	 * Used by LU-2919(exclusive open) for open lease lock
- 	 */
- 	if (ldlm_is_excl(lock))
- 		return false;
- 
--	/*
--	 * llite sometimes wants to match locks that will be
-+	/* llite sometimes wants to match locks that will be
- 	 * canceled when their users drop, but we allow it to match
- 	 * if it passes in CBPENDING and the lock still has users.
- 	 * this is generally only going to be used by children
-@@ -1106,10 +1107,7 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 			return false;
- 		break;
- 	case LDLM_IBITS:
--		/*
--		 * We match if we have existing lock with same or wider set
--		 * of bits.
--		 */
-+		/* We match with existing lock with same or wider set of bits. */
- 		if ((lpol->l_inodebits.bits &
- 		     data->lmd_policy->l_inodebits.bits) !=
- 		    data->lmd_policy->l_inodebits.bits)
-@@ -1124,10 +1122,8 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- 	default:
- 		break;
+ 	return (char *)m + offset;
+ }
+@@ -410,7 +409,7 @@ static int lustre_shrink_msg_v2(struct lustre_msg_v2 *msg, u32 segment,
+ 	if (move_data && msg->lm_bufcount > segment + 1) {
+ 		tail = lustre_msg_buf_v2(msg, segment + 1, 0);
+ 		for (n = segment + 1; n < msg->lm_bufcount; n++)
+-			tail_len += cfs_size_round(msg->lm_buflens[n]);
++			tail_len += round_up(msg->lm_buflens[n], 8);
  	}
--	/*
--	 * We match if we have existing lock with same or wider set
--	 * of bits.
--	 */
-+
-+	/* We match if we have existing lock with same or wider set of bits. */
- 	if (!(data->lmd_match & LDLM_MATCH_UNREF) && LDLM_HAVE_MASK(lock, GONE))
- 		return false;
  
-@@ -1168,16 +1164,13 @@ static bool lock_matches(struct ldlm_lock *lock, void *vdata)
- struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 			       struct ldlm_match_data *data)
+ 	msg->lm_buflens[segment] = newlen;
+@@ -562,7 +561,7 @@ static int lustre_unpack_msg_v2(struct lustre_msg_v2 *m, int len)
+ 	for (i = 0; i < m->lm_bufcount; i++) {
+ 		if (swabbed)
+ 			__swab32s(&m->lm_buflens[i]);
+-		buflen = cfs_size_round(m->lm_buflens[i]);
++		buflen = round_up(m->lm_buflens[i], 8);
+ 		if (buflen < 0 || buflen > PTLRPC_MAX_BUFLEN) {
+ 			CERROR("buffer %d length %d is not valid\n", i, buflen);
+ 			return -EINVAL;
+diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
+index 86d135a65d81..7c0fb5a1c652 100644
+--- a/include/linux/libcfs/libcfs_private.h
++++ b/include/linux/libcfs/libcfs_private.h
+@@ -139,13 +139,9 @@ do {								\
+ /* logical equivalence */
+ #define equi(a, b) (!!(a) == !!(b))
+ 
+-#ifndef HAVE_CFS_SIZE_ROUND
+ static inline size_t cfs_size_round(int val)
  {
--	struct ldlm_extent ext = {
--		.start	= data->lmd_policy->l_extent.start,
--		.end	= data->lmd_policy->l_extent.end
--	};
-+	u64 end = data->lmd_policy->l_extent.end;
- 	int idx;
- 
- 	data->lmd_lock = NULL;
- 
- 	if (data->lmd_match & LDLM_MATCH_RIGHT)
--		ext.end = OBD_OBJECT_EOF;
-+		end = OBD_OBJECT_EOF;
- 
- 	for (idx = 0; idx < LCK_MODE_NUM; idx++) {
- 		struct ldlm_interval_tree *tree = &res->lr_itree[idx];
-@@ -1188,7 +1181,9 @@ struct ldlm_lock *search_itree(struct ldlm_resource *res,
- 		if (!(tree->lit_mode & *data->lmd_mode))
- 			continue;
- 
--		ldlm_extent_search(&tree->lit_root, ext.start, ext.end,
-+		ldlm_extent_search(&tree->lit_root,
-+				   data->lmd_policy->l_extent.start,
-+				   end,
- 				   lock_matches, data);
- 		if (data->lmd_lock)
- 			return data->lmd_lock;
-@@ -1557,7 +1552,7 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
- {
- 	struct ldlm_lock *lock;
- 	struct ldlm_resource *res;
--	int rc;
-+	int rc = 0;
- 
- 	res = ldlm_resource_get(ns, res_id, type, 1);
- 	if (IS_ERR(res))
-@@ -1603,11 +1598,13 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
- 
- /**
-  * Enqueue (request) a lock.
-- * On the client this is called from ldlm_cli_enqueue_fini
-- * after we already got an initial reply from the server with some status.
-  *
-  * Does not block. As a result of enqueue the lock would be put
-  * into granted or waiting list.
-+ *
-+ * If namespace has intent policy sent and the lock has LDLM_FL_HAS_INTENT flag
-+ * set, skip all the enqueueing and delegate lock processing to intent policy
-+ * function.
-  */
- enum ldlm_error ldlm_lock_enqueue(const struct lu_env *env,
- 				  struct ldlm_namespace *ns,
-@@ -1616,6 +1613,7 @@ enum ldlm_error ldlm_lock_enqueue(const struct lu_env *env,
- {
- 	struct ldlm_lock *lock = *lockp;
- 	struct ldlm_resource *res;
-+	enum ldlm_error rc = ELDLM_OK;
- 
- 	res = lock_res_and_lock(lock);
- 	if (ldlm_is_granted(lock)) {
-@@ -1637,8 +1635,7 @@ enum ldlm_error ldlm_lock_enqueue(const struct lu_env *env,
- 	if (*flags & LDLM_FL_TEST_LOCK)
- 		ldlm_set_test_lock(lock);
- 
--	/*
--	 * This distinction between local lock trees is very important; a client
-+	/* This distinction between local lock trees is very important; a client
- 	 * namespace only has information about locks taken by that client, and
- 	 * thus doesn't have enough information to decide for itself if it can
- 	 * be granted (below).  In this case, we do exactly what the server
-@@ -1651,7 +1648,7 @@ enum ldlm_error ldlm_lock_enqueue(const struct lu_env *env,
- 
- out:
- 	unlock_res_and_lock(lock);
--	return ELDLM_OK;
-+	return rc;
+ 	return round_up(val, 8);
  }
  
- /**
-diff --git a/fs/lustre/ldlm/ldlm_lockd.c b/fs/lustre/ldlm/ldlm_lockd.c
-index a839ff2177d1..46ab61e78231 100644
---- a/fs/lustre/ldlm/ldlm_lockd.c
-+++ b/fs/lustre/ldlm/ldlm_lockd.c
-@@ -1283,17 +1283,18 @@ int ldlm_init(void)
- 						    0, SLAB_HWCACHE_ALIGN,
- 						    NULL);
- 	if (!ldlm_interval_tree_slab)
--		goto out_lock;
-+		goto out_lock_slab;
- 
- #if LUSTRE_TRACKS_LOCK_EXP_REFS
- 	class_export_dump_hook = ldlm_dump_export_locks;
+-#define HAVE_CFS_SIZE_ROUND
+-#endif
+-
  #endif
- 	return 0;
+diff --git a/net/lnet/libcfs/module.c b/net/lnet/libcfs/module.c
+index a126683354ac..17cb8e4b818f 100644
+--- a/net/lnet/libcfs/module.c
++++ b/net/lnet/libcfs/module.c
+@@ -72,8 +72,8 @@ static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
+ {
+ 	size_t len = sizeof(*data);
  
--out_lock:
-+out_lock_slab:
- 	kmem_cache_destroy(ldlm_lock_slab);
- out_resource:
- 	kmem_cache_destroy(ldlm_resource_slab);
-+
- 	return -ENOMEM;
+-	len += cfs_size_round(data->ioc_inllen1);
+-	len += cfs_size_round(data->ioc_inllen2);
++	len += round_up(data->ioc_inllen1, 8);
++	len += round_up(data->ioc_inllen2, 8);
+ 	return len;
  }
  
+@@ -124,7 +124,7 @@ static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
+ 		return true;
+ 	}
+ 	if (data->ioc_inllen2 &&
+-	    data->ioc_bulk[cfs_size_round(data->ioc_inllen1) +
++	    data->ioc_bulk[round_up(data->ioc_inllen1, 8) +
+ 			   data->ioc_inllen2 - 1] != '\0') {
+ 		CERROR("LIBCFS ioctl: inlbuf2 not 0 terminated\n");
+ 		return true;
+@@ -144,7 +144,7 @@ static int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data)
+ 
+ 	if (data->ioc_inllen2)
+ 		data->ioc_inlbuf2 = &data->ioc_bulk[0] +
+-			cfs_size_round(data->ioc_inllen1);
++				    round_up(data->ioc_inllen1, 8);
+ 
+ 	return 0;
+ }
 -- 
 2.39.3
 
