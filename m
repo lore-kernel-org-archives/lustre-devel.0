@@ -4,34 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 9203AC0218F
-	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:06:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 43A28C0218F
+	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:07:06 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMFv5r1Bz1yBw;
-	Sun, 02 Feb 2025 12:50:11 -0800 (PST)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMGW1qSlz21H7;
+	Sun, 02 Feb 2025 12:50:43 -0800 (PST)
+Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YmMDV3VCkz20xl
- for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:48:58 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm2-e204-208.ccs.ornl.gov [160.91.203.3])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id DBAEF899ADE;
- Sun,  2 Feb 2025 15:46:41 -0500 (EST)
+ 4YmMF15hV3z20yt
+ for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:49:25 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm-e204-208.ccs.ornl.gov [160.91.203.12])
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 09447182372;
+ Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id D946A106BE15; Sun,  2 Feb 2025 15:46:41 -0500 (EST)
+ id 0823D106BE18; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  2 Feb 2025 15:46:17 -0500
-Message-ID: <20250202204633.1148872-18-jsimmons@infradead.org>
+Date: Sun,  2 Feb 2025 15:46:26 -0500
+Message-ID: <20250202204633.1148872-27-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250202204633.1148872-1-jsimmons@infradead.org>
 References: <20250202204633.1148872-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 17/33] lnet: libcfs: Remove unsed
- LASSERT_ATOMIC_* macros
+Subject: [lustre-devel] [PATCH 26/33] lustre: mdc: md_open_data should keep
+ ref on close_req
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,112 +44,65 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Arshad Hussain <arshad.hussain@aeoncomputing.com>,
+Cc: Lai Siyao <lai.siyao@whamcloud.com>, Li Dongyang <dongyangli@ddn.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+From: Li Dongyang <dongyangli@ddn.com>
 
-This is the first up series of patchs which
-replaces atomic_t with refcount_t
+md_open_data should keep a ref on mod_close_req,
+otherwise the mod_close_req could be freed before
+we try to access mod_close_req via md_open_data.
 
-This patch removes unused LASSERT_ATOMIC_* macros.
-There are still:
-        LASSERT_ATOMIC_GT
-        LASSERT_ATOMIC_GT_LT
-        LASSERT_ATOMIC_ZERO
-        LASSERT_ATOMIC_POS
-
-macros being used which will be subsequently removed
-in following patches. This helps in breaking up patch
-logically as changes are large.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16796
-Lustre-commit: f875d0c714b548553 ("LU-16796 libcfs: Remove unsed LASSERT_ATOMIC_* macros")
-Signed-off-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50870
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16745
+Lustre-commit: ca716f763f89af192 ("LU-16745 mdc: md_open_data should keep ref on close_req")
+Signed-off-by: Li Dongyang <dongyangli@ddn.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50656
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- include/linux/libcfs/libcfs_private.h | 44 ---------------------------
- 1 file changed, 44 deletions(-)
+ fs/lustre/include/obd.h     | 2 ++
+ fs/lustre/mdc/mdc_request.c | 4 ++++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
-index 378c2a56ed67..86d135a65d81 100644
---- a/include/linux/libcfs/libcfs_private.h
-+++ b/include/linux/libcfs/libcfs_private.h
-@@ -112,26 +112,10 @@ int libcfs_debug_mark_buffer(const char *text);
- #define LASSERT_ATOMIC_EQ(a, v)			\
- 	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
- 
--/** assert value of @a is unequal to @v */
--#define LASSERT_ATOMIC_NE(a, v)		\
--	LASSERTF(atomic_read(a) != v, "value: %d\n", atomic_read((a)))
--
--/** assert value of @a is little than @v */
--#define LASSERT_ATOMIC_LT(a, v)		\
--	LASSERTF(atomic_read(a) < v, "value: %d\n", atomic_read((a)))
--
--/** assert value of @a is little/equal to @v */
--#define LASSERT_ATOMIC_LE(a, v)		\
--	LASSERTF(atomic_read(a) <= v, "value: %d\n", atomic_read((a)))
--
- /** assert value of @a is great than @v */
- #define LASSERT_ATOMIC_GT(a, v)		\
- 	LASSERTF(atomic_read(a) > v, "value: %d\n", atomic_read((a)))
- 
--/** assert value of @a is great/equal to @v */
--#define LASSERT_ATOMIC_GE(a, v)		\
--	LASSERTF(atomic_read(a) >= v, "value: %d\n", atomic_read((a)))
--
- /** assert value of @a is great than @v1 and little than @v2 */
- #define LASSERT_ATOMIC_GT_LT(a, v1, v2)				\
- do {								\
-@@ -139,39 +123,11 @@ do {								\
- 	LASSERTF(__v > v1 && __v < v2, "value: %d\n", __v);	\
- } while (0)
- 
--/** assert value of @a is great than @v1 and little/equal to @v2 */
--#define LASSERT_ATOMIC_GT_LE(a, v1, v2)				\
--do {								\
--	int __v = atomic_read(a);				\
--	LASSERTF(__v > v1 && __v <= v2, "value: %d\n", __v);    \
--} while (0)
--
--/** assert value of @a is great/equal to @v1 and little than @v2 */
--#define LASSERT_ATOMIC_GE_LT(a, v1, v2)				\
--do {								\
--	int __v = atomic_read(a);				\
--	LASSERTF(__v >= v1 && __v < v2, "value: %d\n", __v);    \
--} while (0)
--
--/** assert value of @a is great/equal to @v1 and little/equal to @v2 */
--#define LASSERT_ATOMIC_GE_LE(a, v1, v2)				\
--do {								\
--	int __v = atomic_read(a);				\
--	LASSERTF(__v >= v1 && __v <= v2, "value: %d\n", __v);   \
--} while (0)
--
- #else /* !LASSERT_ATOMIC_ENABLED */
- 
- #define LASSERT_ATOMIC_EQ(a, v)		do {} while (0)
--#define LASSERT_ATOMIC_NE(a, v)		do {} while (0)
--#define LASSERT_ATOMIC_LT(a, v)		do {} while (0)
--#define LASSERT_ATOMIC_LE(a, v)		do {} while (0)
- #define LASSERT_ATOMIC_GT(a, v)		do {} while (0)
--#define LASSERT_ATOMIC_GE(a, v)		do {} while (0)
- #define LASSERT_ATOMIC_GT_LT(a, v1, v2)	do {} while (0)
--#define LASSERT_ATOMIC_GT_LE(a, v1, v2)	do {} while (0)
--#define LASSERT_ATOMIC_GE_LT(a, v1, v2)	do {} while (0)
--#define LASSERT_ATOMIC_GE_LE(a, v1, v2)	do {} while (0)
- 
- #endif /* LASSERT_ATOMIC_ENABLED */
+diff --git a/fs/lustre/include/obd.h b/fs/lustre/include/obd.h
+index c62d9171150a..604739ca92c2 100644
+--- a/fs/lustre/include/obd.h
++++ b/fs/lustre/include/obd.h
+@@ -1188,6 +1188,8 @@ static inline struct md_open_data *obd_mod_alloc(void)
+ 	if (atomic_dec_and_test(&(mod)->mod_refcount)) {		\
+ 		if ((mod)->mod_open_req)				\
+ 			ptlrpc_req_finished((mod)->mod_open_req);	\
++		if ((mod)->mod_close_req)				\
++			ptlrpc_req_finished((mod)->mod_close_req);	\
+ 		kfree(mod);						\
+ 	}								\
+ })
+diff --git a/fs/lustre/mdc/mdc_request.c b/fs/lustre/mdc/mdc_request.c
+index 2b8386661a31..3b838bceba39 100644
+--- a/fs/lustre/mdc/mdc_request.c
++++ b/fs/lustre/mdc/mdc_request.c
+@@ -1033,12 +1033,16 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
+ 	if (mod) {
+ 		if (rc != 0)
+ 			mod->mod_close_req = NULL;
++		if (mod->mod_close_req)
++			ptlrpc_request_addref(mod->mod_close_req);
++
+ 		/* Since now, mod is accessed through open_req only,
+ 		 * thus close req does not keep a reference on mod anymore.
+ 		 */
+ 		obd_mod_put(mod);
+ 	}
+ 	*request = req;
++
+ 	return rc < 0 ? rc : saved_rc;
+ }
  
 -- 
 2.39.3
