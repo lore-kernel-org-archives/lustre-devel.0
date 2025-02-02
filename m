@@ -4,34 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id C194CC02193
-	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:06:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 9203AC0218F
+	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:06:22 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMGK0MjCz217f;
-	Sun, 02 Feb 2025 12:50:33 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMFv5r1Bz1yBw;
+	Sun, 02 Feb 2025 12:50:11 -0800 (PST)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YmMF13zyXz20yq
- for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:49:25 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm-e204-208.ccs.ornl.gov [160.91.203.12])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id E336B899ADF;
+ 4YmMDV3VCkz20xl
+ for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:48:58 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm2-e204-208.ccs.ornl.gov [160.91.203.3])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id DBAEF899ADE;
  Sun,  2 Feb 2025 15:46:41 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id E140E106BE16; Sun,  2 Feb 2025 15:46:41 -0500 (EST)
+ id D946A106BE15; Sun,  2 Feb 2025 15:46:41 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Sun,  2 Feb 2025 15:46:19 -0500
-Message-ID: <20250202204633.1148872-20-jsimmons@infradead.org>
+Date: Sun,  2 Feb 2025 15:46:17 -0500
+Message-ID: <20250202204633.1148872-18-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250202204633.1148872-1-jsimmons@infradead.org>
 References: <20250202204633.1148872-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 19/33] lustre: lmv: treat unknown hash type
- as sane type
+Subject: [lustre-devel] [PATCH 17/33] lnet: libcfs: Remove unsed
+ LASSERT_ATOMIC_* macros
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,77 +44,113 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lai Siyao <lai.siyao@whamcloud.com>,
- Hongchao Zhang <hongchao@whamcloud.com>,
+Cc: Arshad Hussain <arshad.hussain@aeoncomputing.com>,
  Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Lai Siyao <lai.siyao@whamcloud.com>
+From: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 
-Directory migration failure may leave directory hash type as
-LMV_HASH_TYPE_UNKNOWN|LMV_HASH_FLAG_BAD_TYPE, which should be treated
-as sane hash type on existing directories, otherwise such directories
-can't be unlinked.
+This is the first up series of patchs which
+replaces atomic_t with refcount_t
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16717
-Lustre-commit: 05cdb71ba68135701 ("LU-16717 mdt: treat unknown hash type as sane type")
-Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50796
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+This patch removes unused LASSERT_ATOMIC_* macros.
+There are still:
+        LASSERT_ATOMIC_GT
+        LASSERT_ATOMIC_GT_LT
+        LASSERT_ATOMIC_ZERO
+        LASSERT_ATOMIC_POS
+
+macros being used which will be subsequently removed
+in following patches. This helps in breaking up patch
+logically as changes are large.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16796
+Lustre-commit: f875d0c714b548553 ("LU-16796 libcfs: Remove unsed LASSERT_ATOMIC_* macros")
+Signed-off-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50870
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Neil Brown <neilb@suse.de>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/include/lustre_lmv.h          |  4 ++--
- include/uapi/linux/lustre/lustre_user.h | 10 ++++++++++
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ include/linux/libcfs/libcfs_private.h | 44 ---------------------------
+ 1 file changed, 44 deletions(-)
 
-diff --git a/fs/lustre/include/lustre_lmv.h b/fs/lustre/include/lustre_lmv.h
-index a2ef550e38d4..5e3dbc52e846 100644
---- a/fs/lustre/include/lustre_lmv.h
-+++ b/fs/lustre/include/lustre_lmv.h
-@@ -443,7 +443,7 @@ static inline bool lmv_is_sane(const struct lmv_mds_md_v1 *lmv)
- 	if (le32_to_cpu(lmv->lmv_stripe_count) == 0)
- 		goto insane;
+diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
+index 378c2a56ed67..86d135a65d81 100644
+--- a/include/linux/libcfs/libcfs_private.h
++++ b/include/linux/libcfs/libcfs_private.h
+@@ -112,26 +112,10 @@ int libcfs_debug_mark_buffer(const char *text);
+ #define LASSERT_ATOMIC_EQ(a, v)			\
+ 	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
  
--	if (!lmv_is_known_hash_type(le32_to_cpu(lmv->lmv_hash_type)))
-+	if (!lmv_is_sane_hash_type(le32_to_cpu(lmv->lmv_hash_type)))
- 		goto insane;
+-/** assert value of @a is unequal to @v */
+-#define LASSERT_ATOMIC_NE(a, v)		\
+-	LASSERTF(atomic_read(a) != v, "value: %d\n", atomic_read((a)))
+-
+-/** assert value of @a is little than @v */
+-#define LASSERT_ATOMIC_LT(a, v)		\
+-	LASSERTF(atomic_read(a) < v, "value: %d\n", atomic_read((a)))
+-
+-/** assert value of @a is little/equal to @v */
+-#define LASSERT_ATOMIC_LE(a, v)		\
+-	LASSERTF(atomic_read(a) <= v, "value: %d\n", atomic_read((a)))
+-
+ /** assert value of @a is great than @v */
+ #define LASSERT_ATOMIC_GT(a, v)		\
+ 	LASSERTF(atomic_read(a) > v, "value: %d\n", atomic_read((a)))
  
- 	return true;
-@@ -465,7 +465,7 @@ static inline bool lmv_is_sane2(const struct lmv_mds_md_v1 *lmv)
- 	if (le32_to_cpu(lmv->lmv_stripe_count) == 0)
- 		goto insane;
+-/** assert value of @a is great/equal to @v */
+-#define LASSERT_ATOMIC_GE(a, v)		\
+-	LASSERTF(atomic_read(a) >= v, "value: %d\n", atomic_read((a)))
+-
+ /** assert value of @a is great than @v1 and little than @v2 */
+ #define LASSERT_ATOMIC_GT_LT(a, v1, v2)				\
+ do {								\
+@@ -139,39 +123,11 @@ do {								\
+ 	LASSERTF(__v > v1 && __v < v2, "value: %d\n", __v);	\
+ } while (0)
  
--	if (!lmv_is_known_hash_type(le32_to_cpu(lmv->lmv_hash_type)))
-+	if (!lmv_is_sane_hash_type(le32_to_cpu(lmv->lmv_hash_type)))
- 		goto insane;
+-/** assert value of @a is great than @v1 and little/equal to @v2 */
+-#define LASSERT_ATOMIC_GT_LE(a, v1, v2)				\
+-do {								\
+-	int __v = atomic_read(a);				\
+-	LASSERTF(__v > v1 && __v <= v2, "value: %d\n", __v);    \
+-} while (0)
+-
+-/** assert value of @a is great/equal to @v1 and little than @v2 */
+-#define LASSERT_ATOMIC_GE_LT(a, v1, v2)				\
+-do {								\
+-	int __v = atomic_read(a);				\
+-	LASSERTF(__v >= v1 && __v < v2, "value: %d\n", __v);    \
+-} while (0)
+-
+-/** assert value of @a is great/equal to @v1 and little/equal to @v2 */
+-#define LASSERT_ATOMIC_GE_LE(a, v1, v2)				\
+-do {								\
+-	int __v = atomic_read(a);				\
+-	LASSERTF(__v >= v1 && __v <= v2, "value: %d\n", __v);   \
+-} while (0)
+-
+ #else /* !LASSERT_ATOMIC_ENABLED */
  
- 	return true;
-diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
-index c098d119f18c..4b49bb9c370a 100644
---- a/include/uapi/linux/lustre/lustre_user.h
-+++ b/include/uapi/linux/lustre/lustre_user.h
-@@ -794,6 +794,16 @@ static inline bool lmv_is_known_hash_type(__u32 type)
+ #define LASSERT_ATOMIC_EQ(a, v)		do {} while (0)
+-#define LASSERT_ATOMIC_NE(a, v)		do {} while (0)
+-#define LASSERT_ATOMIC_LT(a, v)		do {} while (0)
+-#define LASSERT_ATOMIC_LE(a, v)		do {} while (0)
+ #define LASSERT_ATOMIC_GT(a, v)		do {} while (0)
+-#define LASSERT_ATOMIC_GE(a, v)		do {} while (0)
+ #define LASSERT_ATOMIC_GT_LT(a, v1, v2)	do {} while (0)
+-#define LASSERT_ATOMIC_GT_LE(a, v1, v2)	do {} while (0)
+-#define LASSERT_ATOMIC_GE_LT(a, v1, v2)	do {} while (0)
+-#define LASSERT_ATOMIC_GE_LE(a, v1, v2)	do {} while (0)
  
- #define LMV_HASH_FLAG_KNOWN		0xbe000000
+ #endif /* LASSERT_ATOMIC_ENABLED */
  
-+/* migration failure may leave hash type as
-+ * LMV_HASH_TYPE_UNKNOWN|LMV_HASH_FLAG_BAD_TYPE, which should be treated as
-+ * sane, so such directory can be accessed (resume migration or unlink).
-+ */
-+static inline bool lmv_is_sane_hash_type(__u32 type)
-+{
-+	return lmv_is_known_hash_type(type) ||
-+	       type == (LMV_HASH_TYPE_UNKNOWN | LMV_HASH_FLAG_BAD_TYPE);
-+}
-+
- /* both SPLIT and MIGRATION are set for directory split */
- static inline bool lmv_hash_is_splitting(__u32 hash)
- {
 -- 
 2.39.3
 
