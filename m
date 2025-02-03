@@ -2,36 +2,68 @@ Return-Path: <lustre-devel-bounces@lists.lustre.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
-	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 781A3C0218F
-	for <lustre-devel@archiver.kernel.org>; Sun,  2 Feb 2025 21:14:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2B1FC02196
+	for <lustre-devel@archiver.kernel.org>; Mon,  3 Feb 2025 17:29:42 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YmMKZ4Q4Tz228x;
-	Sun, 02 Feb 2025 12:53:22 -0800 (PST)
-Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
- (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Ymtm60wSTz20v1;
+	Mon, 03 Feb 2025 09:29:42 -0800 (PST)
+Received: from smtp-fw-6001.amazon.com (smtp-fw-6001.amazon.com [52.95.48.154])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YmMGC4q0Cz214b
- for <lustre-devel@lists.lustre.org>; Sun, 02 Feb 2025 12:50:27 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm2-e204-208.ccs.ornl.gov [160.91.203.3])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 22852881AA2;
- Sun,  2 Feb 2025 15:46:42 -0500 (EST)
-Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 1F670106BE17; Sun,  2 Feb 2025 15:46:42 -0500 (EST)
-From: James Simmons <jsimmons@infradead.org>
-To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
- NeilBrown <neilb@suse.de>
-Date: Sun,  2 Feb 2025 15:46:32 -0500
-Message-ID: <20250202204633.1148872-33-jsimmons@infradead.org>
-X-Mailer: git-send-email 2.43.5
-In-Reply-To: <20250202204633.1148872-1-jsimmons@infradead.org>
-References: <20250202204633.1148872-1-jsimmons@infradead.org>
+ 4Ymtfc6Zptz20ws
+ for <lustre-devel@lists.lustre.org>; Mon, 03 Feb 2025 09:24:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
+ t=1738603497; x=1770139497;
+ h=from:to:cc:date:message-id:references:in-reply-to:
+ content-id:content-transfer-encoding:mime-version:subject;
+ bh=mmBWhoMcsUFfOnxt4v0jqJ+EsInrQCEa0LTzytNMYkg=;
+ b=CsY/0cuIXOrgqb7mmzl+FXI4paaat6SJTzqPcKDvXnBF7SPD0itLlifw
+ VaDKPsrZw1BYrXnQ0Kocdjg/Zk3Csb8sYgXjw+DSvIGfOmQMxV3yOtPG6
+ QAMQYyZqWhUMGft7Zo5KB3lc2oJKlVI+rjJ6ISV5DdiJiGf+zW6iV1tZc Y=;
+X-IronPort-AV: E=Sophos;i="6.13,256,1732579200"; d="scan'208";a="459252343"
+Thread-Topic: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
+ upstreaming
+Received: from iad12-co-svc-p1-lb1-vlan2.amazon.com (HELO
+ smtpout.prod.us-east-1.prod.farcaster.email.amazon.dev) ([10.43.8.2])
+ by smtp-border-fw-6001.iad6.amazon.com with
+ ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 03 Feb 2025 17:24:55 +0000
+Received: from EX19MTAUEA002.ant.amazon.com [10.0.44.209:43675]
+ by smtpin.naws.us-east-1.prod.farcaster.email.amazon.dev [10.0.38.255:2525]
+ with esmtp (Farcaster)
+ id a6f84d25-7cc7-47a4-94d7-1cf2f4976003; Mon, 3 Feb 2025 17:24:54 +0000 (UTC)
+X-Farcaster-Flow-ID: a6f84d25-7cc7-47a4-94d7-1cf2f4976003
+Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
+ EX19MTAUEA002.ant.amazon.com (10.252.134.9) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
+ Mon, 3 Feb 2025 17:24:54 +0000
+Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
+ EX19D017UEA001.ant.amazon.com (10.252.134.93) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
+ Mon, 3 Feb 2025 17:24:54 +0000
+Received: from EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed]) by
+ EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed%3]) with
+ mapi id 15.02.1258.039; Mon, 3 Feb 2025 17:24:54 +0000
+From: "Day, Timothy" <timday@amazon.com>
+To: Oleg Drokin <green@whamcloud.com>, "neilb@suse.de" <neilb@suse.de>
+CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Index: AQHbdQC60jpqmvximka6OK5s2qgm4LM1gz+A
+Date: Mon, 3 Feb 2025 17:24:54 +0000
+Message-ID: <AFA09EE9-0679-4484-8571-F03F7DEE20EC@amazon.com>
+References: <d008c14bba74e39999ae70af871740a5d0c5c6eb.camel@whamcloud.com>
+ <173844834301.22054.134358817491003595@noble.neil.brown.name>
+ <82e4528eb0f4961bdc6b065dfcabea03c1a9face.camel@whamcloud.com>
+In-Reply-To: <82e4528eb0f4961bdc6b065dfcabea03c1a9face.camel@whamcloud.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [10.252.141.28]
+Content-ID: <417F732B6A432241808BCA7EC995D67E@amazon.com>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 32/33] lnet: ksocklnd:
- ksocklnd_ni_get_eth_intf_speed() must use only rtnl lock
+Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
+ upstreaming
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -44,75 +76,23 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Chris Horn <chris.horn@hpe.com>,
- Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-A kernel with debug enable is reporting the following:
+> If you want to avoid surprises for your patches, I can publish my
+> boilpot scripts and you can run your own instance if you have the
+> hardware.
+> Or we can find some sponsors to have some sort of a shared public
+> instance where people could drop their patches to?
 
-include/linux/inetdevice.h:221 suspicious rcu_dereference_check() usage!
-other info that might help us debug this:
-rcu_scheduler_active = 2, debug_locks = 1
-5 locks held by lctl/42289:
- #0: ffffffffa04263f8 ((libcfs_ioctl_list).rwsem){++++}-{3:3}, at: __blocking_notifier_call_chain+0x44/0xa0
- #1: ffffffffa04fa7b0 (lnet_config_mutex){+.+.}-{3:3}, at: lnet_configure+0x1d/0xc0 [lnet]
- #2: ffffffffa04f06e8 (the_lnet.ln_api_mutex){+.+.}-{3:3}, at: LNetNIInit+0x4c/0x960 [lnet]
- #3: ffffffffa04f0788 (&the_lnet.ln_lnd_mutex){+.+.}-{3:3}, at: lnet_startup_lndnet+0x11e/0xa90 [lnet]
- #4: ffffffff834a0cd0 (rtnl_mutex){+.+.}-{3:3}, at: rtnl_lock+0x1b/0x30
+If you could publish the boilpot scripts, I think that'd be super helpful.
+It'd be a lot easier to understand how to reproduce these failures.
+Plus, writing the orchestration to run it in the cloud would be
+straightforward, I think.
 
-stack backtrace:
-CPU: 2 PID: 42289 Comm: lctl Kdump: loaded Tainted: G        W  O     --------- -  - 4.18.0rh8.5-debug #2
-Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
-  Call Trace:
-  ? dump_stack+0x119/0x18e
-  ? lockdep_rcu_suspicious+0x141/0x14f
-  ? ksocklnd_ni_get_eth_intf_speed.isra.1+0x308/0x360 [ksocklnd]
-  ? mark_held_locks+0x6a/0xc0
-  ? ktime_get_with_offset+0x233/0x2b0
-  ? trace_hardirqs_on+0x4e/0x220
-  ? ksocknal_tunables_setup+0xed/0x200 [ksocklnd]
-  ? ksocknal_startup+0x4ff/0x1180 [ksocklnd]
-
-The function __ethtool_get_link_ksettings() has a hard requirement
-to have the in_dev device protected by the rtnl mutex. At the
-same time we are aquiring in_dev using the rcu lock. The in_dev
-needs to be stabilized by the same lock. So use rtnl functions
-instead.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16807
-Lustre-commit: 65d664bff40590366 ("LU-16807 ksocklnd: ksocklnd_ni_get_eth_intf_speed() must use only rtnl lock")
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/51028
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Reviewed-by: Chris Horn <chris.horn@hpe.com>
-Reviewed-by: Neil Brown <neilb@suse.de>
----
- net/lnet/klnds/socklnd/socklnd_modparams.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/net/lnet/klnds/socklnd/socklnd_modparams.c b/net/lnet/klnds/socklnd/socklnd_modparams.c
-index 5eb58ca97c06..031fe13d2a38 100644
---- a/net/lnet/klnds/socklnd/socklnd_modparams.c
-+++ b/net/lnet/klnds/socklnd/socklnd_modparams.c
-@@ -183,11 +183,11 @@ static int ksocklnd_ni_get_eth_intf_speed(struct lnet_ni *ni)
- 		if (!(flags & IFF_UP))
- 			continue;
- 
--		in_dev = __in_dev_get_rcu(dev);
-+		in_dev = __in_dev_get_rtnl(dev);
- 		if (!in_dev)
- 			continue;
- 
--		in_dev_for_each_ifa_rcu(ifa, in_dev) {
-+		in_dev_for_each_ifa_rtnl(ifa, in_dev) {
- 			if (strcmp(ifa->ifa_label, ni->ni_interface) == 0)
- 				intf_idx = dev->ifindex;
- 		}
--- 
-2.39.3
+Tim Day
 
 _______________________________________________
 lustre-devel mailing list
