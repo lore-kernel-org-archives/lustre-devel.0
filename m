@@ -4,61 +4,73 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 12CA0C02192
-	for <lustre-devel@archiver.kernel.org>; Thu,  6 Feb 2025 01:20:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 11359C02199
+	for <lustre-devel@archiver.kernel.org>; Thu,  6 Feb 2025 18:24:57 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YpK6h2rFzz1xnx;
-	Wed, 05 Feb 2025 17:20:44 -0800 (PST)
-Received: from mail-lj1-f176.google.com (mail-lj1-f176.google.com
- [209.85.208.176])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YplrN2vsXz1wVt;
+	Thu, 06 Feb 2025 10:24:52 -0800 (PST)
+Received: from smtp-fw-9106.amazon.com (smtp-fw-9106.amazon.com
+ [207.171.188.206])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YpK6f6jjCz1xh7
- for <lustre-devel@lists.lustre.org>; Wed, 05 Feb 2025 17:20:42 -0800 (PST)
-Received: by mail-lj1-f176.google.com with SMTP id
- 38308e7fff4ca-307c13298eeso4219971fa.0
- for <lustre-devel@lists.lustre.org>; Wed, 05 Feb 2025 17:20:42 -0800 (PST)
+ 4Yplqs6vNrz1wLw
+ for <lustre-devel@lists.lustre.org>; Thu, 06 Feb 2025 10:24:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1738804841; x=1739409641; darn=lists.lustre.org;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=Hs2DB5QdekhEFBORw9lXSf+7IZTDplQbNWGsI5a8pBg=;
- b=ix/wk4Bom7erUgRvYlZEgB2GU2R8K5O0FE7nHbb85hIemUfAyN8loYL4D95Gs2kG9z
- I8xE7XuteEJxS/LkjCzQQF68B+Hp0gAmGck5BGt/TTHxTT23+Uk2xbWr++lVcDW6KF+t
- gBS3a9rdYcmTDkM+IFFGaiHTnaP8ri2fadZBGqkVznMCHN1g5l8ERdVYPJJ8TsKbhrcY
- ZJ7eEDxlp7ynoJvo42HdJWje5bDAy/IuCwT7I03VHvaduHYbxd0Xoj7Q4LEo1R9MiTqe
- BbK4GUHRinFDnghAJSJzFnQNTJND0Y/l0NaKpDnsBIavEWsbcBQj3ofENiU6+5N669L7
- pgCw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1738804841; x=1739409641;
- h=to:subject:message-id:date:from:mime-version:x-gm-message-state
- :from:to:cc:subject:date:message-id:reply-to;
- bh=Hs2DB5QdekhEFBORw9lXSf+7IZTDplQbNWGsI5a8pBg=;
- b=uoJ5cY6N1uu0+TPoRlur0gQIx1qKRdL7bggMCVfdj/AjQHQKc4HdOwK23sfwobwMhA
- M+lURdiZAA7PKPRuP/08cwj9UAtPH0VcVHCDh9sm/yBUu7WmtI6CP7mQwn+XUqYLbth8
- koHVK3+G3nLQfe/yzjP+BZgVrEJ9CsihJWI52bb8fG0Pr8EBhuFEU7ZVqaOQWJtsnTqt
- qyCDBDhfVPDjqExCOJVJUQhzFCUhSM80lxuP2gjrH4LMx6ok9zJzERMs5jZEKjKGMsGp
- U/gKrEcjDIBc0Dkth8V6U1ViNJ5G0J/7J0QZjhS2TeXXx9+aj5QUx1b3WXpbWI6s1/mt
- JQ/w==
-X-Gm-Message-State: AOJu0YzyBSYzSQOwaRWf+c2irDa88jssgdTTfM7LQFx3ON8jfEt/7f1o
- knayTIlLU4zLI5LnZCcCRoPkad1BY4QxjeSpijNBzlODvuwGSmpTvurzuQzCXCllF4m2kXognzN
- MK5Q5lN9+/zqqanPDf8LNm2qE67wPS7H7oaNpusOP8k98cbcCmA==
-X-Gm-Gg: ASbGncvfePeCPx2i6jYUH+xDxxihcT3/Z+xUsEhLG1IKC5VL4lL65Cd3U2w5xOMeWM8
- lCAnRjOB58jq9MkwZWzBBy47bhaCZ8D3pwC8j4xiVkeeWIThqvEbRFSNFZn0W+AWPxVE1m2U=
-X-Google-Smtp-Source: AGHT+IHlu+HBVoW0JipPEi+pQ0h66T87zzR+ZEBPrzqs/xghiLbIN+AjZnHB7NzrF8SUEKCCdTE9qgHcUWuqORl95Rs=
-X-Received: by 2002:a2e:a7ca:0:b0:302:2565:6fea with SMTP id
- 38308e7fff4ca-307da51cb89mr4936601fa.3.1738804840594; Wed, 05 Feb 2025
- 17:20:40 -0800 (PST)
+ d=amazon.com; i=@amazon.com; q=dns/txt; s=amazon201209;
+ t=1738866266; x=1770402266;
+ h=from:to:cc:date:message-id:references:in-reply-to:
+ content-id:content-transfer-encoding:mime-version:subject;
+ bh=3jU5EIMAiRxtrIwTXcabbYB2UvUgGN0ogh87c9ku0b8=;
+ b=gruCaU6bDzVl58yrfvsvbylGBT0Jn7suVmzKylWIWSIw3sHXtJhohtHU
+ N9HDbmPIUne7WOtelXrEmDkIJIrAk6rhOxIAly2D3nje7SGaIQwYV+SEe
+ KktucoAqu6tliVfEkczIWMQUCcdfSl0CjYPXjYi7Tkcxpw77gYvfe8Xnj A=;
+X-IronPort-AV: E=Sophos;i="6.13,264,1732579200"; d="scan'208";a="796703956"
+Thread-Topic: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
+ upstreaming
+Received: from pdx4-co-svc-p1-lb2-vlan2.amazon.com (HELO
+ smtpout.prod.us-east-1.prod.farcaster.email.amazon.dev) ([10.25.36.210])
+ by smtp-border-fw-9106.sea19.amazon.com with
+ ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 06 Feb 2025 18:24:26 +0000
+Received: from EX19MTAUEB001.ant.amazon.com [10.0.29.78:42738]
+ by smtpin.naws.us-east-1.prod.farcaster.email.amazon.dev [10.0.50.106:2525]
+ with esmtp (Farcaster)
+ id d94d6eea-a157-4d72-88cf-89af7e0df6cb; Thu, 6 Feb 2025 18:24:24 +0000 (UTC)
+X-Farcaster-Flow-ID: d94d6eea-a157-4d72-88cf-89af7e0df6cb
+Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
+ EX19MTAUEB001.ant.amazon.com (10.252.135.108) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
+ Thu, 6 Feb 2025 18:24:24 +0000
+Received: from EX19D017UEA001.ant.amazon.com (10.252.134.93) by
+ EX19D017UEA001.ant.amazon.com (10.252.134.93) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.1258.39;
+ Thu, 6 Feb 2025 18:24:24 +0000
+Received: from EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed]) by
+ EX19D017UEA001.ant.amazon.com ([fe80::bffb:623f:af5e:ebed%3]) with
+ mapi id 15.02.1258.039; Thu, 6 Feb 2025 18:24:24 +0000
+From: "Day, Timothy" <timday@amazon.com>
+To: Oleg Drokin <green@whamcloud.com>, "neilb@suse.de" <neilb@suse.de>
+CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Index: AQHbdQC60jpqmvximka6OK5s2qgm4LM1gz+AgAB6TAD//7QUAIAAV7kAgARBhYA=
+Date: Thu, 6 Feb 2025 18:24:24 +0000
+Message-ID: <0CA3103F-1578-4AE5-9260-E95ED38139DE@amazon.com>
+References: <d008c14bba74e39999ae70af871740a5d0c5c6eb.camel@whamcloud.com>
+ <173844834301.22054.134358817491003595@noble.neil.brown.name>
+ <82e4528eb0f4961bdc6b065dfcabea03c1a9face.camel@whamcloud.com>
+ <AFA09EE9-0679-4484-8571-F03F7DEE20EC@amazon.com>
+ <3ce0efd54f2bf45e84882de0e1b469caf1f74397.camel@whamcloud.com>
+ <6F2B1870-F031-429B-8257-730845B6E18F@amazon.com>
+ <3285ff88995a57ec6c01917c608519c5a7d0f78c.camel@whamcloud.com>
+In-Reply-To: <3285ff88995a57ec6c01917c608519c5a7d0f78c.camel@whamcloud.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [10.106.239.32]
+Content-ID: <C82F01722EC848459BC8C404751685C5@amazon.com>
 MIME-Version: 1.0
-From: Kevin Zhao <kevin.zhao@linaro.org>
-Date: Thu, 6 Feb 2025 09:20:29 +0800
-X-Gm-Features: AWEUYZn4xbqfO1z7caoQTWC4LgdVjtqNbszKyIoDsTu_A_bu8HwTy2WmBddJXSg
-Message-ID: <CACzn6-W5LWNNUu_zXFgFBHccqCSWgCGxHKouYicD81_LSCszdg@mail.gmail.com>
-To: "lustre-devel@lists.lustre.org lustre-devel"
- <lustre-devel@lists.lustre.org>
-Subject: [lustre-devel] unsubscribe
+Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
+ upstreaming
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -71,80 +83,53 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============1972894695731545849=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1972894695731545849==
-Content-Type: multipart/alternative; boundary="000000000000db9c5a062d6f0c57"
+> don't really need memory overcommit (in fact it's somewhat
+> counterproductive), but since VMs typically don't use all RAM I wing it
+> and run somewhat more VMs than what memory permits.
+>
+> as for CPU - the more overcommit is the better (my box has 96 cores).
 
---000000000000db9c5a062d6f0c57
-Content-Type: text/plain; charset="UTF-8"
+Thanks for the pointers. Not sure which instance type I'd use, but
+it's easy enough to try a bunch and see what works best.
 
--- 
-*Best Regards*
+> if this is to be deployed in the cloud at will, some robust
+> orchestration is needed host-side - I create 240 libvirt driven VMs
+> with their own storage in LVM, dhcp-driven autoconf, nfs export host-
+> side with the right distro - just once per box lifetime and compiled
+> lustre every time I run testing (so a resh checkout of master-next
+> usually).
+> Then configure crashdumping and an inotifywatch-based script to catch
+> cores and do some light processign and ship results to the central data
+> collector. (might be more efficient to do using in-vm crashdumping
+> instead?)
 
-*Kevin Zhao*
+I wrote a parallel ktest runner [1] a while back that probably does
+the needed orchestration on the host side. It was originally intended
+to run sanity tests faster (mostly for the OSD stuff I was working on).
+But I think it could be adapted to run boilpot without much work.
+It'd probably need some daemonize mode and I'd need to validate
+that ktest actually captures all of the error modes we care about.
 
-Tech Lead, Linaro Data Center Group
+Ideally, the boilpot part would be platform agnostic. The cloud
+orchestration part would just create the VM, run boilpot, and shuffle
+the crash dumps off the box. My main goal (right now) is to get
+something easily reproducible and get a sense of the signal/noise
+ratio on boilpot. Plus, it might be interesting to try and flush out bugs
+in my OSD as well [2]. It's hard to say how often I'd run it without
+first seeing how effective it is.
 
-Linaro Ecosystem Engineering
+Tim Day
 
-Slack(cloud-native.slack.com)
+[1] https://github.com/tim-day-387/ktest/tree/pktest
+[2] https://review.whamcloud.com/c/fs/lustre-release/+/55594
 
-kevin.zhao@linaro.org | Mobile/Direct/Wechat:  +86 18818270915
-
---000000000000db9c5a062d6f0c57
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div><br clear=3D"all"></div><div><br></div><span class=3D=
-"gmail_signature_prefix">-- </span><br><div dir=3D"ltr" class=3D"gmail_sign=
-ature" data-smartmail=3D"gmail_signature"><div dir=3D"ltr"><div dir=3D"ltr"=
-><div dir=3D"ltr"><div dir=3D"ltr"><b>Best Regards</b><div><div style=3D"ma=
-rgin:0px;padding:0px 0px 20px;width:1262px"><div style=3D"margin:8px 0px 0p=
-x;padding:0px"><div dir=3D"ltr"><font><div dir=3D"ltr"><div dir=3D"ltr"><p =
-class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,Robo=
-toDraft,Helvetica,Arial,sans-serif;font-size:medium"><b><span style=3D"font=
--size:11pt"><font color=3D"#38761d">Kevin Zhao</font></span></b></p><p clas=
-s=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDr=
-aft,Helvetica,Arial,sans-serif;font-size:medium"><font color=3D"#757b80"><s=
-pan style=3D"font-size:14.6667px">Tech Lead, Linaro Data Center Group</span=
-></font></p><p class=3D"MsoNormal" style=3D"color:rgb(136,136,136);font-fam=
-ily:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><font c=
-olor=3D"#757b80"><span style=3D"font-size:14.6667px">Linaro Ecosystem Engin=
-eering</span></font></p><p class=3D"MsoNormal"><font color=3D"#757b80"><fon=
-t color=3D"#888888" face=3D"Roboto, RobotoDraft, Helvetica, Arial, sans-ser=
-if"><span style=3D"font-size:14.6667px">Slack(</span></font><font face=3D"R=
-oboto, RobotoDraft, Helvetica, Arial, sans-serif"><span style=3D"font-size:=
-14.6667px"><a href=3D"http://cloud-native.slack.com" target=3D"_blank">clou=
-d-native.slack.com</a>)</span></font></font></p><p class=3D"MsoNormal" styl=
-e=3D"color:rgb(136,136,136);font-family:Roboto,RobotoDraft,Helvetica,Arial,=
-sans-serif;font-size:medium"><font color=3D"#757b80"><span style=3D"font-si=
-ze:14.6667px"><a href=3D"mailto:kevin.zhao@linaro.org" target=3D"_blank"><s=
-pan>kevin.zhao@linaro.org</span></a>=C2=A0| Mobile/Direct/Wechat:=C2=A0 +86=
- 18818270915</span></font><span style=3D"color:rgb(117,123,128);font-size:1=
-1pt">=C2=A0</span><br></p><div style=3D"color:rgb(136,136,136);font-family:=
-Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"><span style=
-=3D"color:rgb(117,123,128);font-size:11pt"><img src=3D"https://ci3.googleus=
-ercontent.com/mail-sig/AIorK4wc4TZ48IdDiJLbNdlQwblxliEGCLVTT3hP2H_ZygmvrR14=
-MUBNPvReiaamhbY-528GfwvH-y-V6gky" width=3D"96" height=3D"16"><br></span></d=
-iv></div></div></font></div><div style=3D"font-family:Roboto,RobotoDraft,He=
-lvetica,Arial,sans-serif;font-size:medium"></div></div><div style=3D"font-f=
-amily:Roboto,RobotoDraft,Helvetica,Arial,sans-serif;font-size:medium"></div=
-></div></div></div></div></div></div></div></div>
-
---000000000000db9c5a062d6f0c57--
-
---===============1972894695731545849==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---===============1972894695731545849==--
