@@ -4,31 +4,33 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id A2EB6C02199
-	for <lustre-devel@archiver.kernel.org>; Sat,  8 Feb 2025 00:30:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 5CCA5C02199
+	for <lustre-devel@archiver.kernel.org>; Sat,  8 Feb 2025 00:30:54 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YqWw10Kr3z1xJ0;
-	Fri, 07 Feb 2025 16:30:41 -0800 (PST)
-Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YqWw30y9bz1xPb;
+	Fri, 07 Feb 2025 16:30:43 -0800 (PST)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4YqWvv4PWfz1x3n
- for <lustre-devel@lists.lustre.org>; Fri, 07 Feb 2025 16:30:35 -0800 (PST)
-Received: from star2.ccs.ornl.gov (ltm2-e204-208.ccs.ornl.gov [160.91.203.3])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id E2D6417D1DE;
+ 4YqWw12S7pz1xNy
+ for <lustre-devel@lists.lustre.org>; Fri, 07 Feb 2025 16:30:41 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm3-e204-208.ccs.ornl.gov [160.91.203.26])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 011AE88F9DD;
  Fri,  7 Feb 2025 19:30:32 -0500 (EST)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id D583B106BE14; Fri,  7 Feb 2025 19:30:32 -0500 (EST)
+ id F09D1106BE14; Fri,  7 Feb 2025 19:30:32 -0500 (EST)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Fri,  7 Feb 2025 19:30:06 -0500
-Message-ID: <20250208003027.180076-1-jsimmons@infradead.org>
+Date: Fri,  7 Feb 2025 19:30:13 -0500
+Message-ID: <20250208003027.180076-8-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
+In-Reply-To: <20250208003027.180076-1-jsimmons@infradead.org>
+References: <20250208003027.180076-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 00/21] lustre: sync to OpenSFS branch June 28, 2023
+Subject: [lustre-devel] [PATCH 07/21] lustre: osc: remove OBD_ -> CFS_ macros
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -47,117 +49,205 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-Port the work done during the month of June on the OpenSFS tree
-to the native client.
+From: Timothy Day <timday@amazon.com>
 
-Arshad Hussain (1):
-  lustre: llite: Fix style issues for dir.c
+Remove OBD macros that are simply redefinitions
+of CFS macros.
 
-Bobi Jam (1):
-  lustre: csdc: reserve connect bits for compressed layout
+WC-bug-id: https://jira.whamcloud.com/browse/LU-12610
+Lustre-commit: ef01e035b3307e20e ("LU-12610 osc: remove OBD_ -> CFS_ macros")
+Signed-off-by: Timothy Day <timday@amazon.com>
+Signed-off-by: Ben Evans <beevans@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/51124
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ fs/lustre/osc/osc_cache.c   |  4 ++--
+ fs/lustre/osc/osc_io.c      |  2 +-
+ fs/lustre/osc/osc_lock.c    |  8 ++++----
+ fs/lustre/osc/osc_request.c | 26 +++++++++++++-------------
+ 4 files changed, 20 insertions(+), 20 deletions(-)
 
-Chris Horn (1):
-  lnet: udsp: lnetctl udsp improvements
-
-Frank Sehr (1):
-  lnet: report actual timeout used by lnd
-
-James Simmons (1):
-  lustre: llite: make lsm_sem nested for ll_update_dir_depth
-
-Lai Siyao (1):
-  lustre: llite: implicit default LMV inherit
-
-Mr NeilBrown (1):
-  lnet: libcfs: move percpt_lock into lnet
-
-Oleg Drokin (2):
-  lustre: osc: Ensure there's no eviction with long cache discard
-  lustre: update version to 2.15.56
-
-Patrick Farrell (3):
-  lustre: osc: Don't include lock for srvlock
-  lustre: clio: Trivial DIO cleanups
-  lustre: osc: Add debug
-
-Sebastien Buisson (1):
-  lustre: gss: fix ptlrpc_gss automatic loading
-
-Serguei Smirnov (3):
-  lnet: socklnd: remove ksnr_myiface from ksock_conn_cb
-  lnet: fix locking multiple NIDs of the MR peer
-  lnet: ensure dev notification on lnd startup
-
-Timothy Day (5):
-  lustre: ptlrpc: replace OBD_ -> CFS_ macros
-  lustre: misc: remove OBD_ -> CFS_ macros
-  lustre: osc: remove OBD_ -> CFS_ macros
-  lnet: libcfs: add unlikely to CFS_ macros
-  lustre: misc: fix clang build errors
-
- fs/lustre/fid/fid_request.c                   |   2 +-
- fs/lustre/fld/fld_request.c                   |   2 +-
- fs/lustre/include/lustre_lmv.h                |  64 ++-
- fs/lustre/include/obd_support.h               |   1 +
- fs/lustre/llite/dcache.c                      |  11 +-
- fs/lustre/llite/dir.c                         | 372 +++++++++---------
- fs/lustre/llite/file.c                        |   9 +-
- fs/lustre/llite/llite_internal.h              |   9 +-
- fs/lustre/llite/llite_lib.c                   | 163 +++++++-
- fs/lustre/llite/llite_nfs.c                   |   2 +-
- fs/lustre/llite/namei.c                       |  58 ++-
- fs/lustre/llite/rw.c                          |   2 +-
- fs/lustre/llite/statahead.c                   |   6 +-
- fs/lustre/llite/vvp_page.c                    |   2 +-
- fs/lustre/mdc/mdc_lib.c                       |   7 +
- fs/lustre/mgc/mgc_request.c                   |   3 +-
- fs/lustre/obdclass/cl_io.c                    |  13 +-
- fs/lustre/obdclass/genops.c                   |   8 +-
- fs/lustre/obdclass/lprocfs_status.c           |   4 +-
- fs/lustre/osc/osc_cache.c                     |   5 +-
- fs/lustre/osc/osc_io.c                        |   2 +-
- fs/lustre/osc/osc_lock.c                      |  10 +-
- fs/lustre/osc/osc_object.c                    |  20 +-
- fs/lustre/osc/osc_page.c                      |   8 +-
- fs/lustre/osc/osc_request.c                   |  39 +-
- fs/lustre/ptlrpc/client.c                     |  20 +-
- fs/lustre/ptlrpc/import.c                     |  12 +-
- fs/lustre/ptlrpc/niobuf.c                     |  21 +-
- fs/lustre/ptlrpc/pack_generic.c               |   6 +-
- fs/lustre/ptlrpc/pinger.c                     |   2 +-
- fs/lustre/ptlrpc/ptlrpcd.c                    |   2 +-
- fs/lustre/ptlrpc/recover.c                    |   4 +-
- fs/lustre/ptlrpc/sec.c                        |  32 +-
- fs/lustre/ptlrpc/sec_plain.c                  |   4 +-
- fs/lustre/ptlrpc/service.c                    |  16 +-
- fs/lustre/ptlrpc/wiretest.c                   |  15 +-
- include/linux/libcfs/libcfs_cpu.h             |  62 ---
- include/linux/libcfs/libcfs_fail.h            |  66 ++--
- include/linux/lnet/lib-lnet.h                 |   5 +-
- include/linux/lnet/lib-types.h                |   3 +
- include/linux/lnet/lock.h                     |  64 +++
- include/uapi/linux/lnet/libcfs_ioctl.h        |   3 +-
- include/uapi/linux/lnet/lnet-dlc.h            |   2 +
- include/uapi/linux/lustre/lustre_idl.h        |   6 +-
- include/uapi/linux/lustre/lustre_user.h       |   6 +-
- include/uapi/linux/lustre/lustre_ver.h        |   4 +-
- net/lnet/klnds/o2iblnd/o2iblnd.c              |  76 ++--
- net/lnet/klnds/o2iblnd/o2iblnd_modparams.c    |   2 +
- net/lnet/klnds/socklnd/socklnd.c              | 145 +++----
- net/lnet/klnds/socklnd/socklnd.h              |   1 -
- net/lnet/klnds/socklnd/socklnd_cb.c           |   4 +-
- net/lnet/klnds/socklnd/socklnd_modparams.c    |   2 +
- net/lnet/libcfs/Makefile                      |   2 +-
- net/lnet/lnet/Makefile                        |   9 +-
- net/lnet/lnet/api-ni.c                        |  30 +-
- net/lnet/lnet/config.c                        |  32 ++
- .../{libcfs/libcfs_lock.c => lnet/lock.c}     |   5 +-
- net/lnet/lnet/peer.c                          |  59 ++-
- net/lnet/lnet/udsp.c                          |   3 +
- 59 files changed, 913 insertions(+), 634 deletions(-)
- create mode 100644 include/linux/lnet/lock.h
- rename net/lnet/{libcfs/libcfs_lock.c => lnet/lock.c} (96%)
-
+diff --git a/fs/lustre/osc/osc_cache.c b/fs/lustre/osc/osc_cache.c
+index 37624a7a99d6..41a07e5d1d07 100644
+--- a/fs/lustre/osc/osc_cache.c
++++ b/fs/lustre/osc/osc_cache.c
+@@ -1638,7 +1638,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
+ 	/* force the caller to try sync io.  this can jump the list
+ 	 * of queued writes and create a discontiguous rpc stream
+ 	 */
+-	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_NO_GRANT) ||
++	if (CFS_FAIL_CHECK(OBD_FAIL_OSC_NO_GRANT) ||
+ 	    !cli->cl_dirty_max_pages || cli->cl_ar.ar_force_sync ||
+ 	    loi->loi_ar.ar_force_sync) {
+ 		OSC_DUMP_GRANT(D_CACHE, cli, "forced sync i/o\n");
+@@ -3196,7 +3196,7 @@ bool osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
+ 		if (!res)
+ 			break;
+ 
+-		OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_SLOW_PAGE_EVICT,
++		CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_SLOW_PAGE_EVICT,
+ 				 cfs_fail_val ?: 20);
+ 
+ 		if (io->ci_type == CIT_MISC &&
+diff --git a/fs/lustre/osc/osc_io.c b/fs/lustre/osc/osc_io.c
+index 71bfe60ad40a..900edf8b9a41 100644
+--- a/fs/lustre/osc/osc_io.c
++++ b/fs/lustre/osc/osc_io.c
+@@ -899,7 +899,7 @@ int osc_io_write_start(const struct lu_env *env,
+ 	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
+ 	int rc = 0;
+ 
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_SETTIME, 1);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_SETTIME, 1);
+ 	cl_object_attr_lock(obj);
+ 	attr->cat_ctime = ktime_get_real_seconds();
+ 	attr->cat_mtime = attr->cat_ctime;
+diff --git a/fs/lustre/osc/osc_lock.c b/fs/lustre/osc/osc_lock.c
+index 181edf286739..3eac1d44fb2d 100644
+--- a/fs/lustre/osc/osc_lock.c
++++ b/fs/lustre/osc/osc_lock.c
+@@ -412,7 +412,7 @@ static int __osc_dlm_blocking_ast(const struct lu_env *env,
+ 
+ 	unlock_res_and_lock(dlmlock);
+ 
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_CANCEL, 5);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_CANCEL, 5);
+ 
+ 	/* if l_ast_data is NULL, the dlmlock was enqueued by AGL or
+ 	 * the object has been destroyed.
+@@ -586,7 +586,7 @@ int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
+ 		dlmlock = NULL;
+ 
+ 		if (!obj && res->lr_type == LDLM_EXTENT) {
+-			if (OBD_FAIL_CHECK(OBD_FAIL_OSC_NO_SIZE_DATA))
++			if (CFS_FAIL_CHECK(OBD_FAIL_OSC_NO_SIZE_DATA))
+ 				break;
+ 
+ 			lock_res(res);
+@@ -1025,8 +1025,8 @@ static int osc_lock_enqueue(const struct lu_env *env,
+ 		if (osc_lock_is_lockless(oscl)) {
+ 			oio->oi_lockless = 1;
+ 		} else if (!async) {
+-			if (OBD_FAIL_PRECHECK(OBD_FAIL_PTLRPC_IDLE_RACE)) {
+-				OBD_RACE(OBD_FAIL_PTLRPC_IDLE_RACE);
++			if (CFS_FAIL_PRECHECK(OBD_FAIL_PTLRPC_IDLE_RACE)) {
++				CFS_RACE(OBD_FAIL_PTLRPC_IDLE_RACE);
+ 				set_current_state(TASK_UNINTERRUPTIBLE);
+ 				schedule_timeout(HZ / 2);
+ 			}
+diff --git a/fs/lustre/osc/osc_request.c b/fs/lustre/osc/osc_request.c
+index 128b7d15d760..3298a9923ea2 100644
+--- a/fs/lustre/osc/osc_request.c
++++ b/fs/lustre/osc/osc_request.c
+@@ -1243,7 +1243,7 @@ static int osc_checksum_bulk_t10pi(const char *obd_name, int nob,
+ 		 * simulate an OST->client data error
+ 		 */
+ 		if (unlikely(i == 0 && opc == OST_READ &&
+-			     OBD_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_RECEIVE))) {
++			     CFS_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_RECEIVE))) {
+ 			unsigned char *ptr = kmap(pga[i]->pg);
+ 
+ 			memcpy(ptr + off, "bad1", min_t(typeof(nob), 4, nob));
+@@ -1292,7 +1292,7 @@ static int osc_checksum_bulk_t10pi(const char *obd_name, int nob,
+ 		 * of corrupting the data so it is still correct on a redo
+ 		 */
+ 		if (opc == OST_WRITE &&
+-		    OBD_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_SEND))
++		    CFS_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_SEND))
+ 			cksum++;
+ 
+ 		*check_sum = cksum;
+@@ -1328,7 +1328,7 @@ static int osc_checksum_bulk(int nob, u32 pg_count,
+ 		 * simulate an OST->client data error
+ 		 */
+ 		if (i == 0 && opc == OST_READ &&
+-		    OBD_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_RECEIVE)) {
++		    CFS_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_RECEIVE)) {
+ 			unsigned char *ptr = kmap(pga[i]->pg);
+ 			int off = pga[i]->off & ~PAGE_MASK;
+ 
+@@ -1356,7 +1356,7 @@ static int osc_checksum_bulk(int nob, u32 pg_count,
+ 	/* For sending we only compute the wrong checksum instead
+ 	 * of corrupting the data so it is still correct on a redo
+ 	 */
+-	if (opc == OST_WRITE && OBD_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_SEND))
++	if (opc == OST_WRITE && CFS_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_SEND))
+ 		(*cksum)++;
+ 
+ 	return 0;
+@@ -1537,9 +1537,9 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 		if (clpage->cp_type == CPT_TRANSIENT)
+ 			directio = true;
+ 	}
+-	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ))
++	if (CFS_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ))
+ 		return -ENOMEM; /* Recoverable */
+-	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ2))
++	if (CFS_FAIL_CHECK(OBD_FAIL_OSC_BRW_PREP_REQ2))
+ 		return -EINVAL; /* Fatal */
+ 
+ 	if ((cmd & OBD_BRW_WRITE) != 0) {
+@@ -1804,7 +1804,7 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
+ 
+ 	if (inode && IS_ENCRYPTED(inode) &&
+ 	    fscrypt_has_encryption_key(inode) &&
+-	    !OBD_FAIL_CHECK(OBD_FAIL_LFSCK_NO_ENCFLAG)) {
++	    !CFS_FAIL_CHECK(OBD_FAIL_LFSCK_NO_ENCFLAG)) {
+ 		if ((body->oa.o_valid & OBD_MD_FLFLAGS) == 0) {
+ 			body->oa.o_valid |= OBD_MD_FLFLAGS;
+ 			body->oa.o_flags = 0;
+@@ -2846,7 +2846,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+ 		       cmd == OBD_BRW_READ ? "read" : "write", starting_offset,
+ 		       ending_offset, cli->cl_r_in_flight, cli->cl_w_in_flight);
+ 	}
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_IO, cfs_fail_val);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_IO, cfs_fail_val);
+ 
+ 	ptlrpcd_add_req(req);
+ 	rc = 0;
+@@ -2987,10 +2987,10 @@ int osc_enqueue_interpret(const struct lu_env *env, struct ptlrpc_request *req,
+ 	ldlm_lock_addref(lockh, mode);
+ 
+ 	/* Let cl_lock_state_wait fail with -ERESTARTSYS to unuse sublocks. */
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_ENQUEUE_HANG, 2);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_LDLM_ENQUEUE_HANG, 2);
+ 
+ 	/* Let CP AST to grant the lock first. */
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_CP_ENQ_RACE, 1);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_CP_ENQ_RACE, 1);
+ 
+ 	if (aa->oa_speculative) {
+ 		LASSERT(!aa->oa_lvb);
+@@ -3006,7 +3006,7 @@ int osc_enqueue_interpret(const struct lu_env *env, struct ptlrpc_request *req,
+ 	rc = osc_enqueue_fini(req, aa->oa_upcall, aa->oa_cookie, lockh, mode,
+ 			      aa->oa_flags, aa->oa_speculative, rc);
+ 
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_CP_CANCEL_RACE, 10);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_CP_CANCEL_RACE, 10);
+ 
+ 	ldlm_lock_decref(lockh, mode);
+ 	LDLM_LOCK_PUT(lock);
+@@ -3165,7 +3165,7 @@ int osc_match_base(const struct lu_env *env, struct obd_export *exp,
+ 	u64 lflags = *flags;
+ 	enum ldlm_mode rc;
+ 
+-	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_MATCH))
++	if (CFS_FAIL_CHECK(OBD_FAIL_OSC_MATCH))
+ 		return -EIO;
+ 
+ 	/* Filesystem lock extents are extended to page boundaries so that
+@@ -3432,7 +3432,7 @@ int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 	char *tmp;
+ 	int rc;
+ 
+-	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_SHUTDOWN, 10);
++	CFS_FAIL_TIMEOUT(OBD_FAIL_OSC_SHUTDOWN, 10);
+ 
+ 	if (KEY_IS(KEY_CHECKSUM)) {
+ 		if (vallen != sizeof(int))
 -- 
 2.39.3
 
