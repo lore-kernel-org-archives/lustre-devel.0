@@ -4,175 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id BEABFC02194
-	for <lustre-devel@archiver.kernel.org>; Thu,  6 Feb 2025 19:08:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8CFB9C02199
+	for <lustre-devel@archiver.kernel.org>; Sat,  8 Feb 2025 00:30:41 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Ypmpy3gYHz1wl2;
-	Thu, 06 Feb 2025 11:08:42 -0800 (PST)
-Received: from outbound-ip191a.ess.barracuda.com
- (outbound-ip191a.ess.barracuda.com [209.222.82.58])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4YqWw021kFz1x5M;
+	Fri, 07 Feb 2025 16:30:40 -0800 (PST)
+Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Ypmpq6tGBz1wrD
- for <lustre-devel@lists.lustre.org>; Thu, 06 Feb 2025 11:08:35 -0800 (PST)
-Received: from NAM02-SN1-obe.outbound.protection.outlook.com
- (mail-sn1nam02lp2047.outbound.protection.outlook.com [104.47.57.47]) by
- mx-outbound47-158.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Thu, 06 Feb 2025 19:08:30 +0000
-ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=F1cUormL9qxFvBzfVWoHKUYfGP9xO9fbatlWiLAqdSPRoRP8smbgMXlan+q87uUW6gcUsw8+X8MJ8SlHa4wbd/uI8jHoPpt+DLTBAHoOOUeyrtW08ls/Xa6j/I2D1OZPDyec4ceUTyrbWz2WGJmYowy29fmLGCKM2RERej3PkSgn6oCu3Yv0II3L+dPT+lpsYjRbaeh5gXhQFLSKNI+1uAAE8sWOoP1wYHE2iCsp768bU1pp64nHSiaThymM6bp5mKf69Pzv/I1OeO/z1Yxey23GGucHzheuDqRXHziWQ4RU0nH/tPqHGmKV+4cAZTGFlu+5YZctP/TSpuuf03Gnew==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
- s=arcselector10001;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=savt2slAby0K+Mal5EZniuYhDHCdvIyBoeLEnqFDRNQ=;
- b=IiZu6hLuOE3FfKmsbxe8EtWToqWCm/eInyQb/utCPI5uG9vhPqvDbgKBysyzK51roSb922pbGTTCEDXIFbMBF6eMtIa3yY0we6ezzRXETSfnuhEWsld6ikcyxcJfcwPzQo6o66068XP+ANR7pBowi/mvMEOnqL0sIS//NAo8JYaBYcg/4vMjFa647BirsLYeoRAsm9d3mWImE72zE6UmdsShAyG1pSl1tGc159+Zb8GXrgJ3bzVilyuxMOdKWc45jZa6L4hp2ynHjFn/NxODtfGbguFNu+BeHFjQTKA/S8uHSBnziwi4IZ18n/XvwwqTlapNWdRq0o00Yj9rfEUj3g==
-ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=whamcloud.com; dmarc=pass action=none
- header.from=whamcloud.com; dkim=pass header.d=whamcloud.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=whamcloud.com;
- s=selector2;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=savt2slAby0K+Mal5EZniuYhDHCdvIyBoeLEnqFDRNQ=;
- b=Bm0a3FFnCUKnYU1yX4FDuwqDlEYmH70S93kq0JTd+jZPEPpkW2PBs943cmtwCGfrev1otDzuEeSj6HvOcUVk2YnFe33g0OMiZ86R8IOf0K2PVoz/hRe4bygboEycV6e5/aK1Fn11m5Rec/sv21VFHaOBqbcRq0jJuNGp01vI5ag=
-Received: from SN7PR19MB6567.namprd19.prod.outlook.com (2603:10b6:806:26d::11)
- by CH2PR19MB4069.namprd19.prod.outlook.com (2603:10b6:610:9f::18)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8422.11; Thu, 6 Feb
- 2025 19:08:25 +0000
-Received: from SN7PR19MB6567.namprd19.prod.outlook.com
- ([fe80::db50:586b:7dda:cf04]) by SN7PR19MB6567.namprd19.prod.outlook.com
- ([fe80::db50:586b:7dda:cf04%3]) with mapi id 15.20.8422.010; Thu, 6 Feb 2025
- 19:08:25 +0000
-From: Oleg Drokin <green@whamcloud.com>
-To: "timday@amazon.com" <timday@amazon.com>, Andreas Dilger <adilger@ddn.com>
-Thread-Topic: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
- upstreaming
-Thread-Index: AQHbaF06daQEbe3e/kelMir67rT0hbMbs8GAgAAqWwCAAUdfgIABebkAgAf62QCAAH1kAIAMBm2AgAASkoCAAr/pAIAAJnkAgAAH54CAAAPkgIAAAWoAgADH0wCAAKtNgIAAOLaAgALrgwCAAAjiAA==
-Date: Thu, 6 Feb 2025 19:08:25 +0000
-Message-ID: <bb7cfdc8a1b8c7158420db91de5de31b2bca0519.camel@whamcloud.com>
-References: <4243d258f1a38e8539e88a68fb705f05bf18dfb1.camel@whamcloud.com>
- <3B83582B-2D34-4D54-97AF-67E36E93FF74@ddn.com>
- <11E4B1AF-3C2A-4E9A-8847-BA319ED6C301@amazon.com>
-In-Reply-To: <11E4B1AF-3C2A-4E9A-8847-BA319ED6C301@amazon.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=whamcloud.com;
-x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: SN7PR19MB6567:EE_|CH2PR19MB4069:EE_
-x-ms-office365-filtering-correlation-id: e874776a-4ecc-4752-2216-08dd46e1a21b
-x-ms-exchange-senderadcheck: 1
-x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0; ARA:13230040|376014|366016|1800799024|38070700018;
-x-microsoft-antispam-message-info: =?utf-8?B?aFNuWWFpMkRhbzFMZG4zYmdhcWRGbVR4VWJJWktjdzJ3WVhEK0t0bmpuUmYz?=
- =?utf-8?B?SStFQXZ0V1JwMncxV2VyenQzOEswL214NnNOdXgzSU9Xb1RUZ2N4eURBK3pP?=
- =?utf-8?B?YktlY1lWeTc0UXE1cytzSGNic3p2U095T09KdDdEQldnOHBhMS96eE9IdUZX?=
- =?utf-8?B?WmptMkZBenk4UFdjTFlPb2pDZlp5VFg3dnAzeTZEOW1MM28yaVUxKzBrSjU2?=
- =?utf-8?B?V3BldllWNnArdHZFdXZYR0ZVNThJNW1pRzYvOFdRbnpRdW9UV0pCTE8zZ0ow?=
- =?utf-8?B?eDhHM2hIc1BxRHUxaEIwVHlpaWFRTWlLcGpVMkR0WEloWUVtcVdWcmp4VU8r?=
- =?utf-8?B?N0Q4VHZoWStEN3ZkN1ZraXpaYU9IK3dYbDVYTjBML2lEMEFManBTUkJpUUZM?=
- =?utf-8?B?b21XSGJDOWtma01lcDBkbFNPWVNPckNxT3BYMXdIUUovMWFlNlp1QStSc1Nr?=
- =?utf-8?B?d093bmFlUmVDY2E5My9QWUNhUFc2MjlDUncyQzVzbzBZRDZkYkNaTEpqc21G?=
- =?utf-8?B?NXkrakl5WTFoZ1lWVWYvbVlkaDBiLzRTbmo1TXZZdHhnMzFpR2gvQlkrUm1X?=
- =?utf-8?B?MG53RkJISG5JV2JtSURRUHkxQWdMRXhpUWduOEJIQ0VJQzIxQWZBdEgzWjVv?=
- =?utf-8?B?OEdvOUtWVjBFWmg3UmpxU24yZWJiejQ3QSszQ0pxSlZveUkwUmhMM3dXSkRS?=
- =?utf-8?B?Y1VGQ2dEZUg4UnZDYVQ2N3FUb2xrZDF6R3FRT0gxV1VlK2J3c0QzTXIwdDc0?=
- =?utf-8?B?RmhHMHdwQWFYNWZoWHZPNDk3RzU2dUNSZXhGallRQXNqZ014emZraVBtdmRy?=
- =?utf-8?B?aFhGWXRBTlhiOHlPWkFVZ2dGMk9DRkFnMmxRbTBsdklNMThyVXhvUUZ4Q3p6?=
- =?utf-8?B?WG5Xa2YwSmRickNFcnNWd1dqUDFtMUZPRGM4bTZtdE9RRzhDbk5KZTJzdG50?=
- =?utf-8?B?M3Z4SlRRck5tand5VzQ3MEVHK2xVanFJVUtybjdsaUVETm1WdGlRUk5vaWZU?=
- =?utf-8?B?Q1R6d2dxSnUwSkJGbjFaaHI4QnJQb2JCZXNESG5GcjFtY2lOZG5wV1BlcmU3?=
- =?utf-8?B?SEUvc20veHNybVVldWY0MnMxYzNGdUFpQ0FHdlV2Y055MkYvRmxwZUFhN0M5?=
- =?utf-8?B?OXFDc1JWTlBGMkhsMUhXd2NNSkRQNkpoVFhtL2gweThzVU0wRzV2bGxpZHJX?=
- =?utf-8?B?Nzg4ek9HaTZDbmtkMkJzcmJQL1p4Y1c5dGlNdHJjTG9GT0U4QzhuWHp1ajhL?=
- =?utf-8?B?Y0NJc3pQU3U2V3licFV1VzFtTXFGc0xrTlV0MDd1cmNkMGp3anArUmROWTly?=
- =?utf-8?B?UzNLKzE3TXprZURBaytSMm0vV1VJaHB5L2dOd3N2ck14a3BLNVJOQURQUFNL?=
- =?utf-8?B?TFVDZmxVblllS1B2Z3J0Z2dLMVVNd2tQbGNYcm5ENWJNcTR3OVFBeE5iaTlV?=
- =?utf-8?B?Z1doQ29nbDdIdXhUNHY2alJaSVUyVmg1anl4L2hKSTk2Y01adVdURlR2aUtC?=
- =?utf-8?B?aGVMSi9ZSGs5N0Z5R1EyR3NZWUVwTUlnb1J1VmtZMWxRUk96MjNnb3d0Ymhr?=
- =?utf-8?B?Rnc1UWdkdGQxcEc4aWQ5cUNRYzRJUHlHSHRyaHRBTm9FM1pYUkNveWd1bXZX?=
- =?utf-8?B?azQxeTlCWG4vVWxZODMwS0grVTNrVStYMHVyVHNlNHJya1JyOS9xdXh2UWs3?=
- =?utf-8?B?Mnp5MWh4RGswcDdqMmk2RTEwTHJXUDV5U0hubHh1NEpCazJNVDZob091Q3FO?=
- =?utf-8?B?TDhFNkNkR1BERXI0Q3FLK1UxekN3ajA0Qk04YkRpMnczV3RlWjlXUWNnMEZU?=
- =?utf-8?B?d2t4TEZzVHZIOStsVkR4N25YMUJFcklMdmpvWjNVK1Z3WWR2TmJEZktNSXds?=
- =?utf-8?B?UW8rWk1PcVhsUWJLbTc4MWUxd2RlZS9XMGpzMFFueVFHWjZuN3hnUS8rcjg4?=
- =?utf-8?Q?6aa/fn7ER2SH4J+rdAJgkOKWwfE7xTro?=
-x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:SN7PR19MB6567.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(376014)(366016)(1800799024)(38070700018); DIR:OUT; SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?bHJnQUVwRVRTWlp3SWxkalYwYjZQSGtNenE4KzAvbG1VY2N3QjRsbCtFWlJh?=
- =?utf-8?B?YXhmMHdVZm1WSmpvcmV1T3YxSW5mS0ZUb0lCcVpjZi9pbzBINklPZUZZVEJz?=
- =?utf-8?B?QVd4QldYeWtEeXBTV0NHbWJkM3lSQlNIdCswNWE0NnEraW5uNGVSendvU0xF?=
- =?utf-8?B?eHk2QVVxSmhlQ2dVbzFiVUlXbTBycThKZUJjdFdjYlF1bGFIV2ZBUFZIVW4y?=
- =?utf-8?B?RXFndlJXOHhHeGlqR1k3RzRIR1ErZERJdnEzbUcvUFVNQUE4SXBxbHFVSFE5?=
- =?utf-8?B?eUF0ZkNuNTBFMlJwQnAzREpmTFExZzNGajdBQTBhakNlQTlvQ3dvVUx3WVVa?=
- =?utf-8?B?Skxzb3R4NVlOYzBJcHNoMFJNR3pBL3dUSEI3eklieHg5MlUvKy9uSllnTm5G?=
- =?utf-8?B?L1dmam90M0FoNGhmVEJ0M0t6YTZTTzJMU29IQ29MM0hLTUZmdGVJTVZlWTRz?=
- =?utf-8?B?WG02MW5XTld4WFlXdG15dnMvNnBPeXRQQWRQd3NHREE0Q2gvbnBGQU1CYWF3?=
- =?utf-8?B?azg2clB1YWcrWEg0bVFaUUI1M2luYUVCRk5JMUh0ckFCWXYrUEp4ZGdlRUth?=
- =?utf-8?B?U21YZm5JaEJpS3BiRXlRWkFISS9tTEJmUndkS2QwdEo3cGlhWWhzMk5CRzBt?=
- =?utf-8?B?RjNtc0NPZ1B1SnNpRzB3YUZiR0JrWUtaSjhpUmN6Zm04Uk9vcEVhMFhuYytm?=
- =?utf-8?B?bUtBUFMvaFBXUFNwOU1rNldtZnM4TUVuSGdzcU8vRHhxanpyR2E1eDA2NHox?=
- =?utf-8?B?N1JkeFM0VDliRlFUWXVITmRFcVlTalZtVm9lcEFsUGRPcnJOb29qNUwwdjBs?=
- =?utf-8?B?VUgvRnJJcXp4Nzc5dDV5SFh6VDkwcXdQY25hUERSWS9tRENkSGhtNVRzOTc1?=
- =?utf-8?B?aTluWnI0MXlremFYYlVkdElSUWxZWTBYSTZHWUtvZ0RENGxQdytya01CRFhM?=
- =?utf-8?B?aFhIN2E4MDVBU1JmSE5VMit1TWRob3Ztd2pZcWFRL2orK2ZtZmVOQ3U5c29k?=
- =?utf-8?B?NjcyQWFJeTRRUDF5NFF0elRYR2ZmbnZNYlpVTGYyMDJCTjBtOTVLSk11QU04?=
- =?utf-8?B?UlZQS3Vuc1N6ak1pRm5Cb2U0KytXOS9RVmllbDNOQkFLaFZXUlVTWkV6emFU?=
- =?utf-8?B?dkE0TUYxVEIzOEZGVldvSEJjZDVGVnBpWkpYM1pCaTdUZjlvMVVuL3gzYllU?=
- =?utf-8?B?ME1GelV4djFoejJxRVVNS1N3M1dFQ1BETVpNZlN3cHJVc3E3dytWNlRCVHRT?=
- =?utf-8?B?M0dUa2FwaVc0eVVTMlJoRXRheEZZc3NkVHJ4TlYyWDgrdEJiYmE2TVJpc3NY?=
- =?utf-8?B?WEtVdlBRdFM4ZVBCWEpUZm1Yc1JVaDU3QVFsQXlMTUFQYkpZOVVRN1JQeDJp?=
- =?utf-8?B?S2d0aUp6VWJUeW0yTGg0S1REazNRMW9kazkrVDhsaWlHL3dIUXIvZnJldzdr?=
- =?utf-8?B?VUQrVzhDaFFDaXlvVmJaclRGQ250c1JSL2NGdE9SSGFCbThDQXVBcWpUcEFi?=
- =?utf-8?B?cktkcmNydVdUOEFSTjZnMnFCNWhpbXhjU2RNajBiajJ2b01STjhvczNhYzZ5?=
- =?utf-8?B?SzBUanJJbWpvbDJsSTB4eVlseDFITEorejBmODJLK3FhTStqUzZsMkYrZzhT?=
- =?utf-8?B?VkJ0dDdwSmNHUlJHOHdvQlVTUzhwZWc3eUZnU2pScUQ3a1BjWVdEZ0JOekxP?=
- =?utf-8?B?N1B5UTNsS0tKeTV0SGlLR3BmN3IzT1VBRDBpdTRDNVd2RDNVZzFwNlIzWUN0?=
- =?utf-8?B?Qms3bVdrS1ZUcUJua2V0dUQyajFlb1dUdGk3S2YvMEFNZ2ZZSE44SWdpV3lr?=
- =?utf-8?B?VkZ5MnRXd3RHZ25wOU1rWFFkeGN1UXF5eS9BTE8vdURCV3RRVEJVd1R2ZnR3?=
- =?utf-8?B?aEFnOFNFUUxVdUJiOHNHbjlJZ0I4clVFWVB1ejMwNFJscHVndjdYYmtFc2w1?=
- =?utf-8?B?dE1KSHZSK0JhbnBqS3VlYWZGcjR4SGczODNnZlFydkJOUVNoSVl4MlM5WmhZ?=
- =?utf-8?B?VXdZekYwTldtU1pXQjhzSFN4eDRpY3RQRVluS2VWZWVlcHcrM1RYbnp2aDA1?=
- =?utf-8?B?TXUrZEM5NmQwVCtLMCtIQWFoTEdhSEk1dUJyZGt2d1FkN3ZZbER5dnJyL1FF?=
- =?utf-8?Q?9791VyRqpzkfatvYdi0419RKK?=
-Content-ID: <FB932C9ABE100741ACCA058529963E61@namprd19.prod.outlook.com>
+ 4YqWvv1961z1wsW
+ for <lustre-devel@lists.lustre.org>; Fri, 07 Feb 2025 16:30:35 -0800 (PST)
+Received: from star2.ccs.ornl.gov (ltm5-e204-208.ccs.ornl.gov [160.91.203.29])
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id E47CC88F9D4;
+ Fri,  7 Feb 2025 19:30:32 -0500 (EST)
+Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
+ id D9A6A106BE16; Fri,  7 Feb 2025 19:30:32 -0500 (EST)
+From: James Simmons <jsimmons@infradead.org>
+To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
+ NeilBrown <neilb@suse.de>
+Date: Fri,  7 Feb 2025 19:30:07 -0500
+Message-ID: <20250208003027.180076-2-jsimmons@infradead.org>
+X-Mailer: git-send-email 2.43.5
+In-Reply-To: <20250208003027.180076-1-jsimmons@infradead.org>
+References: <20250208003027.180076-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: BHxjEIrPmI3A86z45h1aj8ySRPxAdhgFPfCkf0Lmj6mvmDr+Cj4pRL4pGWqOEqDL1cmAuR+YZRTHOcsdzJPSOHUhd6PbNI57YjVsIudXT6KNs/L4RjuOEU4Mav8dK4b1iF1kd4FUAyId/r9i4eGsvbsfg9i1HIBRhevASEEstVkMhEYb58zmhgFnpNaiFSsVVhjuBHXkiErqOwHHxC4EWo4u69+iumWnXoxstqwQ3Oa4B/uooL8Bb1YwDGowYPqhjUOkD607p7v4/SholUGlMHxEJoarb0o72idiNPTfXXL2GfQYyeMJOHuo3w6QCEDMGbVTnbiFV3GEra4d5GCVnXh8b9fYISlMagg2BE3L9B3LeGfjFACOKP5Hh7XkdfwH8CgjgJt3tQ7sSOCTO/lsHHGvmSOYCe0PVDtH+wbzmQeA5LDoJ//BERHKNK3RD1Y2bkO+vwqrUQfEfXN+7N62qsDPU9lj4kkmHceSCMs9IN16bK6etVt3lgarauX2H1p19hct/J9UINZ7H3cr0GUyqMfbBZKKgmCIItpAdnQJqftbrxYFwyP2Xn6sFks4dlpxeFGdRJVS+NqzHWrxRkf5qwXcFQkt5mFtywNs57g3XlWMf0baiiH5ERfxc4uLTE1byc9SynnzwyME2Zb1tVl4tW8HDLDJ1N77a4k6m+MvDK0=
-X-OriginatorOrg: whamcloud.com
-X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: SN7PR19MB6567.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e874776a-4ecc-4752-2216-08dd46e1a21b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Feb 2025 19:08:25.7446 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: ULsjPMN1on6n+fiT2POr8NWpFeTPSc3GDi/eTemBDXb0FsKtKVwmOoq24gRnnuMe
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CH2PR19MB4069
-X-BESS-ID: 1738868909-112190-7501-10443-1
-X-BESS-VER: 2019.1_20250205.2128
-X-BESS-Apparent-Source-IP: 104.47.57.47
-X-BESS-Parts: H4sIAAAAAAACA4uuVkqtKFGyUioBkjpK+cVKVpZmxkBGBlAs1SItzdQ80cTS0s
- TE3DTNOMnUIMnY0tQoKdHQwDA1yUSpNhYAt6Gh7EAAAAA=
-X-BESS-Outbound-Spam-Score: 0.00
-X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.262336 [from 
- cloudscan20-112.us-east-2b.ess.aws.cudaops.com]
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=BSF_BESS_OUTBOUND
-X-BESS-BRTS-Status: 1
-Subject: Re: [lustre-devel] [LSF/MM/BPF TOPIC] [DRAFT] Lustre client
- upstreaming
+Subject: [lustre-devel] [PATCH 01/21] lustre: llite: implicit default LMV
+ inherit
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -185,34 +44,847 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Cc: Lai Siyao <lai.siyao@whamcloud.com>,
+ Hongchao Zhang <hongchao@whamcloud.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-On Thu, 2025-02-06 at 18:36 +0000, Day, Timothy wrote:
-> > To better cover the skew between different VMs running different
-> > subtests, we could change the test-framework code to run the
-> > subtests in different order (either starting at a random offset, or
-> > in random order).
-> > 
-> > This would also expose some hidden assumptions and dependencies in
-> > the subtests themselves, so that would need to be fixed to avoid
-> > false test failures, but the main goal of the boilpot testing is
-> > finding crashes/deadlocks, so if a few tests fail because of minor
-> > test issues I don't think that is a blocker.
-> > 
-> > 
-> > Cheers, Andreas
-> 
-> We could also limit each VM to run a subset of the sanity tests. Then
-> we could cap the length of the longest run test. I have some
-> scripting
-> magic already to divide up the subtests between VMs.
+From: Lai Siyao <lai.siyao@whamcloud.com>
 
-That probably means you need more VMs to cover everything good enough
-(the process is probabilistic as it is)
+With implicit default LMV inherit, the inherited default LMV is
+not stored on disk, but maintained on client side.
+
+Benefits:
+* change of directory default LMV will be populated to all sub levels
+  at runtime.
+* default LMV will be packed into mkdir request, therefore MDT doesn't
+  need to read it from disk, as will improve mkdir performance.
+
+Caveats:
+* to disable inherited default LMV on subdir, a default LMV need to be
+  set on this subdir explicitly like this:
+        "lfs setdirstripe -D -i <subdir_mdt_index> --max-inherit 0"
+Changes on client side:
+* update inherited default LMV after lookup/open/revalidate.
+* pack default LMV in mkdir request.
+* add "--raw" option for "lfs getdirstripe -D" to print default LMV
+  stored in inode, if directory doesn't have default LMV, or its
+  default LMV is implicitly inherited, nothing will be printed.
+
+Changes on MDT side:
+* use the default LMV from client in lod_ah_init() to mkdir.
+* don't save inherited default LMV in mkdir.
+
+WC-bug-id: https://jira.whamcloud.com/browse/LU-15971
+Lustre-commit: 388a185eace0e6b16 ("LU-15971 llite: implicit default LMV inherit")
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/47789
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ fs/lustre/include/lustre_lmv.h          |  64 ++++++----
+ fs/lustre/llite/dcache.c                |  11 +-
+ fs/lustre/llite/dir.c                   | 129 ++++++++++---------
+ fs/lustre/llite/file.c                  |   9 +-
+ fs/lustre/llite/llite_internal.h        |   9 +-
+ fs/lustre/llite/llite_lib.c             | 158 ++++++++++++++++++++----
+ fs/lustre/llite/namei.c                 |  58 +++++++--
+ fs/lustre/llite/statahead.c             |   6 +-
+ fs/lustre/mdc/mdc_lib.c                 |   7 ++
+ fs/lustre/obdclass/lprocfs_status.c     |   2 +-
+ fs/lustre/ptlrpc/wiretest.c             |   2 +
+ include/uapi/linux/lustre/lustre_idl.h  |   2 +
+ include/uapi/linux/lustre/lustre_user.h |   6 +-
+ 13 files changed, 344 insertions(+), 119 deletions(-)
+
+diff --git a/fs/lustre/include/lustre_lmv.h b/fs/lustre/include/lustre_lmv.h
+index 5e3dbc52e846..c3b55d4b63e0 100644
+--- a/fs/lustre/include/lustre_lmv.h
++++ b/fs/lustre/include/lustre_lmv.h
+@@ -82,6 +82,33 @@ static inline bool lmv_dir_bad_hash(const struct lmv_stripe_md *lsm)
+ 	return !lmv_is_known_hash_type(lsm->lsm_md_hash_type);
+ }
+ 
++static inline u8 lmv_inherit_next(u8 inherit)
++{
++	if (inherit == LMV_INHERIT_END || inherit == LMV_INHERIT_NONE)
++		return LMV_INHERIT_NONE;
++
++	if (inherit == LMV_INHERIT_UNLIMITED || inherit > LMV_INHERIT_MAX)
++		return inherit;
++
++	return inherit - 1;
++}
++
++static inline u8 lmv_inherit_rr_next(u8 inherit_rr)
++{
++	if (inherit_rr == LMV_INHERIT_RR_NONE ||
++	    inherit_rr == LMV_INHERIT_RR_UNLIMITED ||
++	    inherit_rr > LMV_INHERIT_RR_MAX)
++		return inherit_rr;
++
++	return inherit_rr - 1;
++}
++
++static inline bool lmv_is_inheritable(u8 inherit)
++{
++	return inherit == LMV_INHERIT_UNLIMITED ||
++	       (inherit > LMV_INHERIT_END && inherit <= LMV_INHERIT_MAX);
++}
++
+ static inline bool
+ lsm_md_eq(const struct lmv_stripe_md *lsm1, const struct lmv_stripe_md *lsm2)
+ {
+@@ -145,6 +172,22 @@ static inline void lsm_md_dump(int mask, const struct lmv_stripe_md *lsm)
+ 		       i, PFID(&lsm->lsm_md_oinfo[i].lmo_fid));
+ }
+ 
++static inline bool
++lsm_md_inherited(const struct lmv_stripe_md *plsm,
++		 const struct lmv_stripe_md *clsm)
++{
++	return plsm && clsm &&
++	       plsm->lsm_md_magic == clsm->lsm_md_magic &&
++	       plsm->lsm_md_stripe_count == clsm->lsm_md_stripe_count &&
++	       plsm->lsm_md_master_mdt_index ==
++			clsm->lsm_md_master_mdt_index &&
++	       plsm->lsm_md_hash_type == clsm->lsm_md_hash_type &&
++	       lmv_inherit_next(plsm->lsm_md_max_inherit) ==
++			clsm->lsm_md_max_inherit &&
++	       lmv_inherit_rr_next(plsm->lsm_md_max_inherit_rr) ==
++			clsm->lsm_md_max_inherit_rr;
++}
++
+ union lmv_mds_md;
+ 
+ void lmv_free_memmd(struct lmv_stripe_md *lsm);
+@@ -517,25 +560,4 @@ static inline bool lmv_is_layout_changing(const struct lmv_mds_md_v1 *lmv)
+ 	       lmv_hash_is_migrating(cpu_to_le32(lmv->lmv_hash_type));
+ }
+ 
+-static inline u8 lmv_inherit_next(u8 inherit)
+-{
+-	if (inherit == LMV_INHERIT_END || inherit == LMV_INHERIT_NONE)
+-		return LMV_INHERIT_NONE;
+-
+-	if (inherit == LMV_INHERIT_UNLIMITED || inherit > LMV_INHERIT_MAX)
+-		return inherit;
+-
+-	return inherit - 1;
+-}
+-
+-static inline u8 lmv_inherit_rr_next(u8 inherit_rr)
+-{
+-	if (inherit_rr == LMV_INHERIT_RR_NONE ||
+-	    inherit_rr == LMV_INHERIT_RR_UNLIMITED ||
+-	    inherit_rr > LMV_INHERIT_RR_MAX)
+-		return inherit_rr;
+-
+-	return inherit_rr - 1;
+-}
+-
+ #endif
+diff --git a/fs/lustre/llite/dcache.c b/fs/lustre/llite/dcache.c
+index d9fb0cdc409f..1abb134f13d2 100644
+--- a/fs/lustre/llite/dcache.c
++++ b/fs/lustre/llite/dcache.c
+@@ -219,8 +219,9 @@ int ll_revalidate_it_finish(struct ptlrpc_request *request,
+ 	ll_set_lock_data(ll_i2sbi(inode)->ll_md_exp, inode, it,
+ 			 &bits);
+ 	if (bits & MDS_INODELOCK_LOOKUP) {
+-		ll_update_dir_depth(de->d_parent->d_inode, inode);
+ 		d_lustre_revalidate(de);
++		if (S_ISDIR(inode->i_mode))
++			ll_update_dir_depth_dmv(de->d_parent->d_inode, de);
+ 	}
+ 
+ 	return rc;
+@@ -263,8 +264,11 @@ static int ll_revalidate_dentry(struct dentry *dentry,
+ 	 * to this dentry, then its lock has not been revoked and the
+ 	 * path component is valid.
+ 	 */
+-	if (lookup_flags & LOOKUP_PARENT)
++	if (lookup_flags & LOOKUP_PARENT) {
++		if (dentry->d_inode && S_ISDIR(dentry->d_inode->i_mode))
++			ll_update_dir_depth_dmv(dir, dentry);
+ 		return 1;
++	}
+ 
+ 	/* Symlink - always valid as long as the dentry was found */
+ 	/* only special case is to prevent ELOOP error from VFS during open
+@@ -298,6 +302,9 @@ static int ll_revalidate_dentry(struct dentry *dentry,
+ 	if (dentry_may_statahead(dir, dentry))
+ 		ll_revalidate_statahead(dir, &dentry, !d_inode(dentry));
+ 
++	if (dentry->d_inode && S_ISDIR(dentry->d_inode->i_mode))
++		ll_update_dir_depth_dmv(dir, dentry);
++
+ 	return 1;
+ }
+ 
+diff --git a/fs/lustre/llite/dir.c b/fs/lustre/llite/dir.c
+index 0f4dc2f1ce5e..25ea565a2f0b 100644
+--- a/fs/lustre/llite/dir.c
++++ b/fs/lustre/llite/dir.c
+@@ -655,6 +655,64 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
+ 	return rc;
+ }
+ 
++/* get default LMV from client cache */
++static int ll_dir_get_default_lmv(struct inode *inode, struct lmv_user_md *lum)
++{
++	struct ll_inode_info *lli = ll_i2info(inode);
++	const struct lmv_stripe_md *lsm;
++	bool fs_dmv_got = false;
++	int rc = -ENODATA;
++
++retry:
++	if (lli->lli_default_lsm_md) {
++		down_read(&lli->lli_lsm_sem);
++		lsm = lli->lli_default_lsm_md;
++		if (lsm) {
++			lum->lum_magic = lsm->lsm_md_magic;
++			lum->lum_stripe_count = lsm->lsm_md_stripe_count;
++			lum->lum_stripe_offset = lsm->lsm_md_master_mdt_index;
++			lum->lum_hash_type = lsm->lsm_md_hash_type;
++			lum->lum_max_inherit = lsm->lsm_md_max_inherit;
++			lum->lum_max_inherit_rr = lsm->lsm_md_max_inherit_rr;
++			rc = 0;
++		}
++		up_read(&lli->lli_lsm_sem);
++	}
++
++	if (rc == -ENODATA && !is_root_inode(inode) && !fs_dmv_got) {
++		lli = ll_i2info(inode->i_sb->s_root->d_inode);
++		fs_dmv_got = true;
++		goto retry;
++	}
++
++	if (!rc && fs_dmv_got) {
++		lli = ll_i2info(inode);
++		if (lum->lum_max_inherit != LMV_INHERIT_UNLIMITED) {
++			if (lum->lum_max_inherit == LMV_INHERIT_NONE ||
++			    lum->lum_max_inherit < LMV_INHERIT_END ||
++			    lum->lum_max_inherit > LMV_INHERIT_MAX ||
++			    lum->lum_max_inherit <= lli->lli_dir_depth) {
++				rc = -ENODATA;
++				goto out;
++			}
++			lum->lum_max_inherit -= lli->lli_dir_depth;
++		}
++
++		if (lum->lum_max_inherit_rr != LMV_INHERIT_RR_UNLIMITED) {
++			if (lum->lum_max_inherit_rr == LMV_INHERIT_NONE ||
++			    lum->lum_max_inherit_rr < LMV_INHERIT_RR_END ||
++			    lum->lum_max_inherit_rr > LMV_INHERIT_RR_MAX ||
++			    lum->lum_max_inherit_rr <= lli->lli_dir_depth)
++				lum->lum_max_inherit_rr = LMV_INHERIT_RR_NONE;
++
++			if (lum->lum_max_inherit_rr > lli->lli_dir_depth)
++				lum->lum_max_inherit_rr -= lli->lli_dir_depth;
++		}
++	}
++out:
++	return rc;
++}
++
+ int ll_dir_get_default_layout(struct inode *inode, void **plmm, int *plmm_size,
+ 			      struct ptlrpc_request **request, u64 valid,
+ 			      enum get_default_layout_type type)
+@@ -1634,7 +1692,6 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		struct lmv_user_md __user *ulmv = uarg;
+ 		struct lmv_user_md lum;
+ 		struct ptlrpc_request *request = NULL;
+-		struct ptlrpc_request *root_request = NULL;
+ 		struct lmv_user_md *tmp = NULL;
+ 		union lmv_mds_md *lmm = NULL;
+ 		u64 valid = 0;
+@@ -1650,6 +1707,19 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		if (copy_from_user(&lum, ulmv, sizeof(*ulmv)))
+ 			return -EFAULT;
+ 
++		/* get default LMV */
++		if (lum.lum_magic == LMV_USER_MAGIC &&
++		    lum.lum_type != LMV_TYPE_RAW) {
++			rc = ll_dir_get_default_lmv(inode, &lum);
++			if (rc)
++				return rc;
++
++			if (copy_to_user(ulmv, &lum, sizeof(lum)))
++				return -EFAULT;
++
++			return 0;
++		}
++
+ 		max_stripe_count = lum.lum_stripe_count;
+ 		/*
+ 		 * lum_magic will indicate which stripe the ioctl will like
+@@ -1664,64 +1734,12 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			return -EINVAL;
+ 
+ 		rc = ll_dir_getstripe_default(inode, (void **)&lmm, &lmmsize,
+-					      &request, &root_request, valid);
++					      &request, NULL, valid);
+ 		if (rc)
+ 			goto finish_req;
+ 
+-		/* Get default LMV EA */
++		/* Get default LMV EA in raw mode */
+ 		if (lum.lum_magic == LMV_USER_MAGIC) {
+-			struct lmv_user_md *lum;
+-			struct ll_inode_info *lli;
+-
+-			if (lmmsize > sizeof(*ulmv)) {
+-				rc = -EINVAL;
+-				goto finish_req;
+-			}
+-
+-			lum = (struct lmv_user_md *)lmm;
+-			if (lum->lum_max_inherit == LMV_INHERIT_NONE) {
+-				rc = -ENODATA;
+-				goto finish_req;
+-			}
+-
+-			if (root_request) {
+-				lli = ll_i2info(inode);
+-				if (lum->lum_max_inherit !=
+-				    LMV_INHERIT_UNLIMITED) {
+-					if (lum->lum_max_inherit <
+-						LMV_INHERIT_END ||
+-					    lum->lum_max_inherit >
+-						LMV_INHERIT_MAX ||
+-					    lum->lum_max_inherit <=
+-						lli->lli_dir_depth) {
+-						rc = -ENODATA;
+-						goto finish_req;
+-					}
+-
+-					lum->lum_max_inherit -=
+-						lli->lli_dir_depth;
+-				}
+-
+-				if (lum->lum_max_inherit_rr !=
+-				    LMV_INHERIT_RR_UNLIMITED) {
+-					if (lum->lum_max_inherit_rr ==
+-						LMV_INHERIT_NONE ||
+-					    lum->lum_max_inherit_rr <
+-						LMV_INHERIT_RR_END ||
+-					    lum->lum_max_inherit_rr >
+-						LMV_INHERIT_RR_MAX ||
+-					    lum->lum_max_inherit_rr <=
+-						lli->lli_dir_depth) {
+-						lum->lum_max_inherit_rr =
+-							LMV_INHERIT_RR_NONE;
+-						goto out_copy;
+-					}
+-
+-					lum->lum_max_inherit_rr -=
+-						lli->lli_dir_depth;
+-				}
+-			}
+-out_copy:
+ 			if (copy_to_user(ulmv, lmm, lmmsize))
+ 				rc = -EFAULT;
+ 
+@@ -1812,7 +1830,6 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		kfree(tmp);
+ finish_req:
+ 		ptlrpc_req_finished(request);
+-		ptlrpc_req_finished(root_request);
+ 		return rc;
+ 	}
+ 	case LL_IOC_RMFID:
+diff --git a/fs/lustre/llite/file.c b/fs/lustre/llite/file.c
+index 7899ffdd92fb..aee529098497 100644
+--- a/fs/lustre/llite/file.c
++++ b/fs/lustre/llite/file.c
+@@ -693,10 +693,8 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 		 * of kernel will deal with that later.
+ 		 */
+ 		ll_set_lock_data(sbi->ll_md_exp, inode, itp, &bits);
+-		if (bits & MDS_INODELOCK_LOOKUP) {
++		if (bits & MDS_INODELOCK_LOOKUP)
+ 			d_lustre_revalidate(de);
+-			ll_update_dir_depth(parent->d_inode, d_inode(de));
+-		}
+ 
+ 		/* if DoM bit returned along with LAYOUT bit then there
+ 		 * can be read-on-open data returned.
+@@ -704,6 +702,11 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 		if (bits & MDS_INODELOCK_DOM && bits & MDS_INODELOCK_LAYOUT)
+ 			ll_dom_finish_open(inode, req);
+ 	}
++	/* open may not fetch LOOKUP lock, update dir depth and default LMV
++	 * anyway.
++	 */
++	if (!rc && S_ISDIR(de->d_inode->i_mode))
++		ll_update_dir_depth_dmv(parent->d_inode, de);
+ 
+ out:
+ 	ptlrpc_req_finished(req);
+diff --git a/fs/lustre/llite/llite_internal.h b/fs/lustre/llite/llite_internal.h
+index 93743d27739c..746ef983edb8 100644
+--- a/fs/lustre/llite/llite_internal.h
++++ b/fs/lustre/llite/llite_internal.h
+@@ -196,7 +196,12 @@ struct ll_inode_info {
+ 			 * statahead hit ratio is too low, or start statahead
+ 			 * thread failed.
+ 			 */
+-			unsigned short			lli_sa_enabled:1;
++			unsigned short			lli_sa_enabled:1,
++			/* default LMV is explicitly set in inode on MDT, this
++			 * is for old server, or default LMV is set by
++			 * "lfs setdirstripe -D".
++			 */
++							lli_default_lmv_set:1;
+ 			/* generation for statahead */
+ 			unsigned int			lli_sa_generation;
+ 			/* rw lock protects lli_lsm_md */
+@@ -1293,7 +1298,7 @@ int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
+ 		       u32 flags);
+ int ll_update_inode(struct inode *inode, struct lustre_md *md);
+ void ll_update_inode_flags(struct inode *inode, unsigned int ext_flags);
+-void ll_update_dir_depth(struct inode *dir, struct inode *inode);
++void ll_update_dir_depth_dmv(struct inode *dir, struct dentry *de);
+ int ll_read_inode2(struct inode *inode, void *opaque);
+ void ll_truncate_inode_pages_final(struct inode *inode, struct cl_io *io);
+ void ll_delete_inode(struct inode *inode);
+diff --git a/fs/lustre/llite/llite_lib.c b/fs/lustre/llite/llite_lib.c
+index b158eccc16c8..afb231ecd70b 100644
+--- a/fs/lustre/llite/llite_lib.c
++++ b/fs/lustre/llite/llite_lib.c
+@@ -327,7 +327,8 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 				   OBD_CONNECT2_DOM_LVB |
+ 				   OBD_CONNECT2_REP_MBITS |
+ 				   OBD_CONNECT2_ATOMIC_OPEN_LOCK |
+-				   OBD_CONNECT2_BATCH_RPC;
++				   OBD_CONNECT2_BATCH_RPC |
++				   OBD_CONNECT2_DMV_IMP_INHERIT;
+ 
+ 	if (test_bit(LL_SBI_LRU_RESIZE, sbi->ll_flags))
+ 		data->ocd_connect_flags |= OBD_CONNECT_LRU_RESIZE;
+@@ -1607,13 +1608,15 @@ static void ll_update_default_lsm_md(struct inode *inode, struct lustre_md *md)
+ 
+ 	if (!md->default_lmv) {
+ 		/* clear default lsm */
+-		if (lli->lli_default_lsm_md) {
++		if (lli->lli_default_lsm_md && lli->lli_default_lmv_set) {
+ 			down_write(&lli->lli_lsm_sem);
+-			if (lli->lli_default_lsm_md) {
++			if (lli->lli_default_lsm_md &&
++			    lli->lli_default_lmv_set) {
+ 				lmv_free_memmd(lli->lli_default_lsm_md);
+ 				lli->lli_default_lsm_md = NULL;
++				lli->lli_inherit_depth = 0;
++				lli->lli_default_lmv_set = 0;
+ 			}
+-			lli->lli_inherit_depth = 0;
+ 			up_write(&lli->lli_lsm_sem);
+ 		}
+ 		return;
+@@ -1634,6 +1637,7 @@ static void ll_update_default_lsm_md(struct inode *inode, struct lustre_md *md)
+ 	if (lli->lli_default_lsm_md)
+ 		lmv_free_memmd(lli->lli_default_lsm_md);
+ 	lli->lli_default_lsm_md = md->default_lmv;
++	lli->lli_default_lmv_set = 1;
+ 	lsm_md_dump(D_INODE, md->default_lmv);
+ 	md->default_lmv = NULL;
+ 	up_write(&lli->lli_lsm_sem);
+@@ -2735,38 +2739,150 @@ static inline bool ll_default_lmv_inherited(struct lmv_stripe_md *pdmv,
+ 	return true;
+ }
+ 
+-/* update directory depth to ROOT, called after LOOKUP lock is fetched. */
+-void ll_update_dir_depth(struct inode *dir, struct inode *inode)
++/* if default LMV is implicitly inherited, subdir default LMV is maintained on
++ * client side.
++ */
++int ll_dir_default_lmv_inherit(struct inode *dir, struct inode *inode)
+ {
++	struct ll_inode_info *plli = ll_i2info(dir);
++	struct ll_inode_info *lli = ll_i2info(inode);
++	struct lmv_stripe_md *plsm;
++	struct lmv_stripe_md *lsm;
++	int rc = 0;
++
++	/* ROOT default LMV is not inherited */
++	if (is_root_inode(dir) ||
++	    !(exp_connect_flags2(ll_i2mdexp(dir)) &
++				 OBD_CONNECT2_DMV_IMP_INHERIT))
++		return 0;
++
++	/* nothing to do if no default LMV on both */
++	if (!plli->lli_default_lsm_md && !lli->lli_default_lsm_md)
++		return 0;
++
++	/* subdir default LMV comes from disk */
++	if (lli->lli_default_lsm_md && lli->lli_default_lmv_set)
++		return 0;
++
++	/* delete subdir default LMV if parent's is deleted or becomes
++	 * uninheritable.
++	 */
++	down_read(&plli->lli_lsm_sem);
++	plsm = plli->lli_default_lsm_md;
++	if (!plsm || !lmv_is_inheritable(plsm->lsm_md_max_inherit)) {
++		if (lli->lli_default_lsm_md && !lli->lli_default_lmv_set) {
++			down_write(&lli->lli_lsm_sem);
++			if (lli->lli_default_lsm_md &&
++			    !lli->lli_default_lmv_set) {
++				lmv_free_memmd(lli->lli_default_lsm_md);
++				lli->lli_default_lsm_md = NULL;
++				lli->lli_inherit_depth = 0;
++			}
++			up_write(&lli->lli_lsm_sem);
++		}
++		rc = 0;
++		goto unlock_parent;
++	}
++
++	/* do nothing if inherited LMV is unchanged */
++	if (lli->lli_default_lsm_md) {
++		rc = 1;
++		down_read(&lli->lli_lsm_sem);
++		if (!lli->lli_default_lmv_set)
++			rc = lsm_md_inherited(plsm, lli->lli_default_lsm_md);
++		up_read(&lli->lli_lsm_sem);
++		if (rc == 1) {
++			rc = 0;
++			goto unlock_parent;
++		}
++	}
++
++	/* inherit default LMV */
++	down_write(&lli->lli_lsm_sem);
++	if (lli->lli_default_lsm_md) {
++		/* checked above, but in case of race, check again with lock */
++		if (lli->lli_default_lmv_set) {
++			rc = 0;
++			goto unlock_child;
++		}
++		/* always update subdir default LMV in case parent's changed */
++		lsm = lli->lli_default_lsm_md;
++	} else {
++		lsm = kzalloc(sizeof(*lsm), GFP_NOFS);
++		if (!lsm) {
++			rc = -ENOMEM;
++			goto unlock_child;
++		}
++		lli->lli_default_lsm_md = lsm;
++	}
++
++	*lsm = *plsm;
++	lsm->lsm_md_max_inherit = lmv_inherit_next(plsm->lsm_md_max_inherit);
++	lsm->lsm_md_max_inherit_rr =
++			lmv_inherit_rr_next(plsm->lsm_md_max_inherit_rr);
++	lli->lli_inherit_depth = plli->lli_inherit_depth + 1;
++
++	lsm_md_dump(D_INODE, lsm);
++
++unlock_child:
++	up_write(&lli->lli_lsm_sem);
++unlock_parent:
++	up_read(&plli->lli_lsm_sem);
++
++	return rc;
++}
++
++/**
++ * Update directory depth and default LMV
++ *
++ * Update directory depth to ROOT and inherit default LMV from parent if
++ * parent's default LMV is inheritable. The default LMV set with command
++ * "lfs setdirstripe -D ..." is stored on MDT, while the inherited default LMV
++ * is generated at runtime on client side.
++ *
++ * \param[in]	dir	parent directory inode
++ * \param[in]	de	dentry
++ */
++void ll_update_dir_depth_dmv(struct inode *dir, struct dentry *de)
++{
++	struct inode *inode = de->d_inode;
+ 	struct ll_inode_info *plli;
+ 	struct ll_inode_info *lli;
+ 
+-	if (!S_ISDIR(inode->i_mode))
+-		return;
+-
++	LASSERT(S_ISDIR(inode->i_mode));
+ 	if (inode == dir)
+ 		return;
+ 
+ 	plli = ll_i2info(dir);
+ 	lli = ll_i2info(inode);
+ 	lli->lli_dir_depth = plli->lli_dir_depth + 1;
+-	if (plli->lli_default_lsm_md && lli->lli_default_lsm_md) {
+-		down_read(&plli->lli_lsm_sem);
+-		down_read(&lli->lli_lsm_sem);
+-		if (ll_default_lmv_inherited(plli->lli_default_lsm_md,
++	if (lli->lli_default_lsm_md && lli->lli_default_lmv_set) {
++		if (plli->lli_default_lsm_md) {
++			down_read(&plli->lli_lsm_sem);
++			down_read(&lli->lli_lsm_sem);
++			if (lsm_md_inherited(plli->lli_default_lsm_md,
+ 					     lli->lli_default_lsm_md))
+-			lli->lli_inherit_depth =
+-				plli->lli_inherit_depth + 1;
+-		else
++				lli->lli_inherit_depth =
++					plli->lli_inherit_depth + 1;
++			else
++				/* in case parent default LMV changed */
++				lli->lli_inherit_depth = 0;
++			up_read(&lli->lli_lsm_sem);
++			up_read(&plli->lli_lsm_sem);
++		} else {
++			/* in case parent default LMV deleted */
+ 			lli->lli_inherit_depth = 0;
+-		up_read(&lli->lli_lsm_sem);
+-		up_read(&plli->lli_lsm_sem);
++		}
+ 	} else {
+-		lli->lli_inherit_depth = 0;
++		ll_dir_default_lmv_inherit(dir, inode);
+ 	}
+ 
+-	CDEBUG(D_INODE, DFID" depth %hu default LMV depth %hu\n",
+-	       PFID(&lli->lli_fid), lli->lli_dir_depth, lli->lli_inherit_depth);
++	if (lli->lli_default_lsm_md)
++		CDEBUG(D_INODE,
++		       "%s "DFID" depth %hu %s default LMV inherit depth %hu\n",
++		       de->d_name.name, PFID(&lli->lli_fid), lli->lli_dir_depth,
++		       lli->lli_default_lmv_set ? "server" : "client",
++		       lli->lli_inherit_depth);
+ }
+ 
+ void ll_truncate_inode_pages_final(struct inode *inode, struct cl_io *io)
+diff --git a/fs/lustre/llite/namei.c b/fs/lustre/llite/namei.c
+index 85a5902b0598..657ad6fd961d 100644
+--- a/fs/lustre/llite/namei.c
++++ b/fs/lustre/llite/namei.c
+@@ -726,10 +726,13 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 
+ 	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
+ 		/* We have the "lookup" lock, so unhide dentry */
+-		if (bits & MDS_INODELOCK_LOOKUP) {
++		if (bits & MDS_INODELOCK_LOOKUP)
+ 			d_lustre_revalidate(*de);
+-			ll_update_dir_depth(parent, d_inode(*de));
+-		}
++		/* open may not fetch LOOKUP lock, update dir depth/dmv anyway
++		 * in case it's used uninitialized.
++		 */
++		if (S_ISDIR(inode->i_mode))
++			ll_update_dir_depth_dmv(parent, *de);
+ 
+ 		if (encrypt) {
+ 			rc = fscrypt_get_encryption_info(inode);
+@@ -1424,10 +1427,11 @@ static int ll_create_it(struct inode *dir, struct dentry *dentry,
+ 	ll_set_lock_data(ll_i2sbi(dir)->ll_md_exp, inode, it, &bits);
+ 	if (bits & MDS_INODELOCK_LOOKUP) {
+ 		d_lustre_revalidate(dentry);
+-		ll_update_dir_depth(dir, inode);
++		if (S_ISDIR(inode->i_mode))
++			ll_update_dir_depth_dmv(dir, dentry);
+ 	}
+ 
+-	return rc;
++	return 0;
+ }
+ 
+ void ll_update_times(struct ptlrpc_request *request, struct inode *inode)
+@@ -1517,6 +1521,9 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
+ 	struct ll_sb_info *sbi = ll_i2sbi(dir);
+ 	struct fscrypt_str *disk_link = NULL;
+ 	bool encrypt = false;
++	struct lmv_user_md *lum = NULL;
++	const void *data = NULL;
++	size_t datalen = 0;
+ 	int err;
+ 
+ 	if (unlikely(tgt)) {
+@@ -1524,6 +1531,8 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
+ 		rdev = 0;
+ 		if (!disk_link)
+ 			return -EINVAL;
++		data = disk_link->name;
++		datalen = disk_link->len;
+ 	}
+ 
+ again:
+@@ -1534,8 +1543,37 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
+ 		goto err_exit;
+ 	}
+ 
+-	if (S_ISDIR(mode))
++	if (S_ISDIR(mode)) {
+ 		ll_qos_mkdir_prep(op_data, dir);
++		if ((exp_connect_flags2(ll_i2mdexp(dir)) &
++		     OBD_CONNECT2_DMV_IMP_INHERIT) &&
++		    op_data->op_default_mea1 && !lum) {
++			const struct lmv_stripe_md *lsm;
++
++			/* once DMV_IMP_INHERIT is set, pack default LMV in
++			 * create request.
++			 */
++			lum = kzalloc(sizeof(*lum), GFP_NOFS);
++			if (!lum) {
++				err = -ENOMEM;
++				goto err_exit;
++			}
++			lsm = op_data->op_default_mea1;
++			lum->lum_magic = cpu_to_le32(lsm->lsm_md_magic);
++			lum->lum_stripe_count =
++				cpu_to_le32(lsm->lsm_md_stripe_count);
++			lum->lum_stripe_offset =
++				cpu_to_le32(lsm->lsm_md_master_mdt_index);
++			lum->lum_hash_type =
++				cpu_to_le32(lsm->lsm_md_hash_type);
++			lum->lum_max_inherit = lsm->lsm_md_max_inherit;
++			lum->lum_max_inherit_rr = lsm->lsm_md_max_inherit_rr;
++			lum->lum_pool_name[0] = 0;
++			op_data->op_bias |= MDS_CREATE_DEFAULT_LMV;
++			data = lum;
++			datalen = sizeof(*lum);
++		}
++	}
+ 
+ 	if (test_bit(LL_SBI_FILE_SECCTX, sbi->ll_flags)) {
+ 		err = ll_dentry_init_security(dchild, mode, &dchild->d_name,
+@@ -1596,11 +1634,13 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
+ 			dchild->d_sb->s_op->destroy_inode(fakeinode);
+ 			if (err)
+ 				goto err_exit;
++
++			data = disk_link->name;
++			datalen = disk_link->len;
+ 		}
+ 	}
+ 
+-	err = md_create(sbi->ll_md_exp, op_data, tgt ? disk_link->name : NULL,
+-			tgt ? disk_link->len : 0, mode,
++	err = md_create(sbi->ll_md_exp, op_data, data, datalen, mode,
+ 			from_kuid(&init_user_ns, current_fsuid()),
+ 			from_kgid(&init_user_ns, current_fsgid()),
+ 			current_cap(), rdev, &request);
+@@ -1727,9 +1767,9 @@ static int ll_new_node(struct inode *dir, struct dentry *dchild,
+ err_exit:
+ 	if (request)
+ 		ptlrpc_req_finished(request);
+-
+ 	if (!IS_ERR_OR_NULL(op_data))
+ 		ll_finish_md_op_data(op_data);
++	kfree(lum);
+ 
+ 	return err;
+ }
+diff --git a/fs/lustre/llite/statahead.c b/fs/lustre/llite/statahead.c
+index c820455cc3af..9399b676e582 100644
+--- a/fs/lustre/llite/statahead.c
++++ b/fs/lustre/llite/statahead.c
+@@ -1612,10 +1612,10 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 				goto out_unplug;
+ 			}
+ 
+-			if ((bits & MDS_INODELOCK_LOOKUP) &&
+-			    d_lustre_invalid(*dentryp)) {
++			if (bits & MDS_INODELOCK_LOOKUP) {
+ 				d_lustre_revalidate(*dentryp);
+-				ll_update_dir_depth(dir, (*dentryp)->d_inode);
++				if (S_ISDIR(inode->i_mode))
++					ll_update_dir_depth_dmv(dir, *dentryp);
+ 			}
+ 
+ 			ll_intent_release(&it);
+diff --git a/fs/lustre/mdc/mdc_lib.c b/fs/lustre/mdc/mdc_lib.c
+index 077639d5127c..a0d35f0b4932 100644
+--- a/fs/lustre/mdc/mdc_lib.c
++++ b/fs/lustre/mdc/mdc_lib.c
+@@ -219,6 +219,13 @@ void mdc_create_pack(struct req_capsule *pill, struct md_op_data *op_data,
+ 		 * create only, and don't restripe if object exists.
+ 		 */
+ 		flags |= MDS_OPEN_CREAT;
++	if (op_data->op_bias & MDS_CREATE_DEFAULT_LMV) {
++		/* borrow MDS_OPEN_DEFAULT_LMV flag to indicate parent default
++		 * LMV is packed in create request.
++		 */
++		flags |= MDS_OPEN_DEFAULT_LMV;
++		LASSERT(data);
++	}
+ 	set_mrc_cr_flags(rec, flags);
+ 	rec->cr_bias = op_data->op_bias;
+ 	rec->cr_umask = current_umask();
+diff --git a/fs/lustre/obdclass/lprocfs_status.c b/fs/lustre/obdclass/lprocfs_status.c
+index 0d669f4dde15..bde287bbb793 100644
+--- a/fs/lustre/obdclass/lprocfs_status.c
++++ b/fs/lustre/obdclass/lprocfs_status.c
+@@ -138,7 +138,7 @@ static const char *const obd_connect_names[] = {
+ 	"atomic_open_lock",		/* 0x4000000 */
+ 	"name_encryption",		/* 0x8000000 */
+ 	"mkdir_replay",			/* 0x10000000 */
+-	"dmv_inherit",			/* 0x20000000 */
++	"dmv_imp_inherit",		/* 0x20000000 */
+ 	"encryption_fid2path",		/* 0x40000000 */
+ 	NULL
+ };
+diff --git a/fs/lustre/ptlrpc/wiretest.c b/fs/lustre/ptlrpc/wiretest.c
+index 45adb33a9c56..8cec6a35c692 100644
+--- a/fs/lustre/ptlrpc/wiretest.c
++++ b/fs/lustre/ptlrpc/wiretest.c
+@@ -2164,6 +2164,8 @@ void lustre_assert_wire_constants(void)
+ 		(unsigned int)MDS_FID_OP);
+ 	LASSERTF(MDS_MIGRATE_NSONLY == 0x00800000UL, "found 0x%.8xUL\n",
+ 		(unsigned int)MDS_MIGRATE_NSONLY);
++	LASSERTF(MDS_CREATE_DEFAULT_LMV == 0x01000000UL, "found 0x%.8xUL\n",
++		(unsigned int)MDS_CREATE_DEFAULT_LMV);
+ 
+ 	/* Checks for struct mdt_body */
+ 	LASSERTF((int)sizeof(struct mdt_body) == 216, "found %lld\n",
+diff --git a/include/uapi/linux/lustre/lustre_idl.h b/include/uapi/linux/lustre/lustre_idl.h
+index 187a807d4809..2a7299e6ce46 100644
+--- a/include/uapi/linux/lustre/lustre_idl.h
++++ b/include/uapi/linux/lustre/lustre_idl.h
+@@ -1702,6 +1702,8 @@ enum mds_op_bias {
+ 	MDS_FID_OP		= 1 << 22,
+ 	/* migrate dirent only */
+ 	MDS_MIGRATE_NSONLY	= 1 << 23,
++	/* create with default LMV from client */
++	MDS_CREATE_DEFAULT_LMV	= 1 << 24,
+ };
+ 
+ #define MDS_CLOSE_INTENT (MDS_HSM_RELEASE | MDS_CLOSE_LAYOUT_SWAP |         \
+diff --git a/include/uapi/linux/lustre/lustre_user.h b/include/uapi/linux/lustre/lustre_user.h
+index 4b49bb9c370a..397d93705d98 100644
+--- a/include/uapi/linux/lustre/lustre_user.h
++++ b/include/uapi/linux/lustre/lustre_user.h
+@@ -901,6 +901,8 @@ static inline __u32 lmv_foreign_to_md_stripes(__u32 size)
+  */
+ enum lmv_type {
+ 	LMV_TYPE_DEFAULT = 0x0000,
++	/* fetch raw default LMV set on directory inode */
++	LMV_TYPE_RAW	 = 0x0001,
+ };
+ 
+ /* lum_max_inherit will be decreased by 1 after each inheritance if it's not
+@@ -1303,7 +1305,9 @@ enum la_valid {
+ 					      * for newly created file
+ 					      */
+ #define MDS_OP_WITH_FID	  020000000000000ULL /* operation carried out by FID */
+-#define MDS_OPEN_DEFAULT_LMV  040000000000000ULL /* open fetches default LMV */
++#define MDS_OPEN_DEFAULT_LMV  040000000000000ULL /* open fetches default LMV,
++						  * or mkdir with default LMV
++						  */
+ 
+ /* lustre internal open flags, which should not be set from user space */
+ #define MDS_OPEN_FL_INTERNAL (MDS_OPEN_HAS_EA | MDS_OPEN_HAS_OBJS |	\
+-- 
+2.39.3
+
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
