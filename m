@@ -4,159 +4,176 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id E9914C282D1
-	for <lustre-devel@archiver.kernel.org>; Thu,  6 Mar 2025 22:15:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8DF8EC282EC
+	for <lustre-devel@archiver.kernel.org>; Sat,  8 Mar 2025 05:36:48 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Z83dP2Z8Zz1xN5;
-	Thu, 06 Mar 2025 14:15:21 -0800 (PST)
-Received: from mx0f-00379502.gpphosted.com (mx0f-00379502.gpphosted.com
- [67.231.155.129])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4Z8sNF6J33z1xFD;
+	Fri, 07 Mar 2025 21:36:45 -0800 (PST)
+Received: from outbound-ip191a.ess.barracuda.com
+ (outbound-ip191a.ess.barracuda.com [209.222.82.58])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4Z83dH4ftcz1wsD
- for <lustre-devel@lists.lustre.org>; Thu, 06 Mar 2025 14:15:15 -0800 (PST)
-Received: from pps.filterd (m0218362.ppops.net [127.0.0.1])
- by mx0f-00379502.gpphosted.com (8.18.1.2/8.18.1.2) with ESMTP id
- 526BhI6o025629
- for <lustre-devel@lists.lustre.org>; Thu, 6 Mar 2025 14:15:14 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=llnl.gov;
- h=from : to : subject :
- date : message-id : content-type : mime-version; s=02022021-podllnl;
- bh=9wTUsN+1xz18BbOK3icdoLHY/EMGwAVW+44LNbMXXPs=;
- b=HZbqil8VeFHS3kcoJL4pFDSHJFrRWXnr0AxnbKBmLQ+HGSCcxCIO9c1MkYA5RZgkZLTe
- fxFqfr/d83g3bMMPou0E0QtnASEhnJrZpsCsHLJgiNXAciC18D2thW86kK2AgaFFGzi1
- drlZ2Mxdj3PklwV5KLm+VbfNtVuWYgqQ5PEG36NH+KqXwmdB/rx6IqGKGFdcFwKDZsGz
- NGo3RHvjKADcyekQowVbZHI9RwWeHQqsk9oCqckdypSV5icrNo+fJd+vc+yLhk08QGIb
- lo1BRoFOP6VkaUoFX0LamzMWjh/fozOcgT8aNknyq9xUhgjYmUbrW2bcemWgNZ2ao/NS Cw== 
-Received: from by5pr09cu001.outbound.protection.outlook.com
- (mail-westusazlp17011012.outbound.protection.outlook.com [40.93.1.12])
- by mx0f-00379502.gpphosted.com (PPS) with ESMTPS id 456xp7jc11-1
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT)
- for <lustre-devel@lists.lustre.org>; Thu, 06 Mar 2025 14:15:14 -0800
+ 4Z8sN05y09z1wVt
+ for <lustre-devel@lists.lustre.org>; Fri, 07 Mar 2025 21:36:32 -0800 (PST)
+Received: from NAM12-BN8-obe.outbound.protection.outlook.com
+ (mail-bn8nam12lp2175.outbound.protection.outlook.com [104.47.55.175]) by
+ mx-outbound42-86.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
+ cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+ Sat, 08 Mar 2025 05:36:28 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=IyE2p8vkQtHmXMJlSGvnehHhzAeyzdVn4eNOoNNte6AbDXdw1BesfwxXh3sAeClB0lR4eKOoV3bJIY8hWVTIDgIz8Dagnm9mUTiXfRa+Khe1EEGq672snDy77JMRX2vl0tFf6dD1sdID2wAeB6v33Clpg6455yGsZGEebOf1VMs62Lg1ALOoiiedT79cJNjOMR0cZfIp05TX+9p5VxLrLrNUfyI6vke5t8MRwtCcXJuqh/21rDvufvZp1WDfBfrpJ682EMWo9mp9732gkOkdur6J38v8LWgdE9pPH/LTznWX/ejFVsHhyMywFBRkI2FqPiW4m4Rcqmy+TEFMAmgnCg==
+ b=aZXWVHCf9uK2xwRKywrj8kQRQm727xriwJgDB3vum/K+ZqP7MZoBgwyOiz4Uj65lkdbXPfnmyrNVzWltYkyPwpGbDvYD6kP88joW1PNt8s3RfAj5MfN6aWDHTnT6w8JtReNAcq4SdCeIENEsQmcb2oz7gHfd1sG1g8xIcau/kYRd71I1n5e+VFXIjLHTgqVoXJDB+koSNVrbbfHGXsDBZzwQVQa0B2jJ1e1uJvidLDDoO8VTyxe+Bsk2QQSY/9nMqDKwQEN9Wpb44MCfd+2gg1lLuPhxToIQ6MPlrLyP34jWmuImweWypvQ+n74HesSCTHc+VxNgRponIqSv5PBPrw==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=9wTUsN+1xz18BbOK3icdoLHY/EMGwAVW+44LNbMXXPs=;
- b=jFfT9wKIiAmtV9ofHy+SNMPf2bkKkn6PqLiWrYpg2rdN1scUAkaM5n977gAMdOzdnZG+uMZMuSrFVpyxTZ6u7QqXbXxp0fWs1Mj7xUkG9CANcTo4m3OYqMJyNNmkttJ+jiFVu6FdAqa2to9TajECn5YQfJE34x3zIakaHp9NDq5rCbiF9y1CXSrHqILkwm8Mzrt91Ws20SEreE233h5R9wXRrlBECoJp/nCJCUaxWREc0Oq5LnIGlbDpxxC1f0O6ZxwGp4mBzFsAfkLxLeUex8TnaiV8Xvfkf1vpYl2l9QDHS03421eLWoxvRSbv5pIBt3c6jOSQHRoDOLiXyY4tzA==
+ bh=J6MxnWi3MdFpI6OYClmFn1vXKV5TVQIigHh0lqKgAVw=;
+ b=yzxuytwmaKrwYc/9Nk2ELBP4GdrQyker7KSxQOzY5wlx4RIszJdHYzIYXGBZ8LT3aP4mIi+w40iqy6mdeM9I3bDKzTSBiYTikE9oogIzJjVS5SWRGXhej9TLB6Xez8peaVmkmFl+FN/j59NO6nixS26B4K5eECfQNtsNsJ8TrsuEULdPk/NOMiLR8y/spR+MAgm/nZWVPs43VTTdtkLhpLcjNx9FT9vjmYMcpKT4EWpsu+LFKX3aYqM7h+j2cGNevWgPRJbtmEWgeTkdmOaRec42GrOKctTGy7okSLCvj1gkRjJPBgBMEbdsfaKJgEDHKTu4PuRi2vbFkWDxpHrmkQ==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=llnl.gov; dmarc=pass action=none header.from=llnl.gov;
- dkim=pass header.d=llnl.gov; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=doellnl.onmicrosoft.com; s=selector1-doellnl-onmicrosoft-com;
+ smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
+ header.d=ddn.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=9wTUsN+1xz18BbOK3icdoLHY/EMGwAVW+44LNbMXXPs=;
- b=LOd4YO+qrvmieMpcZ8sYFxiAYT3dWSueLtxviv53GnTizLa8CJeOV8of08hAA36QGygm2xLOoGDj8VYt5J8YC6ljaN8MwCnd1LdofEnSq7XUgD1AmvL5Pw9YhmAai6kqyG6FutzbM//IPz4xB0qRk6tH9VDAH5qh03y49UkP8fU=
-Received: from SJ0PR09MB6381.namprd09.prod.outlook.com (2603:10b6:a03:268::15)
- by PH8PR09MB9229.namprd09.prod.outlook.com (2603:10b6:510:182::10)
+ bh=J6MxnWi3MdFpI6OYClmFn1vXKV5TVQIigHh0lqKgAVw=;
+ b=kWum+qNC8rChO9TX8irZSIyNVn7EAX9lv5AA79/z/pqR6+GJ+s3JI7BFJ2UN+8hLuUU1z3+a5Fdkmu60hLetF2hCnSd6veKqMG6zHy1Pc8Grgv9EK4TyxXzQ9EfcHXFVVLsGZwbeSU5LIZBY4N1miAhuNz6YRhd23FNHcjUVT8Q=
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
+ by SJ0PR19MB4477.namprd19.prod.outlook.com (2603:10b6:a03:278::12)
  with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8511.19; Thu, 6 Mar
- 2025 22:15:11 +0000
-Received: from SJ0PR09MB6381.namprd09.prod.outlook.com
- ([fe80::5938:b67a:8aed:12c8]) by SJ0PR09MB6381.namprd09.prod.outlook.com
- ([fe80::5938:b67a:8aed:12c8%4]) with mapi id 15.20.8511.017; Thu, 6 Mar 2025
- 22:15:10 +0000
-From: "Defazio, Gian-Carlo" <defazio1@llnl.gov>
-To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: prevent lustre from using specific ports for socket connections
-Thread-Index: AQHbjuGD40YijsJvgUqCehz3IkhwsQ==
-Date: Thu, 6 Mar 2025 22:15:10 +0000
-Message-ID: <SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2@SJ0PR09MB6381.namprd09.prod.outlook.com>
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8511.19; Sat, 8 Mar
+ 2025 05:36:24 +0000
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::92fd:9b94:d9cd:81d2]) by MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::92fd:9b94:d9cd:81d2%7]) with mapi id 15.20.8511.017; Sat, 8 Mar 2025
+ 05:36:23 +0000
+From: Andreas Dilger <adilger@ddn.com>
+To: Gian-Carlo Defazio <defazio1@llnl.gov>
+CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: [lustre-devel] prevent lustre from using specific ports for
+ socket connections
+Thread-Index: AQHbjuGD40YijsJvgUqCehz3IkhwsbNouj0A
+Date: Sat, 8 Mar 2025 05:36:23 +0000
+Message-ID: <773F80A9-9357-4297-BC8B-B61477B25360@ddn.com>
+References: <SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2@SJ0PR09MB6381.namprd09.prod.outlook.com>
+In-Reply-To: <SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2@SJ0PR09MB6381.namprd09.prod.outlook.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-ms-reactions: allow
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=ddn.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: SJ0PR09MB6381:EE_|PH8PR09MB9229:EE_
-x-ms-office365-filtering-correlation-id: 5d0b376f-cec1-4fab-e8aa-08dd5cfc5c61
+x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|SJ0PR19MB4477:EE_
+x-ms-office365-filtering-correlation-id: 28b6fe1f-60e9-4a60-db24-08dd5e0329e8
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|1800799024|366016|8096899003|38070700018; 
-x-microsoft-antispam-message-info: =?us-ascii?Q?CPHGAsI4ZEoiFTQL3a7LgKawacM8zin1iWgLt27oklmSHs+qIqM2KiWAAyo7?=
- =?us-ascii?Q?gsPpKYiDATq9UTrWQSxgWel/lPSwfSg16UJcbQLZDSH80ApE1Eb/dReyHXv0?=
- =?us-ascii?Q?cdjJuZoM278kOxqTBr5iO7gTKjHbZt9w9VrcLMNL2ZXYDMNW+21Bv3tJ6xwD?=
- =?us-ascii?Q?QPqfYN5wJ37cbYY71MkURV0gQ4mfCgf0ehuVjteqJPOCIGonbjnnMWwIg6tQ?=
- =?us-ascii?Q?Pq7j5ilb4qXC8bRVo6qLZhs4N0Q6yK+SdCMnPZIqADgTWwVBM9+UoMVsweRw?=
- =?us-ascii?Q?cQZyM4l0X8Pqy98BqjXQ+OjTVCq5slz7GpVy4Klm+v5aRBL212COg9UWk7ZM?=
- =?us-ascii?Q?5HzpQmjL3A+HrGhcpCoy/crkqhQMn5mLEBCTcWJfYISKrJP+rwPnFzi42hzy?=
- =?us-ascii?Q?K8DW9lK0ro1xMvf0Yk4k4C+nJggCs4Mc1GPlbdldz9ldlotXmTjMX+MUGZJN?=
- =?us-ascii?Q?f1BRwq9/JtRRqPCQnY81zZqepUgzhfyqoH+J0kvZ5pIWEkhyxkiiYhcVdbVy?=
- =?us-ascii?Q?l3mIGvou/LYzT4q45K2p1yaCFxMkvFr3CBn1LJgOghwhl4pyuEhOJYPNSoGY?=
- =?us-ascii?Q?J/pqgdPsI+s/nBfU+YP3/0Cs2yUfZJKsskP8FfeEPHcwCgJdLfAdYaOvTuwN?=
- =?us-ascii?Q?xgDyty17p7pHjw460P05/3OeLNC/xE7GjJjwBdyhGPfRn7Hjx39kXRqFxnox?=
- =?us-ascii?Q?gQfx5+gLyQF17sQNTElAs2f12g/CnJjl6HdB2xzz2dMMaZ0uZrxCzEFo8OME?=
- =?us-ascii?Q?wlmuAoo3iCCPRLHmTjknrbOvMo3Blex5TJyIvH377nvq7GrvBTMrh7izETaP?=
- =?us-ascii?Q?C/l0TkEh89jIJK6ooZlRxj4D2cB5BJF7M6CRKM8dyuQPi5l+/2l/PVIP/Rsw?=
- =?us-ascii?Q?xlZLEx53msMDVDvhfKIHloNNUN3VB7yHPHPTaWmDyNRoayGzAgxwBCAaIM+y?=
- =?us-ascii?Q?Hw9nq4GymSJxAypnFdKtw7NtCuRx22/CPGatwHzXtm17mW1xydbb6u8fIR1g?=
- =?us-ascii?Q?ftuiNN0wl5cq2SIIn6MYJK8FImXkZ0rs5Eiow62kzx8M7f0BPf0hC1Jc9FNc?=
- =?us-ascii?Q?MugfYd4NPgufhz/U4BlQgwLA7jUaOYw7tDLppP3QZm9JYH6bQAw6kxIcbChU?=
- =?us-ascii?Q?Lo9k3Uo9tm9jB0bVr7On4vw6tLvShloNn0UAHuTlV8oQY1PEDrG8PvBGOiYd?=
- =?us-ascii?Q?ersNgvO9DYfqcw/8tf3PwHApa1S8W4Ry0HyabAyHU7FHnyouidlW2Y8snU4o?=
- =?us-ascii?Q?oWyA+DjZraUHZxoCzjZFNJWw7phWqN+rZDmqHyt8sOhMi6pQrkugeFBkhRQQ?=
- =?us-ascii?Q?AxqwcNX39rOCnHhQ9VqveXZ1Io5ed9MdVW+/YJyQTzHUnvLGZu5jYH4Q2/pY?=
- =?us-ascii?Q?+lDHeLSbOnXnTrng0BLCIxr0DiRkmAK9WZkctCqkw5U4GbSbZmi4bsxni5HO?=
- =?us-ascii?Q?UuZGmoah4DkISsZqzATZDJoZImUKJOtj?=
+ ARA:13230040|376014|1800799024|366016|38070700018|7053199007|8096899003; 
+x-microsoft-antispam-message-info: =?utf-8?B?ZlBNemtrV1A2czVJdk5XbFozdkVFcWJheW5UTkw4dVVIcVJ4bEdnSkV3UHda?=
+ =?utf-8?B?MHUydjBmR0xyVXRidHppbmJyZE5GOXNQSGtYREFOSDlCRjRhRFkrdTNsOEZS?=
+ =?utf-8?B?RHhEa2tlUVpzMnhWVnBORXR4VVlPZmVVejFXYlZXT1ZFb1l1NWFob2FieHpi?=
+ =?utf-8?B?YlFVYmx6VUoxd0U1VVJBN01QN0Vwa1pFRFcrZ2NyVDNRRmNLdjJXUjNOTVcv?=
+ =?utf-8?B?eXdlSWsxYVFEVHR0Y0ZkcXU1UnN4bVR5VlM2dHhEaFhkc0k4ZkN3NzB2dVFu?=
+ =?utf-8?B?czQzd1orK1FwZEREUlpEY3pMZVRsb1p2ZmhVUnhVZ05TZmVxNDZJRVJ2cE1C?=
+ =?utf-8?B?bFpaVmVBV3k0MHR4WWVXV2FQU3JDVDNUNm1sa1hBajhBOUZYS29kK2lhT2Ft?=
+ =?utf-8?B?QTZ5cHVwN2txaCtyK0Y3UEpEekxBUVh0UnlGSmJQVHpKMFlsVDFQcGlaQ2ZJ?=
+ =?utf-8?B?Rkl6NFdxOU9XSHNqQjZFTTFmNlEzUlM1Zy9mSzUzOG5lcnlsUjBEbTRYejZH?=
+ =?utf-8?B?MzBRbmpsTjBkSVhHbnVjcnFjQ1JBUFpBWktYcWxqcEJXVHd5ajZ6bEplNS9m?=
+ =?utf-8?B?N3FkT2ovVjJVRjVXTU1kNmRMYlZ3dGFQU2Z0K2JHS1pTY05DSmhibWZQcXVP?=
+ =?utf-8?B?NkVoU1cydWpDc2VJUjZBTjZXa2J2QlBjOEdvaTM4NHFrWGlGbFIxVEJSWFNl?=
+ =?utf-8?B?VXp6MDBwN2FsOUVuYnFPaFQ0RFpNV0ViV0hCS0psam1rd3BSVDZUYmttVEw0?=
+ =?utf-8?B?emtNUXZ3MkZ5cElSbzhRV0J3Z0RIQ0JwQTlxZHUrdU5KQm5mTmVEd2grdDhw?=
+ =?utf-8?B?dE9YTlYrL1pWVlIwMzYvV2ZFbUpEbFFWNXA5NUoyZkx1VHZCNHoycENTYlJ2?=
+ =?utf-8?B?Z2w0Z0xsYlMrWHR1Wk96M3J3b2VZYlhFQWRPcHVqZmRNS0RYM004TnJadmpx?=
+ =?utf-8?B?MVgwUnJuRDNrTXZxaHJ3NFFienFCSERlYmJ0SC9XK1hFQXhlMnFsdGRNRE5h?=
+ =?utf-8?B?RWtva0hadFVMQXpGejZvUEc4QjN6eWkrRndtdUVxQWc1cGRxdWxVSFFUMnZP?=
+ =?utf-8?B?RUVxNElwNlQvRHhtVy9NUnZyUXpJQ3RVejNBTHl2VXJ2UWhqMjN5dDh1WFpY?=
+ =?utf-8?B?QkljdEFJdnk3bWx1VExicnZxc1Vnelo0MDhNaHRsTEtta1dFdWVJUWlEZjhI?=
+ =?utf-8?B?RkZNbFBjc2xRR2pDWE0vQTZWeStyK0xhR3pSSWh4NS9mcU1lL0RjWlprM2Z0?=
+ =?utf-8?B?SnNROFFrUWpsdlMxN3RIOXhpZTMvek9Wb0k5TmZuczZDbEFOaWliMDVVMU1m?=
+ =?utf-8?B?S0N0dkN4S2lFZzNQYW5YbWczZ1kvVEdSNStpT2JKREgzMWRwTFYwaGp0V3hB?=
+ =?utf-8?B?VjdlYzh5YUk1eC9aZVBueUZ3RHBEZWVGbkpnZTJlcWxIRXduQUhyczR3R2Nn?=
+ =?utf-8?B?aTFZL2JpN0FhT0ZQNkM3akFKQWw3UFlYMllWZHI5cVpSU2Z3a1ZGK2t3UXho?=
+ =?utf-8?B?clpBWUkvUFZ0dEo2WGVha3U5SElnT09hZi90bUFNcEhZaDBMYVI2cytaQUVm?=
+ =?utf-8?B?WGpJZkZWTGFsTlBiNUMyM3hyQTFmTHFFOXZvZ3prWEZaZkFLY0VwSWdaaXpZ?=
+ =?utf-8?B?MzhobE12dUpza0pIQ3IzZ2FIOUtYK0wyR25qNnVmNHFLQU5kVW5BRHJidnpP?=
+ =?utf-8?B?U3BuU0JJVEk4RVlUTWxoYi9jK0MrdGlZTkNSR1doOGZsTXhETndiTys5akV6?=
+ =?utf-8?B?dDNlV1dYMUdrRmVhc0Q3TXk5VEM4UCsrK1dkMHU1alNONGpyVEJ0R3BTbi8z?=
+ =?utf-8?B?TUpPZTFmOUpzem9OY2prS3hTMHhqSVNBdlZxYlAySitPTDZFZzM5UGtwVnBu?=
+ =?utf-8?Q?L2A9sPx3u1+FK?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:SJ0PR09MB6381.namprd09.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(1800799024)(366016)(8096899003)(38070700018); DIR:OUT; SFP:1101;
+ IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(376014)(1800799024)(366016)(38070700018)(7053199007)(8096899003);
+ DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?XlLFkHl3AaYsnW8ZfrfVROWLIxJsceHc6//O2JViQMk0SGWciyLpjdJMumte?=
- =?us-ascii?Q?fig1ZjqYcZ1CfuGT1dUa7WVojpiC/M6otY/LXJIP8KppVkIa/KSvoHqNnN1k?=
- =?us-ascii?Q?J7smYnlFBW87tBeH+91Ayi8ljMozOgHgVlhgsWKybB1K2UZL7Po1VnE9tnkB?=
- =?us-ascii?Q?Fx1fI+jbJEkhXgaJiW7yfgalvLVdltHqLH1uzFjSdhGM6DC7/Pb4OdPmngtv?=
- =?us-ascii?Q?3MWh7nxKJV299zIgpdYg3j/yWvKzXehkJSyyqDgfBpMNWhKAxzADseNQo9z1?=
- =?us-ascii?Q?w4q6tITaJxXWdcKe+Y9/Uxmu8NbJRO8f5sxqv3x5mlyoE37CY26uBCNKKdF1?=
- =?us-ascii?Q?+MwRxi3nQVxhAsdiz/5E8b2k+1kN/L9lAv3rG7mPdOMal1AOJcztvrTbOQIo?=
- =?us-ascii?Q?hnD1XwqJoZD1Viyv3NM6o/N85odZqYNORoZ9Ql7V0oS2n3oGODI84tA13HLX?=
- =?us-ascii?Q?aHXBDYh+4QTfzrEf6Es7niy+ikyo7h+1P/dCWKGfb8kSC641Un1IiCfIdC9j?=
- =?us-ascii?Q?y6hlWlkRQ9lJWfyHD5OxgXzynWvjuIrfxW8jXBMA9eBzR4ZDKAQkTN6e1sij?=
- =?us-ascii?Q?j1ar2p6CpKIY7jlA46XsycTWZZwse/d3txTlDboCaF1X37OQgyLUWLKQk9iL?=
- =?us-ascii?Q?YM0PTJLJg3ljVvQ0HLvKh8tkrUpAW+ySvAc9RGdeLbyglBkx4sHReJkSjaZ/?=
- =?us-ascii?Q?apNdilhX4SsXQ6N4rWZEVfq+/sqXMXWWVZWi4jUlG+KKPLttsTRX2ozGhlMi?=
- =?us-ascii?Q?C+9BGU2K6g3D3KG0uJJ2bCyVpl3Dg6u6QZ1ORYgolptry0a45+cLj4ma5186?=
- =?us-ascii?Q?+CQHoAZ55tg4f0/T7R8rp9Trui4OQWhotAV6XVcHL7WF18mnybsWhsuLAOYv?=
- =?us-ascii?Q?6sC9XKcupxQXNak6L81mspY/8iTaXT50ZDpJgKrIrKGKBvz1jq4HzJj3I4p1?=
- =?us-ascii?Q?id2RXPac2AjY0Vd+B5IYZvu2b9bGA4chA99gM3CDRA779+Sd+3U2p8kAjvWq?=
- =?us-ascii?Q?1ROFaG0roPU+sj+J5g58muQvoaCLk4M3DkB7U99cP9e+59cfZTwgyTrFiTgb?=
- =?us-ascii?Q?CTCNK6VW7KO0gCP9xoFDADTNK16wo75oMWxoLHXlW5HGN+oWciNuvpYHV5bO?=
- =?us-ascii?Q?IYcHFPRGpnLaWnR0thcSVgxIw4J6dtCT3W3sqmc+sf7zYwqh41G+KYELM8jb?=
- =?us-ascii?Q?lgL7EH1k938Qg4WodhLbdzTVIG14ydsX6E4gEgiGNjgZITyu7QehUTAr0cv5?=
- =?us-ascii?Q?BJdJjkIMvTEs0H9HqcXaikRnuVkzFO62ueLDNbGLE/PNdbqnFEIbzJV3LZMS?=
- =?us-ascii?Q?3tvac+Vb/8n70SHewty3EGm9r3U7hZ/7L0bPPtIFAJxoo3rtJns7VLvKIZMK?=
- =?us-ascii?Q?mh9RR6llcV+VwInkeo42T4NYRUs6xzWQST3NaJ/4x3aHVJ40YI0nGSAT3eT9?=
- =?us-ascii?Q?lCXrw34i60nCUl9jXHbUzGJX0/52Bs3epl99AHnndP6D1lKx1gfQJiZhe9Cj?=
- =?us-ascii?Q?szj6fPKqhy5v+YBRn0aOkhtpS0CdhJJ8nqbV96h1vbo60X86jbItIa1KtkG5?=
- =?us-ascii?Q?o8V2lKmmdgoQ/eIgdgPSSx9zgGKWiBwmYfhnYuwdzVyXclIo0HokA4RswjZR?=
- =?us-ascii?Q?Bg=3D=3D?=
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?VjdXNFo0cFpvZmZ0MExmeCtkeE0yN0FuRVZiUExRL29pWHJVQ0l5MnU4MDRi?=
+ =?utf-8?B?VnJhU1BoNytqTTBlcjhUdlFEVlhET3RFbkRyRmgzbTh5bXlCdERxVUF0Q3VM?=
+ =?utf-8?B?T24vNTJYVnlYOUlKZnoyL3Q5VXFOSTI0TzA0N3RGQjgyVGw4clU3S3ZnRmJ2?=
+ =?utf-8?B?bE9vMGhHNXZ0alFLbmV5RXZIU2tWV0JGVEJwR29GZGxaTDJuQ0lNaHcwTHpu?=
+ =?utf-8?B?ay9veUN2WWJkRXM4b08xSGVkN1FOeVJ4QSt0S3lVVTJ1ODlzUFRZZ3M1WHZa?=
+ =?utf-8?B?d0VnL1pLZmxRODJhN21DTTlNaVdPeE5JekNZSzRCVXdmTU1ObllUZzFMNXBY?=
+ =?utf-8?B?dmJjcVJvZDlSZHMybWdaOXozNGhTNHdwdHNIK2hmQnJ0VXNyK00ydmJTRlE0?=
+ =?utf-8?B?KzZiZ0pDU2ZvenlMeExOSFZiSnlFTlNYU2ZUR1ZzRzYxd0F2Y3dVNnpINW1j?=
+ =?utf-8?B?alFKclV0Rlh0Ykg4bzVEWGFQOS9TaW1KS0V5TVVyZ1RER3pXUTd4RGtGS3ZY?=
+ =?utf-8?B?MUpoUlJFL0M5b3hka2xCVFJmU1krUG80UmJTUGVrRENkYkozcGl2TVQ1cEE3?=
+ =?utf-8?B?NDExUGtONmN1RXp3SE1SbXg4T3F1bW1tNUF6MmpDd1pKaHZHQmp2U2RBb09D?=
+ =?utf-8?B?dWVmWS9uNTk3bThYMU00b2ROSitpVU1xNzRjRzErY0didzVaWjF6L3pxankw?=
+ =?utf-8?B?NnpGck5IR2MrcXZrNmV4Ty9jQ0dtZkRiOWc4dE9lYzVZTWxtaWorUzhpTmtZ?=
+ =?utf-8?B?SVVpeGtSanROWDFZSU9ueUJ3NlFNSHVETjZjOE56UGdCczUvRXo3KzhCdGxh?=
+ =?utf-8?B?bGZmL3NwYjgzYkpodDd4OURHd29VMW5sZTRVZThTcnl3TkhJQ00yS0F2OHpT?=
+ =?utf-8?B?NmlJMzhlTXJDaDBuRUg1Qm8yc1NUMUFHY09MOGp2dFJmYTJ1ald2QXQxdVRs?=
+ =?utf-8?B?VWZQSkxGcFBheXJ2NjRpQ3ExUUtyUzVSVWdOQmFyV1N2N2FSQWVJK1VGOTAr?=
+ =?utf-8?B?RzFwanhud0t1eVF6dmFxaFlRV2U1UXh1SDA5RWwzSlYzYnNjVjByRDROQ1VP?=
+ =?utf-8?B?WUV3aENHRlJucmF5YllpVFpWV2I0bVdha3EvOW52czBYOWN3aTFMTWRUUkpn?=
+ =?utf-8?B?SWRzRXAzRjgzenljUWsvTnVtamtsOTRWN0Q1cFRpMXl1cUZyMGFDSDNzejZl?=
+ =?utf-8?B?QnB6OHF2ODVVd0R4dDBQaWlMbk1EM2piT0NubDQzNnRoUEFFNEJ4SVNRZkVk?=
+ =?utf-8?B?ekdUeWw1ejhtRGlNS21Hb1RpbWxrNE1FZlFERjhHaHRSTDNoTEp1aXJnMmVT?=
+ =?utf-8?B?cFl0UjRXczBjaE5TUUs1ZlFZUnBLcTA2V1l3NjlSQjl5UlhjQUtiVTFmV0xS?=
+ =?utf-8?B?bEdKUko1cEs4WmhrdmR1eklkMGFYSWdneEcyMlNiZitmU1Q1VkFVbndBWGk3?=
+ =?utf-8?B?VXFQUVdpL05VWVRvb2Z5cnJVdjVpQ0gzNk1GYkVrQ0cyY3BjaEhQNlhSWTh2?=
+ =?utf-8?B?YlRDVnJSNUx3RWNMREZjc3hOTEJKeEdzUDJRUzB6Skt4bzV1N2FCOWxXT0Yr?=
+ =?utf-8?B?bXhPcDFkUURhVnIrVVVycXNxZDdXaDYxWjMxTlVNRys3NEJaU0UrVTQzM1Bh?=
+ =?utf-8?B?aUx1NGxvSHRRNTFVNXhxV2NPV0JjSHRIdEVqMEthUHVkcEhwcndjRjE3L1hj?=
+ =?utf-8?B?akQ0a0d2OXpSRERtQkVmUHVCNHhza1hIR09tbHhWSHBJRlNIL1RQU0ZzYWxH?=
+ =?utf-8?B?c3QwRjJsRXM3alBGTmNBVWZwSC9FSm5hclRUZW5WaUhXSmVRKzRJR0R1NXd1?=
+ =?utf-8?B?bE9uRlhIdDErM3lRQVZweWRTV0lVVUpLcUhwV0MyOGthTlJKamF6TVpVYmNo?=
+ =?utf-8?B?M3gxZ21Ga011aG52SW5QeXB5UnpGWFhrZURiL2x3Ly9rUWpCd21BQ3V1bHEw?=
+ =?utf-8?B?bURic0dDRnUrSkJGS1N6MVk1b3FRNThXMStETm5nYWlPcmt2dE1QVUxySTFY?=
+ =?utf-8?B?THJMSGo4TERYRExxWDU3aEpXRzNFQlY2VVVCUnlHT2NOWUo2SW5QdzZ1aUc2?=
+ =?utf-8?B?aUthR2NOVjA2QTE4UzZEOExKeXFjS3RJZFlEV0ozbVhHSkxYZHFOUi9JWEww?=
+ =?utf-8?Q?0EEY=3D?=
 MIME-Version: 1.0
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: tnVTLcMlckdd+tWyQbPQpAIs3VE10Yw/CmIT162lSlVCtmUGdbSVIz6YPv3Jzpi31IEZ2+kZyaKhwDMBitmBf84VIjNbGJKxiqknjIbxfOT2cmjgdCbReEXoKgkt+jTj5xzmHqrHK194ye4XH7ymBxAZl5S9oZK/jP+wHu6rdxcTfREEbsNKUtcSTsmGWuJpnwy5hjMj7g/50mzQabgS14iqX9rQtGDr3mSuvsy8IB/79rk7LQXQP0FgvROsxR4JceRejaaAsM/4CUnoW4PP2pypJ2G4b6Xiz+a9Z1o7iYI0VDilHIcyY2TrMAC7fONhoCAa8Ew0gWrJWSLse9ygw9lDYbgnFB6OX+Viv65qSHf4qvFQXvmfZgFCq53tcS9fKh6bTqBijsZfOxbMI8nQXtVheHN4WwtI81bKfdYP7dWdT8IQQid8cUbxKqLBpWsgf9x+2q0KXzT/Ro2Ndlh/zYGomaOvBtpQMS73wuWgRcZfSd1uJarrzu9T1dbXmDGfYHQltvV0CXuKUyRtOsKJpBsC9um6Sr1iKlIOGjSd+OB3CyyXVeu2QJCc17cR9DZVoe7gIX0/UZGWXmfpCMH1w33TuXf258c6tjDYE4zuHsh4aym9g1Igi64NzaeqD3sssAAxBWrOeiIxumYKipzZ6Q==
-X-OriginatorOrg: llnl.gov
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: ZZ06zWJZVW2QwGdDY7r1fYuU9l35YS6MRZZt6pE6Wv739BVvL/ilrlXdd2W+OkIe/vGjNVEkZemoQl7jPTRjNXAGWHrLK6DLFz2gg56g34uR9UIKcjYUrF5Lh3zZVXgz/jX2o08DzjQI7DKtsWttyRYB0PYkaqqrNqX1Y6Ix4v7GOfXKVvTDo2H2BxiQkWY3C5ZfLyuO3mVxwlXM5R3bCdoaCrGsYP/8JAt/34MNMUUz1LB2yV7aLC1MjPmiqiXcmCxrQ3YSHGxlWJK28GXXjb47jDjaP22hdLkkc0NNsHUMqS4NGtR1xAbkZRNayYaW4n+/4Sjp/2RTFcpnudRwteLujTOpJ9ZaA8e/cwSaRq/31Awpn0PrUoxoIb3f5ZgfneI15pMv2mxsFjF/r0iwlhNGJHQMZUwN9SDZSJfGCauSIFOMjXw+oAbxv6IFq+ucevwlviL/U3+P4urRpwM5aqaLItnp81YoArHZXT0x3+gqVXk9yFTYWVL1CezcPPtOB5wCJOMetW7/gv5g++Z31WzbTBQfvCarmK4fcpvZ9uM3AnQ3oPxY69u2dHd8L3nyBH370rv3SoKznS0lynF8HSGbqehBlgprCdCmx6OL7eM42aA8EBXaFAzxZBVmkG9WMuVqY+Un37ZHsPwpsvSgSQ==
+X-OriginatorOrg: ddn.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: SJ0PR09MB6381.namprd09.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5d0b376f-cec1-4fab-e8aa-08dd5cfc5c61
-X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Mar 2025 22:15:10.7615 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 28b6fe1f-60e9-4a60-db24-08dd5e0329e8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Mar 2025 05:36:23.6996 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: a722dec9-ae4e-4ae3-9d75-fd66e2680a63
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: PH8PR09MB9229
-X-Proofpoint-ORIG-GUID: c_FNYfcqg8vyO56oZZfqscCng3xILy1d
-X-Proofpoint-GUID: c_FNYfcqg8vyO56oZZfqscCng3xILy1d
-X-Proofpoint-Virus-Version: vendor=baseguard
- engine=ICAP:2.0.293,Aquarius:18.0.1093,Hydra:6.0.680,FMLib:17.12.68.34
- definitions=2025-03-06_08,2025-03-06_04,2024-11-22_01
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- malwarescore=0 phishscore=0
- suspectscore=0 spamscore=0 lowpriorityscore=0 adultscore=0 bulkscore=0
- impostorscore=0 mlxscore=0 priorityscore=1501 clxscore=1011
- mlxlogscore=753 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.12.0-2502100000 definitions=main-2503060171
-Subject: [lustre-devel] prevent lustre from using specific ports for socket
- connections
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: zZigr5z3EqpW6/OZAtEdL+vX1pAQ7r2yEJMt0wXrimWUZR8Lg7qhAET5MfeIOh2G
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SJ0PR19MB4477
+X-BESS-ID: 1741412187-110838-28170-35679-1
+X-BESS-VER: 2019.1_20250304.2151
+X-BESS-Apparent-Source-IP: 104.47.55.175
+X-BESS-Parts: H4sIAAAAAAACAzXLOw7CQAxF0b24ThHbjD/ZCqKIHUdpEAVTIKHsnSlC83T1pH
+ P/Qn06LNDHTvB6w4KsNuoYp8+eRVsYmewlc/JeDeWWyJbVHM7p74/+vDyT6+UxMCScN1
+ 4xpawlhWkioaKWrHA+foHG7LyBAAAA
+X-BESS-Outbound-Spam-Score: 0.10
+X-BESS-Outbound-Spam-Report: Code version 3.2,
+ rules version 3.2.2.262998 [from 
+ cloudscan14-11.us-east-2a.ess.aws.cudaops.com]
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------
+ 0.00 HTML_MESSAGE           BODY: HTML included in message 
+ 0.10 BSF_SC0_SA085          META: Custom Rule SA085 
+ 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
+X-BESS-Outbound-Spam-Status: SCORE=0.10 using account:ESS124931 scores of
+ KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_SC0_SA085, BSF_BESS_OUTBOUND
+X-BESS-BRTS-Status: 1
+Subject: Re: [lustre-devel] prevent lustre from using specific ports for
+ socket connections
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -169,128 +186,113 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============4188690189340432758=="
+Content-Type: multipart/mixed; boundary="===============2928871835570278282=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============4188690189340432758==
+--===============2928871835570278282==
 Content-Language: en-US
 Content-Type: multipart/alternative;
-	boundary="_000_SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2SJ0PR09MB6381namp_"
+	boundary="_000_773F80A993574297BC8BB61477B25360ddncom_"
 
---_000_SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2SJ0PR09MB6381namp_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+--_000_773F80A993574297BC8BB61477B25360ddncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Hi,
+SSBoYXZlbid0IGxvb2tlZCBhdCB0aGlzIGluIGEgd2hpbGUsIGJ1dCB0aGVyZSBpcyBhIExpbnV4
+IHBhY2thZ2Ugc29tZXRoaW5nIGxpa2UgInBvcnRyZXNlcnZlIiB0aGF0IGNhbiBob2xkIHBvcnRz
+IGZvciBvdGhlciBzZXJ2aWNlcyB1bnRpbCB0aGV5IGFyZSBzdGFydGVkLg0KDQpDaGVlcnMsIEFu
+ZHJlYXMNCg0KT24gTWFyIDYsIDIwMjUsIGF0IDE1OjE2LCBEZWZhemlvLCBHaWFuLUNhcmxvIDxk
+ZWZhemlvMUBsbG5sLmdvdj4gd3JvdGU6DQoNCu+7vw0KSGksDQoNCklzIGl0IHBvc3NpYmxlIHRv
+IHByZXZlbnQgbHVzdHJlIGZyb20gdXNpbmcgc3BlY2lmaWMgcG9ydHMgd2hlbiBlc3RhYmxpc2hp
+bmcgYSBzb2NrZXQgY29ubmVjdGlvbj8NCldlIGhhdmUgdGhlIHNpdHVhdGlvbiB3aGVyZSBsdXN0
+cmUgbWF5IHVzZSBhIHBvcnQgKDEwMjIpIGFuZCB0aGVuIGEgc2VydmljZSB0aGF0IG5lZWRzIHRv
+IHVzZSB0aGF0IHBvcnQgZmFpbHMgdG8gc3RhcnQuDQoNCk91ciBjdXJyZW50IHNvbHV0aW9uIGlz
+IGEgbG9jYWwgcGF0Y2ggdG8gY2hlY2sgdGhlIHBvcnQgdmFsdWVzIGJlaW5nIGl0ZXJhdGVkIHRo
+cm91Z2ggaW4gbG5ldC9sbmV0L2FjY2VwdG9yLmM6bG5ldF9jb25uZWN0KCkgYW5kIHRvIGp1c3Qg
+c2tpcCBvdmVyIDEwMjIuDQoNCklzIHRoZXJlIGFscmVhZHkgYSB3YXkgdG8gYXZvaWQgY2VydGFp
+biBwb3J0cyBmb3IgbHVzdHJlPyBFaXRoZXIgaW4gbHVzdHJlIG9yIHZpYSBzb21lIGtlcm5lbCBt
+ZWNoYW5pc20gdGhhdCB3b3VsZCBhZmZlY3QgbHVzdHJlPw0KDQpXZSdyZSBjb25zaWRlcmluZyBt
+YWtpbmcgYSBtb3JlIGdlbmVyYWwgcGF0Y2ggdGhhdCB3b3VsZCBhbGxvdyBzcGVjaWZ5aW5nIHBv
+cnRzIHRvIGF2b2lkIGJ5IGFkZGluZyBhIG1vZHVsZSBwYXJhbWV0ZXIgdG8gbG5ldCBidXQgYXJl
+bid0IHN1cmUgd2hhdCBhIGdvb2QgZGVzaWduIHdvdWxkIGJlLiBTbyBmYXIsIHRoZSBiYXNpYyBp
+ZGVhIGlzIHRoYXQgdGhlIHVzZXIgc3VwcGxpZXMgYSBzdHJpbmcgb2YgbnVtYmVycy9yYW5nZXMg
+c3VjaCBhcyAiNTEyLDUxMy01MTUsMTAyMiIgYW5kIHRoZW4gYSBsaXN0IG9yIGJpdG1hcCBvciBz
+b21lIG90aGVyIGRhdGEgc3RydWN0dXJlIG9mIHBvcnRzIHRvIGF2b2lkIGlzIGNyZWF0ZWQgYW5k
+IHRoZW4gbG5ldF9jb25uZWN0KCkgY2hlY2tzIHRoYXQgZGF0YSBzdHJ1Y3R1cmUgd2hlbiBzZWxl
+Y3RpbmcgcG9ydHMuDQoNClRoYW5rcywNCkdpYW4tQ2FybG8NCl9fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fDQpsdXN0cmUtZGV2ZWwgbWFpbGluZyBsaXN0DQps
+dXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZw0KaHR0cDovL2xpc3RzLmx1c3RyZS5vcmcvbGlz
+dGluZm8uY2dpL2x1c3RyZS1kZXZlbC1sdXN0cmUub3JnDQo=
 
-Is it possible to prevent lustre from using specific ports when establishin=
-g a socket connection?
-We have the situation where lustre may use a port (1022) and then a service=
- that needs to use that port fails to start.
+--_000_773F80A993574297BC8BB61477B25360ddncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <24BD33F935DB0B40B5ADB653CA9A07A8@teamddn.com>
+Content-Transfer-Encoding: base64
 
-Our current solution is a local patch to check the port values being iterat=
-ed through in lnet/lnet/acceptor.c:lnet_connect() and to just skip over 102=
-2.
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IGRpcj0iYXV0byI+DQpJ
+IGhhdmVuJ3QgbG9va2VkIGF0IHRoaXMgaW4gYSB3aGlsZSwgYnV0IHRoZXJlIGlzIGEgTGludXgg
+cGFja2FnZSBzb21ldGhpbmcgbGlrZSAmcXVvdDtwb3J0cmVzZXJ2ZSZxdW90OyB0aGF0IGNhbiBo
+b2xkIHBvcnRzIGZvciBvdGhlciBzZXJ2aWNlcyB1bnRpbCB0aGV5IGFyZSBzdGFydGVkLiZuYnNw
+Ow0KPGRpdj48YnIgaWQ9ImxpbmVCcmVha0F0QmVnaW5uaW5nT2ZTaWduYXR1cmUiPg0KPGRpdiBk
+aXI9Imx0ciI+Q2hlZXJzLCBBbmRyZWFzPC9kaXY+DQo8ZGl2IGRpcj0ibHRyIj48YnI+DQo8Ymxv
+Y2txdW90ZSB0eXBlPSJjaXRlIj5PbiBNYXIgNiwgMjAyNSwgYXQgMTU6MTYsIERlZmF6aW8sIEdp
+YW4tQ2FybG8gJmx0O2RlZmF6aW8xQGxsbmwuZ292Jmd0OyB3cm90ZTo8YnI+DQo8YnI+DQo8L2Js
+b2NrcXVvdGU+DQo8L2Rpdj4NCjxibG9ja3F1b3RlIHR5cGU9ImNpdGUiPg0KPGRpdiBkaXI9Imx0
+ciI+77u/DQo8bWV0YSBuYW1lPSJHZW5lcmF0b3IiIGNvbnRlbnQ9Ik1pY3Jvc29mdCBXb3JkIDE1
+IChmaWx0ZXJlZCBtZWRpdW0pIj4NCiA8c3R5bGU+QGZvbnQtZmFjZSB7IGZvbnQtZmFtaWx5OiAi
+Q2FtYnJpYSBNYXRoIjsgfQ0KQGZvbnQtZmFjZSB7IGZvbnQtZmFtaWx5OiBBcHRvczsgfQ0KcC5N
+c29Ob3JtYWwsIGxpLk1zb05vcm1hbCwgZGl2Lk1zb05vcm1hbCB7IG1hcmdpbjogMGluOyBmb250
+LXNpemU6IDEycHQ7IGZvbnQtZmFtaWx5OiBBcHRvcywgc2Fucy1zZXJpZjsgfQ0Kc3Bhbi5FbWFp
+bFN0eWxlMTcgeyBmb250LWZhbWlseTogQXB0b3MsIHNhbnMtc2VyaWY7IGNvbG9yOiB3aW5kb3d0
+ZXh0OyB9DQouTXNvQ2hwRGVmYXVsdCB7IH0NCkBwYWdlIFdvcmRTZWN0aW9uMSB7IHNpemU6IDgu
+NWluIDExaW47IG1hcmdpbjogMWluOyB9DQpkaXYuV29yZFNlY3Rpb24xIHsgcGFnZTogV29yZFNl
+Y3Rpb24xOyB9PC9zdHlsZT4NCjxkaXYgY2xhc3M9IldvcmRTZWN0aW9uMSI+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjExLjBwdCI+SGksPG86cD48L286cD48
+L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTox
+MS4wcHQiPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwi
+PjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij5JcyBpdCBwb3NzaWJsZSB0byBwcmV2ZW50
+IGx1c3RyZSBmcm9tIHVzaW5nIHNwZWNpZmljIHBvcnRzIHdoZW4gZXN0YWJsaXNoaW5nIGEgc29j
+a2V0IGNvbm5lY3Rpb24/PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQiPldlIGhhdmUgdGhlIHNpdHVhdGlvbiB3
+aGVyZSBsdXN0cmUgbWF5IHVzZSBhIHBvcnQgKDEwMjIpIGFuZCB0aGVuIGEgc2VydmljZSB0aGF0
+IG5lZWRzIHRvIHVzZSB0aGF0IHBvcnQgZmFpbHMgdG8gc3RhcnQuPG86cD48L286cD48L3NwYW4+
+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQi
+PjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFu
+IHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij5PdXIgY3VycmVudCBzb2x1dGlvbiBpcyBhIGxvY2Fs
+IHBhdGNoIHRvIGNoZWNrIHRoZSBwb3J0IHZhbHVlcyBiZWluZyBpdGVyYXRlZCB0aHJvdWdoIGlu
+IGxuZXQvbG5ldC9hY2NlcHRvci5jOmxuZXRfY29ubmVjdCgpIGFuZCB0byBqdXN0IHNraXAgb3Zl
+ciAxMDIyLjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFu
+IHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8
+cCBjbGFzcz0iTXNvTm9ybWFsIj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjExLjBwdCI+SXMgdGhl
+cmUgYWxyZWFkeSBhIHdheSB0byBhdm9pZCBjZXJ0YWluIHBvcnRzIGZvciBsdXN0cmU/IEVpdGhl
+ciBpbiBsdXN0cmUgb3IgdmlhIHNvbWUga2VybmVsIG1lY2hhbmlzbSB0aGF0IHdvdWxkIGFmZmVj
+dCBsdXN0cmU/PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNw
+YW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQiPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4N
+CjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij5XZSdy
+ZSBjb25zaWRlcmluZyBtYWtpbmcgYSBtb3JlIGdlbmVyYWwgcGF0Y2ggdGhhdCB3b3VsZCBhbGxv
+dyBzcGVjaWZ5aW5nIHBvcnRzIHRvIGF2b2lkIGJ5IGFkZGluZyBhIG1vZHVsZSBwYXJhbWV0ZXIg
+dG8gbG5ldCBidXQgYXJlbid0IHN1cmUgd2hhdCBhIGdvb2QgZGVzaWduIHdvdWxkIGJlLiBTbyBm
+YXIsIHRoZSBiYXNpYyBpZGVhIGlzIHRoYXQgdGhlDQogdXNlciBzdXBwbGllcyBhIHN0cmluZyBv
+ZiBudW1iZXJzL3JhbmdlcyBzdWNoIGFzICZxdW90OzUxMiw1MTMtNTE1LDEwMjImcXVvdDsgYW5k
+IHRoZW4gYSBsaXN0IG9yIGJpdG1hcCBvciBzb21lIG90aGVyIGRhdGEgc3RydWN0dXJlIG9mIHBv
+cnRzIHRvIGF2b2lkIGlzIGNyZWF0ZWQgYW5kIHRoZW4gbG5ldF9jb25uZWN0KCkgY2hlY2tzIHRo
+YXQgZGF0YSBzdHJ1Y3R1cmUgd2hlbiBzZWxlY3RpbmcgcG9ydHMuPG86cD48L286cD48L3NwYW4+
+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQi
+PjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFu
+IHN0eWxlPSJmb250LXNpemU6MTEuMHB0Ij5UaGFua3MsPG86cD48L286cD48L3NwYW4+PC9wPg0K
+PHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxMS4wcHQiPkdpYW4t
+Q2FybG8gPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8c3Bhbj5fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXzwvc3Bhbj48YnI+DQo8c3Bhbj5sdXN0
+cmUtZGV2ZWwgbWFpbGluZyBsaXN0PC9zcGFuPjxicj4NCjxzcGFuPmx1c3RyZS1kZXZlbEBsaXN0
+cy5sdXN0cmUub3JnPC9zcGFuPjxicj4NCjxzcGFuPmh0dHA6Ly9saXN0cy5sdXN0cmUub3JnL2xp
+c3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZzwvc3Bhbj48YnI+DQo8L2Rpdj4NCjwv
+YmxvY2txdW90ZT4NCjwvZGl2Pg0KPC9ib2R5Pg0KPC9odG1sPg0K
 
-Is there already a way to avoid certain ports for lustre? Either in lustre =
-or via some kernel mechanism that would affect lustre?
+--_000_773F80A993574297BC8BB61477B25360ddncom_--
 
-We're considering making a more general patch that would allow specifying p=
-orts to avoid by adding a module parameter to lnet but aren't sure what a g=
-ood design would be. So far, the basic idea is that the user supplies a str=
-ing of numbers/ranges such as "512,513-515,1022" and then a list or bitmap =
-or some other data structure of ports to avoid is created and then lnet_con=
-nect() checks that data structure when selecting ports.
-
-Thanks,
-Gian-Carlo
-
---_000_SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2SJ0PR09MB6381namp_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html xmlns:o=3D"urn:schemas-microsoft-com:office:office" xmlns:w=3D"urn:sc=
-hemas-microsoft-com:office:word" xmlns:m=3D"http://schemas.microsoft.com/of=
-fice/2004/12/omml" xmlns=3D"http://www.w3.org/TR/REC-html40">
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered medium)">
-<style><!--
-/* Font Definitions */
-@font-face
-	{font-family:"Cambria Math";
-	panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
-	{font-family:Aptos;
-	panose-1:2 11 0 4 2 2 2 2 2 4;}
-/* Style Definitions */
-p.MsoNormal, li.MsoNormal, div.MsoNormal
-	{margin:0in;
-	font-size:12.0pt;
-	font-family:"Aptos",sans-serif;
-	mso-ligatures:standardcontextual;}
-span.EmailStyle17
-	{mso-style-type:personal-compose;
-	font-family:"Aptos",sans-serif;
-	color:windowtext;}
-.MsoChpDefault
-	{mso-style-type:export-only;}
-@page WordSection1
-	{size:8.5in 11.0in;
-	margin:1.0in 1.0in 1.0in 1.0in;}
-div.WordSection1
-	{page:WordSection1;}
---></style>
-</head>
-<body lang=3D"EN-US" link=3D"#467886" vlink=3D"#96607D" style=3D"word-wrap:=
-break-word">
-<div class=3D"WordSection1">
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Hi,<o:p></o:p></spa=
-n></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt"><o:p>&nbsp;</o:p></=
-span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Is it possible to p=
-revent lustre from using specific ports when establishing a socket connecti=
-on?<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">We have the situati=
-on where lustre may use a port (1022) and then a service that needs to use =
-that port fails to start.<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt"><o:p>&nbsp;</o:p></=
-span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Our current solutio=
-n is a local patch to check the port values being iterated through in lnet/=
-lnet/acceptor.c:lnet_connect() and to just skip over 1022.<o:p></o:p></span=
-></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt"><o:p>&nbsp;</o:p></=
-span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Is there already a =
-way to avoid certain ports for lustre? Either in lustre or via some kernel =
-mechanism that would affect lustre?<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt"><o:p>&nbsp;</o:p></=
-span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">We're considering m=
-aking a more general patch that would allow specifying ports to avoid by ad=
-ding a module parameter to lnet but aren't sure what a good design would be=
-. So far, the basic idea is that the
- user supplies a string of numbers/ranges such as &quot;512,513-515,1022&qu=
-ot; and then a list or bitmap or some other data structure of ports to avoi=
-d is created and then lnet_connect() checks that data structure when select=
-ing ports.<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt"><o:p>&nbsp;</o:p></=
-span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Thanks,<o:p></o:p><=
-/span></p>
-<p class=3D"MsoNormal"><span style=3D"font-size:11.0pt">Gian-Carlo <o:p></o=
-:p></span></p>
-</div>
-</body>
-</html>
-
---_000_SJ0PR09MB638165AB4F27BA6F6F65BD2EE3CA2SJ0PR09MB6381namp_--
-
---===============4188690189340432758==
+--===============2928871835570278282==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -301,4 +303,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============4188690189340432758==--
+--===============2928871835570278282==--
