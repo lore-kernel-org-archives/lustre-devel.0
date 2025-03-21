@@ -4,33 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id A7C17C36000
-	for <lustre-devel@archiver.kernel.org>; Fri, 21 Mar 2025 13:08:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id EF105C36000
+	for <lustre-devel@archiver.kernel.org>; Fri, 21 Mar 2025 13:09:32 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZK2mb511Zz1xfB;
-	Fri, 21 Mar 2025 06:07:43 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZK2mp617Pz1xny;
+	Fri, 21 Mar 2025 06:07:54 -0700 (PDT)
 Received: from smtp4.ccs.ornl.gov (smtp4.ccs.ornl.gov [160.91.203.40])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4ZK2m526mVz1xNs
- for <lustre-devel@lists.lustre.org>; Fri, 21 Mar 2025 06:07:17 -0700 (PDT)
+ 4ZK2m43VWsz1whP
+ for <lustre-devel@lists.lustre.org>; Fri, 21 Mar 2025 06:07:16 -0700 (PDT)
 Received: from star2.ccs.ornl.gov (ltm3-e204-208.ccs.ornl.gov [160.91.203.26])
- by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 60FD817D1DE;
+ by smtp4.ccs.ornl.gov (Postfix) with ESMTP id 593C717D1C3;
  Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 5D14C106BE16; Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
+ id 5520C106BE18; Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Fri, 21 Mar 2025 09:06:48 -0400
-Message-ID: <20250321130711.3257092-6-jsimmons@infradead.org>
+Date: Fri, 21 Mar 2025 09:06:46 -0400
+Message-ID: <20250321130711.3257092-4-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250321130711.3257092-1-jsimmons@infradead.org>
 References: <20250321130711.3257092-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 05/27] lustre: nrs: Fix console messages
+Subject: [lustre-devel] [PATCH 03/27] lustre: gss: no sec flavor on loopback
+ connection
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -43,218 +44,100 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Cc: Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Aurelien Degremont <adegremont@nvidia.com>,
+ Lustre Development List <lustre-devel@lists.lustre.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Etienne AUJAMES <eaujames@ddn.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-Fix format of console messages and missing end-of-line.
+When using a local client, i.e. a client mounted on a server node,
+there is no benefit from a security standpoint to enforce an SSK or
+KRB flavor, since the data does not go over the network.
+So force the 'null' security flavor for connections on 0@lo,
+independently of the currently defined srpc flavor.
 
-CERROR("%s.%d NRS: ....", service_name, cpt, ...);
-
-Fixes: f5e513a ("lustre: nrs: change nrs policies at run time")
-WC-bug-id: https://jira.whamcloud.com/browse/LU-16846
-Lustre-commit: c1915c5f0dd865c13 ("LU-16846 nrs: Fix console messages")
-Signed-off-by: Etienne AUJAMES <eaujames@ddn.com>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/51121
+WC-bug-id: https://jira.whamcloud.com/browse/LU-13343
+Lustre-commit: e3e91ea95fd96a5ea ("LU-13343 gss: no sec flavor on loopback connection")
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/46704
+Reviewed-by: Aurelien Degremont <adegremont@nvidia.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Timothy Day <timday@amazon.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/ptlrpc/nrs.c | 70 +++++++++++++++++++++++++-----------------
- 1 file changed, 42 insertions(+), 28 deletions(-)
+ fs/lustre/lmv/lmv_obd.c       |  1 +
+ fs/lustre/lov/lov_obd.c       | 11 +++++++----
+ fs/lustre/ptlrpc/sec_config.c |  4 ++++
+ 3 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/fs/lustre/ptlrpc/nrs.c b/fs/lustre/ptlrpc/nrs.c
-index 661bba7a0f06..eb0e65b6ddb7 100644
---- a/fs/lustre/ptlrpc/nrs.c
-+++ b/fs/lustre/ptlrpc/nrs.c
-@@ -209,6 +209,8 @@ static void nrs_policy_stop_primary(struct ptlrpc_nrs *nrs)
- static int nrs_policy_start_locked(struct ptlrpc_nrs_policy *policy, char *arg)
- {
- 	struct ptlrpc_nrs *nrs = policy->pol_nrs;
-+	struct ptlrpc_service_part *svcpt = nrs->nrs_svcpt;
-+	char *srv_name = svcpt->scp_service->srv_name;
- 	int rc = 0;
- 
- 	/**
-@@ -224,8 +226,10 @@ static int nrs_policy_start_locked(struct ptlrpc_nrs_policy *policy, char *arg)
- 		return -EAGAIN;
- 
- 	if (arg && strlen(arg) >= sizeof(policy->pol_arg)) {
--		CWARN("NRS: arg '%s' is too long\n", arg);
--		return -EINVAL;
-+		rc = -EINVAL;
-+		CWARN("%s.%d NRS: arg '%s' is too long: rc = %d\n",
-+		      srv_name, svcpt->scp_cpt, arg, rc);
-+		return rc;
- 	}
- 
- 	if (policy->pol_flags & PTLRPC_NRS_FL_FALLBACK) {
-@@ -277,9 +281,10 @@ static int nrs_policy_start_locked(struct ptlrpc_nrs_policy *policy, char *arg)
- 	if (atomic_inc_return(&policy->pol_desc->pd_refs) == 1 &&
- 	    !try_module_get(policy->pol_desc->pd_owner)) {
- 		atomic_dec(&policy->pol_desc->pd_refs);
--		CERROR("NRS: cannot get module for policy %s; is it alive?\n",
--		       policy->pol_desc->pd_name);
--		return -ENODEV;
-+		rc = -ENODEV;
-+		CERROR("%s.%d NRS: cannot get module for policy %s (is it alive?): rc = %d\n",
-+		       srv_name, svcpt->scp_cpt, policy->pol_desc->pd_name, rc);
-+		return rc;
- 	}
- 
- 	/**
-@@ -713,6 +718,8 @@ static int nrs_policy_ctl(struct ptlrpc_nrs *nrs, char *name,
- static int nrs_policy_unregister(struct ptlrpc_nrs *nrs, char *name)
- {
- 	struct ptlrpc_nrs_policy *policy = NULL;
-+	struct ptlrpc_service_part *svcpt = nrs->nrs_svcpt;
-+	char *srv_name = svcpt->scp_service->srv_name;
- 	int rc = 0;
- 
- 	spin_lock(&nrs->nrs_lock);
-@@ -720,14 +727,15 @@ static int nrs_policy_unregister(struct ptlrpc_nrs *nrs, char *name)
- 	policy = nrs_policy_find_locked(nrs, name);
- 	if (!policy) {
- 		rc = -ENOENT;
--		CERROR("NRS: cannot find policy '%s': rc = %d\n", name, rc);
-+		CERROR("%s.%d NRS: cannot find policy '%s': rc = %d\n",
-+		       srv_name, svcpt->scp_cpt, name, rc);
- 		goto out_unlock;
- 	}
- 
- 	if (policy->pol_ref > 1) {
- 		rc = -EBUSY;
--		CERROR("NRS: policy '%s' is busy with %ld references: rc = %d",
--		       name, policy->pol_ref, rc);
-+		CERROR("%s.%d NRS: policy '%s' is busy with %ld references: rc = %d\n",
-+			srv_name, svcpt->scp_cpt, name, policy->pol_ref, rc);
- 		goto out_put;
- 	}
- 
-@@ -737,8 +745,9 @@ static int nrs_policy_unregister(struct ptlrpc_nrs *nrs, char *name)
- 	if (policy->pol_state != NRS_POL_STATE_STOPPED) {
- 		rc = nrs_policy_stop_locked(policy);
- 		if (rc) {
--			CERROR("NRS: failed to stop policy '%s' with refcount %d: rc = %d\n",
--			       name, refcount_read(&policy->pol_start_ref), rc);
-+			CERROR("%s.%d NRS: failed to stop policy '%s' with refcount %d: rc = %d\n",
-+			       srv_name, svcpt->scp_cpt, name,
-+			       refcount_read(&policy->pol_start_ref), rc);
- 			goto out_put;
- 		}
- 	}
-@@ -775,6 +784,7 @@ static int nrs_policy_register(struct ptlrpc_nrs *nrs,
- 	struct ptlrpc_nrs_policy *policy;
- 	struct ptlrpc_nrs_policy *tmp;
- 	struct ptlrpc_service_part *svcpt = nrs->nrs_svcpt;
-+	char *srv_name = svcpt->scp_service->srv_name;
- 	int rc;
- 
- 	LASSERT(desc->pd_ops->op_res_get);
-@@ -809,16 +819,17 @@ static int nrs_policy_register(struct ptlrpc_nrs *nrs,
- 
- 	tmp = nrs_policy_find_locked(nrs, policy->pol_desc->pd_name);
- 	if (tmp) {
--		CERROR("NRS policy %s has been registered, can't register it for %s\n",
--		       policy->pol_desc->pd_name,
--		       svcpt->scp_service->srv_name);
-+		rc = -EEXIST;
-+		CERROR("%s.%d NRS: policy %s has been registered, can't register it: rc = %d\n",
-+		       srv_name, svcpt->scp_cpt, policy->pol_desc->pd_name,
-+		       rc);
- 		nrs_policy_put_locked(tmp);
- 
- 		spin_unlock(&nrs->nrs_lock);
- 		nrs_policy_fini(policy);
- 		kfree(policy);
- 
--		return -EEXIST;
-+		return rc;
- 	}
- 
- 	list_add_tail(&policy->pol_list, &nrs->nrs_policy_list);
-@@ -921,9 +932,9 @@ static int nrs_register_policies_locked(struct ptlrpc_nrs *nrs)
- 		if (nrs_policy_compatible(svc, desc)) {
- 			rc = nrs_policy_register(nrs, desc);
- 			if (rc != 0) {
--				CERROR("Failed to register NRS policy %s for partition %d of service %s: %d\n",
--				       desc->pd_name, svcpt->scp_cpt,
--				       svc->srv_name, rc);
-+				CERROR("%s.%d NRS: Failed to register policy %s: rc = %d\n",
-+				       svc->srv_name, svcpt->scp_cpt,
-+				       desc->pd_name, rc);
- 				/**
- 				 * Fail registration if any of the policies'
- 				 * registration fails.
-@@ -1108,6 +1119,7 @@ static int nrs_policy_unregister_locked(struct ptlrpc_nrs_pol_desc *desc)
+diff --git a/fs/lustre/lmv/lmv_obd.c b/fs/lustre/lmv/lmv_obd.c
+index f7c7826d0baf..da28bc0e544b 100644
+--- a/fs/lustre/lmv/lmv_obd.c
++++ b/fs/lustre/lmv/lmv_obd.c
+@@ -471,6 +471,7 @@ static int lmv_check_connect(struct obd_device *obd)
  			continue;
  
- 		ptlrpc_service_for_each_part(svcpt, i, svc) {
-+			char *srv_name = svcpt->scp_service->srv_name;
- 			bool hp = false;
+ 		--lmv->lmv_mdt_descs.ltd_lmv_desc.ld_active_tgt_count;
++		obd_register_observer(tgt->ltd_exp->exp_obd, NULL);
+ 		obd_disconnect(tgt->ltd_exp);
+ 	}
  
- again:
-@@ -1120,9 +1132,9 @@ static int nrs_policy_unregister_locked(struct ptlrpc_nrs_pol_desc *desc)
- 			if (rc == -ENOENT) {
- 				rc = 0;
- 			} else if (rc != 0) {
--				CERROR("Failed to unregister NRS policy %s for partition %d of service %s: %d\n",
--				       desc->pd_name, svcpt->scp_cpt,
--				       svcpt->scp_service->srv_name, rc);
-+				CERROR("%s.%d NRS: Failed to unregister policy %s: rc = %d\n",
-+				       srv_name, svcpt->scp_cpt, desc->pd_name,
-+				       rc);
- 				return rc;
- 			}
+diff --git a/fs/lustre/lov/lov_obd.c b/fs/lustre/lov/lov_obd.c
+index 392395f4c35e..f05091560e95 100644
+--- a/fs/lustre/lov/lov_obd.c
++++ b/fs/lustre/lov/lov_obd.c
+@@ -134,8 +134,10 @@ int lov_connect_osc(struct obd_device *obd, u32 index, int activate,
+ 	tgt_obd = lov->lov_tgts[index]->ltd_obd;
  
-@@ -1182,17 +1194,18 @@ static int ptlrpc_nrs_policy_register(struct ptlrpc_nrs_pol_conf *conf)
- 	if ((conf->nc_flags & PTLRPC_NRS_FL_REG_EXTERN) &&
- 	    (conf->nc_flags & (PTLRPC_NRS_FL_FALLBACK |
- 			       PTLRPC_NRS_FL_REG_START))) {
--		CERROR("NRS: failing to register policy %s. Please check policy flags; external policies cannot act as fallback policies, or be started immediately upon registration without interaction with lprocfs\n",
--		       conf->nc_name);
+ 	if (!tgt_obd->obd_set_up) {
+-		CERROR("Target %s not set up\n", obd_uuid2str(tgt_uuid));
 -		return -EINVAL;
 +		rc = -EINVAL;
-+		CERROR("NRS: failing to register policy %s. Please check policy flags; external policies cannot act as fallback policies, or be started immediately upon registration without interaction with lprocfs: rc = %d\n",
-+		       conf->nc_name, rc);
++		CERROR("%s: target not set up: rc = %d\n",
++		       obd_uuid2str(tgt_uuid), rc);
 +		return rc;
  	}
  
- 	mutex_lock(&nrs_core.nrs_mutex);
+ 	/* override the sp_me from lov */
+@@ -159,7 +161,7 @@ int lov_connect_osc(struct obd_device *obd, u32 index, int activate,
  
- 	if (nrs_policy_find_desc_locked(conf->nc_name)) {
--		CERROR("NRS: failing to register policy %s which has already been registered with NRS core!\n",
--		       conf->nc_name);
- 		rc = -EEXIST;
-+		CERROR("NRS: failing to register policy %s which has already been registered with NRS core: rc = %d\n",
-+		       conf->nc_name, rc);
- 		goto fail;
+ 	rc = obd_register_observer(tgt_obd, obd);
+ 	if (rc) {
+-		CERROR("Target %s register_observer error %d\n",
++		CERROR("%s: target register_observer error: rc = %d\n",
+ 		       obd_uuid2str(tgt_uuid), rc);
+ 		return rc;
+ 	}
+@@ -174,8 +176,9 @@ int lov_connect_osc(struct obd_device *obd, u32 index, int activate,
+ 	rc = obd_connect(NULL, &lov->lov_tgts[index]->ltd_exp, tgt_obd,
+ 			 &lov_osc_uuid, data, lov->lov_cache);
+ 	if (rc || !lov->lov_tgts[index]->ltd_exp) {
+-		CERROR("Target %s connect error %d\n",
++		CERROR("%s: target connect error: rc = %d\n",
+ 		       obd_uuid2str(tgt_uuid), rc);
++		obd_register_observer(tgt_obd, NULL);
+ 		return -ENODEV;
  	}
  
-@@ -1243,14 +1256,15 @@ static int ptlrpc_nrs_policy_register(struct ptlrpc_nrs_pol_conf *conf)
+diff --git a/fs/lustre/ptlrpc/sec_config.c b/fs/lustre/ptlrpc/sec_config.c
+index 95e0da4b2da2..35bd95315bd7 100644
+--- a/fs/lustre/ptlrpc/sec_config.c
++++ b/fs/lustre/ptlrpc/sec_config.c
+@@ -380,6 +380,10 @@ static int sptlrpc_rule_set_choose(struct sptlrpc_rule_set *rset,
+ 	struct sptlrpc_rule *r;
+ 	int n;
  
- 		ptlrpc_service_for_each_part(svcpt, i, svc) {
- 			struct ptlrpc_nrs *nrs;
-+			char *srv_name = svcpt->scp_service->srv_name;
- 			bool hp = false;
- again:
- 			nrs = nrs_svcpt2nrs(svcpt, hp);
- 			rc = nrs_policy_register(nrs, desc);
- 			if (rc != 0) {
--				CERROR("Failed to register NRS policy %s for partition %d of service %s: %d\n",
--				       desc->pd_name, svcpt->scp_cpt,
--				       svcpt->scp_service->srv_name, rc);
-+				CERROR("%s.%d NRS: Failed to register policy %s: rc = %d\n",
-+				       srv_name, svcpt->scp_cpt,
-+				       desc->pd_name, rc);
++	if (nid_is_lo0(nid))
++		/* do not enforce any sec flavor on loopback connection */
++		return 0;
++
+ 	for (n = 0; n < rset->srs_nrule; n++) {
+ 		r = &rset->srs_rules[n];
  
- 				rc2 = nrs_policy_unregister_locked(desc);
- 				/**
 -- 
 2.39.3
 
