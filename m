@@ -4,34 +4,34 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id D0136C36000
-	for <lustre-devel@archiver.kernel.org>; Fri, 21 Mar 2025 13:34:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 37343C36000
+	for <lustre-devel@archiver.kernel.org>; Fri, 21 Mar 2025 13:35:56 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZK2tT4ksXz20yK;
-	Fri, 21 Mar 2025 06:12:49 -0700 (PDT)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZK2tq51WWz20yq;
+	Fri, 21 Mar 2025 06:13:07 -0700 (PDT)
 Received: from smtp3.ccs.ornl.gov (smtp3.ccs.ornl.gov [160.91.203.39])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4ZK2nN3mK4z1xdv
- for <lustre-devel@lists.lustre.org>; Fri, 21 Mar 2025 06:08:24 -0700 (PDT)
+ 4ZK2nd1cqCz1y7P
+ for <lustre-devel@lists.lustre.org>; Fri, 21 Mar 2025 06:08:37 -0700 (PDT)
 Received: from star2.ccs.ornl.gov (ltm3-e204-208.ccs.ornl.gov [160.91.203.26])
- by smtp3.ccs.ornl.gov (Postfix) with ESMTP id 91FE2891205;
+ by smtp3.ccs.ornl.gov (Postfix) with ESMTP id A1373893D84;
  Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
 Received: by star2.ccs.ornl.gov (Postfix, from userid 2004)
- id 8F3CE106BE17; Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
+ id 9E4A3106BE19; Fri, 21 Mar 2025 09:07:14 -0400 (EDT)
 From: James Simmons <jsimmons@infradead.org>
 To: Andreas Dilger <adilger@whamcloud.com>, Oleg Drokin <green@whamcloud.com>,
  NeilBrown <neilb@suse.de>
-Date: Fri, 21 Mar 2025 09:07:01 -0400
-Message-ID: <20250321130711.3257092-19-jsimmons@infradead.org>
+Date: Fri, 21 Mar 2025 09:07:05 -0400
+Message-ID: <20250321130711.3257092-23-jsimmons@infradead.org>
 X-Mailer: git-send-email 2.43.5
 In-Reply-To: <20250321130711.3257092-1-jsimmons@infradead.org>
 References: <20250321130711.3257092-1-jsimmons@infradead.org>
 MIME-Version: 1.0
-Subject: [lustre-devel] [PATCH 18/27] lustre: fld: use
- list_first/last_entry() for list heads
+Subject: [lustre-devel] [PATCH 22/27] lnet: libcfs: Remove reference to
+ LASSERT_ATOMIC_GT_LT
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -51,40 +51,84 @@ Content-Transfer-Encoding: 7bit
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-From: Mr NeilBrown <neilb@suse.de>
+From: Arshad Hussain <arshad.hussain@aeoncomputing.com>
 
-This patch changes
-    list_entry(foo.next, ...)
-to
-    list_first_entry(&foo, ...)
+This patch removes all reference to LASSERT_ATOMIC_GT_LT macro.
 
-in cases where 'foo' is a list head - not a list member.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-6142
-Lustre-commit: 94b72e3478d73133c ("LU-6142 lustre: use list_first/last_entry() for list heads")
-Signed-off-by: Mr NeilBrown <neilb@suse.de>
-Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/50828
-Reviewed-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-16796
+Lustre-commit: 5cc0c6b2630e955ee ("LU-16796 libcfs: Remove reference to LASSERT_ATOMIC_GT_LT")
+Signed-off-by: Arshad Hussain <arshad.hussain@aeoncomputing.com>
+Reviewed-on: https://review.whamcloud.com/c/fs/lustre-release/+/51157
+Reviewed-by: Neil Brown <neilb@suse.de>
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- fs/lustre/fld/fld_request.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/lustre/include/lustre_log.h        | 8 ++++++--
+ fs/lustre/ldlm/ldlm_resource.c        | 5 ++++-
+ include/linux/libcfs/libcfs_private.h | 8 --------
+ 3 files changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/fs/lustre/fld/fld_request.c b/fs/lustre/fld/fld_request.c
-index 0fe8cef6e945..eb9f43cf8fe1 100644
---- a/fs/lustre/fld/fld_request.c
-+++ b/fs/lustre/fld/fld_request.c
-@@ -447,7 +447,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- 			target = list_entry(fld->lcf_targets.next,
- 					    struct lu_fld_target, ft_chain);
- 		else
--			target = list_entry(target->ft_chain.next,
-+			target = list_first_entry(&target->ft_chain,
- 						 struct lu_fld_target,
- 						 ft_chain);
- 		spin_unlock(&fld->lcf_lock);
+diff --git a/fs/lustre/include/lustre_log.h b/fs/lustre/include/lustre_log.h
+index 1586595399cf..60d451ca1710 100644
+--- a/fs/lustre/include/lustre_log.h
++++ b/fs/lustre/include/lustre_log.h
+@@ -286,10 +286,14 @@ static inline struct llog_ctxt *llog_ctxt_get(struct llog_ctxt *ctxt)
+ 
+ static inline void llog_ctxt_put(struct llog_ctxt *ctxt)
+ {
++	int refcount;
++
+ 	if (!ctxt)
+ 		return;
+-	LASSERT(refcount_read(&ctxt->loc_refcount) > 0);
+-	LASSERT(refcount_read(&ctxt->loc_refcount) < LI_POISON);
++
++	refcount = refcount_read(&ctxt->loc_refcount);
++	LASSERT(refcount > 0 && refcount < LI_POISON);
++
+ 	CDEBUG(D_INFO, "PUTting ctxt %p : new refcount %d\n", ctxt,
+ 	       refcount_read(&ctxt->loc_refcount) - 1);
+ 	__llog_ctxt_put(NULL, ctxt);
+diff --git a/fs/lustre/ldlm/ldlm_resource.c b/fs/lustre/ldlm/ldlm_resource.c
+index 7da47976e994..db0f7f169701 100644
+--- a/fs/lustre/ldlm/ldlm_resource.c
++++ b/fs/lustre/ldlm/ldlm_resource.c
+@@ -1220,8 +1220,11 @@ void ldlm_resource_putref(struct ldlm_resource *res)
+ {
+ 	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
+ 	struct cfs_hash_bd bd;
++	int refcount;
++
++	refcount = atomic_read(&res->lr_refcount);
++	LASSERT(refcount > 0 && refcount < LI_POISON);
+ 
+-	LASSERT_ATOMIC_GT_LT(&res->lr_refcount, 0, LI_POISON);
+ 	CDEBUG(D_INFO, "putref res: %p count: %d\n",
+ 	       res, atomic_read(&res->lr_refcount) - 1);
+ 
+diff --git a/include/linux/libcfs/libcfs_private.h b/include/linux/libcfs/libcfs_private.h
+index d46c66e8534b..0a377f09d6dd 100644
+--- a/include/linux/libcfs/libcfs_private.h
++++ b/include/linux/libcfs/libcfs_private.h
+@@ -112,17 +112,9 @@ int libcfs_debug_mark_buffer(const char *text);
+ #define LASSERT_ATOMIC_EQ(a, v)			\
+ 	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
+ 
+-/** assert value of @a is great than @v1 and little than @v2 */
+-#define LASSERT_ATOMIC_GT_LT(a, v1, v2)				\
+-do {								\
+-	int __v = atomic_read(a);				\
+-	LASSERTF(__v > v1 && __v < v2, "value: %d\n", __v);	\
+-} while (0)
+-
+ #else /* !LASSERT_ATOMIC_ENABLED */
+ 
+ #define LASSERT_ATOMIC_EQ(a, v)		do {} while (0)
+-#define LASSERT_ATOMIC_GT_LT(a, v1, v2)	do {} while (0)
+ 
+ #endif /* LASSERT_ATOMIC_ENABLED */
+ 
 -- 
 2.39.3
 
