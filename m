@@ -4,69 +4,175 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 9E4B4C3ABBE
-	for <lustre-devel@archiver.kernel.org>; Tue,  6 May 2025 23:49:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8E077C3ABBE
+	for <lustre-devel@archiver.kernel.org>; Thu,  8 May 2025 04:04:13 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZsZqY0Fwkz1xR7;
-	Tue, 06 May 2025 16:49:13 -0700 (PDT)
-Received: from mail-oa1-f49.google.com (mail-oa1-f49.google.com
- [209.85.160.49])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4ZtJR55G2mz1xPV;
+	Wed, 07 May 2025 21:04:01 -0700 (PDT)
+Received: from outbound-ip191a.ess.barracuda.com
+ (outbound-ip191a.ess.barracuda.com [209.222.82.58])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4ZsZqF0KqGz1wfw
- for <lustre-devel@lists.lustre.org>; Tue, 06 May 2025 16:48:56 -0700 (PDT)
-Received: by mail-oa1-f49.google.com with SMTP id
- 586e51a60fabf-2db0217abe4so1345815fac.1
- for <lustre-devel@lists.lustre.org>; Tue, 06 May 2025 16:48:56 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20230601; t=1746575335; x=1747180135; darn=lists.lustre.org;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=kpdzFM67vNwIhDGfXiAMBZJuzsZejjxX24mEZDZmWSU=;
- b=kivLG2UR/7kNy7vzNdhhgXRxw6Ehg5WpIjaiQ/H0YhvQaOSDrOUHYhZf1t+VI8TnUp
- ck0We89DD4ge8Jp29cZCSf8MfvTQ7XLWQVsTkLTsE1843mDwDPcJ0u7m6IXkUR1oNrcA
- z5Vgs6N0vPIHunPt9tJ3CptwX2HUO0FLwfhMGEEPGgERr+gv2MhNaYSpjoYxZ4tn1GpP
- SKdlf74J0CyydzhqrvDy+jmV5v+qZ84Eqp4zjyHD6CmTLABeneYRdVyb0hKI6BuyaH+X
- hoPXJGIleZOuTjCQPKqPyK3A7sRLaBp16bwXtsuBRaDruGL3acNzQ+wEY5NR/0eOPh8t
- l1eA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1746575335; x=1747180135;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
- :reply-to;
- bh=kpdzFM67vNwIhDGfXiAMBZJuzsZejjxX24mEZDZmWSU=;
- b=sxXTtJo2J6MO6LwgfIAAHdpQAn9isKY9qK9zfnQ180CkWFUrMTf5E59t/+ORt9vpUi
- 0EeWoXi8KPztMQ6ziFF70awrBg/M3U07Ga2dm8HtkBaij2pSABI6oJXNNe+ajSwZhcFa
- MLpf9m7W0no4Z6Fx8M6srji82Odr4l4m5grHlfKkAJsRqEXD4w501MmaQi3qoGaXuXuE
- ROXiKUUbXUasWlvajZHgIyFpUkKL6poWFVoSHsJB63W2G8yEteLKhsrQtMylB2RIinzG
- +YN71NbShZINvqGVy4smbG+ceje4wkGRC+WH3u9FD7894irysaMrvIkCTT+i8LV7NDNQ
- Fi2A==
-X-Gm-Message-State: AOJu0YwA5XuoBQ6xb2Uw3nAnlK2NALBuQ3LuD+V6rA2Gj/kmkiIEb67z
- FePbyKZm1DZ3pqdXO1ZtX160dComQLbtU9Nd2bb0OT5rjeML/UiQDY9KJO+WfW9ngx6qckvEltN
- tXczLL4/+RAFOVTyuMQerq9lF+tM=
-X-Gm-Gg: ASbGnctyDBVhxjAi3yIbwATfSe1KFDPTlu6auS80hHY57Lttkpxo4DyqU652IC9r583
- m6t0+THGoz+x8sknHy6rSxa1pK3uCxk0y4hyMY3f4gUBj+L0bhMhEKD798GOjtGcTyzyE6AM1//
- C9KbYztftyrb/6o5+zy5prEA==
-X-Google-Smtp-Source: AGHT+IFiSJGat7SbXm7pgEtVTQMT5J7Vfkz7GqewRMpWLlHzImVvDFApOwpbEj9zLRT8/8IAwWjBRBIzyWIKnmzofso=
-X-Received: by 2002:a05:6871:3329:b0:2d4:d9d6:c8cf with SMTP id
- 586e51a60fabf-2db5bd9056cmr851745fac.5.1746575334612; Tue, 06 May 2025
- 16:48:54 -0700 (PDT)
+ 4ZtJR310Mqz1wYs
+ for <lustre-devel@lists.lustre.org>; Wed, 07 May 2025 21:03:59 -0700 (PDT)
+Received: from NAM10-MW2-obe.outbound.protection.outlook.com
+ (mail-mw2nam10lp2044.outbound.protection.outlook.com [104.47.55.44]) by
+ mx-outbound11-165.us-east-2a.ess.aws.cudaops.com (version=TLSv1.2
+ cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+ Thu, 08 May 2025 04:03:28 +0000
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
+ b=wUoTyzi9n0upcfGeVrQT4NIFijzPzH4lABb4suSG1fHPJ9mcu3O1B8k8i/MPTaGw5YQsPd+Q3icEU6dAWZ9REJBFbGOg2S8Ac2rsEqGWH64Nby+VSsbcy2ZK2dbw9lcP4xLz1Q29zX42RR4LRr7FYx5TrVXg2dtLrZRXpIzVQd+x/wK7VAdxAUtRbu6tFznPWeO4ZIgSeH75MlyzCOR3ss50SweJQnpUtrarah2EfCuldzE3C2Nbpe+vfBN5Dei8WqR2DplFX8iGWrz9Pxr7WMxjG4QvXmHxDoee83RvX5pJ0SCFh2RPAjAUvu1YUqYzzPg7f4uCEnNqZ/XtOYtUQA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector10001;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=wqhYPhUClNc70jBD0GMlBQFt+3C0Ww3kC8UB+h4dgJk=;
+ b=DfoWli3d5R04BG/RdoGTMTko3iKOQf0YatvtDFU94ca/lKBm7tZ8VSdomns4oyVeC+2ysM62AUSxoCqbZzwYw4UZUnoVLOVwVbiKN77w1zM+czMuhoS3wMkvZWutGQ5fQy04UBfgRnMSrzYXuhm+SrWbKYpjaRllswULm6cjn8owYfBXFcvjbN5UILnCx0FOFdQpviaKUj02nGs5AoEkyMle7bFd7kFtM0s7wvIiEfsopM6iHSzBsuawIxkmafl33v9gs2+aD50OMVhXtoT74sKjqM4K59zPPJlzmUUqAmh8GsIskb8V6/DDFJ/WotJZERd6scnkTm1mO8W6Wfv0+Q==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
+ header.d=ddn.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=wqhYPhUClNc70jBD0GMlBQFt+3C0Ww3kC8UB+h4dgJk=;
+ b=0J5pF/pE7d2/P7v3lyZ1Kupm+k3kdL9cNbIoulf5HYzTDtAPaLdMvcQwJnpapLVox+6QZPHUPpsrVDVAt9XQ7TzEo5GjgLzPBUtCncEzUCEGeov1G62xJGjKfR1gzl9iIskGa+Gp5fZg69+yXMb47JfJcLbBq3MMN9beKcmlc44=
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
+ by DS0PR19MB7791.namprd19.prod.outlook.com (2603:10b6:8:114::19) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8699.26; Thu, 8 May
+ 2025 04:03:20 +0000
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::92fd:9b94:d9cd:81d2]) by MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::92fd:9b94:d9cd:81d2%5]) with mapi id 15.20.8699.022; Thu, 8 May 2025
+ 04:03:20 +0000
+From: Andreas Dilger <adilger@ddn.com>
+To: Sylvain GOUDEAU <sylvain.goudeau@eviden.com>
+Thread-Topic: new LND number reservation
+Thread-Index: AQHbvyvjQOuRG+cmKkWqLwu0dOOQlbPIHeCA
+Date: Thu, 8 May 2025 04:03:20 +0000
+Message-ID: <B6A23093-EF2D-4A4A-9020-14765083FD34@ddn.com>
+References: <GV2PR07MB91561F38B3C84AF344F6C5C09088A@GV2PR07MB9156.eurprd07.prod.outlook.com>
+In-Reply-To: <GV2PR07MB91561F38B3C84AF344F6C5C09088A@GV2PR07MB9156.eurprd07.prod.outlook.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: Apple Mail (2.3826.200.121)
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=ddn.com;
+x-ms-publictraffictype: Email
+x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|DS0PR19MB7791:EE_
+x-ms-office365-filtering-correlation-id: ec8b80aa-0e60-496c-6eab-08dd8de54510
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+ ARA:13230040|376014|1800799024|366016|7053199007|8096899003|38070700018; 
+x-microsoft-antispam-message-info: =?utf-8?B?OWZDY1hPdTV2SmI1Qk1KUHR3cS9RalBpRXI1MThFcDNxZ2RFK3UxbEQ5RzRS?=
+ =?utf-8?B?TFE2eG5zVUh1enNYYU1pRnJrbkpCQ3VjTUtBSHNaSyttYmJwR0p2RWNDalR3?=
+ =?utf-8?B?QnZmQmZJNU5VOTJlZHR0ODU5RjlwaWpoU2FoSWFUcXRWN0gxMW5aaFVzV0dG?=
+ =?utf-8?B?eWpreTZEWWdHays1ZUlMbEIwbVpGVllaMVN2a2hYenVVZ0VHQjAvbGI1dzA1?=
+ =?utf-8?B?NDFEY3ludmozakh6WCsrdjRyeGVEYUJpRDZGcm9RZnVMQ0x0ejRmeERWRE9Q?=
+ =?utf-8?B?TnN6QmkrVHZsUjhJMmU2ajRkRG5mTHgxWWZwK2N6TmFnVmtsdmNsUFJlR2My?=
+ =?utf-8?B?ZjBnYUwzQTRhdjhLMFZ6WGoySmJoanNSUjhEdjFUWWVWY1dWK05RbXdBbXVQ?=
+ =?utf-8?B?VEZ3VmFPYXdaRTQvbXdjaUYxOTZjb01MNE0rNmZhWUN3NGRBQXZBMnJwNjVN?=
+ =?utf-8?B?YktaQ1IrL05FcHlqaWFjLzdXaEgzTTBaYzY5cWs3WncvZlFlR1JNWnZHTGRm?=
+ =?utf-8?B?clNPVTlHa0hrSG9tM2JKUWt2UkgyZVYxUUNPSDhWQ21UQ0UxRTcrNUVmNHVy?=
+ =?utf-8?B?cUlsaUtRaWNLRnJYbXZ6bjllYkQrVWdyR1F2elFNd0ZvTWw0RjVjRUFxbXh1?=
+ =?utf-8?B?d1NscU1pN3BlUzVPNlNTMkxPazdXV3ZkaWFNS3YyWTZCU3ZmZ0IvYUpYYTFN?=
+ =?utf-8?B?Vk5GeE1iQUFrOXJjNEZuYm5pOGFOUjhUdnVrRGI1Mnp1SFkrK3g3NUE4SCtG?=
+ =?utf-8?B?L3BMVllYVFZwK1A0UlBhdGdvb2svVUNqYlVVUUdCQllRNDVkRGJrQWEyZEsv?=
+ =?utf-8?B?MHRZSk1wZkRKYW1ja0ZCU3MxYllGSDJtNm9zL3dlZzU4eldIVmNSVjVLZ2hX?=
+ =?utf-8?B?THVCYy9SNVQveGxydzYveE93RzY2Z1A0YmR2NXYyWTVFUW53b2xMcFBLWkdO?=
+ =?utf-8?B?bjdjYTdWNnF0aVp3RFVuRW12YlR5cG5vNFFNNXExV0lIbGJRdnpkVCtGZ1dp?=
+ =?utf-8?B?bjNmOU1aMkxmZk13TGVFd0RQWWFzUHlpZytJVU0zaEoyNlgxYU8rT0lLRFBv?=
+ =?utf-8?B?c0QzaXN5Ti9CUGlGSXZsVmFjWUFGa0hxaTFUVVZpOTlBSU5kdjA0YXJwWDNW?=
+ =?utf-8?B?UGRHdlh4MWlzUU9leHlKb0xJeHNDVUFkbDlxaURwc3BYUXZRMWlraTQ1UnUv?=
+ =?utf-8?B?WUdqV0VmRVVBQkRBYTRZTi8yYWtJVnVjS2V0Z2MvM3dxU3c3TFg0SkM4WUhh?=
+ =?utf-8?B?Z2szMjJuRWxnMzhEL0NTTmgxWkN4K0gwZDY3SXhiQW5iVXlpbHRTZnpEWW9S?=
+ =?utf-8?B?QzNqeURSTnRlT3U2Uy83SWd5N0FjakZ6VDJuNXpEbkp5UXVsMlpobkF2TEl0?=
+ =?utf-8?B?TFdrN3ZZc2w0dTBqS0JtS21pbWNGcS9ybWZPeFoxRUNyc1dZTytxS2drZExu?=
+ =?utf-8?B?TEQxOGlQcVJObnhTdmRkYW5hZWVPZFl6azJMSWJJazdZcFRPeTFhTlBBUm5Y?=
+ =?utf-8?B?NXNaUmxNRW96NWQ2TTMrSmU3eGloc2VTV1VDSjhnYVFTQkJnR1NMdUE1dUdT?=
+ =?utf-8?B?S1lGRlkwbmErc0xxbm1wMVNDcnVsNDRUYUxjUjZBOVhyQ3VxcmJhMGRWSUlM?=
+ =?utf-8?B?WnNzSmw1dWpoM3lRa2xlUkM4dU1HNG1RSUxwdzVva1Q5ZjB5eHp0MFgzU2J1?=
+ =?utf-8?B?N1ptbWFCZ044bW5jSWtxdXBXWnRjY3RDczMxWTIyemlQaURGU3ErQWpWSytF?=
+ =?utf-8?B?Nm5yTE11YWd4S1ZsekwybUREcjc2eDlvV1RrRzJYb2FxdXR1NkZ4dHJyOFFO?=
+ =?utf-8?B?OHhacXhndGlXMnBxN0sxSDZUUHRtdUh6cTBVVmVsS0NaTkRtZ3pzTlZDd1dy?=
+ =?utf-8?B?dEZEUzh0eCt0SmdqVVZIRldMSk9pVE95TDVaWUYvTWJyQm15VGcvMC9KTmNC?=
+ =?utf-8?B?d0YvSXl2WjhkVUgxY0x4RXc3RmQzcXJqVm9HaGl0QXJqS0xOYXIyb2NhTHly?=
+ =?utf-8?Q?y2Inmb1yXCT+++8J01Lsu48V9fxUPo=3D?=
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(376014)(1800799024)(366016)(7053199007)(8096899003)(38070700018);
+ DIR:OUT; SFP:1102; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?ZUJ2cXZPMlhyZDdDSlNjZVovVVlZRDBnVGxOZHYrRDEwT3lxM290dUdlajF0?=
+ =?utf-8?B?ei9qZTREV09GUCtyVVF5SStjbzBaM05pTWpUYVdNRS9zUVNUMkRqWDk0Z29o?=
+ =?utf-8?B?RVJLWjJnRFl4dGpCOXE1Z3BYbGlqK2d1YkhoYkd4dE5ZN0l0M1YxSXF6eEUv?=
+ =?utf-8?B?WnhVZHlkdG9ITW1rdG1mVlpnNDdqYllISFhlWE14TUlnb25wUmp0RW5yTXNS?=
+ =?utf-8?B?WHJzRGZjR3U4N2NPRnRHTkhyWk9mc3ByOThTRVlGRkpBQkJyZWZmazJmUGJT?=
+ =?utf-8?B?M1FpTW5EQkFNc005TGRKZElRc3hIb3dqNkI0S0ZZNkZtZ25weXc1UStoZ3VX?=
+ =?utf-8?B?cmh1WldWbHo3VzJrblJSUTR0VGJsTU1JamcvU3krR2luZ3A4NXl2VVRXUS9K?=
+ =?utf-8?B?TTJjY21VNFArendlTjlTb05JUDdUVHQ0d2xxTWpTL0dTdURDVnZaOHMxdmR3?=
+ =?utf-8?B?Vm1taDVqM001MXdMU0FPOSttMldUTjVINXZLK3QrZm1VZUNFcEwrZG5KWkJY?=
+ =?utf-8?B?elJ4bE93dno5aVU1Sm44YllxK2E0K09GQWJqbTB3M2JnaXo2NThxNytHRVEv?=
+ =?utf-8?B?SXdwd0VVUmtFSUxjYlY1KzYwZmx5TXl0R1RKR0U1elVuck9vR3I1cWFsblVh?=
+ =?utf-8?B?TnZFV3lJNVVhdk16eEdvai96dWh5ZENxOXdJY25ucDJlUlhyL2lFYnBLeVlS?=
+ =?utf-8?B?Ry92dFVvQkVjSTJzZytVTmc3V0psMEdqaHZvWGhEcGVHZk1ybUg5Smg5R09z?=
+ =?utf-8?B?Vkh0YnRLa3JoQkFOc2F4VVROa1Z1WnFBY3hsQ1JuUzBKQWRHSXJpeWV6cUZD?=
+ =?utf-8?B?YVpyeTJtL3ZKcW04ejZMT1Q3T21RcHhpUXBkWWhQZDZlclNRT2FSenZ5K3JR?=
+ =?utf-8?B?cGlONFBWY3pRS0xOdnNyMGRuVGpFZG83WVJ6WGxDV3ZZSXNiZm8xQmZNYlNX?=
+ =?utf-8?B?UTJybXFQWDRieFUrbC92UHEvWHpybDRUb2FDNVJQQ09LWVJDd2t6TWJUemJT?=
+ =?utf-8?B?ajUxVDFUbkVyNERnRkJjSElsSjBzb0FsNVFicmFTTEpwMU1yWnNkVlhhS3Bt?=
+ =?utf-8?B?aXc3VHUyL05UdDREZ285eU4wNzJDOC9QTzhkUXdYNkprSzdVdDViT2lBNWh1?=
+ =?utf-8?B?bkF4UGFQbjdLaGNSZjQyWEh4eEs3K3hSRFg4SXd3L2JzOTg1UW01Rm9wcTlB?=
+ =?utf-8?B?NG5TTWlCSGs5MHorTXU1cXFjMCs1Nk5yaWtzSzBvQkdDTDhLM3ZzYyt0di9z?=
+ =?utf-8?B?SDIxV0dURnRIaVhtQlhtUXF3Q0MvSm50K3lzNFdOQTJYQXRBSlNXbCthcUls?=
+ =?utf-8?B?K1AyTkpEQ0hiM3l5RHVuajRaMU9QQWNIZ3p3OEg5dW1XUGxsYlVKVGhLRzkx?=
+ =?utf-8?B?SkJIZlkwdHVlNWs0V2VleGVpc0FQelZCeEJHQjRaKzlqQlJ6VW1lcVpaZHd2?=
+ =?utf-8?B?ZWFsVzMxejV6Q0ZzVEZBMzE3dmxYZUVIRHVsdkRDTkpHdGE3T1B3QnVRUkJv?=
+ =?utf-8?B?UjZEbEE2Q2dvcVMzSnNOeTM3akd4WDVKTm8vRDdpVURtdXhJRDVRQzhhZ1ky?=
+ =?utf-8?B?azJwTWd5M0M2dlZGNW1qZ3UrTzlldGU1Q09zaFJyZUd1Uk8xTEIrdWVTUlMv?=
+ =?utf-8?B?bDdFeGdNbzJlRys2UlJ1cTZ3OGV4V1pQcWlMWWJKQ1lDRE9pYUJ2OWZ3TkY5?=
+ =?utf-8?B?ZjR2NXYzUFJRbGkwR3BQVDl1MHZoOUZVZG1hcnhaUGtVSVNXcWtJd3JOaktO?=
+ =?utf-8?B?RDRnK3l1Y3dZeUUxb0ZrUXVoUjA0K0xmRXAxMC9xVXFOdWNvY2tobjBmbit6?=
+ =?utf-8?B?YW5pU2FjeXF6UmE5SjU4bE12Nkx5ZndKZkNhanNPMzFqVFJRbWcwWmdmdFE5?=
+ =?utf-8?B?OXBOTVViNmdXZUhDU1loMVZnTzBIcUJMTW9uZXRQYTNpMDk2UjgxYWhkNVpr?=
+ =?utf-8?B?enI2RmNFMURGekZHUjg5YVh0SE5rTFZvSkZqa1dXc3B5dVA4ZWtCV2lWV3Rw?=
+ =?utf-8?B?V3BsYkJEaFJkTkRYRklGdWJ6SWRGSHd3Qm1lTzZrTnk4dnNScTdUUGJzbEhF?=
+ =?utf-8?B?N1BBbk9zUnliaGJKZTRHY05YREQ5MHdremN0Rk43ZXBUV3R3VFNhRnRENC9V?=
+ =?utf-8?Q?hmQxvvuSWJsmITr38h8xrgX3s?=
 MIME-Version: 1.0
-References: <CAFhHJg=GrakUdiZ713MjmDfUSFypNtc0HDfjVOsaWPrp+qzjQQ@mail.gmail.com>
- <AB2369CB-C2D2-4879-A5B6-2D428A213D6D@ddn.com>
-In-Reply-To: <AB2369CB-C2D2-4879-A5B6-2D428A213D6D@ddn.com>
-From: GEORGE ZHAO <georgezhaojobs@gmail.com>
-Date: Tue, 6 May 2025 19:48:41 -0400
-X-Gm-Features: ATxdqUFMltjadMPSaUGCJVonfZPWkF9-iwhNGBv_jT-y0P62gBHqyiOQ5H5WfEU
-Message-ID: <CAFhHJgmyHMBY8bha2eAP1QRGvcBumgLViusKy-NNxoDeLQQt6A@mail.gmail.com>
-To: Andreas Dilger <adilger@ddn.com>
-Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] 
-	=?utf-8?q?New_contributor_inquiry_=E2=80=93_statu?=
-	=?utf-8?q?s_of_LU-1643_=28=E2=80=9Creserved_space=E2=80=9D_in_stat?=
-	=?utf-8?q?fs/df=29_and_guidance_requested?=
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: Fi3vNn4gmxxE1HGOnW1TBf4zrgb+f/q5z90+6vX80lijMxWET+p62RXSkucxorAyseu9c20HFdYyJSyVEE1rbjMI1RUc92ZLlwB6vWjoCJO6DsM6X6RXGbh8jtggoiAwmuCdpMYCG4JPItyThLZTkNHaewjyAotLxKe5suGHK0b0OIbmwFSCuTA1sTaO/8VQ6/whj/bAW6fDmRF95fY+is8nZKFcCeiP19pAefyBRJ5eFZH+uuM7hJAGA0d2JwpU1rYpDjlQ45K35ggt60vyLGz0UXEYsejWUSeSwWj/7G0N0B30rbyweeYd3lnSKXc9Yr++UzMkEm3t4mYpBMIlKPfV8nikc8VFlms9exnv1jJsds0VQ4DSfQgxWEEwHOOtKsBjy8f3zsxLiYvlX1GQ2KAPj1szDONsKDirNxJbAbankJMTkT6ojTLDGBK0NGOaV40ZXWLCUDz2NAbancZaIjnUQbm83q2oOD4vLRza5wWaOS2xaQS30uj0DA191Aw/NLWbo+VqIw/jcjIcicBSwj4Mih3CYB+FDoOPYmwrc030xstAIbsgIRbbcso8/Y68oKZIyMaonISjzhTpD8J1PsHVMHQtFL0Wx7TQSVBXwG0FajgiKXh/cmNYU8UJeaPeF6PCvTT+3wc4awb33rPeqA==
+X-OriginatorOrg: ddn.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: ec8b80aa-0e60-496c-6eab-08dd8de54510
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 May 2025 04:03:20.1575 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: sLVR6ZnIP1/w7vEyjN34Cx1kFXVUS22UqL5rK15Pgr4cYjiLqN18WRrb64xsZUiX
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DS0PR19MB7791
+X-BESS-ID: 1746677008-102981-11754-37959-1
+X-BESS-VER: 2019.1_20250507.1658
+X-BESS-Apparent-Source-IP: 104.47.55.44
+X-BESS-Parts: H4sIAAAAAAACAzXLsQ6AIAwE0H/p7AANFeqvGIcCbVyMgwwmxn+XQZbL3SVvfU
+ DvBgu0nhOcFyw+Od/b3k/HiI7MKjIL1owp1KTRh2KlYFB4p+H3dvw+Eg6vDqPk2Uy9ZK
+ nEQqLMMWmfJRC82wfQI31PgQAAAA==
+X-BESS-Outbound-Spam-Score: 0.00
+X-BESS-Outbound-Spam-Report: Code version 3.2,
+ rules version 3.2.2.264441 [from 
+ cloudscan9-222.us-east-2a.ess.aws.cudaops.com]
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------
+ 0.00 HTML_MESSAGE           BODY: HTML included in message 
+ 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
+X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
+ KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND
+X-BESS-BRTS-Status: 1
+Subject: Re: [lustre-devel] new LND number reservation
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -79,305 +185,198 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============7619570289454798224=="
+Cc: =?utf-8?B?R3LDqWdvaXJlIFBpY2hvbg==?= <gregoire.pichon@eviden.com>,
+ "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============4611495536730911202=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7619570289454798224==
-Content-Type: multipart/alternative; boundary="00000000000064a3d60634804255"
+--===============4611495536730911202==
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_B6A23093EF2D4A4A902014765083FD34ddncom_"
 
---00000000000064a3d60634804255
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+--_000_B6A23093EF2D4A4A902014765083FD34ddncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Hi Andreas,
+T24gTWF5IDcsIDIwMjUsIGF0IDAyOjU4LCBTeWx2YWluIEdPVURFQVUgPHN5bHZhaW4uZ291ZGVh
+dUBldmlkZW4uY29tPiB3cm90ZToNCg0KVGhlcmUgaXMgdGhpcyBjb21tZW50IGluIEx1c3RyZSBz
+b3VyY2UgY29kZToNCg0KLyogUGxlYXNlIGVtYWlsIGFkaWxnZXJAd2hhbWNsb3VkLmNvbTxtYWls
+dG86YWRpbGdlckB3aGFtY2xvdWQuY29tPiBhbmQgbHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5v
+cmc8bWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPg0KICAqIHRvIHJlc2VydmUg
+bmV3IExORCBudW1iZXJzIGJlZm9yZSB0aGV5IGFyZSB1c2VkIGFueXdoZXJlLg0KDQpXZSBhcmUg
+c3RhcnRpbmcgdG8gd3JpdGUgYW4gTE5EIGZvciB0aGUgQlhJIDMgaW50ZXJjb25uZWN0IHdoaWNo
+IGlzIHVuZGVyIGRldmVsb3BtZW50IGluIG91ciBsYWJzLg0KQXMgZGlzY3Vzc2VkIHdpdGggIFBl
+dGVyIEpvbmVzLCB3ZSB3aWxsIHRyeSB0byBtYWtlIGl0IGF2YWlsYWJsZSBmb3IgTHVzdHJlIDIu
+MTcuDQoNCkN1cnJlbnRseSB0aGUgbmV4dCBhdmFpbGFibGUgc2xvdCBsb29rcyBsaWtlIG51bWJl
+ciAxOToNCg0KICAgICAgICBQVEw0TE5EICAgICAgICAgPSAxNSwgLyogQVRPUy9CdWxsIFBvcnRh
+bHMgNCBmb3IgQlhJICAgICAgICAgICovDQogICAgICAgIEtGSUxORCAgICAgICAgICA9IDE2LCAv
+KiBIUEUgS2VybmVsIEZhYnJpYyBJbnRlcmZhY2UgICAgICAgICAgKi8NCiAgICAgICAgVE9GVUxO
+RCAgICAgICAgID0gMTcsIC8qIEZ1aml0c3UgVG9ydXMgRnVzaW9uICAgICAgICAgICAgICAgICAg
+ICAgICovDQogICAgICAgIEVGQUxORCAgICAgICAgICA9IDE4LCAvKiBBbWF6b24gRWxhc3RpYyBG
+YWJyaWMgQWRhcHRlciAgKi8NCisgICAgICBCWEkzTE5EICAgICAgICAgPSAxOSwgLyogQnVsbCBC
+WEl2MyBGYWJyaWMgSW50ZXJmYWNlICAgICAgICAgICAgKi8NCg0KVGhhbmsgeW91IGZvciB5b3Vy
+IGVtYWlsLiAgVGhpcyBMTkQgbnVtYmVyIGlzIGF2YWlsYWJsZSwgcGxlYXNlIHN1Ym1pdCBhIHBh
+dGNoIG9uIG1hc3RlciB0byByZXNlcnZlIHRoaXMgbnVtYmVyLg0KDQpJdCB3b3VsZCBhbHNvIGJl
+IHByZWZlcnJlZCB0byB1cGRhdGUgbGliY2ZzX25ldHN0cmZuc1tdIHRvIGluY2x1ZGUgdGhlIExO
+RCBuYW1lLCBtb2R1bGUgbmFtZSwgYW5kIGZ1bmN0aW9ucyB0byBtYXAgdG8vZnJvbSB0aGUgTklE
+IHN0cmluZy4gIFRoYXQgaXMgZmFpcmx5IHN0cmFpZ2h0IGZvcndhcmQgaWYgYWRkcmVzc2VzIGFy
+ZSBudW1iZXJzIG9yIElQdjQvSVB2NiBhZGRyZXNzZXMuICBUaGlzIGFsbG93cyByb3V0aW5nIHRv
+L2Zyb20geW91ciBuZXR3b3JrIGV2ZW4gaWYgY2xpZW50cy9zZXJ2ZXJzIGRvIG5vdCBoYXZlIHRo
+ZSBCWEkzTE5EIGZ1bmN0aW9uYWxpdHkuDQoNCk91ciBjb21wYW55IGlzIHVuZGVyZ29pbmcgb3Jn
+YW5pemF0aW9uYWwgY2hhbmdlcyBzbyBtYXliZSB0aGVyZSB3aWxsIGJlIGFub3RoZXIgY29tcGFu
+eSBuYW1lIG5leHQgdG8gIkJ1bGwiLg0KDQpUaGF0IGlzIGZpbmUsIGl0IGRvZXNuJ3QgYWZmZWN0
+IGFueSBmdW5jdGlvbmFsaXR5Lg0KDQpJcyBpdCBPSyB0byByZXNlcnZlIHNsb3QgMTk/IE90aGVy
+d2lzZSBjb3VsZCB5b3UgcGxlYXNlIGluZGljYXRlIHRoZSBuZXh0IGF2YWlsYWJsZSBzbG90IG51
+bWJlciB0aGF0IGNhbiBiZSByZXNlcnZlZD8NCkRvbid0IGhlc2l0YXRlIHRvIGNvbnRhY3QgbWUg
+b3IgR3JlZ29pcmUgZm9yIGZ1cnRoZXIgaW5mb3JtYXRpb24sDQoNCkNoZWVycywgQW5kcmVhcw0K
+4oCUDQpBbmRyZWFzIERpbGdlcg0KTHVzdHJlIFByaW5jaXBhbCBBcmNoaXRlY3QNCldoYW1jbG91
+ZC9ERE4NCg0KDQoNCg0K
 
-Could you or Simmons send me an invitation to this channel?
-https://lustreupstreamclient.slack.com/messages/CAV4QF0ER/
-An invitation from the workspace admin is required (James Simmons)
+--_000_B6A23093EF2D4A4A902014765083FD34ddncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <8883242DFCD695439EB0132CC2CA2E72@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: base64
 
-I have a question about how to retrieve data from /proc.
-And I'd like to clarify the behavior of "lfs df --stats".
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IHN0eWxlPSJvdmVyZmxv
+dy13cmFwOiBicmVhay13b3JkOyAtd2Via2l0LW5ic3AtbW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6
+IGFmdGVyLXdoaXRlLXNwYWNlOyI+DQpPbiBNYXkgNywgMjAyNSwgYXQgMDI6NTgsIFN5bHZhaW4g
+R09VREVBVSAmbHQ7c3lsdmFpbi5nb3VkZWF1QGV2aWRlbi5jb20mZ3Q7IHdyb3RlOjxicj4NCjxk
+aXY+DQo8YmxvY2txdW90ZSB0eXBlPSJjaXRlIj48YnI+DQo8ZGl2Pg0KPGRpdiBzdHlsZT0iY2Fy
+ZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1mYW1pbHk6IEhlbHZldGljYTsgZm9udC1zaXpl
+OiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7IGZv
+bnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0
+OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6IG5v
+cm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDsg
+dGV4dC1kZWNvcmF0aW9uOiBub25lOyI+DQo8ZGl2IGNsYXNzPSJlbGVtZW50VG9Qcm9vZiIgc3R5
+bGU9ImZvbnQtZmFtaWx5OiBBcHRvcywgQXB0b3NfRW1iZWRkZWRGb250LCBBcHRvc19NU0ZvbnRT
+ZXJ2aWNlLCBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTFwdDsi
+Pg0KVGhlcmUgaXMgdGhpcyBjb21tZW50IGluIEx1c3RyZSBzb3VyY2UgY29kZTo8L2Rpdj4NCjxk
+aXYgY2xhc3M9ImVsZW1lbnRUb1Byb29mIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFwdG9zLCBBcHRv
+c19FbWJlZGRlZEZvbnQsIEFwdG9zX01TRm9udFNlcnZpY2UsIENhbGlicmksIEhlbHZldGljYSwg
+c2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMXB0OyI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgY2xhc3M9
+ImVsZW1lbnRUb1Byb29mIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFwdG9zLCBBcHRvc19FbWJlZGRl
+ZEZvbnQsIEFwdG9zX01TRm9udFNlcnZpY2UsIENhbGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJp
+ZjsgZm9udC1zaXplOiAxMXB0OyI+DQovKiBQbGVhc2UgZW1haWw8c3BhbiBjbGFzcz0iQXBwbGUt
+Y29udmVydGVkLXNwYWNlIj4mbmJzcDs8L3NwYW4+PGEgaHJlZj0ibWFpbHRvOmFkaWxnZXJAd2hh
+bWNsb3VkLmNvbSI+YWRpbGdlckB3aGFtY2xvdWQuY29tPC9hPjxzcGFuIGNsYXNzPSJBcHBsZS1j
+b252ZXJ0ZWQtc3BhY2UiPiZuYnNwOzwvc3Bhbj5hbmQ8c3BhbiBjbGFzcz0iQXBwbGUtY29udmVy
+dGVkLXNwYWNlIj4mbmJzcDs8L3NwYW4+PGEgaHJlZj0ibWFpbHRvOmx1c3RyZS1kZXZlbEBsaXN0
+cy5sdXN0cmUub3JnIj5sdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZzwvYT48YnI+DQombmJz
+cDsgKiB0byByZXNlcnZlIG5ldyBMTkQgbnVtYmVycyBiZWZvcmUgdGhleSBhcmUgdXNlZCBhbnl3
+aGVyZS48L2Rpdj4NCjxkaXYgY2xhc3M9ImVsZW1lbnRUb1Byb29mIiBzdHlsZT0iZm9udC1mYW1p
+bHk6IEFwdG9zLCBBcHRvc19FbWJlZGRlZEZvbnQsIEFwdG9zX01TRm9udFNlcnZpY2UsIENhbGli
+cmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMXB0OyI+DQo8YnI+DQo8L2Rp
+dj4NCjxkaXYgY2xhc3M9ImVsZW1lbnRUb1Byb29mIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFwdG9z
+LCBBcHRvc19FbWJlZGRlZEZvbnQsIEFwdG9zX01TRm9udFNlcnZpY2UsIENhbGlicmksIEhlbHZl
+dGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMXB0OyI+DQpXZSBhcmUgc3RhcnRpbmcgdG8g
+d3JpdGUgYW4gTE5EIGZvciB0aGUgQlhJIDMgaW50ZXJjb25uZWN0IHdoaWNoIGlzIHVuZGVyIGRl
+dmVsb3BtZW50IGluIG91ciBsYWJzLjwvZGl2Pg0KPGRpdiBjbGFzcz0iZWxlbWVudFRvUHJvb2Yi
+IHN0eWxlPSJmb250LWZhbWlseTogQXB0b3MsIEFwdG9zX0VtYmVkZGVkRm9udCwgQXB0b3NfTVNG
+b250U2VydmljZSwgQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEx
+cHQ7Ij4NCkFzIGRpc2N1c3NlZCB3aXRoJm5ic3A7IFBldGVyIEpvbmVzLCB3ZSB3aWxsIHRyeSB0
+byBtYWtlIGl0IGF2YWlsYWJsZSBmb3IgTHVzdHJlIDIuMTcuPC9kaXY+DQo8ZGl2IGNsYXNzPSJl
+bGVtZW50VG9Qcm9vZiIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcHRvcywgQXB0b3NfRW1iZWRkZWRG
+b250LCBBcHRvc19NU0ZvbnRTZXJ2aWNlLCBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7
+IGZvbnQtc2l6ZTogMTFwdDsiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IGNsYXNzPSJlbGVtZW50VG9Q
+cm9vZiIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcHRvcywgQXB0b3NfRW1iZWRkZWRGb250LCBBcHRv
+c19NU0ZvbnRTZXJ2aWNlLCBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6
+ZTogMTFwdDsiPg0KQ3VycmVudGx5IHRoZSBuZXh0IGF2YWlsYWJsZSBzbG90IGxvb2tzIGxpa2Ug
+bnVtYmVyIDE5OjwvZGl2Pg0KPGRpdiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiIHN0eWxlPSJmb250
+LWZhbWlseTogQXB0b3MsIEFwdG9zX0VtYmVkZGVkRm9udCwgQXB0b3NfTVNGb250U2VydmljZSwg
+Q2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDExcHQ7Ij4NCjxicj4N
+CjwvZGl2Pg0KPGRpdiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiIHN0eWxlPSJmb250LWZhbWlseTog
+QXB0b3MsIEFwdG9zX0VtYmVkZGVkRm9udCwgQXB0b3NfTVNGb250U2VydmljZSwgQ2FsaWJyaSwg
+SGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDExcHQ7Ij4NCiZuYnNwOyAmbmJzcDsg
+Jm5ic3A7ICZuYnNwOyBQVEw0TE5EICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyA9IDE1LCAv
+KiBBVE9TL0J1bGwgUG9ydGFscyA0IGZvciBCWEkgJm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7
+ICZuYnNwOyovPC9kaXY+DQo8ZGl2IGNsYXNzPSJlbGVtZW50VG9Qcm9vZiIgc3R5bGU9ImZvbnQt
+ZmFtaWx5OiBBcHRvcywgQXB0b3NfRW1iZWRkZWRGb250LCBBcHRvc19NU0ZvbnRTZXJ2aWNlLCBD
+YWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTFwdDsiPg0KJm5ic3A7
+ICZuYnNwOyAmbmJzcDsgJm5ic3A7IEtGSUxORCAmbmJzcDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsg
+Jm5ic3A7PSAxNiwgLyogSFBFIEtlcm5lbCBGYWJyaWMgSW50ZXJmYWNlICZuYnNwOyAmbmJzcDsg
+Jm5ic3A7ICZuYnNwOyAmbmJzcDsqLzwvZGl2Pg0KPGRpdiBjbGFzcz0iZWxlbWVudFRvUHJvb2Yi
+IHN0eWxlPSJmb250LWZhbWlseTogQXB0b3MsIEFwdG9zX0VtYmVkZGVkRm9udCwgQXB0b3NfTVNG
+b250U2VydmljZSwgQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEx
+cHQ7Ij4NCiZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyBUT0ZVTE5EICZuYnNwOyAmbmJzcDsg
+Jm5ic3A7ICZuYnNwOyA9IDE3LCAvKiBGdWppdHN1IFRvcnVzIEZ1c2lvbiZuYnNwOyAmbmJzcDsg
+Jm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyAm
+bmJzcDsgKi88L2Rpdj4NCjxkaXYgY2xhc3M9ImVsZW1lbnRUb1Byb29mIiBzdHlsZT0iZm9udC1m
+YW1pbHk6IEFwdG9zLCBBcHRvc19FbWJlZGRlZEZvbnQsIEFwdG9zX01TRm9udFNlcnZpY2UsIENh
+bGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMXB0OyI+DQombmJzcDsg
+Jm5ic3A7ICZuYnNwOyAmbmJzcDsgRUZBTE5EICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyAm
+bmJzcDs9IDE4LCAvKiBBbWF6b24gRWxhc3RpYyBGYWJyaWMgQWRhcHRlciZuYnNwOyAqLzwvZGl2
+Pg0KPGRpdiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiIHN0eWxlPSJmb250LWZhbWlseTogQXB0b3Ms
+IEFwdG9zX0VtYmVkZGVkRm9udCwgQXB0b3NfTVNGb250U2VydmljZSwgQ2FsaWJyaSwgSGVsdmV0
+aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDExcHQ7Ij4NCismbmJzcDsgJm5ic3A7ICZuYnNw
+OyBCWEkzTE5EICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyA9IDE5LCAvKiBCdWxsIEJYSXYz
+IEZhYnJpYyBJbnRlcmZhY2UmbmJzcDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNw
+OyAqLzwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvYmxvY2txdW90ZT4NCjxkaXY+PGJyPg0KPC9k
+aXY+DQpUaGFuayB5b3UgZm9yIHlvdXIgZW1haWwuICZuYnNwO1RoaXMgTE5EIG51bWJlciBpcyBh
+dmFpbGFibGUsIHBsZWFzZSBzdWJtaXQgYSBwYXRjaCBvbiBtYXN0ZXIgdG8gcmVzZXJ2ZSB0aGlz
+IG51bWJlci48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2Pkl0IHdvdWxkIGFsc28gYmUg
+cHJlZmVycmVkIHRvIHVwZGF0ZSZuYnNwOzxzcGFuIHN0eWxlPSJjb2xvcjogcmdiKDE2LCAxNiwg
+MTYpOyBmb250LWZhbWlseTogTWVubG87IGZvbnQtc2l6ZTogMTJweDsgYmFja2dyb3VuZC1jb2xv
+cjogcmdiYSgyNTUsIDI1NSwgMjU1LCAwLjg3KTsiPmxpYmNmc19uZXRzdHJmbnNbXTwvc3Bhbj4m
+bmJzcDt0byBpbmNsdWRlIHRoZSZuYnNwOzxzcGFuIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAs
+IDAsIDApOyBjb2xvcjogcmdiKDAsIDAsIDApOyI+TE5EDQogbmFtZSwgbW9kdWxlIG5hbWUsIGFu
+ZCBmdW5jdGlvbnMgdG8gbWFwIHRvL2Zyb20gdGhlIE5JRCBzdHJpbmcuICZuYnNwO1RoYXQgaXMg
+ZmFpcmx5IHN0cmFpZ2h0IGZvcndhcmQgaWYgYWRkcmVzc2VzIGFyZSBudW1iZXJzIG9yIElQdjQv
+SVB2NiBhZGRyZXNzZXMuICZuYnNwO1RoaXMgYWxsb3dzIHJvdXRpbmcgdG8vZnJvbSB5b3VyIG5l
+dHdvcmsgZXZlbiBpZiBjbGllbnRzL3NlcnZlcnMgZG8gbm90IGhhdmUgdGhlIEJYSTNMTkQgZnVu
+Y3Rpb25hbGl0eS48L3NwYW4+PGJyPg0KPGJyPg0KPGJsb2NrcXVvdGUgdHlwZT0iY2l0ZSI+DQo8
+ZGl2Pg0KPGRpdiBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1mYW1pbHk6
+IEhlbHZldGljYTsgZm9udC1zaXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFy
+aWFudC1jYXBzOiBub3JtYWw7IGZvbnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3Jt
+YWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTog
+bm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4
+dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyI+DQo8ZGl2IGNsYXNz
+PSJlbGVtZW50VG9Qcm9vZiIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcHRvcywgQXB0b3NfRW1iZWRk
+ZWRGb250LCBBcHRvc19NU0ZvbnRTZXJ2aWNlLCBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2Vy
+aWY7IGZvbnQtc2l6ZTogMTFwdDsiPg0KT3VyIGNvbXBhbnkgaXMgdW5kZXJnb2luZyBvcmdhbml6
+YXRpb25hbCBjaGFuZ2VzIHNvIG1heWJlIHRoZXJlIHdpbGwgYmUgYW5vdGhlciBjb21wYW55IG5h
+bWUgbmV4dCB0byAmcXVvdDtCdWxsJnF1b3Q7LjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvYmxv
+Y2txdW90ZT4NCjxkaXY+PGJyPg0KPC9kaXY+DQpUaGF0IGlzIGZpbmUsIGl0IGRvZXNuJ3QgYWZm
+ZWN0IGFueSBmdW5jdGlvbmFsaXR5LjwvZGl2Pg0KPGRpdj48YnI+DQo8YmxvY2txdW90ZSB0eXBl
+PSJjaXRlIj4NCjxkaXYgc3R5bGU9ImNhcmV0LWNvbG9yOiByZ2IoMCwgMCwgMCk7IGZvbnQtZmFt
+aWx5OiBIZWx2ZXRpY2E7IGZvbnQtc2l6ZTogMTRweDsgZm9udC1zdHlsZTogbm9ybWFsOyBmb250
+LXZhcmlhbnQtY2Fwczogbm9ybWFsOyBmb250LXdlaWdodDogNDAwOyBsZXR0ZXItc3BhY2luZzog
+bm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zv
+cm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0
+LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQtZGVjb3JhdGlvbjogbm9uZTsiPg0KPGRpdiBj
+bGFzcz0iZWxlbWVudFRvUHJvb2YiIHN0eWxlPSJmb250LWZhbWlseTogQXB0b3MsIEFwdG9zX0Vt
+YmVkZGVkRm9udCwgQXB0b3NfTVNGb250U2VydmljZSwgQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5z
+LXNlcmlmOyBmb250LXNpemU6IDExcHQ7Ij4NCklzIGl0IE9LIHRvIHJlc2VydmUgc2xvdCAxOT8g
+T3RoZXJ3aXNlIGNvdWxkIHlvdSBwbGVhc2UgaW5kaWNhdGUgdGhlIG5leHQgYXZhaWxhYmxlIHNs
+b3QgbnVtYmVyIHRoYXQgY2FuIGJlIHJlc2VydmVkPyZuYnNwOzwvZGl2Pg0KPGRpdiBjbGFzcz0i
+ZWxlbWVudFRvUHJvb2YiIHN0eWxlPSJmb250LWZhbWlseTogQXB0b3MsIEFwdG9zX0VtYmVkZGVk
+Rm9udCwgQXB0b3NfTVNGb250U2VydmljZSwgQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlm
+OyBmb250LXNpemU6IDExcHQ7Ij4NCkRvbid0IGhlc2l0YXRlIHRvIGNvbnRhY3QgbWUgb3IgR3Jl
+Z29pcmUgZm9yIGZ1cnRoZXIgaW5mb3JtYXRpb24sPC9kaXY+DQo8L2Rpdj4NCjwvYmxvY2txdW90
+ZT4NCjwvZGl2Pg0KPGJyPg0KPGRpdj4NCjxkaXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29s
+b3I6IHJnYigwLCAwLCAwKTsgY29sb3I6IHJnYigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5v
+cm1hbDsgdGV4dC1hbGlnbjogc3RhcnQ7IHRleHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3Jt
+OiBub25lOyB3aGl0ZS1zcGFjZTogbm9ybWFsOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10
+ZXh0LXN0cm9rZS13aWR0aDogMHB4OyB0ZXh0LWRlY29yYXRpb246IG5vbmU7IG92ZXJmbG93LXdy
+YXA6IGJyZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0
+ZXItd2hpdGUtc3BhY2U7Ij4NCjxkaXYgZGlyPSJhdXRvIiBzdHlsZT0iY2FyZXQtY29sb3I6IHJn
+YigwLCAwLCAwKTsgY29sb3I6IHJnYigwLCAwLCAwKTsgbGV0dGVyLXNwYWNpbmc6IG5vcm1hbDsg
+dGV4dC1hbGlnbjogc3RhcnQ7IHRleHQtaW5kZW50OiAwcHg7IHRleHQtdHJhbnNmb3JtOiBub25l
+OyB3aGl0ZS1zcGFjZTogbm9ybWFsOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtpdC10ZXh0LXN0
+cm9rZS13aWR0aDogMHB4OyB0ZXh0LWRlY29yYXRpb246IG5vbmU7IG92ZXJmbG93LXdyYXA6IGJy
+ZWFrLXdvcmQ7IC13ZWJraXQtbmJzcC1tb2RlOiBzcGFjZTsgbGluZS1icmVhazogYWZ0ZXItd2hp
+dGUtc3BhY2U7Ij4NCjxkaXY+Q2hlZXJzLCBBbmRyZWFzPC9kaXY+DQo8ZGl2PuKAlDwvZGl2Pg0K
+PGRpdj5BbmRyZWFzIERpbGdlcjwvZGl2Pg0KPGRpdj5MdXN0cmUgUHJpbmNpcGFsIEFyY2hpdGVj
+dDwvZGl2Pg0KPGRpdj5XaGFtY2xvdWQvREROPC9kaXY+DQo8L2Rpdj4NCjxiciBjbGFzcz0iQXBw
+bGUtaW50ZXJjaGFuZ2UtbmV3bGluZSI+DQo8L2Rpdj4NCjxiciBjbGFzcz0iQXBwbGUtaW50ZXJj
+aGFuZ2UtbmV3bGluZSI+DQo8YnIgY2xhc3M9IkFwcGxlLWludGVyY2hhbmdlLW5ld2xpbmUiPg0K
+PC9kaXY+DQo8YnI+DQo8L2JvZHk+DQo8L2h0bWw+DQo=
 
-Thanks,
-George
+--_000_B6A23093EF2D4A4A902014765083FD34ddncom_--
 
-On Thu, May 1, 2025 at 1:52=E2=80=AFAM Andreas Dilger <adilger@ddn.com> wro=
-te:
-
-> There is a Slack channel, which is linked from wiki.lustre.org "lists"
-> page that you can use for simple discussions. Email is probably better fo=
-r
-> complex questions.
->
-> Cheers, Andreas
->
-> On Apr 30, 2025, at 20:18, GEORGE ZHAO <georgezhaojobs@gmail.com> wrote:
->
-> =EF=BB=BF
-> Thank you, Andreas!
-> I'm currently looking into LU-7880. Will follow up if I have an
-> implementation plan or run into any questions (quite likely).
->
-> By the way, should I reach out to the lustre-devel for questions like
-> this, or is there a more specific channel?
->
-> Thanks!
-> George
->
-> On Wed, Apr 30, 2025 at 4:44=E2=80=AFAM Andreas Dilger <adilger@ddn.com> =
-wrote:
->
->> Hi George,
->> thanks for your interest.  There are definitely a number of open tickets
->> in the "easy" (and "medium") categories that you could work on, though
->> there have been a number of interns and new hires working on those ticke=
-ts
->> recently and fewer are now available.
->>
->> LU-1643 happens to be the oldest "easy" ticket, but don't let that guide
->> your selection.  I would suggest you take a look through the whole list =
-and
->> pick something that is of interest to you and/or matches your experience
->> level.
->>
->> - LU-16738 <https://jira.whamcloud.com/browse/LU-16738> - Improve
->> mount.lustre with many MGS NIDs
->> <https://jira.whamcloud.com/browse/LU-16738>: this is partly a userspace
->> (mount.lustre) change and partly in the kernel (though not incredibly
->> complex).  This is actually in the "useful" category that provides impro=
-ved
->> functionality for something that is seen regularly.
->>
->>
->> If you are feeling more adventurous, you might look at one of the
->> "medium" tickets, which may not be too difficult:
->> - LU-7880 <https://jira.whamcloud.com/browse/LU-7880> - add OST/MDT
->> performance statistics to obd_statfs
->> <https://jira.whamcloud.com/browse/LU-7880>:  this is a very useful
->> feature that would allow clients/user applications to probe the IO load =
-on
->> OSTs, and self-optimize checkpoint IO to times when the OSTs are less bu=
-sy
->> - LU-13123 <https://jira.whamcloud.com/browse/LU-13123> - Add list of
->> client NIDs to job_stats output
->> <https://jira.whamcloud.com/browse/LU-13123>: this would associate all
->> of the clients that are contributing to the job_stats for a specific Job=
-ID,
->> and would be useful for debugging and monitoring/
->>
->> On Apr 29, 2025, at 17:41, GEORGE ZHAO <georgezhaojobs@gmail.com> wrote:
->>
->>
->> I'm a storage engineer and a Lustre beginner who just figured out how to
->> deploy it. Did read a lot about it though.
->> My goal is using Lustre to support HPC/ML workload. And I believe doing
->> some tasks would help me proceed better.
->>
->> As wiki suggested, I found an "easy" ticket LU-1643: =E2=80=9CRequest to=
- remove
->> display of reserved space from statfs (df) total space.=E2=80=9D
->> Is it still unclaimed?
->> If it's already in progress, or there's a higher priority issue that
->> could use help, please point me in the right direction.
->>
->> Thanks in advance for any advice.
->>
->> Best regards,
->> George
->> _______________________________________________
->> lustre-devel mailing list
->> lustre-devel@lists.lustre.org
->> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->>
->>
->> Cheers, Andreas
->> =E2=80=94
->> Andreas Dilger
->> Lustre Principal Architect
->> Whamcloud/DDN
->>
->>
->>
->>
->>
-
---00000000000064a3d60634804255
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">Hi Andreas,<div><br></div><div><div>Could you or Simmons s=
-end me an invitation=C2=A0to this channel?</div><div><a href=3D"https://lus=
-treupstreamclient.slack.com/messages/CAV4QF0ER/">https://lustreupstreamclie=
-nt.slack.com/messages/CAV4QF0ER/</a><br>An invitation from the workspace ad=
-min is required (James Simmons)</div><div><br></div><div>I have a question=
-=C2=A0about how to retrieve=C2=A0data from /proc.</div><div>And I&#39;d lik=
-e to clarify the behavior of &quot;lfs df --stats&quot;.</div><div><br></di=
-v><div>Thanks,</div><div>George</div></div></div><br><div class=3D"gmail_qu=
-ote gmail_quote_container"><div dir=3D"ltr" class=3D"gmail_attr">On Thu, Ma=
-y 1, 2025 at 1:52=E2=80=AFAM Andreas Dilger &lt;<a href=3D"mailto:adilger@d=
-dn.com">adilger@ddn.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_=
-quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,=
-204);padding-left:1ex">
-
-
-
-<div dir=3D"auto">
-There is a Slack channel, which is linked from <a href=3D"http://wiki.lustr=
-e.org" target=3D"_blank">wiki.lustre.org</a> &quot;lists&quot; page that yo=
-u can use for simple discussions. Email is probably better for complex ques=
-tions.=C2=A0
-<div><br id=3D"m_-4661364368212878897lineBreakAtBeginningOfSignature">
-<div dir=3D"ltr">Cheers, Andreas</div>
-<div dir=3D"ltr"><br>
-<blockquote type=3D"cite">On Apr 30, 2025, at 20:18, GEORGE ZHAO &lt;<a hre=
-f=3D"mailto:georgezhaojobs@gmail.com" target=3D"_blank">georgezhaojobs@gmai=
-l.com</a>&gt; wrote:<br>
-<br>
-</blockquote>
-</div>
-<blockquote type=3D"cite">
-<div dir=3D"ltr">=EF=BB=BF
-<div dir=3D"ltr">
-<div dir=3D"ltr">Thank you, Andreas!<br>
-I&#39;m currently looking into LU-7880. Will follow up if I have an impleme=
-ntation plan or run into any questions (quite likely).<br>
-<br>
-By the way, should I reach out to the lustre-devel for questions like this,=
- or is there a more specific channel?<br>
-<div><br>
-</div>
-<div>Thanks!</div>
-<div>George</div>
-</div>
-<br>
-<div class=3D"gmail_quote">
-<div dir=3D"ltr" class=3D"gmail_attr">On Wed, Apr 30, 2025 at 4:44=E2=80=AF=
-AM Andreas Dilger &lt;<a href=3D"mailto:adilger@ddn.com" target=3D"_blank">=
-adilger@ddn.com</a>&gt; wrote:<br>
-</div>
-<blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-=
-left:1px solid rgb(204,204,204);padding-left:1ex">
-<div>Hi George,
-<div>thanks for your interest.=C2=A0 There are definitely a number of open =
-tickets in the &quot;easy&quot; (and &quot;medium&quot;) categories that yo=
-u could work on, though there have been a number of interns and new hires w=
-orking on those tickets recently and fewer are now available.</div>
-<div><br>
-</div>
-<div>LU-1643 happens to be the oldest &quot;easy&quot; ticket, but don&#39;=
-t let that guide your selection.=C2=A0 I would suggest you take a look thro=
-ugh the whole list and pick something that is of interest to you and/or mat=
-ches your experience level.</div>
-<div><br>
-</div>
-<div>-=C2=A0<a href=3D"https://jira.whamcloud.com/browse/LU-16738" id=3D"m_=
--4661364368212878897m_1429994837881312626key-val" rel=3D"75582" target=3D"_=
-blank">LU-16738</a>=C2=A0-=C2=A0<a href=3D"https://jira.whamcloud.com/brows=
-e/LU-16738" target=3D"_blank">Improve mount.lustre with many MGS NIDs</a>: =
-this is
- partly a userspace (mount.lustre) change and partly in the kernel (though =
-not incredibly complex).=C2=A0 This is actually in the &quot;useful&quot; c=
-ategory that provides improved functionality for something that is seen reg=
-ularly.</div>
-<div><br>
-</div>
-<div><br>
-</div>
-<div>If you are feeling more adventurous, you might look at one of the &quo=
-t;medium&quot; tickets, which may not be too difficult:</div>
-<div>-=C2=A0<a href=3D"https://jira.whamcloud.com/browse/LU-7880" target=3D=
-"_blank">LU-7880</a>=C2=A0-=C2=A0<a href=3D"https://jira.whamcloud.com/brow=
-se/LU-7880" target=3D"_blank">add OST/MDT performance statistics to obd_sta=
-tfs</a>: =C2=A0this is a very useful feature that would allow
- clients/user applications to probe the IO load on OSTs, and self-optimize =
-checkpoint IO to times when the OSTs are less busy</div>
-<div>-=C2=A0<a href=3D"https://jira.whamcloud.com/browse/LU-13123" target=
-=3D"_blank">LU-13123</a>=C2=A0-=C2=A0<a href=3D"https://jira.whamcloud.com/=
-browse/LU-13123" target=3D"_blank">Add list of client NIDs to job_stats out=
-put</a>: this would associate all of the clients that are
- contributing to the job_stats for a specific JobID, and would be useful fo=
-r debugging and monitoring/<br id=3D"m_-4661364368212878897m_14299948378813=
-12626lineBreakAtBeginningOfMessage">
-<div><br>
-<div>
-<div>On Apr 29, 2025, at 17:41, GEORGE ZHAO &lt;<a href=3D"mailto:georgezha=
-ojobs@gmail.com" target=3D"_blank">georgezhaojobs@gmail.com</a>&gt; wrote:<=
-/div>
-</div>
-<blockquote type=3D"cite">
-<div>
-<div>
-<div>
-<div dir=3D"ltr">
-<div><br>
-</div>
-<div>I&#39;m a storage engineer and a Lustre=C2=A0beginner who just figured=
- out how to deploy it. Did read a lot about it though.</div>
-<div>My goal is using Lustre to support=C2=A0HPC/ML workload. And I believe=
- doing some tasks would help me proceed better.</div>
-<div><br>
-</div>
-<div>As wiki suggested, I found an &quot;easy&quot; ticket LU-1643: =E2=80=
-=9CRequest to remove display of reserved space from statfs (df) total space=
-.=E2=80=9D</div>
-<div>Is it still unclaimed?=C2=A0</div>
-<div>If it&#39;s already in progress, or there&#39;s a higher priority issu=
-e that could use help, please point me in the right direction.</div>
-<div><br>
-</div>
-<div>Thanks in advance for any advice.<br>
-<br>
-Best regards,</div>
-<div>George</div>
-</div>
-</div>
-</div>
-_______________________________________________<br>
-lustre-devel mailing list<br>
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
-rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
-g</a><br>
-</div>
-</blockquote>
-</div>
-<br>
-<div>
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div dir=3D"auto" style=3D"color:rgb(0,0,0);letter-spacing:normal;text-alig=
-n:start;text-indent:0px;text-transform:none;white-space:normal;word-spacing=
-:0px;text-decoration:none">
-<div>Cheers, Andreas</div>
-<div>=E2=80=94</div>
-<div>Andreas Dilger</div>
-<div>Lustre Principal Architect</div>
-<div>Whamcloud/DDN</div>
-</div>
-<br>
-</div>
-<br>
-<br>
-</div>
-<br>
-</div>
-</div>
-</blockquote>
-</div>
-</div>
-</div>
-</blockquote>
-</div>
-</div>
-
-</blockquote></div>
-
---00000000000064a3d60634804255--
-
---===============7619570289454798224==
+--===============4611495536730911202==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -388,4 +387,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============7619570289454798224==--
+--===============4611495536730911202==--
