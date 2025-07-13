@@ -4,151 +4,164 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 8423CC83F09
-	for <lustre-devel@archiver.kernel.org>; Wed,  9 Jul 2025 13:51:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E185DC83F1D
+	for <lustre-devel@archiver.kernel.org>; Sun, 13 Jul 2025 00:09:44 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4bcfWR47b9z1xPT;
-	Wed, 09 Jul 2025 06:50:43 -0700 (PDT)
-Received: from outbound-ip168a.ess.barracuda.com
- (outbound-ip168a.ess.barracuda.com [209.222.82.36])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4bfm614YDwz1xgn;
+	Sat, 12 Jul 2025 17:09:29 -0700 (PDT)
+Received: from outbound-ip191a.ess.barracuda.com
+ (outbound-ip191a.ess.barracuda.com [209.222.82.58])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4bcfWP10MTz1wLS
- for <lustre-devel@lists.lustre.org>; Wed, 09 Jul 2025 06:50:41 -0700 (PDT)
-Received: from NAM12-BN8-obe.outbound.protection.outlook.com
- (mail-bn8nam12on2124.outbound.protection.outlook.com [40.107.237.124]) by
- mx-outbound13-172.us-east-2a.ess.aws.cudaops.com (version=TLSv1.2
+ 4bfm5h5mPhz1wnQ
+ for <lustre-devel@lists.lustre.org>; Sat, 12 Jul 2025 17:09:12 -0700 (PDT)
+Received: from NAM12-DM6-obe.outbound.protection.outlook.com
+ (mail-dm6nam12on2092.outbound.protection.outlook.com [40.107.243.92]) by
+ mx-outbound43-204.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
  cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Wed, 09 Jul 2025 13:50:38 +0000
+ Sun, 13 Jul 2025 00:09:08 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=xv0i15MJ387On9nQtOvra+210IKGIish09yFH0LW5c0jd76M/ZyEXZKNTPXms5bfPe4TO6zq4YnIOOB+q5Gzdj7vGUh+7s9CnuId+5Z+JYX19eHZwOPEqCgckzxWbMVKEksA++idcFEYlMqZ9P+3buPaZeGjHg6O3GsIWd7AjfibKBmXTw2hBki86zVtifPr+OsfrscFoNfhgXuxvPRPlUBfLcyV4Hs5/laLnjlQf/dbXdeJrvLLpClXPCjJrDgeF07y3Ta10bCXkHRaultECgmA+4rnepI7VcXzYj8HyrRRh5BHPxtIu7SVdeA1xLmpz00YEkjPi8m2pUkED6V54A==
+ b=XE1GL+9fxcJ2jSkr/LF92cTCq2D1rxlbMQxdKpcOXZu+S8InEYBoYeJ2dQ4SdKMmP83V/IuZgr6BjHnh2bdNAeuuKQ1cuTwOgE8vZNFw1mZweP9HRnzjH+8Ay+P1RYXf+fIFQm1qSF/mrfEMzRZd1y/Dny62SN0GfJx+FcBiX2cxrPkjUrEoYVm5/zQYVQkcLOKHW4yUhMcFMse+XE75asz34AELMcaRjL7g+lrr0a8U11+GuT1AeiTk5c2+es+ImwuYogLRAoWp9Jofnh8ndMQFCQm+ZorBizYLsor57Pvm1V0o2WWDCVPfptmvPlkTviyn6Sz4c0HcO5Wm+khW7g==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=YmLEqer2CYmNCqvRMmuq3iWtBaT8IypL9v9SZMjLzYY=;
- b=autE73IqGgLpDcCIMXN8RI2pRcaFfpQ/Tj2E00UUusDVxWlAUCIiXIxqOcXzvMhCh8rX99a0X/RxRirPw+4MMolA+BtIyQMKzpaS9q406uC0I6OaIjn6t4/YuCWOZLpA8gtn9cUhf2YlDVPR/FnqBsq8b/tUr6O9q3/sbmHVF0iR7/isI6RPDehbU9Qn6gihwzpy3XVcIn/NWsv0jSXVBot4n7GjIxhMMJNDwNE87R1VlXHtK68U1ZaXUiyNh3zKQvPKygnls4at2Vwx5tk9AEuHKkr2EDT5LqfyMTJ5Z0mCQLoeGECl+5Wk9XljqKOj4sFaOPFAx6OpTJo+jSc2Dg==
+ bh=b5FurzKwLyZkR1yLPgRtbwCj4NytuiNAifqZHTpuwfU=;
+ b=FmwzA8Bv/wATM5nokEzFykJFgki0/DJBlZhXsYjjHRzkpPLTRgHkc2HU6Wvhw+fQNnfoteJGigp83oDQEYLhocBQA9riXh4Opj19HIvpuL2aLbPjksK+f4UdsFQQpjzErcLM1lOTvZRTWcokkbfpM28j7TwLPXdtNJBeQ5OdBgqEA23nzJYQiDduEdWQUKkLTF6hcRG/oHxDFFIl4mHcYOFlrGvykPR72hTgV0ZtLTItIKDRSoqKePZFgmMTJDP2uzFT6Egw1W1bGeljL7R3jRmH8x44Omy+FgA4ovKxZ29b+enlv5QjlS6MbuBUSXE6gkVfEvf/sj3iT6M/pK1lbw==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
  smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
  header.d=ddn.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=YmLEqer2CYmNCqvRMmuq3iWtBaT8IypL9v9SZMjLzYY=;
- b=R4w5+fKfZCJ1P19rC4XzJAppCmBUWVu5eHtTa74NA1UhztAOvSmVj5cooem2049dB5HOomlRCfjdYYoM8USwXgSLVS/D+intyRFlkWS7v5kJbgw/7NGQS6jTS4RUIVaOm/0R5/7WlM0B0ZtQ/l2C5Vzb59+6q0BNS8KrcsZWqCQ=
+ bh=b5FurzKwLyZkR1yLPgRtbwCj4NytuiNAifqZHTpuwfU=;
+ b=WEqouzTMeFRk3RzFhvme5ZkJAPCJm449AaBkHbiXETJcdzyqr1NihxDeXS731ABgiuIzITXiKz/v7tceyA8wZvQANjIw7yysGj2M1ZRHiW17FwsJCJ/WYu+I4KkuYyCVwcowSjTuFa4tuG0a16b0JJd61XH2bW46Cc4imIKMwm0=
 Received: from LV2PR19MB5717.namprd19.prod.outlook.com (2603:10b6:408:17e::15)
- by DS0PR19MB6504.namprd19.prod.outlook.com (2603:10b6:8:c8::17) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8922.20; Wed, 9 Jul
- 2025 13:50:34 +0000
+ by BL1PPF0F914ABD7.namprd19.prod.outlook.com
+ (2603:10b6:20f:fc04::e87) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8901.15; Sun, 13 Jul
+ 2025 00:09:03 +0000
 Received: from LV2PR19MB5717.namprd19.prod.outlook.com
  ([fe80::f07f:2f11:4f86:d70b]) by LV2PR19MB5717.namprd19.prod.outlook.com
- ([fe80::f07f:2f11:4f86:d70b%7]) with mapi id 15.20.8922.017; Wed, 9 Jul 2025
- 13:50:34 +0000
+ ([fe80::f07f:2f11:4f86:d70b%7]) with mapi id 15.20.8922.023; Sun, 13 Jul 2025
+ 00:09:03 +0000
 To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, Whamcloud
  - All Staff <all.staff@whamcloud.com>
 Thread-Topic: Whamcloud Gerrit downtime notification
-Thread-Index: AQHb6hheWWYbjty+UEWybPB5tYp3BrQp2//R
-Importance: high
-X-Priority: 1
-Date: Wed, 9 Jul 2025 13:50:24 +0000
-Message-ID: <LV2PR19MB57177ADB8F4820795AC3654ACD49A@LV2PR19MB5717.namprd19.prod.outlook.com>
+Thread-Index: AQHb6hheWWYbjty+UEWybPB5tYp3BrQp2//RgAVjrd0=
+Date: Sun, 13 Jul 2025 00:09:03 +0000
+Message-ID: <LV2PR19MB57173DEB49C1E65202DE2A6ACD55A@LV2PR19MB5717.namprd19.prod.outlook.com>
 References: <SA0PR19MB46346DDF4A24FF1937F75192D56AA@SA0PR19MB4634.namprd19.prod.outlook.com>
  <LV2PR19MB571738E0622C6E8E2DCC8DA2CD75A@LV2PR19MB5717.namprd19.prod.outlook.com>
  <LV2PR19MB571793A9C0C77422EE40FFF9CD46A@LV2PR19MB5717.namprd19.prod.outlook.com>
-In-Reply-To: <LV2PR19MB571793A9C0C77422EE40FFF9CD46A@LV2PR19MB5717.namprd19.prod.outlook.com>
+ <LV2PR19MB57177ADB8F4820795AC3654ACD49A@LV2PR19MB5717.namprd19.prod.outlook.com>
+In-Reply-To: <LV2PR19MB57177ADB8F4820795AC3654ACD49A@LV2PR19MB5717.namprd19.prod.outlook.com>
 Accept-Language: en-GB, en-US
-Content-Language: en-US
+Content-Language: en-GB
 X-MS-Has-Attach: yes
 X-MS-TNEF-Correlator: 
 x-ms-reactions: allow
 authentication-results: dkim=none (message not signed)
  header.d=none;dmarc=none action=none header.from=ddn.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: LV2PR19MB5717:EE_|DS0PR19MB6504:EE_
-x-ms-office365-filtering-correlation-id: 99eca680-00b8-4af8-13d0-08ddbeef93d4
+x-ms-traffictypediagnostic: LV2PR19MB5717:EE_|BL1PPF0F914ABD7:EE_
+x-ms-office365-filtering-correlation-id: a61eb69b-acc3-484d-965e-08ddc1a17998
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|366016|19092799006|376014|1800799024|4053099003|38070700018|8096899003;
-x-microsoft-antispam-message-info: =?us-ascii?Q?EIctLdFEjNq8RUhQh2Sz2PDBQfdgpq5VwGNshitRATzNAdjqhN9MFtM1bslm?=
- =?us-ascii?Q?xouz90nDd2LRWAgLVhIUJtHYIMk1IMWXE1TRZ61I6gyLVqdhA1zwD6F4kEB2?=
- =?us-ascii?Q?Elu8aHGiUsFHCMAobZQfeDuLoFdG5yF/ukHxRfV9R8oRwc3D8VuIr6KGvyid?=
- =?us-ascii?Q?Mf1UENN+aJLW5dXobxapQGWk2+NFXKpSE+K1udnPW6ijIltEQ4pzJUlPkcku?=
- =?us-ascii?Q?ebmZUDacU0n53tFKPPQ+D+C7+UxGJ9m0Op6VDEt5hgwH+y8WWKA5cft7B4f6?=
- =?us-ascii?Q?WP3U27Vtgu84AmDingiu61aPZ4ueyUDEWbp/dZttBYl7qqD095ot8mBY2er7?=
- =?us-ascii?Q?1w30ZjJMLAo95pfQUg3/HcciiYOTfUg+38plJyQT70Nyc3gXYVoH+/ithbdT?=
- =?us-ascii?Q?7Z989OJHvol5boeTlEMS0jICAVVX1d6wWIbOJD17IOTqxbgj4C5P/p3DSihw?=
- =?us-ascii?Q?Lag0ru9T5kxYqE48Bsy2+FENgJGncPrM/TVR426mxqrltJF9ciKN5ULqCYa/?=
- =?us-ascii?Q?0U1aF0HIqAYpLoR9Wubxf3avXpUb7VUj1OdmOfEs2hrujIEvvivR3xsSgiFf?=
- =?us-ascii?Q?2MGhDQSYpzEHZIVVEAuIhXY7y8mjFMDjyoqQXAsvd6K3C/O6kXirBE5jWf4x?=
- =?us-ascii?Q?22EzFDoWmNFridfZzR6c7W/8bTLmBWUNqpw/ut7w5gPHCFdxFffji9gCm8EZ?=
- =?us-ascii?Q?S/3yFzsBgT2XQThlp4s9L9YGRfXitl+91SfL1unbItVno/SjxdzI9dZ+Y6T6?=
- =?us-ascii?Q?SpM3VZLU7roWm0htlzr+NejQMog9tURDmZwwBsdDA/XAPVVdtIRacUQGQ2xY?=
- =?us-ascii?Q?w6o2qxkW4nBFmx4sgbDtYb+5Lve75ew3snMPjWjMP+7nmgvbajBGmSyB4WZA?=
- =?us-ascii?Q?fZlFFOgPjCIsOo3yVLahWp6uX1b1RUg0rhA5E87IrL+WLfw2b4T5q0W0LM23?=
- =?us-ascii?Q?aBnrwvCS/OpkeyrDoI+xAidCWeyUVL6T4g177J+7IQYr3AClUFV+Sn8B34N3?=
- =?us-ascii?Q?USLJwZsZBK685MKBYV+AvdN9VhPZ4A468Lu1ibp6VyAhdYp2uFlS0LT036R/?=
- =?us-ascii?Q?MSK8a1HG42RwlktAvngUxDngSO+uLZ1YCQy0CTPHd8JCO/9RHp2zK2J0R2cz?=
- =?us-ascii?Q?SVRsd8vHSyU2BV5JZMOtmJBQu7OqsZgWsNuKRD25zXRckGyc8OEnZwfS194T?=
- =?us-ascii?Q?pZXH2pT0V9NYo5Wd7XfeqRlria1nHUmu0kkM6bFW4gcLEEcJSN6qbaF5wteN?=
- =?us-ascii?Q?u8R0CGV6f7GzCWxSrXUtHsAu32xaJiSc2zIADQAGnIz6Ez01g4kvChb/Jpjs?=
- =?us-ascii?Q?jAm7i69WGo0Cztb2kD1efVg4fBdo00bUFuvrjkyZ6IwHooWgNYhtJofjkLkS?=
- =?us-ascii?Q?YkrBMHu5BHOzcq62p2yG07P4yGycuDomzC78pu3HsOGxGUHsTpIofLliNvOD?=
- =?us-ascii?Q?0Rx5efil6Iw=3D?=
+ ARA:13230040|366016|19092799006|1800799024|376014|4053099003|7053199007|4013099003|8096899003|38070700018;
+x-microsoft-antispam-message-info: =?Windows-1252?Q?gURBa7oETKtIk+EuVS5y74nD2kXTETSoZx+MVVShXvZdEMp9DFoRRuKy?=
+ =?Windows-1252?Q?IsjmmaIeSIRFgm6PgMuIfdEyL3LUYRH9yUSpnL8vBkGtIcpsC54hnVKd?=
+ =?Windows-1252?Q?dEDyb4atRHeEPkF30g9whZm9dV+hZ3K5twbI4A+rtVCqza8+8reALFGf?=
+ =?Windows-1252?Q?q31oKsrAE8anZosnRTmNJpzkdzm1yqJAskCo/g6spEDIpDqiuNy2zDFy?=
+ =?Windows-1252?Q?carzgnXFRQ7eV+YHhlj24pe97L8UbjpJ1L2PWWNyfU6aaycn68veLQzO?=
+ =?Windows-1252?Q?NXoQQjTsh/VGJIprFZWNhADejfbp8l8nCiW7fsldJDTUqrjutqQxvPcE?=
+ =?Windows-1252?Q?xs/7958lhubmDvS3yVCDCrmMpJA6Jfg0bkMjAAXtkDosAr4qv19hvJm7?=
+ =?Windows-1252?Q?ROCg7tk4ZCZsE4r3FWiZIqR7qJF8wU93B1I0/hVi1sqi28fq5FR4g7m4?=
+ =?Windows-1252?Q?dZdsSWdu+FyGBQinLjMii0tsEKhUAywq28FDai+F+6fof76lOAKOASx4?=
+ =?Windows-1252?Q?fALBDwHaixNR6CZ2T7d6/tw3JdcPjwVdm4cmuGkJ6xH2i1WZ0EBHbLsx?=
+ =?Windows-1252?Q?E0IbMMw6Qe4R/95XzMNmVUf8cKz0bkHDePHXXbpj23Sv8w3SWlvf4NNX?=
+ =?Windows-1252?Q?OHOsML4xZrgkzo9AJiaYw+L8U0LHa0H1X8XCSESVM4GG9097duuaDYBP?=
+ =?Windows-1252?Q?fooWzWTiyg8FgVXBg0eUhyhrwHBpF4cOA/DqkOkmoUBc//hplG4t3v4x?=
+ =?Windows-1252?Q?o9PBuzQsvf9B017Y5f554MzfoY10pquCyd6LxLEgrDi7OtTZZKR4ZfbB?=
+ =?Windows-1252?Q?xRHo68ewZCGDD30OSeSXOFGJxYLy/uJQu8dKzzoaatz7B3/WC21Hr1GA?=
+ =?Windows-1252?Q?5Ii922iyRh8/KXunkaTUKOcoCLcNTC8D9P4MvkZP2UJfO8GHs5zZBYt5?=
+ =?Windows-1252?Q?7X0oqXrm0scTl6UHxGCZNV2dDr/1LdiP6ydSmZjIHzt0rS1VyHaAsuPF?=
+ =?Windows-1252?Q?OP+7QBsJF/Xy6SHdhhLksmYZJteFtDW2zDz5c7kjbOnkMva7EClJR2Fe?=
+ =?Windows-1252?Q?5O42nM8PRFnB53FUZl6F0IGZe/HLmOhP0grSoOprpAmCEQBGgkw35Xpu?=
+ =?Windows-1252?Q?G9VC/CtmR4aK86OUiSGDAlVTfkqPLOj4L3OyZoklQwCgBn6w/DJfahmX?=
+ =?Windows-1252?Q?HmzSMiWrcTUjSXpaP7AmEbKKGPYyqUNHDx3/ttZc8zHNH8nSUwypfVX9?=
+ =?Windows-1252?Q?QknSjjM3eYgWSwChGawfE/KVBiZnhtcEf/kY3SVE80UatPyKdTRhnBgs?=
+ =?Windows-1252?Q?yMUQkVMOGd7mWi1jtfd1c3W9yNLm9hUNrc3lnCY68lXGxcBKPLzwh0fl?=
+ =?Windows-1252?Q?cFmf2QBhnh+S3g6icGTXAdWkuQ42qtlrVzBAAJfNaRuF8DM8UbqHA22N?=
+ =?Windows-1252?Q?CSqsSOldRWHXLutHjsYfJviD42Pk/QvlCsiQhupyA7RSAbatKtlIj7pY?=
+ =?Windows-1252?Q?pdS2qgzapjPNnAsTLN+/155KEYgsEdu/zXBO7vyEMfCHVw+XRbI=3D?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
  IPV:NLI; SFV:NSPM; H:LV2PR19MB5717.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(366016)(19092799006)(376014)(1800799024)(4053099003)(38070700018)(8096899003);
+ SFS:(13230040)(366016)(19092799006)(1800799024)(376014)(4053099003)(7053199007)(4013099003)(8096899003)(38070700018);
  DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?UbfP/sY3KMaTFlqHWInlXLPo0Jwn2bpjskju90POr5LZI9ObHlp73ukclHvt?=
- =?us-ascii?Q?Raylpe2kKRMPqljDtzQRCkosuRVU8fgKDo6nUMnxjpDH92NLMXgAw2D8o/oY?=
- =?us-ascii?Q?siYVP76MniYER1s03TDZcPm4L1PSXa0gTwWwLyXBaVfelNZuPJvY9DusrE1m?=
- =?us-ascii?Q?y5cUEooebN/8V8KwdrGEIrh931Ot6oe12qAIVd1n/OgwYyJwaQNcEoQzPuzw?=
- =?us-ascii?Q?T91URAafF0ZF7R7RPJkHsrtTrWQb43kqCDKeNPD+N/zF4JDQXYm2UN+jJniI?=
- =?us-ascii?Q?VaQX3+Vb08a8T1yUXKADQhABX0VmGFsdPZ2tOD1izmk6HrqcYcRZLlIDF7gQ?=
- =?us-ascii?Q?cWDXRjPIxlVBORWGV1YRqfVX90zusM4HrfVS4DqyOAuhC/2WMyT4lgDHnt42?=
- =?us-ascii?Q?8Lc3hdtcqezliv1uW982rm645VOpyYTX4mhYA4VaJgr9fL+VzLyri06WKQt/?=
- =?us-ascii?Q?HwN542n+r0tToRlOv39vtyNYj5b7b98bURRJUTUcBqsldOKIxBOrJtQCU7gM?=
- =?us-ascii?Q?HP4y/ToPz9gIr+xWri0BMW24D3EbADhw7uASskqIMd5MZidohxtOMbFJcBhe?=
- =?us-ascii?Q?RVvG50Zm/2tHbUqY8antConpEvvZJf5XRwNbsIj6D37famSR9JkHpWwLXdaG?=
- =?us-ascii?Q?EDa1vpRoPPrHpTALCnuCye2Cjcgyv1U+EtOCqAoaXZsPLRsGwgZuc2QqYOMT?=
- =?us-ascii?Q?16iAjfb0/NL+i4HUp1faSjXjECffchLcGmdHoKFvMaxV6EZ/YwS5V+0XKRgu?=
- =?us-ascii?Q?4pY7lIA1xaJnobhiPfkva1ViZ7fjtbpRM7s0j0edoyFA4tlLbAzNjznezMOE?=
- =?us-ascii?Q?KTgg4xzNBWZuPb2vkYAO4BIkvDuIzPFpRwg1hOZswTy9TvbyU76TbvwKQJhx?=
- =?us-ascii?Q?s+ra18CS/QNgPdT2vRzf59oHYTlXU3nhrfMca5mLkHAf19cg+UW6I3/H4j9B?=
- =?us-ascii?Q?K5+m2Gx+QVaBh2UI/7lMdfp/ppcab/xS8Zq78bgIKeDGvgCkNb25U3avl4Py?=
- =?us-ascii?Q?H1rJ3L5JnK9moaTxhLo7CXD3gQ+EolcW7ENLQdhhEyue75tULmwCg/aTSBLz?=
- =?us-ascii?Q?fCRDm8Ng++xKCsXm6vm8YAAgRVmLgMGp9N4vVv7vZt79bQxMndXam4VbtEyo?=
- =?us-ascii?Q?DI8XXPy4+2hRzvevaRvydaU6FPHkP7ya+khfVcQvO9pRFtVBRhh6NesJUrNY?=
- =?us-ascii?Q?wG3A6fTKkPbfUSIhkO6C/Smga+aX1wdT+WElypoCJINvqN+ZEOq30TBn8qTW?=
- =?us-ascii?Q?wcxIcYh5axRlqnTHwEaGyE1WPNf5Mva2NU7UbrhgrDclVFXq6Pum5toyapdc?=
- =?us-ascii?Q?kDjUEnv6k9h1c4OU1ZWWMAn2cbkje8yXo91ikIn3bavBcRGTMWHX8nkme5Zx?=
- =?us-ascii?Q?JkzaV6ghL+vgmPpqEHrp3iOykJQbeDSaG/3EpM8UMnpyy1LVgmKAnREl6HzP?=
- =?us-ascii?Q?90Rzgyg1Lh6If/ExJWLk/JoMGvC+PoL0WBew+VM01ktsN5rDxK9PahB0IeHi?=
- =?us-ascii?Q?HpE4fOqjN3RtFdsfDI+xid2nnzuV6+ubI3QGBDSlGXMhFyKB++JyaqrnaMvO?=
- =?us-ascii?Q?yFeBqu3BuEr5vdU/jC0=3D?=
+x-ms-exchange-antispam-messagedata-0: =?Windows-1252?Q?/NZM+S9fKZhN5HvuR8SmM+JR0+FKUZCxtLWBFhWS7BZlLYGhqFZmcsdF?=
+ =?Windows-1252?Q?JtH1m6XSRS+k695YyUpx1FJx8zPUyifhsuafbF7X5jrgGdh6OSfuzj4t?=
+ =?Windows-1252?Q?iZm46PF25NQISqOSKnPCvm5mdB6dokLsIEs5KsBcBcVmwVGZThOX7r6m?=
+ =?Windows-1252?Q?EsrBdqPm7ryP0eMmwgJCSOJkmwovuF8/VZ/Z0XzyqkClvtOKTPpAoeme?=
+ =?Windows-1252?Q?T448NhrRGM1ToqZxTBYqGw46hLuzmp+pIVQNFv17F6f9z9vLGMcTYNZg?=
+ =?Windows-1252?Q?EUHYYWoBfOrIwSqOMNG1aVTFgIYsSWQ6pp+CCBHwsIjzUKDOMLqrziVe?=
+ =?Windows-1252?Q?z01OOyZe3JVF/jmE+EwttCeNp1ABvBL3s7by41O2wFZ9UHNQ543wDWKY?=
+ =?Windows-1252?Q?9D6O0Guw13zh3zz0NWqVv6n2Co1vwlV5gyP+iOEJxX3HNbrwwv80v94f?=
+ =?Windows-1252?Q?1Ag/85Ht5eg0wMJLFNSB860VM7V1fVur3r5qz2tKHsJkGZX778oDLX1l?=
+ =?Windows-1252?Q?ygBnLCdxE2CqnZaV+QGuWgLKXSZkULbOtuA6HAPeqGzEbyIbvF4SOmOQ?=
+ =?Windows-1252?Q?g8EJoHK5ghO2jzMFGxY3LKQ5xSpsmDSzkFHLpyg5SaPdP0g+xVquXhOi?=
+ =?Windows-1252?Q?xFAM2WWvrfpFiH6rIBB7gI4uuLSOhS5aeOHF1BHVvemS7kjoc19NxyAl?=
+ =?Windows-1252?Q?OO06haBo6tegTj0W7y2FvEl7uNGBbsBAfZsG7JqKZf2i5Rs3sP1x5enZ?=
+ =?Windows-1252?Q?GFUjpLJvXFJZvwhhJvc/6oAV2rDOytPFLDJTscdXG1uD3WM83tQcXcLi?=
+ =?Windows-1252?Q?OnpfJSCJCqvx2UUBzBo1ACg5HkaimPR1OPoWHWrjSkyLsyL49B18z2lB?=
+ =?Windows-1252?Q?FAjW1E9EHD9kUgt8dB3pepFtmfkP3and323BtGR8q1SGFV6Wc3xER4l/?=
+ =?Windows-1252?Q?crU9hADRlD/DU0ExW1WxNH80fi/byD1Y2+bOtbc4qdBiQDiHlOw1I3V+?=
+ =?Windows-1252?Q?+iEPOTFJWPCo1PrFKCreI3ld/oMQzfnG965wf/vI6ps0IyorJ+fqpINn?=
+ =?Windows-1252?Q?pdJAyrLeWPUN/RJtom1d/RaJBVsXkkKj4N8c4zhNE5NAl5Z5EQ8Jis/d?=
+ =?Windows-1252?Q?Jy9YX14IgRTTLqr4ThnWDa07U4vcywknYtZIDaMLCP1xXtL4h5VIV2WQ?=
+ =?Windows-1252?Q?aB934vv74z7+kJpt46q6FkLCWAKXAwzAVTHI0jo4H61VwP0oQQ0d2kBg?=
+ =?Windows-1252?Q?wk898blxasjiDOO53Bc97uAVqLkM8/ijfH3SujALsvnJzTIX3Gr7febi?=
+ =?Windows-1252?Q?+jeO2Pben+eMkX6V38rQW1maGmXdd3cuQQ/krIosoxcewkShZqyRKDUO?=
+ =?Windows-1252?Q?JMPiq9MTHZ9yixTdBOwEG3RaydgKL9yLqWxr8Juph24I8m0T/AQ6eCXv?=
+ =?Windows-1252?Q?6vqRlcz+DgV9+xHmNX6/bl27Q28zBsxKLFNhJ9NpmOg7U60Mui18zSIi?=
+ =?Windows-1252?Q?NzDC1xDAmFgAPRm9pTHTwqtdIJ4GcuInfPPZaXs7JKyUrEZ0AbUNBzeU?=
+ =?Windows-1252?Q?OR2fmFvNCg7MhHbfG7EXQ4d1WTQh+ckbVGT8tZyO0kc9XXIMNG+t9xGY?=
+ =?Windows-1252?Q?OPM00VfDHznQBGVqYW/YXaPvx+TaAdO98A1eUPhqXPyaYhXF4bGJezCM?=
+ =?Windows-1252?Q?8sL5ps1SGAwKUbbeN6Emh8gQdldIlMbA?=
 MIME-Version: 1.0
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: XuAWN94CZ9jDjxjeUNc0CXhLBLYTGD4fRag5GyDA7TLKrgjF6vK8dNE6KmV3ToclU4BbnQjmuytfg90RbDoafxFttHKkCoC44Yfy1MkNPixyJ9a62uhAGCBpRgc0qpoE6fJjjGcSKfBxGC+k1Envazvd8DyVLCJDk3Q8LAhHfR5SEKnDcbaAjSCqhrE1If0vhMHh2GCAUqz8uU+uYCf3eFOJfhTPts2v45tWWQtpDNvHroWq8T1Zvk8oOcoMfCoBJwf9+noqF0kzxtzh9Z820Wt6me1hONsDxYMSyq+cC08Zj8ox47PB/Oqm85BwxRJSu4fIVDvyYEweLsl4tvE5tAG3eFtN869lHw8iAi5SihEUJNh6LUJYcOzaGFab5/U1c3+BWhj9hZfpDjWL3E4ctPr7vzJns2hj+EH1sIbNp9QJddzy3ETqacc7CCl1qxVXPxreDPC09BAL47mr6Xbu/S7VlpHdVFhUHE7CE4L8m6kKYN2Z6oT3yt4Q5I4CR3FXH2Rk+FpwnCSoqX7Ip9x945r4y0AIX7odnQK6ml36Ijli03ik6QJ5Zi4gNxMbdTETDWM7WAx7ef6SaWGGWrVIsF2yjVixYa7Ho6WBDO3kync6yj0jS6FvabTiIa9wCvjSmwRJgneZFec2sOxFP+Wmrw==
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: uz8FCSNwXZzy7LVYIPreLfBnbNay/RgUX3kQEDWynEdkiKf3pw9UDMiPeY+oq8uFRqYNISs2FHFu+VG7mupbJAjHuVavJ7qwbt6jk6+HMfuKHp7LRg4QKoEYkYu/GAN2R9pXR5jYCGz3SEO8VCMuU7iKxRrGVxhH3klfqeFcACMMUQQQZvXcawpGZwURfFvbQh2ADgYyAUCXEA6S5yueSTPROYTcOj47ElFEkyhVjK7X74wL0F0ZaNT6Fc0Cr9LLg349ALVK5Kw7CVYcAqfBRu+cXyLy5E06iVu4mLmw8z8rqg624yQ+W5n/rCJEuSLaMNthDQLLPASfyPRjqStfDkw/DqYOs5HyYeFHonkoaGVWOWq+z/ZVfBgFalkMzyCqj4idCqcFz3HbDamXQ7vMudGBt9v+AMcamQhxUf/f/YcLDrAJLS7QZlhOCZR9XB0UlUm64y9aLD5JCE/GTXSl9DEUVgGWd0ckeQ9iPRxdOqHQCJgFwZtI3nukgWtLtKPNP9mwp9axSQRVj1lqIRwDs1FFbDi0Gumit0qc4dCMACBouHE4DoVY3gK6iLmxLrRf4SysTOx6DoMnVBoS53SwpU38+X6kcIY6PBUNIJY10Q6wBupgsvQ1kreEHMhVpKswHewYGJbKuIy5SPNtXy0trQ==
 X-OriginatorOrg: ddn.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
 X-MS-Exchange-CrossTenant-AuthSource: LV2PR19MB5717.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 99eca680-00b8-4af8-13d0-08ddbeef93d4
-X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Jul 2025 13:50:34.2782 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: a61eb69b-acc3-484d-965e-08ddc1a17998
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Jul 2025 00:09:03.0108 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: J4qjdenX0HxLeHB8FqsjMR6a6W7ZZv6bfS9eqlOFE0ieKFmYOBzWCGkjq+BXN12xToHjWRDfoiaUTC3Yihwrow==
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DS0PR19MB6504
-X-BESS-ID: 1752069038-103500-7597-3154-1
-X-BESS-VER: 2019.1_20250703.1506
-X-BESS-Apparent-Source-IP: 40.107.237.124
-X-BESS-Parts: H4sIAAAAAAACA02MvQrDMAyE30VzBkuWIjmvUjrEttws/YFmKJS8ezy40OU47v
- i+yxf8s8MCe88Jnm9YjLmXrW8mRTBgU2+JNZmW6hQJs2aNDRsc0w/f9vvAkQRtCFyCaG
- plpZaTl/6gurXibFGZw5/g9bgNAXFAHIKMKckcK60lO89swlGqVKOgFDzDcT0BPtF8tc
- IAAAA=
+X-MS-Exchange-CrossTenant-userprincipalname: yNEEaAlCwC+xOxNVW0cfUQTsDKRDEXRdE4bDKk0S1erzuwErfBNtXLFPmQfviw5lKzqZTOnFSGYiCJyN1pfmrw==
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL1PPF0F914ABD7
+X-BESS-ID: 1752365348-111212-7676-34138-1
+X-BESS-VER: 2019.1_20250709.1638
+X-BESS-Apparent-Source-IP: 40.107.243.92
+X-BESS-Parts: H4sIAAAAAAACA02Ouw7DMAhF/4U5g8HgR36l6lBsaJY+pGaoVOXf4yGRuiAu0j
+ mXyw/su8IM65gTvD4wYyEc2zKOVkhS064pU4vZ3RspORqnqoQJtunkl/Vx8hxjPgToZm
+ Hk0jtrdDGiW8Pkhiat8r/g/bwfAuKA5weKtUqKfWA6WrkIR+nSC4VMwRS26w4RFy3Zww
+ AAAA==
+X-BESS-Outbound-Spam-Score: 0.00
+X-BESS-Outbound-Spam-Report: Code version 3.2,
+ rules version 3.2.2.266002 [from 
+ cloudscan9-142.us-east-2a.ess.aws.cudaops.com]
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------
+ 0.00 HTML_MESSAGE           BODY: HTML included in message 
+ 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
+X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
+ KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND
 X-BESS-BRTS-Status: 1
-Subject: [lustre-devel] Whamcloud Gerrit downtime notification
+Subject: Re: [lustre-devel] Whamcloud Gerrit downtime notification
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -163,330 +176,432 @@ List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>,
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 From: Krupal Solanki via lustre-devel <lustre-devel@lists.lustre.org>
 Reply-To: Krupal Solanki <ksolanki@ddn.com>
-Content-Type: multipart/mixed; boundary="===============8900818390757976976=="
+Content-Type: multipart/mixed; boundary="===============8122317766123316324=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============8900818390757976976==
-Content-Language: en-US
+--===============8122317766123316324==
+Content-Language: en-GB
 Content-Type: multipart/related;
-	boundary="_004_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_";
+	boundary="_004_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_";
 	type="multipart/alternative"
 
---_004_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_
+--_004_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_
 Content-Type: multipart/alternative;
-	boundary="_000_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_"
+	boundary="_000_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_"
 
---_000_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_
-Content-Type: text/plain; charset="us-ascii"
+--_000_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_
+Content-Type: text/plain; charset="Windows-1252"
 Content-Transfer-Encoding: quoted-printable
+
+The upgrade has been successfully completed, and the migration is now finis=
+hed. You can access Gerrit as usual.
+
+Here=92s a summary of the new features available to end users:
+
+1. Editing & Diffs: Enjoy inline code editing, side-by-side diffs, and patc=
+hset-level comments.
+2. UI Experience: Benefit from dynamic polling, dark mode, material icons, =
+and performance enhancements.
+3. Review Workflow: Explore attention sets, copyable approvals, case-insens=
+itive logins, and robust search operators.
+4. Advanced Features: Utilize merge commit rebasing, fix suggestions, and m=
+ulti-email support.
+
+Feel free to explore these new features and enhancements.
+
+
+Thanks,
+Krupal Solanki
+________________________________
+From: Krupal Solanki <ksolanki@ddn.com>
+Sent: Wednesday, July 9, 2025 9:50:09 AM
+To: lustre-devel@lists.lustre.org <lustre-devel@lists.lustre.org>; Whamclou=
+d - All Staff <all.staff@whamcloud.com>
+Subject: Whamcloud Gerrit downtime notification
+
+
 
 
 
 ANNOUNCEMENT:
+
 APPLICATION
+
 Gerrit (review.whamcloud.com)
+
 [cid:image001.png@01DBD9EB.62A7AEE0]
+
 SEVERITY
+
 Planned
+
 REASON
+
 2.16.27 EOL
+
 WHEN:
+
 START
+
 Saturday, July 12
+
 03:00 PM (UTC)
 
+
+
 DURATION
+
 8 to 10 hours
+
 DETAILS:
+
 Gerrit service will be unavailable, and code review activities (including p=
 ushing and reviewing changes) will be temporarily paused.
 
 We are performing essential upgrades to improve the performance, stability,=
  and security of the Gerrit platform.
 
+
+
 WHAT TO DO:
+
 No action needed. We will notify you once the maintenance is complete and t=
 he service is fully restored.
+
 FOR THOSE WHO WANT TO KNOW MORE:
+
  For additional information refer the G<https://wiki.whamcloud.com/display/=
 DCO/Maloo+Release+Notes#MalooReleaseNotes-v6.1.0>errit Upgrade page.
+
 FOR SUPPORT:
+
 If you have any concerns or questions, email us at dl-exa-devops@whamcloud.=
 com
 
 
---_000_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_
-Content-Type: text/html; charset="us-ascii"
+
+--_000_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_
+Content-Type: text/html; charset="Windows-1252"
 Content-Transfer-Encoding: quoted-printable
 
 <html>
 <head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DWindows-1=
+252">
 </head>
 <body>
-<div dir=3D"ltr" style=3D"font-family: Aptos; font-size: 12pt; color: black=
-;"><br>
+<div dir=3D"auto" style=3D"font-family: Aptos, Aptos_MSFontService, -apple-=
+system, Roboto, Arial, Helvetica, sans-serif; font-size: 12pt;">
 </div>
-<div id=3D"ms-outlook-mobile-signature" dir=3D"ltr"></div>
-<div id=3D"mail-editor-reference-message-container">
-<div id=3D"ms-outlook-mobile-signature" dir=3D"ltr"></div>
-<div id=3D"mail-editor-reference-message-container">
-<div id=3D"ms-outlook-mobile-signature" dir=3D"ltr"></div>
-<div id=3D"mail-editor-reference-message-container">
-<table class=3D"MsoNormalTable" id=3D"table_0" cellspacing=3D"0" cellpaddin=
-g=3D"0" style=3D"margin-left: 19.85pt; width: 683.796875px; box-sizing: bor=
-der-box; border-collapse: collapse; border-spacing: 0px;">
+<div dir=3D"auto">
+<div dir=3D"auto">
+<div dir=3D"auto">The upgrade has been successfully completed, and the migr=
+ation is now finished. You can access Gerrit as usual.&nbsp;</div>
+<div dir=3D"auto"><br>
+</div>
+<div dir=3D"auto">Here=92s a summary of the new features available to end u=
+sers:</div>
+<br>
+<div dir=3D"auto">1. Editing &amp; Diffs: Enjoy inline code editing, side-b=
+y-side diffs, and patchset-level comments.</div>
+<div dir=3D"auto">2. UI Experience: Benefit from dynamic polling, dark mode=
+, material icons, and performance enhancements.</div>
+<div dir=3D"auto">3. Review Workflow: Explore attention sets, copyable appr=
+ovals, case-insensitive logins, and robust search operators.</div>
+<div dir=3D"auto">4. Advanced Features: Utilize merge commit rebasing, fix =
+suggestions, and multi-email support.</div>
+<br>
+<div>Feel free to explore these new features and enhancements.</div>
+<div></div>
+</div>
+</div>
+<div dir=3D"auto" style=3D"font-family: Aptos, Aptos_MSFontService, -apple-=
+system, Roboto, Arial, Helvetica, sans-serif; font-size: 12pt;">
+</div>
+<div dir=3D"auto" style=3D"font-family: Aptos, Aptos_MSFontService, -apple-=
+system, Roboto, Arial, Helvetica, sans-serif; font-size: 12pt;">
+<br>
+</div>
+<div id=3D"ms-outlook-mobile-body-separator-line" dir=3D"auto"><br>
+</div>
+<div id=3D"ms-outlook-mobile-signature" style=3D"font-family: Aptos, Aptos_=
+MSFontService, -apple-system, Roboto, Arial, Helvetica, sans-serif; font-si=
+ze: 12pt;" dir=3D"auto">
+<div dir=3D"auto">Thanks,</div>
+<div dir=3D"auto">Krupal Solanki</div>
+</div>
+<hr style=3D"display:inline-block;width:98%" tabindex=3D"-1">
+<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" st=
+yle=3D"font-size:11pt" color=3D"#000000"><b>From:</b> Krupal Solanki &lt;ks=
+olanki@ddn.com&gt;<br>
+<b>Sent:</b> Wednesday, July 9, 2025 9:50:09 AM<br>
+<b>To:</b> lustre-devel@lists.lustre.org &lt;lustre-devel@lists.lustre.org&=
+gt;; Whamcloud - All Staff &lt;all.staff@whamcloud.com&gt;<br>
+<b>Subject:</b> Whamcloud Gerrit downtime notification</font>
+<div>&nbsp;</div>
+</div>
+<div>
+<div dir=3D"ltr" style=3D"font-family:Aptos; font-size:12pt; color:black"><=
+br>
+</div>
+<div id=3D"x_ms-outlook-mobile-signature" dir=3D"ltr"></div>
+<div id=3D"x_mail-editor-reference-message-container">
+<div id=3D"x_ms-outlook-mobile-signature" dir=3D"ltr"></div>
+<div id=3D"x_mail-editor-reference-message-container">
+<div id=3D"x_ms-outlook-mobile-signature" dir=3D"ltr"></div>
+<div id=3D"x_mail-editor-reference-message-container">
+<table class=3D"x_MsoNormalTable" id=3D"x_table_0" cellspacing=3D"0" cellpa=
+dding=3D"0" style=3D"margin-left:19.85pt; width:683.796875px; box-sizing:bo=
+rder-box; border-collapse:collapse; border-spacing:0px">
 <tbody>
 <tr>
-<td rowspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: 1pt; bord=
-er-style: solid; border-color: windowtext; background-color: rgb(83, 129, 5=
-3); padding: 0in 5.4pt; vertical-align: top; width: 158.046875px; height: 8=
-7px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>&nbsp;</b></span></p>
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>ANNOUNCEMENT:</b></span></p>
+<td rowspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:1pt; bor=
+der-style:solid; border-color:windowtext; background-color:rgb(83,129,53); =
+padding:0in 5.4pt; vertical-align:top; width:158.046875px; height:87px; box=
+-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>&nbsp;</b></span></p>
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>ANNOUNCEMENT:</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: 1pt 1pt 1pt medium; bor=
-der-style: solid solid solid none; border-color: windowtext windowtext wind=
-owtext currentcolor; padding: 0in 5.4pt; width: 121.96875px; height: 37px; =
-box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 112, 192);"><b>APPLICATION</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:1pt 1pt 1pt medium; bo=
+rder-style:solid solid solid none; border-color:windowtext windowtext windo=
+wtext currentcolor; padding:0in 5.4pt; width:121.96875px; height:37px; box-=
+sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,112,192)"><b>APPLICATION</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: 1pt 1pt 1pt medium; bor=
-der-style: solid solid solid none; border-color: windowtext windowtext wind=
-owtext currentcolor; padding: 0in 5.4pt; word-break: break-word; width: 223=
-px; height: 37px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 0, 0);">Gerrit (review.whamcloud.com)</span></=
-p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:1pt 1pt 1pt medium; bo=
+rder-style:solid solid solid none; border-color:windowtext windowtext windo=
+wtext currentcolor; padding:0in 5.4pt; word-break:break-word; width:223px; =
+height:37px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,0,0)">Gerrit (review.whamcloud.com)</span></p>
 </td>
-<td rowspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: 1pt 1pt 1=
-pt medium; border-style: solid solid solid none; border-color: windowtext w=
-indowtext windowtext currentcolor; padding: 0in 5.4pt; word-break: break-wo=
-rd; width: 179.78125px; height: 87px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: 105%; margin: 0in 0in 8pt; fon=
-t-family: Calibri, sans-serif; font-size: 11pt;">
-<img src=3D"cid:image001.png@01DBD9EB.62A7AEE0" id=3D"Picture_x0020_2" widt=
-h=3D"156" height=3D"66" style=3D"width: 1.6354in; height: 0.6979in; margin-=
-top: 0px; margin-bottom: 0px;"></p>
+<td rowspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:1pt 1pt =
+1pt medium; border-style:solid solid solid none; border-color:windowtext wi=
+ndowtext windowtext currentcolor; padding:0in 5.4pt; word-break:break-word;=
+ width:179.78125px; height:87px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:105%; margin:0in 0in 8pt; fon=
+t-family:Calibri,sans-serif; font-size:11pt">
+<img src=3D"cid:image001.png@01DBD9EB.62A7AEE0" id=3D"x_Picture_x0020_2" wi=
+dth=3D"156" height=3D"66" style=3D"width:1.6354in; height:0.6979in; margin-=
+top:0px; margin-bottom:0px"></p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; width: 121.96875px; height: 25=
-px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 112, 192);"><b>SEVERITY</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; width:121.96875px; height:25px; =
+box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,112,192)"><b>SEVERITY</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; word-break: break-word; width:=
- 223px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; word-break:break-word; width:223=
+px; height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
 <b>Planned</b></p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; width: 121.96875px; box-sizing=
-: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 112, 192);"><b>REASON</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; width:121.96875px; box-sizing:bo=
+rder-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,112,192)"><b>REASON</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; word-break: break-word; width:=
- 223px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 0, 0);">2.16.27 EOL</span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; word-break:break-word; width:223=
+px; height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,0,0)">2.16.27 EOL</span></p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt; border-styl=
-e: none solid; border-color: currentcolor windowtext; background-color: gra=
-y; padding: 0in 5.4pt; vertical-align: top; width: 158.046875px; height: 25=
-px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>WHEN:</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt; border-sty=
+le:none solid; border-color:currentcolor windowtext; background-color:gray;=
+ padding:0in 5.4pt; vertical-align:top; width:158.046875px; height:25px; bo=
+x-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>WHEN:</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; width: 121.96875px; height: 25=
-px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 112, 192);"><b>START</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; width:121.96875px; height:25px; =
+box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,112,192)"><b>START</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; word-break: break-word; width:=
- 223px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; word-break:break-word; width:223=
+px; height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
 Saturday, July 12</p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.4pt; word-break: break-word; width:=
- 179.78125px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.4pt; word-break:break-word; width:179=
+.78125px; height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
 03:00 PM (UTC)</p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt; border-=
-style: none solid solid; border-color: currentcolor windowtext windowtext; =
-background-color: gray; padding: 0in 5.4pt; vertical-align: top; width: 158=
-.046875px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>&nbsp;</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt; border=
+-style:none solid solid; border-color:currentcolor windowtext windowtext; b=
+ackground-color:gray; padding:0in 5.4pt; vertical-align:top; width:158.0468=
+75px; height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>&nbsp;</b></span></p>
 </td>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt medium; =
-border-style: none solid solid none; border-color: currentcolor windowtext =
-windowtext currentcolor; padding: 0in 5.75pt; width: 121.96875px; height: 2=
-5px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: rgb(0, 112, 192);"><b>DURATION</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt medium;=
+ border-style:none solid solid none; border-color:currentcolor windowtext w=
+indowtext currentcolor; padding:0in 5.75pt; width:121.96875px; height:25px;=
+ box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:rgb(0,112,192)"><b>DURATION</b></span></p>
 </td>
-<td colspan=3D"2" class=3D"MsoNormalTable" style=3D"border-width: medium 1p=
-t 1pt medium; border-style: none solid solid none; border-color: currentcol=
-or windowtext windowtext currentcolor; padding: 0in 5.4pt; width: 402.78125=
-px; height: 25px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
+<td colspan=3D"2" class=3D"x_MsoNormalTable" style=3D"border-width:medium 1=
+pt 1pt medium; border-style:none solid solid none; border-color:currentcolo=
+r windowtext windowtext currentcolor; padding:0in 5.4pt; width:402.78125px;=
+ height:25px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
 8 to 10 hours</p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt; border-=
-style: none solid solid; border-color: currentcolor windowtext windowtext; =
-background-color: gray; padding: 0in 5.4pt; vertical-align: top; width: 158=
-.046875px; height: 155px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>DETAILS:</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt; border=
+-style:none solid solid; border-color:currentcolor windowtext windowtext; b=
+ackground-color:gray; padding:0in 5.4pt; vertical-align:top; width:158.0468=
+75px; height:155px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>DETAILS:</b></span></p>
 </td>
-<td colspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: medium 1p=
-t 1pt medium; border-style: none solid solid none; border-color: currentcol=
-or windowtext windowtext currentcolor; padding: 0in 5.75pt; width: 524.75px=
-; height: 155px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"text-align: left; text-indent: 0px; line-he=
-ight: normal; margin-right: 0in; margin-left: 0in;">
-<span style=3D"font-family: Calibri, sans-serif; font-size: 11pt; color: rg=
-b(0, 0, 0);">Gerrit service will be
+<td colspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:medium 1=
+pt 1pt medium; border-style:none solid solid none; border-color:currentcolo=
+r windowtext windowtext currentcolor; padding:0in 5.75pt; width:524.75px; h=
+eight:155px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"text-align:left; text-indent:0px; line-he=
+ight:normal; margin-right:0in; margin-left:0in">
+<span style=3D"font-family:Calibri,sans-serif; font-size:11pt; color:rgb(0,=
+0,0)">Gerrit service will be
 <b>unavailable</b>, and code review activities (including pushing and revie=
 wing changes) will be temporarily paused.</span></p>
-<p class=3D"MsoNormalTable" style=3D"text-align: left; text-indent: 0px;"><=
-span style=3D"font-family: Calibri, sans-serif; font-size: 11pt; color: rgb=
-(0, 0, 0);">We are performing essential upgrades to improve the performance=
-, stability, and security of the Gerrit
- platform.</span></p>
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"font-family: Aptos, sans-serif;">&nbsp;</span>&nbsp;&nbsp;&n=
-bsp;</p>
+<p class=3D"x_MsoNormalTable" style=3D"text-align:left; text-indent:0px"><s=
+pan style=3D"font-family:Calibri,sans-serif; font-size:11pt; color:rgb(0,0,=
+0)">We are performing essential upgrades to improve the performance, stabil=
+ity, and security of the Gerrit platform.</span></p>
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"font-family:Aptos,sans-serif">&nbsp;</span>&nbsp;&nbsp;&nbsp=
+;</p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt; border-=
-style: none solid solid; border-color: currentcolor windowtext windowtext; =
-background-color: gray; padding: 0in 5.4pt; vertical-align: top; width: 158=
-.046875px; height: 41px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>WHAT TO DO:</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt; border=
+-style:none solid solid; border-color:currentcolor windowtext windowtext; b=
+ackground-color:gray; padding:0in 5.4pt; vertical-align:top; width:158.0468=
+75px; height:41px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>WHAT TO DO:</b></span></p>
 </td>
-<td colspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: medium 1p=
-t 1pt medium; border-style: none solid solid none; border-color: currentcol=
-or windowtext windowtext currentcolor; padding: 0in 5.4pt; width: 524.75px;=
- height: 41px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in;"><span st=
-yle=3D"font-family: Calibri, sans-serif; font-size: 11pt; color: black;">No=
- action needed. We will notify you once the maintenance is complete and the=
- service is fully restored.</span></p>
+<td colspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:medium 1=
+pt 1pt medium; border-style:none solid solid none; border-color:currentcolo=
+r windowtext windowtext currentcolor; padding:0in 5.4pt; width:524.75px; he=
+ight:41px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in"><span sty=
+le=3D"font-family:Calibri,sans-serif; font-size:11pt; color:black">No actio=
+n needed. We will notify you once the maintenance is complete and the servi=
+ce is fully restored.</span></p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt; border-=
-style: none solid solid; border-color: currentcolor windowtext windowtext; =
-background-color: gray; padding: 0in 5.4pt; vertical-align: top; width: 158=
-.046875px; height: 56px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>FOR THOSE WHO WANT TO KNOW MORE:</b></span=
-></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt; border=
+-style:none solid solid; border-color:currentcolor windowtext windowtext; b=
+ackground-color:gray; padding:0in 5.4pt; vertical-align:top; width:158.0468=
+75px; height:56px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>FOR THOSE WHO WANT TO KNOW MORE:</b></span><=
+/p>
 </td>
-<td colspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: medium 1p=
-t 1pt medium; border-style: none solid solid none; border-color: currentcol=
-or windowtext windowtext currentcolor; padding: 0in 5.4pt; width: 524.75px;=
- height: 56px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-&nbsp;For additional information refer the <span style=3D"color: rgb(70, 12=
-0, 134);"><u><a href=3D"https://wiki.whamcloud.com/display/DCO/Maloo+Releas=
-e+Notes#MalooReleaseNotes-v6.1.0" data-outlook-id=3D"b448082d-58b7-4918-abe=
-0-1b25feae04fc" style=3D"color: rgb(70, 120, 134); margin-top: 0px; margin-=
-bottom: 0px;">G</a>errit
+<td colspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:medium 1=
+pt 1pt medium; border-style:none solid solid none; border-color:currentcolo=
+r windowtext windowtext currentcolor; padding:0in 5.4pt; width:524.75px; he=
+ight:56px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+&nbsp;For additional information refer the <span style=3D"color:rgb(70,120,=
+134)"><u><a href=3D"https://wiki.whamcloud.com/display/DCO/Maloo+Release+No=
+tes#MalooReleaseNotes-v6.1.0" data-outlook-id=3D"b448082d-58b7-4918-abe0-1b=
+25feae04fc" style=3D"color:rgb(70,120,134); margin-top:0px; margin-bottom:0=
+px">G</a>errit
  Upgrade</u></span>&nbsp;page.</p>
 </td>
 </tr>
 <tr>
-<td class=3D"MsoNormalTable" style=3D"border-width: medium 1pt 1pt; border-=
-style: none solid solid; border-color: currentcolor windowtext windowtext; =
-background-color: gray; padding: 0in 5.4pt; vertical-align: top; width: 158=
-.046875px; height: 49px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"color: white;"><b>FOR SUPPORT:</b></span></p>
+<td class=3D"x_MsoNormalTable" style=3D"border-width:medium 1pt 1pt; border=
+-style:none solid solid; border-color:currentcolor windowtext windowtext; b=
+ackground-color:gray; padding:0in 5.4pt; vertical-align:top; width:158.0468=
+75px; height:49px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
+<span style=3D"color:white"><b>FOR SUPPORT:</b></span></p>
 </td>
-<td colspan=3D"3" class=3D"MsoNormalTable" style=3D"border-width: medium 1p=
-t 1pt medium; border-style: none solid solid none; border-color: currentcol=
-or windowtext windowtext currentcolor; padding: 0in 5.4pt; width: 524.75px;=
- height: 49px; box-sizing: border-box;">
-<p class=3D"MsoNormal" style=3D"line-height: normal; margin: 0in; font-fami=
-ly: Calibri, sans-serif; font-size: 11pt;">
+<td colspan=3D"3" class=3D"x_MsoNormalTable" style=3D"border-width:medium 1=
+pt 1pt medium; border-style:none solid solid none; border-color:currentcolo=
+r windowtext windowtext currentcolor; padding:0in 5.4pt; width:524.75px; he=
+ight:49px; box-sizing:border-box">
+<p class=3D"x_MsoNormal" style=3D"line-height:normal; margin:0in; font-fami=
+ly:Calibri,sans-serif; font-size:11pt">
 If you have any concerns or questions, email us at dl-exa-devops@whamcloud.=
 com&nbsp;</p>
 </td>
 </tr>
 </tbody>
 </table>
-<p class=3D"MsoNormal" style=3D"line-height: 105%; margin: 0in 0in 8pt; fon=
-t-family: Calibri, sans-serif; font-size: 11pt;">
-<span style=3D"font-family: Aptos, sans-serif; font-size: 12pt; line-height=
-: 105%;">&nbsp;</span></p>
+<p class=3D"x_MsoNormal" style=3D"line-height:105%; margin:0in 0in 8pt; fon=
+t-family:Calibri,sans-serif; font-size:11pt">
+<span style=3D"font-family:Aptos,sans-serif; font-size:12pt; line-height:10=
+5%">&nbsp;</span></p>
+</div>
 </div>
 </div>
 </div>
 </body>
 </html>
 
---_000_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_--
+--_000_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_--
 
---_004_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_
+--_004_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_
 Content-Type: image/png; name="image001.png"
 Content-Description: image001.png
 Content-Disposition: inline; filename="image001.png"; size=24011;
 	creation-date="Tue, 10 Jun 2025 16:38:14 GMT";
-	modification-date="Wed, 09 Jul 2025 13:48:04 GMT"
+	modification-date="Sun, 13 Jul 2025 00:06:07 GMT"
 Content-ID: <image001.png@01DBD9EB.62A7AEE0>
 Content-Transfer-Encoding: base64
 
@@ -913,9 +1028,9 @@ AkyACTABJsAEmAATYAJMgAkwASbABJgAE2ACTIAJMAEmwASYABNgAkyACTABJsAEmAATYAJMgAkw
 ASbABJjA/0ngT6vBPKESG8QBAAAAAElFTkSuQmCCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 AAAAAAAAAAAAAAAAAAA=
 
---_004_LV2PR19MB57177ADB8F4820795AC3654ACD49ALV2PR19MB5717namp_--
+--_004_LV2PR19MB57173DEB49C1E65202DE2A6ACD55ALV2PR19MB5717namp_--
 
---===============8900818390757976976==
+--===============8122317766123316324==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -926,4 +1041,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============8900818390757976976==--
+--===============8122317766123316324==--
