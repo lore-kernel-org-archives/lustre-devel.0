@@ -4,53 +4,49 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 3E13DCCF9F8
-	for <lustre-devel@archiver.kernel.org>; Tue,  4 Nov 2025 02:47:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id BFDA0CCFA04
+	for <lustre-devel@archiver.kernel.org>; Tue,  4 Nov 2025 16:44:02 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d0tCt0xxLz1y22;
-	Mon, 03 Nov 2025 18:47:38 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d1DdX5Mzdz1yDJ;
+	Tue, 04 Nov 2025 08:37:36 -0800 (PST)
 Received: from outbound-ip191a.ess.barracuda.com
  (outbound-ip191a.ess.barracuda.com [209.222.82.58])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4d0tCg2DXhz1wgn
- for <lustre-devel@lists.lustre.org>; Mon, 03 Nov 2025 18:47:27 -0800 (PST)
-Received: from BYAPR05CU005.outbound.protection.outlook.com
- (mail-westusazon11020117.outbound.protection.outlook.com [52.101.85.117]) by
- mx-outbound47-216.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
+ by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id
+ 4d1DdL24gSz1y4F
+ for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 08:37:26 -0800 (PST)
+Received: from DM1PR04CU001.outbound.protection.outlook.com
+ (mail-centralusazon11020114.outbound.protection.outlook.com [52.101.61.114])
+ by mx-outbound15-122.us-east-2a.ess.aws.cudaops.com (version=TLSv1.2
  cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Tue, 04 Nov 2025 02:47:24 +0000
+ Tue, 04 Nov 2025 16:36:24 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=Xu0jC0lsn11W5GiGpBmkdmL4OHEnxPaRlxwbk68GVtuQHqr9pp3zdlHC9ExNdtQQLH+ka3uV20Dr/CV1CqJ4CkQqXCrE6jqJ5c+kKtj34xewli/9CjpWjsvImASTKj4sZBmDf7JxEGrhAiMZJgczlCj8IOpLJ69OovdIXgzQ3NaXfYeow38ga7ZrIhLg20hXzraR5iZU7NSaI7sE5ZHi710OMxQdLmrkc+DnKgsLTIMVu5m6z1Uafr/O+ZI3Z4kpacF1XQqe4Si9HgkN9bu6VrtfsiTHDMyYQkGsKgOuVm1sUhrRyMKe79PtZuoNBAzeijSXNn8p91Hok2xjkxWcdg==
+ b=a+iFeKC7UAMOYiUBej8U0WUZPBsljBUPjpJVg8Heoll4UkW5NLUnoqwr7gAiSyBQXYaq0T7PO+DoAuGcU9aczryUX8BLVi8H1ECqz+9pd37R1iVpccgADPnDshqKXlYyUu5SThMj6s4zqRusR6Q4RjjU8LAetvkeFw86NyCMSAlwx6pGiskvDJmL1cwcxAOPKEDejc5nehSvMwD2I79svsOJHwBVI0f+Qi1L/SIIMr9ngPdkIedQQC2u4hh3yCyCFqpGSXD0vIW2l+G2iwrpZ9dyCdMxbXv85365gdNKDiuknYx/ooOx/jhM0bgwVNZg2+FY9jUeaJEYsJYZkT53yA==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=gjSgrEV4AVPRWaRtPC8qOr5XhAmpHD8nujJkY5BuxM4=;
- b=U5RWTd/2CeH+lbZObFjekkjKglsIj27Hkkw+XaRxYKnw/q4oXBo3BG39yvNAYSQllaOKa5EEujHIw4MWQdQXI8nskCkrNnwokwdkxt5LGTY0rF6RlYCLUXC4lWbDpr0evbQxNUAL+D1bxeVMNh/MlG7bSip1iy3/0/4n0zdTGmdyp2K5DhTjr3dbfk+MoTvqZakTxDcOEIXKmQUWRYqNhC1/WV8aP9kaVz1i3r2wxkH4PxUWC9FYS12GrF+GfgtWoqr2f28Yr8+gRPWy+5z0KIgMVySlelojuPSM1Gh5EZ/MswK2LPq/LqyUwN88QpnIj5NifHOhK6vWFEZp7mNGyg==
+ bh=ic2N88QkrM/CQ3kT0hYnm1hDlcT32vjjgM1to8QRvTc=;
+ b=RqcBJvjEsmUmRfmWsChb+88KlSE23iqNYSMHk+mHllnmNs2Qo5aSfTuZiXn9Qyl3SvLvFQJYYms7QxDCA3v8321MAZh4Gn8xv2H4UkloB3wPXoACbTjXlTx5yys4CsHopn45U2BJ3uRAlEhRFyhIOKRVAvcsXbf09lFmhSZwzEYWrHzinrfGjf/CXe68AgUklnzFBESj9IR6jDT2I7/Dt2BS2EkztCSskHGmcSGHlxO6f/ulCerZ0boLzu1BaG0PK+veHUsBYYU1I8HyU/b4+zdX/Mx1gOlUD0qYrbNanxd/z70dmZ2Y1Ng/Foqg/OgeeC1hAEBySP1RaRg1adTLlw==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
  smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
  header.d=ddn.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=gjSgrEV4AVPRWaRtPC8qOr5XhAmpHD8nujJkY5BuxM4=;
- b=ZSMKws5WPyUogXw49IQ766wvtjGZ7D+QnFaMSsNA3xzLtLumnWudyIvRPFVllz9bgJlWHTAPeuHYTx/ElWvU9AGgrZfY5b6zPCLCGXT9WIikw/u8eQ2+mTZHOiWqWLOLiHW497HHluFuRZjNTTE9no8//Z92upZtpxTlPpn3X7g=
-Received: from DM6PR19MB2636.namprd19.prod.outlook.com (2603:10b6:5:15f::15)
- by IA3PR19MB8761.namprd19.prod.outlook.com (2603:10b6:208:50e::16) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9275.16; Tue, 4 Nov
- 2025 02:47:21 +0000
-Received: from DM6PR19MB2636.namprd19.prod.outlook.com
- ([fe80::48f4:9756:558e:f02c]) by DM6PR19MB2636.namprd19.prod.outlook.com
- ([fe80::48f4:9756:558e:f02c%5]) with mapi id 15.20.9275.013; Tue, 4 Nov 2025
- 02:47:21 +0000
-To: Oleg Drokin via lustre-devel <lustre-devel@lists.lustre.org>,
- "jinshanx@google.com" <jinshanx@google.com>, Oleg Drokin
- <green@whamcloud.com>
+ bh=ic2N88QkrM/CQ3kT0hYnm1hDlcT32vjjgM1to8QRvTc=;
+ b=IobjRuL5BTgy2JfOsAPbJ9zUxUATuXa3HRwqr7EkyOG8Q2Fw7RbSVteYMx0K0CPWdKX2CJTH32/KLt4Vp9crFbWs5lReHyLA64zoaEukUjlGI3Kh90Mt7gvmvpWVonj3PzMldCi9DSHc60CxZ80D2BX2hCMUJFzYKh/xwNTB90U=
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com (2603:10b6:303:189::12)
+ by CH4PR19MB8562.namprd19.prod.outlook.com (2603:10b6:610:231::14)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9298.7; Tue, 4 Nov
+ 2025 16:36:13 +0000
+Received: from MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::e1df:47f8:9e7b:c4ea]) by MW4PR19MB5630.namprd19.prod.outlook.com
+ ([fe80::e1df:47f8:9e7b:c4ea%7]) with mapi id 15.20.9298.006; Tue, 4 Nov 2025
+ 16:36:13 +0000
+To: Oleg Drokin <green@whamcloud.com>
 Thread-Topic: [lustre-devel] RFC: Spill device for Lustre OSD
-Thread-Index: AQHcTQ0r4j1Aax3hO0uk16UW69NCCrThlTEAgAAN0YCAAAMnAIAABRWAgAAXyYCAAAyKGg==
-Date: Tue, 4 Nov 2025 02:47:21 +0000
-Message-ID: <DM6PR19MB263631D5057975AB09DB7F60C9C4A@DM6PR19MB2636.namprd19.prod.outlook.com>
+Thread-Index: AQHcTE+oyTsUrj6dQkiChGfZaurnlbThgYYAgAAVJgCAAA3RgIAAAycAgAAFFYCAABfJgIAA9RKA
+Date: Tue, 4 Nov 2025 16:36:13 +0000
+Message-ID: <54DC145F-B965-4B04-8B03-473A845892F6@ddn.com>
 References: <e2c69a503e80f3ba59d69f093bc8df519cdd7f66.camel@whamcloud.com>
  <BFDDAAED-BA9A-44DB-BCD0-B3B84E652FE7@gmail.com>
  <c6c016567a02f857303eedb9a4af6b5831c2c818.camel@whamcloud.com>
@@ -61,108 +57,121 @@ Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
+x-mailer: Apple Mail (2.3826.200.121)
 authentication-results: dkim=none (message not signed)
  header.d=none;dmarc=none action=none header.from=ddn.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: DM6PR19MB2636:EE_|IA3PR19MB8761:EE_
-x-ms-office365-filtering-correlation-id: 3c9a2df0-003a-428a-863c-08de1b4c7a1f
+x-ms-traffictypediagnostic: MW4PR19MB5630:EE_|CH4PR19MB8562:EE_
+x-ms-office365-filtering-correlation-id: bf94972b-8df3-4e56-9aa0-08de1bc044ba
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|19092799006|1800799024|376014|366016|13003099007|8096899003|7053199007|38070700021;
-x-microsoft-antispam-message-info: =?Windows-1252?Q?zHCC3pjOTg4o10ElmADd43ULzfN6pWyTVscD8AdSZrxphgpunLnXqm9O?=
- =?Windows-1252?Q?ovuynAN8XPJSJGj83wKm7maxbT0lMyfyr6QX8yW009uR892BLilFGWQb?=
- =?Windows-1252?Q?Ex5FHnxxxL4L4+a9ysw2wpIovG0BWhFiNQV5arvt3AWEyu0TQrgVg5cc?=
- =?Windows-1252?Q?W9rLjlu3uqRng6dPlPrMPPUs/8coyHM9BGn+seIED0z2iMJyhdUgBgHD?=
- =?Windows-1252?Q?dVf4mWgys9cGIiRT36Daeb4NbNx31/CF/vVhHy7ORbnxliHlPyJCeM/a?=
- =?Windows-1252?Q?Rh9JBym30oyPn8wmxS9qEDBRLrqxlsXTuWHl+j01jF+mZFjSRQTYePY1?=
- =?Windows-1252?Q?8X1NPWzuOAliySYH80q9ZqZp9Mx3GHabM3aODEiXF2S7IBnLDmOq3W9S?=
- =?Windows-1252?Q?PdxJ5Ht5IRnbvfSy20FYXNxCWd/msB946uJO4kyHmZ0AP3Zk/e1RaQRA?=
- =?Windows-1252?Q?vdDBi74s8UEMUoiNQ4E9Kj1OGzdFCogxnyQBjCUqBF8cxA8sd/xXc5cc?=
- =?Windows-1252?Q?lj6vFqbuIYjnftXHRAIBh6UEVoVEzK6Db8B04LOBMub185Jth9OpCpXr?=
- =?Windows-1252?Q?maSDVs/2W9KG2llOuG8/FKi7OJFMgLVN5Lm3RPqlSi7NukS0ve9BGr4Z?=
- =?Windows-1252?Q?NH1ssRe4eHLql/6lLQMnJQuxV0Ug6STSCAn4XvIZoTKXY6DE/k4xrjfD?=
- =?Windows-1252?Q?zFpgVH0wLn6/XpN3x+ZkI/BrUclmwRG0ydY7EMPOlbkR1n6DPYVAoYXK?=
- =?Windows-1252?Q?j9yJ0xtc6TngpMl0Uq+zMgh/CGN1WScKGlgHiFZWeKt2NFmEBXscpSLh?=
- =?Windows-1252?Q?Kn8jwkZYMTS6nF6e92NHq32+CtvLat0PlEhYgd2bRqsvJF2y5kd8PblY?=
- =?Windows-1252?Q?jPfe0E/TmNkhcVBhf02uOG6bf4f6BGRVygNI+CO7Ztr/JM6HmMr3oZ1L?=
- =?Windows-1252?Q?oF1BeMRQfknD0/4KtOhKgx19NpoYtgr8aAwg7NJcfxhArtW2v04kOCua?=
- =?Windows-1252?Q?K2OaSTrA5Lw0QWrhGXgKx7WLKuf1RNel2e4TnKinROMXNcYE0eEBsHey?=
- =?Windows-1252?Q?fqEiQ8YG6Q9mhsIPE1goyowBeJocvTQKaW6zg1rZ1BjNiH2vp0QSWsvK?=
- =?Windows-1252?Q?jDpvpHkvCd0FgHr3a5UiWx8Riw0dhb51nRn5Rf4WTQKxl3znB1DFfRZf?=
- =?Windows-1252?Q?sCgkN5SCiBh5HInK6YmDqGpbkQsa7k3KoCBJY3R2D6yLDqqcLSH+oVd7?=
- =?Windows-1252?Q?cqupJDwMrm3o1E70ByWKD6c4/KDS3onBu369ktAstmhPfloexkPKNk5W?=
- =?Windows-1252?Q?scPHeiMRiRqCvQDrbhGn7IHN/plblb0h3fflGF14swINJwEgNWAe6Gbb?=
- =?Windows-1252?Q?+Agz1AwvNtlityL8zovdtSec6P6kguv/wY2UPqpEljpOfVRBl1gLgdoX?=
- =?Windows-1252?Q?2bNh8jDQIBNx6e61C0pdLYYA1Vx/jMPz+t/dWHTKcyYl0NYn17O2vYtc?=
- =?Windows-1252?Q?A+ZWXm7ih7xHwEkd7ixu6wJ/bv+xy+a05TrUaVHY3zY1ARd0QfL8iLnF?=
- =?Windows-1252?Q?8wbgiiyIJv9Oi7tYHJSnTyxbgGBbD52G4Tqbgts01xBlJyaAxIcey8ds?=
- =?Windows-1252?Q?yeD4SX/50feHVct96d/h/fxs?=
+ ARA:13230040|376014|19092799006|1800799024|366016|38070700021|13003099007|8096899003;
+x-microsoft-antispam-message-info: =?utf-8?B?YXZ3MWUyTXBaM2ZOSklxQU00c2dva3VqbnJsZTZSZVpLVmtxZ0NSNm8vdGpW?=
+ =?utf-8?B?K0loajNYR2orTytzYzJRWVJNbVNpbjFWUFZDVGtnSzhoeDBSa2RoU25sZXpO?=
+ =?utf-8?B?c3ZBZGNtRFB1cUU4NnZpeHJ5UjhiSi9qc0FnQ0RJSVAwOXZvTU5vc2dPRmFs?=
+ =?utf-8?B?bFduQXhINlRWaWR4dFRVRFA2TkxFYnNVcTZvR1RqdkZHVVhvQ3B3YUxkUDVs?=
+ =?utf-8?B?WFZROWZLYmh6SG1iSGkvZXcwU0wyaWU4a3lBS1lmOHAvRkxYOTBlRi96bDA0?=
+ =?utf-8?B?aHpoS0pHaFJSZnpoNXFHcmVONzU5UU1UazlxazMrQmp6R3Q0Q0dJWlFtelpC?=
+ =?utf-8?B?b01jck1DUVpVeDZTYjRmbEpkSjFoc3pTWjhra0Z6SE90amk4UnBkdnVNSTZX?=
+ =?utf-8?B?Z0Z5emhBZkxSaGsxVUpPcWlKbWc2WHFCcG4zUTJDWDllWlUzWUQzTzV0WU80?=
+ =?utf-8?B?dWpXZGFKSUtkUVB2UGxpb2lVdU1Uc2wycE9LZHh5aU5weWJWWGVsYitFd3JI?=
+ =?utf-8?B?Y2tSK0hqeGxGN2VOUFJpVmJyYXU5L3FJQ3gvS3gwUk91SzVGYWFzRzhjU2F1?=
+ =?utf-8?B?Y3lQUmNBdHZNanlxWmQwODM4UC9paW91UklKTDdpMmV5aVcvcGFsTlVJUEtV?=
+ =?utf-8?B?ZGN2d2gvMzhXOGxOaWR2U096N0hHK050WEJUdHh6VXNsSjg2NmUxNGZXMFZq?=
+ =?utf-8?B?ME9UbkpBOU1HQkJlOEhIMlgwMktlRUxDWS9uaHNBS1pGOHZaQWJjUEtrL2dY?=
+ =?utf-8?B?WUpmNDVhYmZlN3dDV2svK2Z4Mlh1VHYwRllZRHJKN1Fxem02YlFCUGV2dUFF?=
+ =?utf-8?B?U2Q4QkVNUUJXWlN2RTBOQ3VMU2R3RXVUaC9ZdC9ndy9pdUVLNThLNkdoUmM0?=
+ =?utf-8?B?Z2ZZMkFkb1h2R3RrbldGSUJNSkt2TmhuUGJ5amQ0UlM1eCtYWjNNaTVjMHFh?=
+ =?utf-8?B?MGpwTzlIbHRSRVU0NDBISkhmc1JjenRuZ1N4bmJmODFoeEYweDlMWFVldFp2?=
+ =?utf-8?B?cjN3SExvQ0MxUmdDNXRiZVZYMnZ2UlBXMGZhSnJjd2EvNThQalVBaitSdTFP?=
+ =?utf-8?B?bHQ0dlYxZEJ3WUVwRmlMYW53aHZPR1Z5ejY3UXFMd3MwQVM1dFFHc2U4aVJj?=
+ =?utf-8?B?VlZFRVdpQ1V6MkI3WXNzNU5WNUVlaFlxVm5lYnJ4QktjNnhCMWtBb1VGSnl0?=
+ =?utf-8?B?ZmxJOC8zQ2p1NkEwYmdOclJPUS9SY2g5SUdJb1YydnBHUFZnZlI0d2ZJY1h1?=
+ =?utf-8?B?Tzh3VWRycXU4M0NGVzNwalhlUHZza1Fpb3BZWU01V0hxRlRrbk5YL2JDSXZO?=
+ =?utf-8?B?RjRrUzhTellPUE9ocnRBOW53S3RvWGorOEsxSEEvQXdmemVGRHNvYnhMMVZ6?=
+ =?utf-8?B?Z0F4V3pBTm5ZY0RxMFBIaEgwQ2hBVGhGWkVJemVhd0h0S2F0eWR5RENiOGlT?=
+ =?utf-8?B?M3lsbjZGZXV1dEhxSlh0amFNaGJTNTZBK3RzbkxKNWVzUXZhZEpSOW1xNjdM?=
+ =?utf-8?B?QnZVdmFWVmwrbEZJVGhPcGxLcVBORVJoaEZENUJVclNZVmRlMlBibnpHSnRS?=
+ =?utf-8?B?TUUxOEpOcWpSc1U2YWMzOUlSa3ZibUdndDlmcjA4VWNoSzJFcDQwY1p6RGE2?=
+ =?utf-8?B?SXd4aFNKZ0pCV3dDS01aclN1ayt5NENCd1QyaHBTRURSZDBWaVl2OWNmSjdl?=
+ =?utf-8?B?ZDhIMTh5eHdLV1dNc2gyenQ2VVUwaFBJemhIemg0b21INGo0Nk5pM0RIVE9U?=
+ =?utf-8?B?ZkgyRFVFNWpGSTFieGV6SGxGZXExWS92YmphV3VIT25sck5FOWJzY2ZHTnVV?=
+ =?utf-8?B?TUhjYVl2VXlScEFoVm1iTkJJanNhcUNxOXoyMXlRejhjS1VDV2ozNGdyeXk1?=
+ =?utf-8?B?bDAwRjFwV0Iwazg5azRCbW10Tis5OEg3L0RhZ3lPYjJVVUE5UlMyOXZ6Mlhy?=
+ =?utf-8?B?Q3NSRTZEQWcvNHh2KzVVblZGdGhiUCtSUlB5K3lqSXRZcDNUbTRlRmNXWi9V?=
+ =?utf-8?B?TnR0aTZUMzdnPT0=?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:DM6PR19MB2636.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(19092799006)(1800799024)(376014)(366016)(13003099007)(8096899003)(7053199007)(38070700021);
+ IPV:NLI; SFV:NSPM; H:MW4PR19MB5630.namprd19.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(376014)(19092799006)(1800799024)(366016)(38070700021)(13003099007)(8096899003);
  DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?Windows-1252?Q?XAC/RjyGkHpUAN0ks7jBIVcq04O5G28KdNDZOA4VK5x28co+GL5Yz8Oj?=
- =?Windows-1252?Q?R9QlpgKC+FoQ8FdbCZO3xU09c78DYHpoIS8a60t0poGsV/ovnNd7Xit/?=
- =?Windows-1252?Q?98m0s6ihmgGNnmdgyiE4sFYOksVrE/psE2ocUtOP2SWE8mA4KOE5vKO+?=
- =?Windows-1252?Q?07C35wpuZj2hinM8pPdDYCwKc2ITUq/ALvqAdLGloyLGQAyfMEl/mD4B?=
- =?Windows-1252?Q?iJ18wK3IChfxmvdANVo+JW5I2PqBFYVBRMb+IDnYByCDolOSogTLpbZ/?=
- =?Windows-1252?Q?OrbwDao046q9nB0qDwgCzotC5GQEUQ/N+TWchWDJBx0sOCaNK1wDcKRD?=
- =?Windows-1252?Q?xgR1eTbiaXyVrXHILIPPImrJmDsKYwIL2h1w3/dihkAcESoozVuQVoND?=
- =?Windows-1252?Q?VdFwAJ9HhjNg3uU2l9vdVtaLj3ua5acfifVbf0lvoi8a5waYKnxq9y0m?=
- =?Windows-1252?Q?BXiDh6uoPBnI87lNAaETmwapiV7xSA5VeA3/0t2MzIamiwUR/e2FzXZI?=
- =?Windows-1252?Q?NtGoALl7F+r6U+Am/wxU/dwLLqXyWhimciw/Uwt/gNUmPmJGgzzCaSpe?=
- =?Windows-1252?Q?F3/dU8qOJksWfMGqMv+GZXDcoVVKHQHaQ+TtWVyN01hOhJhHC8TALQkD?=
- =?Windows-1252?Q?bnkkLAsmmXk5vSGZ4BSsjl4yW+RVZCvF4GMprroT4TtKpB1HXEKjmJr+?=
- =?Windows-1252?Q?LcCQxKIP/VsDjmC+CiVYYg7fHxJNe25+KB3B+CQmhLWpxNgixoLi63f9?=
- =?Windows-1252?Q?E1eM/wh2kQ6z3+0Nq/rXrNpDRZNgCExyD7DIypQy1tsZjrU3ce1dNO+7?=
- =?Windows-1252?Q?mElYCjcIRCoveAl2jHHspNCMB2mXS1/LLUJNDGsUpvTjIB6TBpHAk5/T?=
- =?Windows-1252?Q?3NJJmxJ3givJsSYLnft7ui9aRDzqAdN4inserAFIrnvWGFLszVqiv3n4?=
- =?Windows-1252?Q?t0pVv8wzk62CuoBUGse2IxGglt9NlmSCKz9tim6MLUxvf0fot3+hR8Vg?=
- =?Windows-1252?Q?Qd3KIbWPHQmAV4yg/zBdsjUNBCJI+jiYXsrUMk+hkk62IH4AlaiMJ/Sh?=
- =?Windows-1252?Q?kU2hVNvbCw5SquZT3OwLJGXijUNAgTbRUVXKUU6EMxed33mssrNm2TI8?=
- =?Windows-1252?Q?NlmwPu26KRuxFsadMVColZvOyklUo42bk3RNwXlFf5yCEtmLIo80FTXp?=
- =?Windows-1252?Q?UR62cHsrS4952jXi0yzDQ7GHibMmNMBOob8zTmGazfqFnAjHUc3qT1Jx?=
- =?Windows-1252?Q?oxCwBsvWCf4pS3eBhULOZcfMJgqDYBUDamhutZrqalSRK4EyW1XztEuj?=
- =?Windows-1252?Q?9dvThy38cwIZjUuTHp2n/hvBpZezt7M8MueUng8WU3d0ZXIzW38qBYKS?=
- =?Windows-1252?Q?eEAZrcRMEH5ij46e4eSTibD7hstautsnK6jNxipRSMKTTtyfn5v8RoBl?=
- =?Windows-1252?Q?owY5owu/7ALU8rqf9Izq+uyU8DezL56uL565D/L1T6UuSOB3C/jo7CMr?=
- =?Windows-1252?Q?0W/2g4KaEeBobWA2TN6Og4W0TlL4Nqk+j08tfBmp6RIKswktZx30T06V?=
- =?Windows-1252?Q?qjEr5VwO5g563oBB5cnJNWZahofjefEQmaXVQw2kJbVWP17/fWqiKmYo?=
- =?Windows-1252?Q?nDP2H6NMINw4RK6CPqBAWcjFQgbxixZgGMNZvDG1Ur6fvsQttsR+TSxA?=
- =?Windows-1252?Q?/LaHUV6kBDM=3D?=
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?OXhIeGV1NzYrR2lITHgzaEpZY0ZWQzlHMTFpdzRNZXJ1eUttVithUXlDUnpE?=
+ =?utf-8?B?TDlDeDJtNExpbGkvaUFyTUQxYWl5RHlIYUJadm00RWZESTh2SlZVK28xdWVh?=
+ =?utf-8?B?OUdjYS8xQU5UdE5pODNabDk2aUJ0R3J4c1VTY2dWRDczcjFDRkNjaFZZUlRv?=
+ =?utf-8?B?R2ROazJNUlplSXlEVmN4aHQ1SEtMemdMMnFoU2hvbGNSN2Q1T0g3SjRiUEdU?=
+ =?utf-8?B?UklQMnMxcy9aam12NVREY2NoSWF1dHZHR0RiZ2pNcGhRSzZZanMrem0raFdx?=
+ =?utf-8?B?OFFEOUxXQkcrYnRmSURLWEdsZS84b3JoMmtJTDdWbnMxUGJ1K1lzdllYTHZh?=
+ =?utf-8?B?TjRwekh6NEl5eG1tVWZQVkxHTXhBMG15bzNVSlFDcWdLWlZ5M1B1aDAzRk9w?=
+ =?utf-8?B?bmFwN0FsS3lnYkhzazRkNytxcW56OUxCTUtyMXlPNUljWWFrVVY0eUNZa1F6?=
+ =?utf-8?B?cUR6bkppeHlwUk9pd2h6aTlYZXNoTWs2b08weFBpKytUVGM3RWxUc3phTzdI?=
+ =?utf-8?B?NmxXMzFRMTJDMURzdGVENzJFRjRNYnNQeXdqaEdqQU1iL3BnU1VnSGpVT1FE?=
+ =?utf-8?B?QTd1RkdPR2dyM3g2SHl6ZkoxZ1pjT0JBVGduVzVramdMQ3JkeEtUSHFUSk91?=
+ =?utf-8?B?NGhvbGVFYzl3cHF4QlpITWhvb1I3cjNLY2ZTN1ZKRkRYdXBiUGxEWDRTcmxO?=
+ =?utf-8?B?L3JVOW1GZUFkcTlYdVY1THhHL216cXIwRmhFb3dTOWJCb3Z6NE1vUHhJSWdu?=
+ =?utf-8?B?cXVNNDM3a0NBdGF5di95czVTeGFrVEhDajU5S3JrZVFJQ280dTFMTW4yTktR?=
+ =?utf-8?B?TUpNMktBUWUxSk1Pdmg0bENYd045VG94cXZLeW03cFNFa3FHOGNyZmR4Y1R6?=
+ =?utf-8?B?aTZJaFNZOFZOYTNwQWU2Q3piVHY4TnRCdUd2TUxzZG5ISDlvZklhNjBhWkxh?=
+ =?utf-8?B?UStOMUd6bk00Rzl0OXVDQ2VITlJiczdsR3QrL2N5Y0ErYVlKMnpSTnNDQWRZ?=
+ =?utf-8?B?OGxnVWkwNmw3aXVET2FVL3FKYVJQR1oxczUza2pjZm1PN3dNaUJZaXdxSFVi?=
+ =?utf-8?B?cHNhMHRKUnNBT1VYbGR4NmZaMkx6dTY1REpwMkZMNTdCaU1XZUtEeUFVOTY5?=
+ =?utf-8?B?YVU2SkFPTUpYNU1YUUtQSDdwR29CQ3hGRDNTTVh3eVJiNjgveURzZ3ZaQVRv?=
+ =?utf-8?B?ZVBJaWdwMkMvSExKMzNjRlpETDkzdUNBOXpRTDNCTE45blR6OUlsKzVTblFl?=
+ =?utf-8?B?aVlLeVB6ZTRnOGMxTjVXeS8yU0dFTERWR1c5dXZHVGd2ckdwdHlLQk9leVVT?=
+ =?utf-8?B?bnQ0ODErajBBUGRvWHFUV0o4UU5GUmh2MTlFR1NpbndWOUdOQXJCdEMvbkg2?=
+ =?utf-8?B?T1hoYTlpelJkTEdVa0pOcE51UUlrWU9FK0xPUUxESWt0OXZlSEFZMHB2aXJj?=
+ =?utf-8?B?Z2tNdlhkSllRdFRVVzMydWdEMTN4NXEwS3dnN0FDRytBSEh1Y2VEK0RyeXRT?=
+ =?utf-8?B?Wkxvc21PVVNRR01ObGRwZ2VPNjlBTG5OQUdLZDZxY1VNd2JYTFdpK1BsQ2FE?=
+ =?utf-8?B?MjFxOVlRQ0RER3RlZ09Vd1c0dCthdkNwRmJQcUdSYkcxZ3Jkc0R0UXRJNCtl?=
+ =?utf-8?B?T1NGV2NBL0tuRy9nMHNwN3FUZlhCOXI4cUlFeU5FYXI3M1lpWU4yN0prejEr?=
+ =?utf-8?B?Z0o0b3dGbUx4eEF1bGNNdE8xUStIZmd2NVlYNlZldzNUQklrcDVFTjJYZkgr?=
+ =?utf-8?B?UnREVitjSFJCZG04QmlVZy81TlYzNEZ2ZElEWGEySjN1N2NtWTgvVzdudWRU?=
+ =?utf-8?B?ZHdLa1JkUEVZd1JzbTJNRFkxY3VhZWZUcEZuYkJqRVNPTlFhaHZVOGFNK20z?=
+ =?utf-8?B?bSt3eHJOWlp1M0w3M09MY1RYb3B6eHZycDRJdDhMM3o0SUVYYWwva2t6Z096?=
+ =?utf-8?B?UThzTnNVSk9IT0R6UU1IdEZRelYvSmJtU1l3ZE50RUN3Ui9PbnA3VzdqVWRY?=
+ =?utf-8?B?cTJ5SUQ1T0tmZDQ0QW95NGh4S0ttL0dLUE5EVGJ2anRobGpuWGE0UEN0RXFl?=
+ =?utf-8?B?bCtDV2poK2dvYlB1TTFNcVArb2ZMbGdrTDZwSHExL3NsSUNkczRVK09icDhG?=
+ =?utf-8?Q?l7d9fsl7ZO/8a23Z4DsrS77z3?=
 MIME-Version: 1.0
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: 7nbYmlL1C/ZS+zi+ORY0XYKv2AXhCdlSFwCjcrj+mzsCreWJXJj5yc8EjmNp7BOaZo0xdORodq3M3/1vZJgpHQBh21yyToa1jHA9gbZshabvoBYeLzuCQu6kEnvIC8nAHsjP1/eO2XkvFoEh4PBkDb3+SCdwYIC4WKdjWWXm/wZbMakB+yP5sj1MB+RZzACDXdtQF1pwrU9cB8YNinOA91glTKOlX1VwAinQRtjBUYroKkSvJY4kyBOgIRHBc/SNx84xDHtKzKs1eKXkZOPSsS4rvXjnZysim9KLo1rv/7Uei6ChueNlh6ZaKu6OnxASMXRpBN/hYQJnhqq10VcP0wjN+5vw77RofBXPN5/WHQ93Uk75y9be6MQcoFhD2dLK88a39C+UV2NQkkD1AkS9kLQX6fO4GDa7xvQnuCSGJ8GEHpTeQlhDO9qPDz/tyGDmuJFdX9R5EJcjhGKClW3fPSO3q4PSkxAqi1eyHs02HcWS71kSwsXylLAIBuwNKgzSlGufbmw7ny7qwedrHm+6ailqzdqLez01dCvwfb48ZjtcAqX5ErVjS6lQBzogN6vGa2jC3bFB108BE9rpoub0H9ncPZd+SxpF2x3holzaoJf32dXTHF8qB8CIstrJYZXe2vjP20sft6BNU3dPT4tErQ==
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: ncguZDVQpRGnkPesir1gqZT6mAi2igq8c6u1PXA1Ftr8KGfCLAmLkwbj8IpZv8eEVDJa+Uo0itWJvlrT1pyq3e8FsLHfrjwZFIkHdc7c7TeOZkueqe2eDh2kne5kdMjSTBxG/bWP6V2mF07OYBj8UAL+o4FU5knR3P8Sq73PFi1CVommH17DtrjvPvihWG4aXw86KK7c/Q3AX7q6ypnKZzMTzRIU+pT/nscGTY77nMRpfE7wgtjYmY7V0tSrev/rWw7tmImaek5Xy0bbvnCKTJhmeUX+TfI1VZn/xzrPTHqm3uj2r9ok+BANLuZCGczCYe6lwxWrymW5G0Lwn/ZPZbG2qnuYi5GCM/MgG5BM5Ta8PlRi+vx9xLAMCs+t2ZnBWLyTYgmLIDe0UD+xqViLaWodPsTr+Mzgm2ogW9jKIvq5gTjZ/YJlt3r1yZ3q7mbTSYjs/Gt55+LTREVPm9hrwH/Cf0ty60fP3gcXGAL+QgKHDTbXkY8p69kJTc3TE4hXz3IXsmB1FSmcULDNmEMXtyej2eJhfHjd4wVzAk0DTPwqT5gPKKabkPNT1cgEl9BG9wZ3h8PA3lKQMvYKejhZKMNRSNlk2V7TRSoADx2l0x2itzVzpTlfAHfnXfO33C+UdUTm2zyLfckKs+dsLJ9iEQ==
 X-OriginatorOrg: ddn.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: DM6PR19MB2636.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3c9a2df0-003a-428a-863c-08de1b4c7a1f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Nov 2025 02:47:21.2931 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: MW4PR19MB5630.namprd19.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: bf94972b-8df3-4e56-9aa0-08de1bc044ba
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Nov 2025 16:36:13.3056 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: v++DMXN5cHJ/7Qkv7B4mLOUJb5F29KFAPj6ZUhTLb1T9iH1pCd89Ckj1ruoXcdoB8h/tXS5NQHJQcok7hKBBZA==
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: IA3PR19MB8761
-X-BESS-ID: 1762224444-112248-9743-7244-1
+X-MS-Exchange-CrossTenant-userprincipalname: wDWIUt4Or4PCbbUIzJiZrGzPRWaEJZ6Vo43C77m+3Xs+FHSDr63Mz9qpjQv0iMaL
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CH4PR19MB8562
+X-BESS-ID: 1762274183-103962-7711-6121-1
 X-BESS-VER: 2019.1_20251103.1605
-X-BESS-Apparent-Source-IP: 52.101.85.117
-X-BESS-Parts: H4sIAAAAAAACAzXMsQqGMAwE4HfJ7JA0Nml9FXFI24DLj4MdBPHd7eC/HMfBd+
- sNfnVYoI+c4DhhEWYabR9jY5wDExYVNg2OzT1xqCbUMlKCZ/r7vf8+n0Tx87EiS1bL0Y
- jdNWotVAyjjz9KAZ7tBdEXHtWBAAAA
-X-BESS-Outbound-Spam-Score: 0.10
+X-BESS-Apparent-Source-IP: 52.101.61.114
+X-BESS-Parts: H4sIAAAAAAACAzXLsQ6DMAyE4XfxzHCOceLwKlUHSGKxIIZmqFTx7s0Ay+nXSd
+ /rR+3baaE+dqLzQwtDeNQ+Tkd0g7RQBDlYUAG8qiEJrKDSNT1+78ftVSTenlflpFyVZY
+ vGnte0zdnKrAGtBqfr/QdH21FAgQAAAA==
+X-BESS-Outbound-Spam-Score: 0.00
 X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.268692 [from 
- cloudscan14-254.us-east-2a.ess.aws.cudaops.com]
+ rules version 3.2.2.268706 [from 
+ cloudscan10-159.us-east-2a.ess.aws.cudaops.com]
  Rule breakdown below
  pts rule name              description
  ---- ---------------------- --------------------------------
  0.00 HTML_MESSAGE           BODY: HTML included in message 
- 0.10 BSF_SC0_SA085          META: Custom Rule SA085 
  0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
-X-BESS-Outbound-Spam-Status: SCORE=0.10 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_SC0_SA085, BSF_BESS_OUTBOUND
+X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
+ KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND
 X-BESS-BRTS-Status: 1
 Subject: Re: [lustre-devel] RFC: Spill device for Lustre OSD
 X-BeenThere: lustre-devel@lists.lustre.org
@@ -177,393 +186,146 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Patrick Farrell via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Patrick Farrell <pfarrell@ddn.com>
-Content-Type: multipart/mixed; boundary="===============3701145815734774479=="
+From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Andreas Dilger <adilger@ddn.com>
+Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============5443643566574501244=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============3701145815734774479==
+--===============5443643566574501244==
 Content-Language: en-US
 Content-Type: multipart/alternative;
-	boundary="_000_DM6PR19MB263631D5057975AB09DB7F60C9C4ADM6PR19MB2636namp_"
+	boundary="_000_54DC145FB9654B048B03473A845892F6ddncom_"
 
---_000_DM6PR19MB263631D5057975AB09DB7F60C9C4ADM6PR19MB2636namp_
-Content-Type: text/plain; charset="Windows-1252"
-Content-Transfer-Encoding: quoted-printable
+--_000_54DC145FB9654B048B03473A845892F6ddncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-I haven=92t seen any mention of failover yet in this conversation (may have=
- missed it), but if the device is truly local, then in failed over configur=
-ations the data is inaccessible.  If it=92s *not* local, why not just make =
-the device part of the OST or an independent OST?
+T24gTm92IDMsIDIwMjUsIGF0IDE4OjU4LCBPbGVnIERyb2tpbiB2aWEgbHVzdHJlLWRldmVsIDxs
+dXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4gd3JvdGU6DQoNCk9uIE1vbiwgMjAyNS0xMS0w
+MyBhdCAxNjozMyAtMDgwMCwgSmluc2hhbiBYaW9uZyB3cm90ZToNCkkgZ3Vlc3MgdXNlcnMgd29u
+J3QgaGF2ZSAxUEIgT1NUcywgd2lsbCB0aGV5Pw0KDQpUaGVyZSBwcm9iYWJseSBhcmUgYWxyZWFk
+eT8gTkFTQSBoYXMgYSBrbm93biAwLjVQIE9TVCBjb25maWd1cmF0aW9uOg0KaHR0cHM6Ly93d3cu
+bmFzLm5hc2EuZ292L2hlY2Mvc3VwcG9ydC9rYi9sdXN0cmUtcHJvZ3Jlc3NpdmUtZmlsZS1sYXlv
+dXQtKHBmbCktd2l0aC1zc2QtYW5kLWhkZC1wb29sc182ODAuaHRtbCM6fjp0ZXh0PVRoZSUyMGF2
+YWlsYWJsZSUyMFNTRCUyMHNwYWNlJTIwaW4lMjBlYWNoJTIwZmlsZXN5c3RlbSxkZWNpbWFsJTIw
+KGZhciUyMHJpZ2h0KSUyMGxhYmVscyUyMG9mJTIwZWFjaCUyME9TVA0KDQpJbiBvcmRlciB0byBt
+YXhpbWl6ZSByZWJ1aWxkIHBlcmZvcm1hbmNlIGZvciBkZWNsdXN0ZXJlZCBwYXJpdHkgUkFJRCwN
+CnRoZXJlIGFyZSBPU1RzIGluIHByb2R1Y3Rpb24gd2l0aCA5MHgyMFRCIEhERHMgPSAxLjQgUEIg
+dG9kYXksDQphbmQgcmVxdWVzdHMgdG8gaGF2ZSBldmVuIGxhcmdlciBPU1RzLiAgV2UndmUgZG9u
+ZSBhIGJ1bmNoIG9mIHdvcmsNCnRvIGltcHJvdmUgaHVnZSBsZGlza2ZzIE9TVCBwZXJmb3JtYW5j
+ZSwgaW5jbHVkaW5nIHRoZSBoeWJyaWQgT1NUDQpwYXRjaGVzIGxpa2UgaHR0cHM6Ly9yZXZpZXcu
+d2hhbWNsb3VkLmNvbS81MTYyNSAoIkxVLTE2NzUwIGxkaXNrZnM6DQpvcHRpbWl6ZSBtZXRhZGF0
+YSBhbGxvY2F0aW9uIGZvciBoeWJyaWQgTFVOcyIpLCBidXQgdGhlcmUgY291bGQgc3RpbGwNCmJl
+IGZ1cnRoZXIgaW1wcm92ZW1lbnRzIGluIHN1cHBvcnRpbmcgc3VjaCBsYXJnZSBPU1RzLg0KDQpD
+aGVlcnMsIEFuZHJlYXMNCuKAlA0KQW5kcmVhcyBEaWxnZXINCkx1c3RyZSBQcmluY2lwYWwgQXJj
+aGl0ZWN0DQpXaGFtY2xvdWQvRERODQoNCg0KDQoNCg==
 
-Or even if it is local only - it could be made an OST
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Ole=
-g Drokin via lustre-devel <lustre-devel@lists.lustre.org>
-Sent: Monday, November 3, 2025 7:58 PM
-To: jinshanx@google.com <jinshanx@google.com>
-Cc: lustre-devel@lists.lustre.org <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] RFC: Spill device for Lustre OSD
+--_000_54DC145FB9654B048B03473A845892F6ddncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <83B8152CFAA4B54C8E513D632F18E72C@namprd19.prod.outlook.com>
+Content-Transfer-Encoding: base64
 
-On Mon, 2025-11-03 at 16:33 -0800, Jinshan Xiong wrote:
-> > > >
-> > > > I am not sure it's a much better idea than the already existing
-> > > > HSM
-> > > > capabilities we have that would allow you to have "offline"
-> > > > objects
-> > > > that would be pulled back in when used, but are otherwise just
-> > > > visible
-> > > > in the metadata only.
-> > > > The underlying capabilities are pretty rich esp. if we also
-> > > > take
-> > > > into
-> > > > account the eventual WBC stuff.
-> > >
-> > > The major problem of current HSM is that it has to have dedicated
-> > > clients to move data. Also, scanning the entire Lustre file
-> > > system
-> >
-> > This (dedicated client) is an implementation detail. It could be
-> > improved in many ways and the effort spent on this would bring
-> > great
-> > benefit to everyone?
->
->
-> Almost all designs assume some upfront implementation. We (as the
-> Lustre team) considered running clients on OST nodes, but cloud users
-> are sensitive about their data being exposed elsewhere.
->
-> Can you list a few improvements that come to mind?
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5IHN0eWxlPSJvdmVyZmxv
+dy13cmFwOiBicmVhay13b3JkOyAtd2Via2l0LW5ic3AtbW9kZTogc3BhY2U7IGxpbmUtYnJlYWs6
+IGFmdGVyLXdoaXRlLXNwYWNlOyI+DQpPbiBOb3YgMywgMjAyNSwgYXQgMTg6NTgsIE9sZWcgRHJv
+a2luIHZpYSBsdXN0cmUtZGV2ZWwgJmx0O2x1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnJmd0
+OyB3cm90ZTo8YnI+DQo8ZGl2Pg0KPGJsb2NrcXVvdGUgdHlwZT0iY2l0ZSI+PGJyIGNsYXNzPSJB
+cHBsZS1pbnRlcmNoYW5nZS1uZXdsaW5lIj4NCjxkaXY+PHNwYW4gc3R5bGU9ImNhcmV0LWNvbG9y
+OiByZ2IoMCwgMCwgMCk7IGZvbnQtZmFtaWx5OiBIZWx2ZXRpY2E7IGZvbnQtc2l6ZTogMTRweDsg
+Zm9udC1zdHlsZTogbm9ybWFsOyBmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsOyBmb250LXdlaWdo
+dDogNDAwOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4dC1p
+bmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7IHdv
+cmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQtZGVj
+b3JhdGlvbjogbm9uZTsgZmxvYXQ6IG5vbmU7IGRpc3BsYXk6IGlubGluZSAhaW1wb3J0YW50OyI+
+T24NCiBNb24sIDIwMjUtMTEtMDMgYXQgMTY6MzMgLTA4MDAsIEppbnNoYW4gWGlvbmcgd3JvdGU6
+PC9zcGFuPjxiciBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1mYW1pbHk6
+IEhlbHZldGljYTsgZm9udC1zaXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFy
+aWFudC1jYXBzOiBub3JtYWw7IGZvbnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3Jt
+YWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTog
+bm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4
+dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyI+DQo8YmxvY2txdW90
+ZSB0eXBlPSJjaXRlIiBzdHlsZT0iZm9udC1mYW1pbHk6IEhlbHZldGljYTsgZm9udC1zaXplOiAx
+NHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7IGZvbnQt
+d2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IG9ycGhhbnM6IGF1dG87IHRleHQt
+YWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hp
+dGUtc3BhY2U6IG5vcm1hbDsgd2lkb3dzOiBhdXRvOyB3b3JkLXNwYWNpbmc6IDBweDsgLXdlYmtp
+dC10ZXh0LXN0cm9rZS13aWR0aDogMHB4OyB0ZXh0LWRlY29yYXRpb246IG5vbmU7Ij4NCkkgZ3Vl
+c3MgdXNlcnMgd29uJ3QgaGF2ZSAxUEIgT1NUcywgd2lsbCB0aGV5Pzxicj4NCjwvYmxvY2txdW90
+ZT4NCjxiciBzdHlsZT0iY2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1mYW1pbHk6IEhl
+bHZldGljYTsgZm9udC1zaXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFu
+dC1jYXBzOiBub3JtYWw7IGZvbnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7
+IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9u
+ZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1z
+dHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyI+DQo8c3BhbiBzdHlsZT0i
+Y2FyZXQtY29sb3I6IHJnYigwLCAwLCAwKTsgZm9udC1mYW1pbHk6IEhlbHZldGljYTsgZm9udC1z
+aXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7
+IGZvbnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0
+YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6
+IG5vcm1hbDsgd29yZC1zcGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBw
+eDsgdGV4dC1kZWNvcmF0aW9uOiBub25lOyBmbG9hdDogbm9uZTsgZGlzcGxheTogaW5saW5lICFp
+bXBvcnRhbnQ7Ij5UaGVyZQ0KIHByb2JhYmx5IGFyZSBhbHJlYWR5PyBOQVNBIGhhcyBhIGtub3du
+IDAuNVAgT1NUIGNvbmZpZ3VyYXRpb246PC9zcGFuPjxiciBzdHlsZT0iY2FyZXQtY29sb3I6IHJn
+YigwLCAwLCAwKTsgZm9udC1mYW1pbHk6IEhlbHZldGljYTsgZm9udC1zaXplOiAxNHB4OyBmb250
+LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7IGZvbnQtd2VpZ2h0OiA0
+MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVu
+dDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9uZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd29yZC1z
+cGFjaW5nOiAwcHg7IC13ZWJraXQtdGV4dC1zdHJva2Utd2lkdGg6IDBweDsgdGV4dC1kZWNvcmF0
+aW9uOiBub25lOyI+DQo8YSBocmVmPSJodHRwczovL3d3dy5uYXMubmFzYS5nb3YvaGVjYy9zdXBw
+b3J0L2tiL2x1c3RyZS1wcm9ncmVzc2l2ZS1maWxlLWxheW91dC0ocGZsKS13aXRoLXNzZC1hbmQt
+aGRkLXBvb2xzXzY4MC5odG1sIzp+OnRleHQ9VGhlJTIwYXZhaWxhYmxlJTIwU1NEJTIwc3BhY2Ul
+MjBpbiUyMGVhY2glMjBmaWxlc3lzdGVtLGRlY2ltYWwlMjAoZmFyJTIwcmlnaHQpJTIwbGFiZWxz
+JTIwb2YlMjBlYWNoJTIwT1NUIiBzdHlsZT0iZm9udC1mYW1pbHk6IEhlbHZldGljYTsgZm9udC1z
+aXplOiAxNHB4OyBmb250LXN0eWxlOiBub3JtYWw7IGZvbnQtdmFyaWFudC1jYXBzOiBub3JtYWw7
+IGZvbnQtd2VpZ2h0OiA0MDA7IGxldHRlci1zcGFjaW5nOiBub3JtYWw7IG9ycGhhbnM6IGF1dG87
+IHRleHQtYWxpZ246IHN0YXJ0OyB0ZXh0LWluZGVudDogMHB4OyB0ZXh0LXRyYW5zZm9ybTogbm9u
+ZTsgd2hpdGUtc3BhY2U6IG5vcm1hbDsgd2lkb3dzOiBhdXRvOyB3b3JkLXNwYWNpbmc6IDBweDsg
+LXdlYmtpdC10ZXh0LXN0cm9rZS13aWR0aDogMHB4OyI+aHR0cHM6Ly93d3cubmFzLm5hc2EuZ292
+L2hlY2Mvc3VwcG9ydC9rYi9sdXN0cmUtcHJvZ3Jlc3NpdmUtZmlsZS1sYXlvdXQtKHBmbCktd2l0
+aC1zc2QtYW5kLWhkZC1wb29sc182ODAuaHRtbCM6fjp0ZXh0PVRoZSUyMGF2YWlsYWJsZSUyMFNT
+RCUyMHNwYWNlJTIwaW4lMjBlYWNoJTIwZmlsZXN5c3RlbSxkZWNpbWFsJTIwKGZhciUyMHJpZ2h0
+KSUyMGxhYmVscyUyMG9mJTIwZWFjaCUyME9TVDwvYT48YnIgc3R5bGU9ImNhcmV0LWNvbG9yOiBy
+Z2IoMCwgMCwgMCk7IGZvbnQtZmFtaWx5OiBIZWx2ZXRpY2E7IGZvbnQtc2l6ZTogMTRweDsgZm9u
+dC1zdHlsZTogbm9ybWFsOyBmb250LXZhcmlhbnQtY2Fwczogbm9ybWFsOyBmb250LXdlaWdodDog
+NDAwOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4dC1pbmRl
+bnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7IHdvcmQt
+c3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQtZGVjb3Jh
+dGlvbjogbm9uZTsiPg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8L2Rpdj4NCjxkaXY+PGJyPg0K
+PC9kaXY+DQpJbiBvcmRlciB0byBtYXhpbWl6ZSByZWJ1aWxkIHBlcmZvcm1hbmNlIGZvciBkZWNs
+dXN0ZXJlZCBwYXJpdHkgUkFJRCwNCjxkaXY+dGhlcmUgYXJlIE9TVHMgaW4gcHJvZHVjdGlvbiB3
+aXRoIDkweDIwVEIgSEREcyA9IDEuNCBQQiB0b2RheSw8L2Rpdj4NCjxkaXY+YW5kIHJlcXVlc3Rz
+IHRvIGhhdmUgZXZlbiBsYXJnZXIgT1NUcy4gJm5ic3A7V2UndmUgZG9uZSBhIGJ1bmNoIG9mIHdv
+cms8L2Rpdj4NCjxkaXY+dG8gaW1wcm92ZSBodWdlIGxkaXNrZnMgT1NUIHBlcmZvcm1hbmNlLCBp
+bmNsdWRpbmcgdGhlIGh5YnJpZCBPU1Q8L2Rpdj4NCjxkaXY+cGF0Y2hlcyBsaWtlJm5ic3A7PGEg
+aHJlZj0iaHR0cHM6Ly9yZXZpZXcud2hhbWNsb3VkLmNvbS81MTYyNSI+aHR0cHM6Ly9yZXZpZXcu
+d2hhbWNsb3VkLmNvbS81MTYyNTwvYT4mbmJzcDsoJnF1b3Q7TFUtMTY3NTAgbGRpc2tmczo8L2Rp
+dj4NCjxkaXY+b3B0aW1pemUgbWV0YWRhdGEgYWxsb2NhdGlvbiBmb3IgaHlicmlkIExVTnMmcXVv
+dDspLCBidXQgdGhlcmUgY291bGQgc3RpbGw8L2Rpdj4NCjxkaXY+YmUgZnVydGhlciBpbXByb3Zl
+bWVudHMgaW4gc3VwcG9ydGluZyBzdWNoIGxhcmdlIE9TVHMuPGJyPg0KPGRpdj48YnI+DQo8ZGl2
+Pg0KPGRpdiBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApOyBjb2xv
+cjogcmdiKDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFy
+dDsgdGV4dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBu
+b3JtYWw7IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7
+IHRleHQtZGVjb3JhdGlvbjogbm9uZTsgb3ZlcmZsb3ctd3JhcDogYnJlYWstd29yZDsgLXdlYmtp
+dC1uYnNwLW1vZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13aGl0ZS1zcGFjZTsiPg0KPGRp
+diBkaXI9ImF1dG8iIHN0eWxlPSJjYXJldC1jb2xvcjogcmdiKDAsIDAsIDApOyBjb2xvcjogcmdi
+KDAsIDAsIDApOyBsZXR0ZXItc3BhY2luZzogbm9ybWFsOyB0ZXh0LWFsaWduOiBzdGFydDsgdGV4
+dC1pbmRlbnQ6IDBweDsgdGV4dC10cmFuc2Zvcm06IG5vbmU7IHdoaXRlLXNwYWNlOiBub3JtYWw7
+IHdvcmQtc3BhY2luZzogMHB4OyAtd2Via2l0LXRleHQtc3Ryb2tlLXdpZHRoOiAwcHg7IHRleHQt
+ZGVjb3JhdGlvbjogbm9uZTsgb3ZlcmZsb3ctd3JhcDogYnJlYWstd29yZDsgLXdlYmtpdC1uYnNw
+LW1vZGU6IHNwYWNlOyBsaW5lLWJyZWFrOiBhZnRlci13aGl0ZS1zcGFjZTsiPg0KPGRpdj5DaGVl
+cnMsIEFuZHJlYXM8L2Rpdj4NCjxkaXY+4oCUPC9kaXY+DQo8ZGl2PkFuZHJlYXMgRGlsZ2VyPC9k
+aXY+DQo8ZGl2Pkx1c3RyZSBQcmluY2lwYWwgQXJjaGl0ZWN0PC9kaXY+DQo8ZGl2PldoYW1jbG91
+ZC9ERE48L2Rpdj4NCjwvZGl2Pg0KPGJyIGNsYXNzPSJBcHBsZS1pbnRlcmNoYW5nZS1uZXdsaW5l
+Ij4NCjwvZGl2Pg0KPGJyIGNsYXNzPSJBcHBsZS1pbnRlcmNoYW5nZS1uZXdsaW5lIj4NCjxiciBj
+bGFzcz0iQXBwbGUtaW50ZXJjaGFuZ2UtbmV3bGluZSI+DQo8L2Rpdj4NCjxicj4NCjwvZGl2Pg0K
+PC9kaXY+DQo8L2JvZHk+DQo8L2h0bWw+DQo=
 
-Clients between server nodes is probably one of the most obvious
-choices indeed. Considering the data already resides on those nodes, I
-am not sure I understand the concerns about "exposing" data that's
-already on those nodes. If customers are so sensitive, we support data
-encryption.
-We could also do some direct server-server migration of some sort where
-OSTs exchange data without bringing up real clients and doing copies
-from userspace. That might be desirable for other reasons for future
-functionality (e.g. various caching things people have been long
-envisioning)
+--_000_54DC145FB9654B048B03473A845892F6ddncom_--
 
-> >
-> > > takes very long time so it resorts to databases in order to make
-> > > correct decisions about which file should be released. By the
-> > > time,
-> > > the two system will be out of sync. That makes it practically
-> > > unusable.
-> >
-> > This again is an implementation detail, not even hardcoded
-> > anywhere.
-> > How do you plan for the OST to to know what stuff is not used
-> > without
-> > resorting to some database or scan? Now take this method and make
-> > it
-> > report "upstream" where currently HSM implementations resort to
-> > databases or scans.
-> >
->
-> The assumption is that OST sizes are relatively small, up to 100TB.
-> Also, scanning local devices in kernel spaces is much faster. So yeah
-> there is no database in the way.
-
-I am not sure why? In general small OSTs are a relatively rare thing
-because to reach large FS sizes you would need to many of them, space
-balancing becomes a chore and so on. So relatively few do it for some
-fringe reasons (e.g. Google) . Majority of people prefer large OSTs.
-
-Also nothing stops you from doing a per-OST scan (when you do have
-small OSTs) and then kicking the results up to the acting agent to do
-something about it (or the other way around, the hsm engine can ask
-OSTs one by one (picking less busy ones or ones that have the least
-free space, or some other factor). And there's absolutely no need to
-wait out to query all OSTs, you can get results from one and work on
-the data from it while the other OSTs are still thinking (or not,
-there's absolutely no requirement to get full filesystem data before
-making any decisions).
-
-> I guess users won't have 1PB OSTs, will they?
-
-There probably are already? NASA has a known 0.5P OST configuration:
-https://www.nas.nasa.gov/hecc/support/kb/lustre-progressive-file-layout-(pf=
-l)-with-ssd-and-hdd-pools_680.html#:~:text=3DThe%20available%20SSD%20space%=
-20in%20each%20filesystem,decimal%20(far%20right)%20labels%20of%20each%20OST
-.
-
-> > Rereading your proposal, I see that this particular detail is not
-> > covered and it's just assumed that "infrequently accessed data"
-> > would
-> > be somehow known.
->
-> I should have mentioned that in the migration section. Also, we need
-> to slightly update the OST read to use a local transaction to update
-> an object's access time (atime) if it's older than a predefined
-> threshold, for example, 10 minutes.
-
-This is going to be fragile in the face of varying clock times on
-different clients potentially not synced with the servers.
-Also in the face of -o noatime.
-
-But yes, I guess it's one way to get this "on the cheap", and the other
-trouble I foresee is you are going to have a biased set. Only recently
-touched objects (so with fresh atime), unless you plan to retain a
-database and update it from such transaction flow, which certainly is
-possible, but I am not sure how practical vs some sort of a scan.
-
-> > > > If the argument is "but OSTs know best what stuff is used"
-> > > > (which I
-> > > > am
-> > > > not sure I buy, after all before you could use something off
-> > > > OSTs
-> > > > you
-> > > > need to open a file I would hope) even then OSTs could just
-> > > > signal
-> > > > a
-> > > > list of "inactive objects" that then a higher level system
-> > > > would
-> > > > take
-> > > > care of by relocatiing somewhere more sensical and changing the
-> > > > layout
-> > > > to indicate those objects now live elsewhere.
-> > > >
-> > > > The plus here is you don't need to attach this "Wart" to every
-> > > > OST
-> > > > and
-> > > > configure it everywhere and such, but rather have a central
-> > > > location
-> > > > that is centrally managed.
-> > > >
-> >
-> > _______________________________________________
-> > lustre-devel mailing list
-> > lustre-devel@lists.lustre.org
-> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> >
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel@lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
---_000_DM6PR19MB263631D5057975AB09DB7F60C9C4ADM6PR19MB2636namp_
-Content-Type: text/html; charset="Windows-1252"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DWindows-1=
-252">
-</head>
-<body>
-<div><span style=3D"-webkit-text-size-adjust: 100%;">I haven=92t seen any m=
-ention of failover yet in this conversation (may have missed it), but if th=
-e device is truly local, then in failed over configurations the data is ina=
-ccessible. &nbsp;If it=92s *not* local, why
- not just make the device part of the OST or an independent OST?</span><br>
-</div>
-<div><br>
-</div>
-<div>Or even if it is local only - it could be made an OST</div>
-<div></div>
-<hr style=3D"display:inline-block;width:98%" tabindex=3D"-1">
-<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" st=
-yle=3D"font-size:11pt" color=3D"#000000"><b>From:</b> lustre-devel &lt;lust=
-re-devel-bounces@lists.lustre.org&gt; on behalf of Oleg Drokin via lustre-d=
-evel &lt;lustre-devel@lists.lustre.org&gt;<br>
-<b>Sent:</b> Monday, November 3, 2025 7:58 PM<br>
-<b>To:</b> jinshanx@google.com &lt;jinshanx@google.com&gt;<br>
-<b>Cc:</b> lustre-devel@lists.lustre.org &lt;lustre-devel@lists.lustre.org&=
-gt;<br>
-<b>Subject:</b> Re: [lustre-devel] RFC: Spill device for Lustre OSD</font>
-<div>&nbsp;</div>
-</div>
-<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt;=
-">
-<div class=3D"PlainText">On Mon, 2025-11-03 at 16:33 -0800, Jinshan Xiong w=
-rote:<br>
-&gt; &gt; &gt; &gt; <br>
-&gt; &gt; &gt; &gt; I am not sure it's a much better idea than the already =
-existing<br>
-&gt; &gt; &gt; &gt; HSM<br>
-&gt; &gt; &gt; &gt; capabilities we have that would allow you to have &quot=
-;offline&quot;<br>
-&gt; &gt; &gt; &gt; objects<br>
-&gt; &gt; &gt; &gt; that would be pulled back in when used, but are otherwi=
-se just<br>
-&gt; &gt; &gt; &gt; visible<br>
-&gt; &gt; &gt; &gt; in the metadata only.<br>
-&gt; &gt; &gt; &gt; The underlying capabilities are pretty rich esp. if we =
-also<br>
-&gt; &gt; &gt; &gt; take<br>
-&gt; &gt; &gt; &gt; into<br>
-&gt; &gt; &gt; &gt; account the eventual WBC stuff.<br>
-&gt; &gt; &gt; <br>
-&gt; &gt; &gt; The major problem of current HSM is that it has to have dedi=
-cated<br>
-&gt; &gt; &gt; clients to move data. Also, scanning the entire Lustre file<=
-br>
-&gt; &gt; &gt; system<br>
-&gt; &gt; <br>
-&gt; &gt; This (dedicated client) is an implementation detail. It could be<=
-br>
-&gt; &gt; improved in many ways and the effort spent on this would bring<br=
->
-&gt; &gt; great<br>
-&gt; &gt; benefit to everyone?<br>
-&gt; <br>
-&gt; <br>
-&gt; Almost all designs assume some upfront implementation. We (as the<br>
-&gt; Lustre team) considered running clients on OST nodes, but cloud users<=
-br>
-&gt; are sensitive about their data being exposed elsewhere.<br>
-&gt; <br>
-&gt; Can you list a few improvements that come to mind?<br>
-<br>
-Clients between server nodes is probably one of the most obvious<br>
-choices indeed. Considering the data already resides on those nodes, I<br>
-am not sure I understand the concerns about &quot;exposing&quot; data that'=
-s<br>
-already on those nodes. If customers are so sensitive, we support data<br>
-encryption.<br>
-We could also do some direct server-server migration of some sort where<br>
-OSTs exchange data without bringing up real clients and doing copies<br>
-from userspace. That might be desirable for other reasons for future<br>
-functionality (e.g. various caching things people have been long<br>
-envisioning)<br>
-&nbsp;<br>
-&gt; &gt; <br>
-&gt; &gt; &gt; takes very long time so it resorts to databases in order to =
-make<br>
-&gt; &gt; &gt; correct decisions about which file should be released. By th=
-e<br>
-&gt; &gt; &gt; time,<br>
-&gt; &gt; &gt; the two system will be out of sync. That makes it practicall=
-y<br>
-&gt; &gt; &gt; unusable.<br>
-&gt; &gt; <br>
-&gt; &gt; This again is an implementation detail, not even hardcoded<br>
-&gt; &gt; anywhere.<br>
-&gt; &gt; How do you plan for the OST to to know what stuff is not used<br>
-&gt; &gt; without<br>
-&gt; &gt; resorting to some database or scan? Now take this method and make=
-<br>
-&gt; &gt; it<br>
-&gt; &gt; report &quot;upstream&quot; where currently HSM implementations r=
-esort to<br>
-&gt; &gt; databases or scans.<br>
-&gt; &gt; <br>
-&gt; <br>
-&gt; The assumption is that OST sizes are relatively small, up to 100TB.<br=
->
-&gt; Also, scanning local devices in kernel spaces is much faster. So yeah<=
-br>
-&gt; there is no database in the way.<br>
-<br>
-I am not sure why? In general small OSTs are a relatively rare thing<br>
-because to reach large FS sizes you would need to many of them, space<br>
-balancing becomes a chore and so on. So relatively few do it for some<br>
-fringe reasons (e.g. Google) . Majority of people prefer large OSTs.<br>
-<br>
-Also nothing stops you from doing a per-OST scan (when you do have<br>
-small OSTs) and then kicking the results up to the acting agent to do<br>
-something about it (or the other way around, the hsm engine can ask<br>
-OSTs one by one (picking less busy ones or ones that have the least<br>
-free space, or some other factor). And there's absolutely no need to<br>
-wait out to query all OSTs, you can get results from one and work on<br>
-the data from it while the other OSTs are still thinking (or not,<br>
-there's absolutely no requirement to get full filesystem data before<br>
-making any decisions).<br>
-<br>
-&gt; I guess users won't have 1PB OSTs, will they?<br>
-<br>
-There probably are already? NASA has a known 0.5P OST configuration:<br>
-<a href=3D"https://www.nas.nasa.gov/hecc/support/kb/lustre-progressive-file=
--layout-(pfl)-with-ssd-and-hdd-pools_680.html#:~:text=3DThe%20available%20S=
-SD%20space%20in%20each%20filesystem,decimal%20(far%20right)%20labels%20of%2=
-0each%20OST">https://www.nas.nasa.gov/hecc/support/kb/lustre-progressive-fi=
-le-layout-(pfl)-with-ssd-and-hdd-pools_680.html#:~:text=3DThe%20available%2=
-0SSD%20space%20in%20each%20filesystem,decimal%20(far%20right)%20labels%20of=
-%20each%20OST</a><br>
-.<br>
-<br>
-&gt; &gt; Rereading your proposal, I see that this particular detail is not=
-<br>
-&gt; &gt; covered and it's just assumed that &quot;infrequently accessed da=
-ta&quot;<br>
-&gt; &gt; would<br>
-&gt; &gt; be somehow known.<br>
-&gt; <br>
-&gt; I should have mentioned that in the migration section. Also, we need<b=
-r>
-&gt; to slightly update the OST read to use a local transaction to update<b=
-r>
-&gt; an object's access time (atime) if it's older than a predefined<br>
-&gt; threshold, for example, 10 minutes.&nbsp;<br>
-<br>
-This is going to be fragile in the face of varying clock times on<br>
-different clients potentially not synced with the servers.<br>
-Also in the face of -o noatime.<br>
-<br>
-But yes, I guess it's one way to get this &quot;on the cheap&quot;, and the=
- other<br>
-trouble I foresee is you are going to have a biased set. Only recently<br>
-touched objects (so with fresh atime), unless you plan to retain a<br>
-database and update it from such transaction flow, which certainly is<br>
-possible, but I am not sure how practical vs some sort of a scan.<br>
-<br>
-&gt; &gt; &gt; &gt; If the argument is &quot;but OSTs know best what stuff =
-is used&quot;<br>
-&gt; &gt; &gt; &gt; (which I<br>
-&gt; &gt; &gt; &gt; am<br>
-&gt; &gt; &gt; &gt; not sure I buy, after all before you could use somethin=
-g off<br>
-&gt; &gt; &gt; &gt; OSTs<br>
-&gt; &gt; &gt; &gt; you<br>
-&gt; &gt; &gt; &gt; need to open a file I would hope) even then OSTs could =
-just<br>
-&gt; &gt; &gt; &gt; signal<br>
-&gt; &gt; &gt; &gt; a<br>
-&gt; &gt; &gt; &gt; list of &quot;inactive objects&quot; that then a higher=
- level system<br>
-&gt; &gt; &gt; &gt; would<br>
-&gt; &gt; &gt; &gt; take<br>
-&gt; &gt; &gt; &gt; care of by relocatiing somewhere more sensical and chan=
-ging the<br>
-&gt; &gt; &gt; &gt; layout<br>
-&gt; &gt; &gt; &gt; to indicate those objects now live elsewhere.<br>
-&gt; &gt; &gt; &gt; <br>
-&gt; &gt; &gt; &gt; The plus here is you don't need to attach this &quot;Wa=
-rt&quot; to every<br>
-&gt; &gt; &gt; &gt; OST<br>
-&gt; &gt; &gt; &gt; and<br>
-&gt; &gt; &gt; &gt; configure it everywhere and such, but rather have a cen=
-tral<br>
-&gt; &gt; &gt; &gt; location<br>
-&gt; &gt; &gt; &gt; that is centrally managed.<br>
-&gt; &gt; &gt; &gt; <br>
-&gt; &gt; <br>
-&gt; &gt; _______________________________________________<br>
-&gt; &gt; lustre-devel mailing list<br>
-&gt; &gt; lustre-devel@lists.lustre.org<br>
-&gt; &gt; <a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lust=
-re.org">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org</a><br=
->
-&gt; &gt; <br>
-<br>
-_______________________________________________<br>
-lustre-devel mailing list<br>
-lustre-devel@lists.lustre.org<br>
-<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org">ht=
-tp://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org</a><br>
-</div>
-</span></font></div>
-</body>
-</html>
-
---_000_DM6PR19MB263631D5057975AB09DB7F60C9C4ADM6PR19MB2636namp_--
-
---===============3701145815734774479==
+--===============5443643566574501244==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -574,4 +336,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============3701145815734774479==--
+--===============5443643566574501244==--
