@@ -4,69 +4,68 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 0A50FCCFA04
-	for <lustre-devel@archiver.kernel.org>; Tue,  4 Nov 2025 17:38:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id F3EBBCCF9E3
+	for <lustre-devel@archiver.kernel.org>; Tue,  4 Nov 2025 17:48:31 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d1G0L0wgnz1y6Q;
-	Tue, 04 Nov 2025 09:38:58 -0800 (PST)
-Received: from mail-ot1-f50.google.com (mail-ot1-f50.google.com
- [209.85.210.50])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d1GBj3xKgz1yWJ;
+	Tue, 04 Nov 2025 09:47:57 -0800 (PST)
+Received: from mail-oo1-f44.google.com (mail-oo1-f44.google.com
+ [209.85.161.44])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4d1G0H6QB8z1y25
- for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 09:38:55 -0800 (PST)
-Received: by mail-ot1-f50.google.com with SMTP id
- 46e09a7af769-7c2816c0495so3793058a34.3
- for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 09:38:55 -0800 (PST)
+ 4d1GBY2R3Sz1y4F
+ for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 09:47:49 -0800 (PST)
+Received: by mail-oo1-f44.google.com with SMTP id
+ 006d021491bc7-65366485678so2915420eaf.2
+ for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 09:47:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=google.com; s=20230601; t=1762277935; x=1762882735; darn=lists.lustre.org;
+ d=google.com; s=20230601; t=1762278468; x=1762883268; darn=lists.lustre.org;
  h=cc:to:subject:message-id:date:from:in-reply-to:references
  :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=sDB07DO43S3R6agv3Z6rJQS8DgpTTYsiMNu67YrEDgM=;
- b=wP4QaqGOn7oFARJpJlHMhzNIKgUbKMlDe+qWceqEjI29tQlJsjL8v+VOWybKTY858w
- KDMwIPqPYy9ho2njhghly/4Xl73Y83j1XVMIUC37bW3qlt7zsqjvaupysf3x/125P14O
- jSazG8tGBdVOryg6PBkUbVIfxXocJ1Uz0wniqPSa0GLSX3f2hztULsPn7AG0+kGXbvdN
- cvk+4mLsPFwTGpLiecO6Ldeby0HPLQWTJ2KwjvYUB3wxd9k4/nHNKx5Tdi34PtE4bHOI
- LM6dZJ1KyN+Uo1nz+O2aisqPPuZk+N5sPz3sb6OGW+pRb1AycVRz9iecoBNY0ebiUmqo
- Ch1w==
+ bh=tqK/pp9JMzS2HD5+SXs7Ua2XjCBGwurl+fmtYJy+nb4=;
+ b=Kjw6mA4iyef0k3+nKp81XQCyUEvIq10YIrv4ajrfgTZeGmHBZr6V9iJOElAFEXvAlo
+ v1dT+GUL3957R7FrAQCT3VT/JKi+fkQ0yWjHB1QyLPwYNIuKjiSWwoJx4TRa1WqOLz6G
+ jkbijqwsmk9eSs+8rxvmFKYyuP3bUvxFGO79n+yoHxwmLwmYHaMzVMPf51P2xq929VFu
+ MmHYbIla8hmUXQV4H7tcWMACsBBPC/KyzZ+NFD9FxWXP7noKW+F3ukcuQMXd+s2WGRZ2
+ 8ykfehpGzH6FSxwi/eEJb9pk+GVTvX7d9pVL664FUDHHHNET6d7qYqLsm9ihPfnfIl2P
+ E5BQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1762277935; x=1762882735;
+ d=1e100.net; s=20230601; t=1762278468; x=1762883268;
  h=cc:to:subject:message-id:date:from:in-reply-to:references
  :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
  :reply-to;
- bh=sDB07DO43S3R6agv3Z6rJQS8DgpTTYsiMNu67YrEDgM=;
- b=gXxTASH5k4lv/1Ik3WsRC78OfLleZ+jRuOJDDyIrVUukENNlkpkwhjaecXMfq+I/go
- VWrxTmouTVc24+TSso7ZEQavfKor461fDpKbfbg6KOKFIbyW/8m8yjBmMcZ96QvaUldx
- L0jC94vw/TVh8nqm08IrYPoiABIfxHRQHre94u4XWDRKKEh+8NACxk/rJM1ZY4f3qx87
- t7iNU8fOBzzeKd6sudSMtGIBvMdgsPvcC2VgHtOfRmzeVujvcjgsD8d1DY3ZEQ1MJKP1
- 2ozOmP83//HpiF5wdOu1POAANAo6THdTA9oxID6bxbFQ+gZrxD64IZ2XiSO97pHmBnk2
- t7HQ==
-X-Gm-Message-State: AOJu0Yxs+wDb1usjmxYpkFlO8nkjug7LRaZyq0FpEXBcuzoevE/dk2j9
- mJ9ZXGPEYLKFqjDJQVLmUjB02Z3loEnLkVv/27gx8DYa686YV2baoVkGzhyNdQ2UXlHZm67a0ex
- 3H806BQhlHqv44SheInGu5fFICTomhcJefOXwDXnE2NuzqesP6geyx7xw
-X-Gm-Gg: ASbGncuHD67INTrGNNlXEsIfAnnmAlRHvgj5wGrOgttnT9hYDBRJkxF1jvTgYZOEBAF
- IaXz0RgXYtnopwHAs83ZEp/4uwwihDKtmBJLJIvYnS+K9vnoMlhEM4L5u3e7k407fcAeIgSdZq1
- Gb+eYQnY3AnVlR33VVUgr9O3ZLH3XrvuRjxE2KK5I6qulPTj3lPIdPMp0CGCU3vkmT0GmdkrLSd
- 1i8VKpkJuzB8KiRUsOQt9GN5r0k0nLS9FZw2DO0UVFxTUnRgBiUyzXq6WrOOTOZJn+0c8LSpnco
- ZCVhkhdmGsJ87BoQ0TfSb3gXoi0Ba66WPY7Y569+Ml5S8cv7lA==
-X-Google-Smtp-Source: AGHT+IFEK4f7NsWr6mbfIlovYTSWH46onOrJTf74EBHbYgLjZ/ZN/p9oRtNCDhlh/fsyW9wF/Q8FzJWNz+ohmU+jwfk=
-X-Received: by 2002:a05:6808:2386:b0:44f:6a32:537a with SMTP id
- 5614622812f47-44fed4f857amr111211b6e.46.1762277934774; Tue, 04 Nov 2025
- 09:38:54 -0800 (PST)
+ bh=tqK/pp9JMzS2HD5+SXs7Ua2XjCBGwurl+fmtYJy+nb4=;
+ b=DVHLcSOlkLegLwcdExBTZykhroql4Gu0zkc93RtmWsWnqt0Az8eOWS03RxDbKVSvTt
+ N0ADQNJxm7mZf3jpIScWa3C3M6sXLankNREfPMbEYQPFHyoFH99gEJH5phc/a6DJEzsz
+ 0vfyjWnrHAvUEprlr+b4t6Pi9xlyiTDOwPFxjDMUV6AjfBy0cOKMsRlM0+nQ2xSb2q3S
+ HPUiZYW5RNMepTb5LzRaRdKyCEPgioA2RbkjO3WxQZeAbUMgW8gJrmvx2ziZMq3N9UIg
+ LB7wai08TWS/3YwrjxeouU9y3/zjmzqWtzaqkpmQnIRhn9MICg8gQzTimZCaPk2GxqtL
+ ZfyQ==
+X-Gm-Message-State: AOJu0YzBuYs5dGKBI7w4dezRXwKWsO7B64r27mDw5X09ZW6ZlUY//rKy
+ HRX5ARxQYkahxVLo3QCrcRNsBHV7ecr28Vt7azQ0gNTVgzeFx0BuG9YlX2Ou3WF2Cmq7SX524Q5
+ 5cZA+ymOUPGQT+K45esVgGgt1DI3GHO/x+5xluVbB
+X-Gm-Gg: ASbGncuqEffOW97Qy4fB6xl7tM3gtoxd8SQKlrXCagmrNCByfXJ/cbC34vPmMjK+awW
+ gXN792eFMiZanwHhZXrPHJTgHr1fmJUjL2aY8Fho7b1ADUmnOG2NmdbNrpHQ/Ln70JVLBMBRRgT
+ UCgnmgbVc69MSL2ydlu/n49mT5v2XHh6/Bbxw4sIvEUNdZRhw9uxSUuzzTmT+SUm7s2iVkwmbpG
+ 01LXERI0H8bVtHz+zyjrg2zlG7uxFRQqm5WjqI/Oy/hSJGJF8TUFAwBClz+d2M2LeigEDyFOVa/
+ 2u/9JZHZhNK1E3LS+h6B2tg1LhQSk011SG7HC24=
+X-Google-Smtp-Source: AGHT+IEAEqTLyOXRUwEVJ3HADOYCNVDnm0HuuHIeKV3UTRNSf70lnXT6YgosMEwvFVhw/V7GByrtgYjKtL0SOSS1Ky8=
+X-Received: by 2002:a05:687c:2057:b0:3e0:df48:d5df with SMTP id
+ 586e51a60fabf-3e19c15b067mr108923fac.34.1762278467500; Tue, 04 Nov 2025
+ 09:47:47 -0800 (PST)
 MIME-Version: 1.0
 References: <e2c69a503e80f3ba59d69f093bc8df519cdd7f66.camel@whamcloud.com>
  <BFDDAAED-BA9A-44DB-BCD0-B3B84E652FE7@gmail.com>
  <c6c016567a02f857303eedb9a4af6b5831c2c818.camel@whamcloud.com>
  <CAEp8vpiZ8iKRbjy8GYKdXFjsycW=a48baOXxUnSP7uE+Xf5cYw@mail.gmail.com>
  <e31f82d56f034cb325ae29a08280122711078a97.camel@whamcloud.com>
- <DM6PR19MB263631D5057975AB09DB7F60C9C4A@DM6PR19MB2636.namprd19.prod.outlook.com>
-In-Reply-To: <DM6PR19MB263631D5057975AB09DB7F60C9C4A@DM6PR19MB2636.namprd19.prod.outlook.com>
-Date: Tue, 4 Nov 2025 09:38:43 -0800
-X-Gm-Features: AWmQ_bn65H4tKWgW0PrZDJq5AJr0wyCH9r1-gMrT2DD2f6YJJdZJOV3Meti-5k8
-Message-ID: <CAEp8vpi_VWA9EXJjED73MmJCMwp-zzi_h+7taB8uohExJY0tdQ@mail.gmail.com>
-To: Patrick Farrell <pfarrell@ddn.com>
+In-Reply-To: <e31f82d56f034cb325ae29a08280122711078a97.camel@whamcloud.com>
+Date: Tue, 4 Nov 2025 09:47:36 -0800
+X-Gm-Features: AWmQ_bndKUDbYyIysemXynxEr0tF9ErzfSN0YTCxTgwQCRHXFF3rns90DfiAvBI
+Message-ID: <CAEp8vpj35nY7atGPwXvjsPKdnKYfyE+w7uJ7gihXrC3_W7G15Q@mail.gmail.com>
+To: Oleg Drokin <green@whamcloud.com>
 Subject: Re: [lustre-devel] RFC: Spill device for Lustre OSD
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
@@ -82,51 +81,21 @@ List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>,
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 From: Jinshan Xiong via lustre-devel <lustre-devel@lists.lustre.org>
 Reply-To: Jinshan Xiong <jinshanx@google.com>
-Cc: Oleg Drokin via lustre-devel <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============3025467022378385101=="
+Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Content-Type: multipart/mixed; boundary="===============6784438486419368419=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============3025467022378385101==
-Content-Type: multipart/alternative; boundary="0000000000004cea750642c84e66"
+--===============6784438486419368419==
+Content-Type: multipart/alternative; boundary="0000000000000d76ba0642c86e5e"
 
---0000000000004cea750642c84e66
+--0000000000000d76ba0642c86e5e
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Nov 3, 2025 at 6:47=E2=80=AFPM Patrick Farrell <pfarrell@ddn.com> w=
-rote:
+On Mon, Nov 3, 2025 at 5:58=E2=80=AFPM Oleg Drokin <green@whamcloud.com> wr=
+ote:
 
-> I haven=E2=80=99t seen any mention of failover yet in this conversation (=
-may have
-> missed it), but if the device is truly local, then in failed over
-> configurations the data is inaccessible.  If it=E2=80=99s *not* local, wh=
-y not just
-> make the device part of the OST or an independent OST?
->
-
-It won't be local. Actually, this is designed for the cloud.
-
-We already have tiered storage based on mirroring; however, that still
-requires clients to move data and a file system level scanner to decide
-which files move to the cold tier. It's cumbersome to maintain those
-clients.
-
-
-
->
->
-
->
-> Or even if it is local only - it could be made an OST
-> ------------------------------
-> *From:* lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of
-> Oleg Drokin via lustre-devel <lustre-devel@lists.lustre.org>
-> *Sent:* Monday, November 3, 2025 7:58 PM
-> *To:* jinshanx@google.com <jinshanx@google.com>
-> *Cc:* lustre-devel@lists.lustre.org <lustre-devel@lists.lustre.org>
-> *Subject:* Re: [lustre-devel] RFC: Spill device for Lustre OSD
->
 > On Mon, 2025-11-03 at 16:33 -0800, Jinshan Xiong wrote:
 > > > > >
 > > > > > I am not sure it's a much better idea than the already existing
@@ -167,7 +136,14 @@ clients.
 > from userspace. That might be desirable for other reasons for future
 > functionality (e.g. various caching things people have been long
 > envisioning)
+
+
+This is going too far ;-)
+
+
 >
+
+
 > > >
 > > > > takes very long time so it resorts to databases in order to make
 > > > > correct decisions about which file should be released. By the
@@ -228,11 +204,28 @@ ST
 > different clients potentially not synced with the servers.
 > Also in the face of -o noatime.
 >
+
+It doesn't use client timestamps. Also, it won't be part of read because
+read doesn't initiate a transaction.
+
+It can simply use the OSS local time and start a local transaction to
+update the atime.
+
+
+>
 > But yes, I guess it's one way to get this "on the cheap", and the other
 > trouble I foresee is you are going to have a biased set. Only recently
 > touched objects (so with fresh atime), unless you plan to retain a
 > database and update it from such transaction flow, which certainly is
 > possible, but I am not sure how practical vs some sort of a scan.
+>
+
+I don't see that as an issue. It's going to update the atime in memory. And
+yeah if the OSS is crashed and the scanner may choose a wrong file to
+migrate, this should be rare and I don't think this would become a severe
+issue.
+
+
 >
 > > > > > If the argument is "but OSTs know best what stuff is used"
 > > > > > (which I
@@ -264,65 +257,19 @@ ST
 > > > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 > > >
 >
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel@lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 >
 
---0000000000004cea750642c84e66
+--0000000000000d76ba0642c86e5e
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
 <div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote g=
 mail_quote_container"><div dir=3D"ltr" class=3D"gmail_attr">On Mon, Nov 3, =
-2025 at 6:47=E2=80=AFPM Patrick Farrell &lt;<a href=3D"mailto:pfarrell@ddn.=
-com">pfarrell@ddn.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_qu=
-ote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,20=
-4);padding-left:1ex">
-
-
-
-<div>
-<div><span>I haven=E2=80=99t seen any mention of failover yet in this conve=
-rsation (may have missed it), but if the device is truly local, then in fai=
-led over configurations the data is inaccessible.=C2=A0 If it=E2=80=99s *no=
-t* local, why
- not just make the device part of the OST or an independent OST?</span></di=
-v></div></blockquote><div><br></div><div>It won&#39;t be local. Actually, t=
-his is designed for the cloud.</div><div><br></div><div>We already have tie=
-red storage based on mirroring; however, that still requires clients to mov=
-e data and a file system level scanner to decide which files move to the co=
-ld tier. It&#39;s cumbersome=C2=A0to maintain those clients.</div><div><br>=
-</div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0p=
-x 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"><d=
-iv><div>=C2=A0</div></div></blockquote><blockquote class=3D"gmail_quote" st=
-yle=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padd=
-ing-left:1ex"><div><div><br>
-</div>
-<div><br>
-</div>
-<div>Or even if it is local only - it could be made an OST</div>
-<div></div>
-<hr style=3D"display:inline-block;width:98%">
-<div id=3D"m_-3839173029790542839divRplyFwdMsg" dir=3D"ltr"><font face=3D"C=
-alibri, sans-serif" style=3D"font-size:11pt" color=3D"#000000"><b>From:</b>=
- lustre-devel &lt;<a href=3D"mailto:lustre-devel-bounces@lists.lustre.org" =
-target=3D"_blank">lustre-devel-bounces@lists.lustre.org</a>&gt; on behalf o=
-f Oleg Drokin via lustre-devel &lt;<a href=3D"mailto:lustre-devel@lists.lus=
-tre.org" target=3D"_blank">lustre-devel@lists.lustre.org</a>&gt;<br>
-<b>Sent:</b> Monday, November 3, 2025 7:58 PM<br>
-<b>To:</b> <a href=3D"mailto:jinshanx@google.com" target=3D"_blank">jinshan=
-x@google.com</a> &lt;<a href=3D"mailto:jinshanx@google.com" target=3D"_blan=
-k">jinshanx@google.com</a>&gt;<br>
-<b>Cc:</b> <a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blan=
-k">lustre-devel@lists.lustre.org</a> &lt;<a href=3D"mailto:lustre-devel@lis=
-ts.lustre.org" target=3D"_blank">lustre-devel@lists.lustre.org</a>&gt;<br>
-<b>Subject:</b> Re: [lustre-devel] RFC: Spill device for Lustre OSD</font>
-<div>=C2=A0</div>
-</div>
-<div><font size=3D"2"><span style=3D"font-size:11pt">
-<div>On Mon, 2025-11-03 at 16:33 -0800, Jinshan Xiong wrote:<br>
+2025 at 5:58=E2=80=AFPM Oleg Drokin &lt;<a href=3D"mailto:green@whamcloud.c=
+om">green@whamcloud.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_=
+quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,=
+204);padding-left:1ex">On Mon, 2025-11-03 at 16:33 -0800, Jinshan Xiong wro=
+te:<br>
 &gt; &gt; &gt; &gt; <br>
 &gt; &gt; &gt; &gt; I am not sure it&#39;s a much better idea than the alre=
 ady existing<br>
@@ -371,7 +318,11 @@ We could also do some direct server-server migration of some sort where<br>
 OSTs exchange data without bringing up real clients and doing copies<br>
 from userspace. That might be desirable for other reasons for future<br>
 functionality (e.g. various caching things people have been long<br>
-envisioning)<br>
+envisioning)</blockquote><div><br></div><div>This is going too far ;-)</div=
+><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px=
+ 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">=C2=A0<=
+/blockquote><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0=
+.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
 =C2=A0<br>
 &gt; &gt; <br>
 &gt; &gt; &gt; takes very long time so it resorts to databases in order to =
@@ -424,10 +375,10 @@ There probably are already? NASA has a known 0.5P OST configuration:<br>
 <a href=3D"https://www.nas.nasa.gov/hecc/support/kb/lustre-progressive-file=
 -layout-(pfl)-with-ssd-and-hdd-pools_680.html#:~:text=3DThe%20available%20S=
 SD%20space%20in%20each%20filesystem,decimal%20(far%20right)%20labels%20of%2=
-0each%20OST" target=3D"_blank">https://www.nas.nasa.gov/hecc/support/kb/lus=
-tre-progressive-file-layout-(pfl)-with-ssd-and-hdd-pools_680.html#:~:text=
-=3DThe%20available%20SSD%20space%20in%20each%20filesystem,decimal%20(far%20=
-right)%20labels%20of%20each%20OST</a><br>
+0each%20OST" rel=3D"noreferrer" target=3D"_blank">https://www.nas.nasa.gov/=
+hecc/support/kb/lustre-progressive-file-layout-(pfl)-with-ssd-and-hdd-pools=
+_680.html#:~:text=3DThe%20available%20SSD%20space%20in%20each%20filesystem,=
+decimal%20(far%20right)%20labels%20of%20each%20OST</a><br>
 .<br>
 <br>
 &gt; &gt; Rereading your proposal, I see that this particular detail is not=
@@ -447,14 +398,26 @@ d<br>
 <br>
 This is going to be fragile in the face of varying clock times on<br>
 different clients potentially not synced with the servers.<br>
-Also in the face of -o noatime.<br>
+Also in the face of -o noatime.<br></blockquote><div><br></div><div>It does=
+n&#39;t use client timestamps. Also, it won&#39;t be part of read because r=
+ead doesn&#39;t initiate a transaction.</div><div><br></div><div>It=C2=A0ca=
+n simply use the OSS local time and start a local transaction to update the=
+ atime.=C2=A0</div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=
+=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding=
+-left:1ex">
 <br>
 But yes, I guess it&#39;s one way to get this &quot;on the cheap&quot;, and=
  the other<br>
 trouble I foresee is you are going to have a biased set. Only recently<br>
 touched objects (so with fresh atime), unless you plan to retain a<br>
 database and update it from such transaction flow, which certainly is<br>
-possible, but I am not sure how practical vs some sort of a scan.<br>
+possible, but I am not sure how practical vs some sort of a scan.<br></bloc=
+kquote><div><br></div><div>I don&#39;t see that as an issue. It&#39;s going=
+ to update the atime in memory. And yeah if the OSS is crashed and the scan=
+ner may choose a wrong file to migrate, this should be rare and I don&#39;t=
+ think this would become a severe issue.</div><div>=C2=A0</div><blockquote =
+class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px sol=
+id rgb(204,204,204);padding-left:1ex">
 <br>
 &gt; &gt; &gt; &gt; If the argument is &quot;but OSTs know best what stuff =
 is used&quot;<br>
@@ -492,26 +455,15 @@ tral<br>
 &gt; &gt; <a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank=
 ">lustre-devel@lists.lustre.org</a><br>
 &gt; &gt; <a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lust=
-re.org" target=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel=
--lustre.org</a><br>
+re.org" rel=3D"noreferrer" target=3D"_blank">http://lists.lustre.org/listin=
+fo.cgi/lustre-devel-lustre.org</a><br>
 &gt; &gt; <br>
 <br>
-_______________________________________________<br>
-lustre-devel mailing list<br>
-<a href=3D"mailto:lustre-devel@lists.lustre.org" target=3D"_blank">lustre-d=
-evel@lists.lustre.org</a><br>
-<a href=3D"http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org" ta=
-rget=3D"_blank">http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.or=
-g</a><br>
-</div>
-</span></font></div>
-</div>
-
 </blockquote></div></div>
 
---0000000000004cea750642c84e66--
+--0000000000000d76ba0642c86e5e--
 
---===============3025467022378385101==
+--===============6784438486419368419==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -522,4 +474,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============3025467022378385101==--
+--===============6784438486419368419==--
