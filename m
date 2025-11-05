@@ -4,70 +4,78 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 7A1E7CCFA04
-	for <lustre-devel@archiver.kernel.org>; Wed,  5 Nov 2025 00:47:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 10CC0CCFA04
+	for <lustre-devel@archiver.kernel.org>; Wed,  5 Nov 2025 00:57:16 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d1RCw6x1Nz1whP;
-	Tue, 04 Nov 2025 16:34:36 -0800 (PST)
-Received: from mail-oa1-f45.google.com (mail-oa1-f45.google.com
- [209.85.160.45])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4d1RXM5zZ2z20dn;
+	Tue, 04 Nov 2025 16:48:51 -0800 (PST)
+Received: from mail-pj1-f51.google.com (mail-pj1-f51.google.com
+ [209.85.216.51])
  (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
  key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4d1RB93ZlXz20fJ
- for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 16:33:05 -0800 (PST)
-Received: by mail-oa1-f45.google.com with SMTP id
- 586e51a60fabf-3e10d1477afso595516fac.3
- for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 16:33:05 -0800 (PST)
+ 4d1RVf4Cp9z1y4F
+ for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 16:47:22 -0800 (PST)
+Received: by mail-pj1-f51.google.com with SMTP id
+ 98e67ed59e1d1-33b5a3e8ae2so308008a91.1
+ for <lustre-devel@lists.lustre.org>; Tue, 04 Nov 2025 16:47:22 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=google.com; s=20230601; t=1762302664; x=1762907464; darn=lists.lustre.org;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=gDkZHYWqGhB936KI53o0+snC1VFza30YWBa/EKhLJP0=;
- b=PoxMmDKxPfco/KNQU80wWgeEeQ62Us7KUL7uAy1l9iaaOXrB2Y+LzECCNZ68mQ6IPz
- SkZZ8hqtJUN8m8ZLl1jF6ZljaAzbcKIOxKW2iH7IVkGAWmnt2VzSFNLw1c80PTDE3R/w
- EuUM2Y9mc0RGxeQImV48frIXeyectOHue8khX0qtB70+WIltV6g8t+w/CCACk+a4WICn
- Rd/TQTvrfRpwdSUvT/4u6IBeo1rLqvgaexmtXS4X0J0FDMsbAGjKBnvrQQJ4+l6fuwvq
- ryVRpF0oxupWpAUkPDHToMJViW3DD9UHdcujSTHj6xneSHgYoScwnI2aqXjDxVFN088x
- Ph1A==
+ d=dilger-ca.20230601.gappssmtp.com; s=20230601; t=1762303607; x=1762908407;
+ darn=lists.lustre.org; 
+ h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
+ :from:from:to:cc:subject:date:message-id:reply-to;
+ bh=SdZHrtwcvZRo/aPse//iPe23dVYdPlHC6ylqpNjeu1I=;
+ b=oP58yhCkY0NbIJ1Y0Mu38W0dF9Eh2szeiiN6dEPbi76TSfej3hB7J+0oRW+0ob7GjC
+ dcpaMD0m8n4R0fZJeQoqv+oXCYfwH6+GGzwlOrEjzWDRCpP9JHdjilgy2k5j+/SC7jpV
+ xqsBy/ze5TOS0AAA5qPD1uCcFbGBi1nB9lzKIzEx9igeznuKI4zdH/mzDbc/IFlSDLTN
+ 8FaKWr0Vca0x7ttzZr9RPscDd+fvNT6kCzc0dPNbeAAUJENT+mVsvjq++Cdi2Ftj2WHd
+ v/ZpPX5HimhpsL+kx991ds7iq0Utmngzy2HIVJOc49zI6Vn83PEVz9jhXtyvpFcuABA/
+ ZZhA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1762302664; x=1762907464;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
- :reply-to;
- bh=gDkZHYWqGhB936KI53o0+snC1VFza30YWBa/EKhLJP0=;
- b=n9xPDc6GwIWMmOpz0a2anblKtYvSJDmJZbhBpVkUfSAxtYtwt23GpWZx+n4KXveJxu
- abAdi7BhQi75QIif7NwTfWqKQzrd151e2T/bhzBmTtqpyQnDa04E5uL6mKhYtZdLApkh
- dCjlLLtwqr1gib6+ExI0dG8a12JGm/j4NlCaZx1u7pew6u0tuu2fqgx9spcWm85o9A03
- 4a0vjcPS5akcjez60LMSZqwE4mfrp+M+/HtYRbZT9OfOtIVvYwEJ9t3EI2CO1oX9ywQF
- EirrvWtg97S1yZqrrDWxKsROYtDTLZzvCgydycTzfG6iZKsL+7Fueq1o5xNO0HgjSCI9
- ju2g==
+ d=1e100.net; s=20230601; t=1762303607; x=1762908407;
+ h=references:to:cc:in-reply-to:date:subject:mime-version:message-id
+ :from:x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
+ bh=SdZHrtwcvZRo/aPse//iPe23dVYdPlHC6ylqpNjeu1I=;
+ b=lLdmEkU1WhNwzJNbjayzy6OBh5jUuhsyktTq8Pjon4NpciuO50H/bThDKYz9JjuT5i
+ wXPrA7w07NptxrBSytfEBq1IwBT8LgVCHPXDvtvr8scv3Yl0ISdTcIyxX1q3dMxGDsfN
+ nsWq/3nE8hSMU6KIaVEmHhhj/6fY/Rm43vZJm7GttokvhuQus3uhvsHYC/rfpW/+hCNh
+ 5Xy99CUsVzxs5BNSqMd3WiRhLiW9sOSrCKTWv7i5+TuLV6ok1/Jvf26M9AO+qRSSHoSL
+ VcI2YiClFzRiKy4kRoj1KPOGDwie2VcOi5CEM49tcJ5w8fHExrnIwPr73gFrgjqN0y7p
+ Ie0w==
 X-Forwarded-Encrypted: i=1;
- AJvYcCUz35Ommm3pF44WkVGGhyxT+cdcklQiYm3Bg59VdbVTeTFUMrgncCU8aAa4MUoJ/SyuPVB6H0CbrrUtk1Y=@lists.lustre.org
-X-Gm-Message-State: AOJu0YwTij8O/kdYeeh3ssJ+xhWi7WD7jp09rxoS3Pc1hIvlrYC5JK5H
- ATH/hMrM9m8C+5a0HYmcoeX/q2odTyPuL1dmej1Znkuf48xd/0stI9E8L47109bOyJS4/T3u0w2
- ioTDRoGDUX+WT4T6z0ZYORl+g41xMcH5w69OrWp3m
-X-Gm-Gg: ASbGncsGR+aSfYPuJxCO/d5UkW8Hm7iDbS/G0pE3QHAIEf8K99fscO9K5+FyRsyjSny
- ViNR1PZ8tZFgfscH3H6X27qEipLuYuFon71ady5p5Ycsc+xi+WOz8iRyVvUVN9uHfdaMEssIbEE
- rMDpUIAQ8hGSGVIlOn9vngWWZJq8NdilXpPlniVRvvu953rHUTobCvqTzHrvB5qnYMkhC8OxBZv
- pXrnmhi2F93mllZAUSOgFbV1lQSOaHmzSxc1dD4K8mEGgahCKFlbqAlw+da2qbJ2en2qZmZMWdv
- Ea8/PmyuLFz4+6BzIkjmxZpe6Xtz
-X-Google-Smtp-Source: AGHT+IECI2DbpXHSKec2aYxaExv1j1BLbJJ+xZZFGwrSbCuP3tjnJUek6/D3MheKO2s1eahdhChJLt4IvbJNEc/k26k=
-X-Received: by 2002:a05:6870:5e4e:b0:375:94a0:166d with SMTP id
- 586e51a60fabf-3e199360603mr540536fac.5.1762302664308; Tue, 04 Nov 2025
- 16:31:04 -0800 (PST)
-MIME-Version: 1.0
-References: <85EBE389-4753-454B-9735-B57039CB003A@amazon.com>
- <2AAB29BD-39BB-42E7-B142-45EA006571BD@ddn.com>
- <2820AB7F-9276-40E2-8C51-C62C9304B4B8@dilger.ca>
- <CAEp8vpi9nRVkBUes8-0RE9YFr7AUPUM+L4AU73UcVU_e6t3ehg@mail.gmail.com>
- <706AC712-F619-41CF-BD57-E12E3733F458@dilger.ca>
-In-Reply-To: <706AC712-F619-41CF-BD57-E12E3733F458@dilger.ca>
-Date: Tue, 4 Nov 2025 16:30:53 -0800
-X-Gm-Features: AWmQ_bk9d_u77AeBh2oecSbpcLbISAhxfOFst7mrxAj8ruK0IFIqk4YxIsQWfzw
-Message-ID: <CAEp8vpg9GEq4wnrNk96=TwnHcA6SVzNyNH11KoLnaqciOrY6Ag@mail.gmail.com>
-To: Andreas Dilger <adilger@dilger.ca>
+ AJvYcCVCyh5QVhw0y0U+dyvSdlHZsXm5Rj1QhXZ68+GGI3t/By5mn2ub/1kEtIdNaAn097PWe5Bd3EVdGC9nbVI=@lists.lustre.org
+X-Gm-Message-State: AOJu0YxFmI8M+henMJQbbH7uanI1y58CvI8wtgmDFE2EelDA4pHNJMKT
+ vYOzU2kVhxmfkie7kd+JNqYRVdjV4CC1I+45lbRGvF1J3nOidiajWVA+we6tXNyvA9E=
+X-Gm-Gg: ASbGncufMPWK17EfuIqBsvn/o91YZJQw1CkV+6nK3N/jqI6oicfXr4eiExIcUcsfN8e
+ UT8+Bvyb8J9KWnjgr6HysiN0CR3bYjUACfySgUcgNdvU5WQkRAg/lkYf6Ntt/GDEGcGkaZ05pv9
+ 9751cjPdb1sFrm3G/OFxNi6qUUOgMfUXkpPV9h/Zwamn07GZ3haFR1ymKNXUnDjLpoz0RLj1FSh
+ fw9rYs10JbZIecs4s0nTfLqPQMH0fxw/889+MVQa59yaboedFlv/YvMFAvRwej0SW3IS55BRboY
+ dPqT0GfqqjLOfioIZGo8zZ5Tlj9dj1DreJXVElAJHAAX8v6iM0uzkyx+dbWBPkc3yZodv2dQYLZ
+ LoaOWzsaaX7xTS78Bzvz0MXOgTb2U0mH83fUEpBKhxbHaf2WIYgY4P/fl260W0viBD0HqFREqrN
+ NMquODfHkm8bEGbmQM/OvcNYdWV5uR1Ma/Rhw+JrIqvHJrGf4HCmXZoA1sKqg=
+X-Google-Smtp-Source: AGHT+IEPQAm3lSfimsbeeyzinYSwaed+6jndG/nVCestFBJoGObEiU8VgVUDYhsS+ZxtqRX7wrF5fQ==
+X-Received: by 2002:a17:903:1a67:b0:295:28a4:f0ba with SMTP id
+ d9443c01a7336-295f94359a1mr65011045ad.14.1762303606944; 
+ Tue, 04 Nov 2025 16:46:46 -0800 (PST)
+Received: from cabot.adilger.int (S01068c763f81ca4b.cg.shawcable.net.
+ [70.77.200.158]) by smtp.gmail.com with ESMTPSA id
+ d9443c01a7336-29601a381edsm41197545ad.71.2025.11.04.16.46.45
+ (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 04 Nov 2025 16:46:45 -0800 (PST)
+Message-Id: <E296EEC2-800E-4C85-9764-2854D5ED26DD@dilger.ca>
+Mime-Version: 1.0 (Mac OS X Mail 10.3 \(3273\))
+Date: Tue, 4 Nov 2025 17:46:43 -0700
+In-Reply-To: <CAEp8vphfZW4CjgQpCQi6yDBACoTP_3n-5EAFckrOi802_Ajmjw@mail.gmail.com>
+To: Jinshan Xiong <jinshanx@google.com>
+References: <CFE3C4C8-104E-4F7F-A52E-21B8957FAC0F@amazon.com>
+ <0092A54A-6EEF-4CD3-8AFD-7B0066A08810@gmail.com>
+ <D8E0F0C0-1A5F-413A-82EA-F3CFA473D2E1@amazon.com>
+ <28B74585-1877-4A33-9218-FD50AE72D33D@ddn.com>
+ <74326E79-3FCD-41F5-B5DA-95EA2CC48435@gmail.com>
+ <A0DE1BFF-A1D4-4104-8333-E6D771F46713@dilger.ca>
+ <CAEp8vphfZW4CjgQpCQi6yDBACoTP_3n-5EAFckrOi802_Ajmjw@mail.gmail.com>
+X-Mailer: Apple Mail (2.3273)
 Subject: Re: [lustre-devel] RFC: Spill device for Lustre OSD
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
@@ -81,120 +89,94 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Jinshan Xiong via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Jinshan Xiong <jinshanx@google.com>
+From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Andreas Dilger <adilger@dilger.ca>
 Cc: Lustre Development List <lustre-devel@lists.lustre.org>
-Content-Type: multipart/mixed; boundary="===============7737040333725089555=="
+Content-Type: multipart/mixed; boundary="===============5975551429210522294=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============7737040333725089555==
-Content-Type: multipart/alternative; boundary="0000000000004b91270642ce1081"
 
---0000000000004b91270642ce1081
-Content-Type: text/plain; charset="UTF-8"
+--===============5975551429210522294==
+Content-Type: multipart/signed;
+ boundary="Apple-Mail=_15B6F48A-53CC-4BDC-8EFD-7DF39AEA8412";
+ protocol="application/pgp-signature"; micalg=pgp-sha256
+
+
+--Apple-Mail=_15B6F48A-53CC-4BDC-8EFD-7DF39AEA8412
 Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain;
+	charset=utf-8
 
-On Tue, Nov 4, 2025 at 4:25=E2=80=AFPM Andreas Dilger <adilger@dilger.ca> w=
-rote:
+On Nov 4, 2025, at 5:28 PM, Jinshan Xiong <jinshanx@google.com> wrote:
+> On Tue, Nov 4, 2025 at 4:20=E2=80=AFPM Andreas Dilger wrote:
+>> I don't see how the layout xattr format is related to =
+filesystem-level
+>> scanning?  This is "just" the xattr format *STORED ON THE OST =
+OBJECT*,
+>> and it could be handled by direct device-level (OST) scan tools as =
+well.
+>=20
+> I see. I initially thought you proposed the spill device would =
+function as a mirror and that the existing software stack would handle =
+it.
+>=20
+> Are we going to store the spilled object's status in the layout? It =
+sounds difficult because you will have to initiate a layout change from =
+the OSTs. I think we still need to store such an xattr locally in the =
+OST object.
 
->
-> On Nov 4, 2025, at 4:54 PM, Jinshan Xiong <jinshanx@google.com> wrote:
-> > On Tue, Nov 4, 2025 at 3:48=E2=80=AFPM Andreas Dilger <adilger@dilger.c=
-a> wrote:
-> >>
-> >> If the overhead of a local Lustre mount on the OSS is problematic, tha=
-t
-> >> seems like something which could/should be fixed?  The local mounts ar=
-e
-> >> already "non-recoverable" so that they do not get an entry in last_rcv=
-d
-> >> and their absence does not cause any recovery issues.
-> >>
-> >> The main issue we've seen with local mountpoints is that this can
-> confuse
-> >> HA and prevent Lustre module unloading if they are not taken into
-> account
-> >> during cleanup.
-> >
-> > You're right. That's actually why we didn't do it in the first place. I=
-f
-> an OSS crashes, it will definitely lead to recovery timeout and client
-> eviction.
->
-> If an OSS crash with a local mountpoint is causing recovery timeouts,
-> then that seems like a bug to be fixed.  This was changed by Alex Z.
-> in patch "LU-12722 target: disable recovery for local clients" back in
-> commit v2_13_52-45-g8bd04b4e57.
->
+I'm exactly proposing that the layout xattr be stored on the OST object.
+It would have the same format as the existing Lustre layout stored on
+the MDT, but *maybe* a different name (e.g. "trusted.spl", =
+"trusted.osd",
+or whatever).
 
-Thanks for the context. My knowledge of Lustre is many years old ;-)
+I'm not sure if using "trusted.lov" will confuse filesystem scanning
+tools or help them...  It probably makes sense to have a different
+xattr name, just in case we want MDT spilling (e.g. NVRAM->QLC) in
+the future.
+
+>> This would allow mirrors (FLR), multiple spill devices (multiple FLR
+>> mirrors), concatenated devices (PFL), etc.  It just avoids adding new
+>> formats that need to be parsed, printed, etc.
+
+Cheers, Andreas
 
 
->
-> Cheers, Andreas
->
->
->
->
->
->
 
---0000000000004b91270642ce1081
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
 
-<div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote g=
-mail_quote_container"><div dir=3D"ltr" class=3D"gmail_attr">On Tue, Nov 4, =
-2025 at 4:25=E2=80=AFPM Andreas Dilger &lt;<a href=3D"mailto:adilger@dilger=
-.ca">adilger@dilger.ca</a>&gt; wrote:<br></div><blockquote class=3D"gmail_q=
-uote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,2=
-04);padding-left:1ex"><br>
-On Nov 4, 2025, at 4:54 PM, Jinshan Xiong &lt;<a href=3D"mailto:jinshanx@go=
-ogle.com" target=3D"_blank">jinshanx@google.com</a>&gt; wrote:<br>
-&gt; On Tue, Nov 4, 2025 at 3:48=E2=80=AFPM Andreas Dilger &lt;<a href=3D"m=
-ailto:adilger@dilger.ca" target=3D"_blank">adilger@dilger.ca</a>&gt; wrote:=
-<br>
-&gt;&gt; <br>
-&gt;&gt; If the overhead of a local Lustre mount on the OSS is problematic,=
- that<br>
-&gt;&gt; seems like something which could/should be fixed?=C2=A0 The local =
-mounts are<br>
-&gt;&gt; already &quot;non-recoverable&quot; so that they do not get an ent=
-ry in last_rcvd<br>
-&gt;&gt; and their absence does not cause any recovery issues.<br>
-&gt;&gt; <br>
-&gt;&gt; The main issue we&#39;ve seen with local mountpoints is that this =
-can confuse<br>
-&gt;&gt; HA and prevent Lustre module unloading if they are not taken into =
-account<br>
-&gt;&gt; during cleanup.<br>
-&gt; <br>
-&gt; You&#39;re right. That&#39;s actually why we didn&#39;t do it in the f=
-irst place. If an OSS crashes, it will definitely lead to recovery timeout =
-and client eviction.<br>
-<br>
-If an OSS crash with a local mountpoint is causing recovery timeouts,<br>
-then that seems like a bug to be fixed.=C2=A0 This was changed by Alex Z.<b=
-r>
-in patch &quot;LU-12722 target: disable recovery for local clients&quot; ba=
-ck in<br>
-commit v2_13_52-45-g8bd04b4e57.<br></blockquote><div><br></div><div>Thanks =
-for the context. My knowledge of Lustre is many years old ;-)</div><div>=C2=
-=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8e=
-x;border-left:1px solid rgb(204,204,204);padding-left:1ex">
-<br>
-Cheers, Andreas<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-</blockquote></div></div>
 
---0000000000004b91270642ce1081--
 
---===============7737040333725089555==
+--Apple-Mail=_15B6F48A-53CC-4BDC-8EFD-7DF39AEA8412
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+	filename=signature.asc
+Content-Type: application/pgp-signature;
+	name=signature.asc
+Content-Description: Message signed with OpenPGP
+
+-----BEGIN PGP SIGNATURE-----
+Comment: GPGTools - http://gpgtools.org
+
+iQIzBAEBCAAdFiEEDb73u6ZejP5ZMprvcqXauRfMH+AFAmkKnnQACgkQcqXauRfM
+H+DAmA//XcaDBRhzNmwwozpOOIZh1F0BLJHdLnapYos71PiJolKEbmedU2DwNxF0
+Es5ORpWJOyLuZ1QMk5THHsZwPr28Glgg19Dm3Q3MuY9x9v8nUZ38lCl83aoOdX45
+kTcEMZadqaLlsyrts+zCOzRpB4gs8/omGTkEw0Pw/MHWrCM/JnuuwhGXE1uk1KHU
+/KRlZReV6fzMuhoVAXEUULJFdpNtVVbaO1jUlG5Y00+NiNPGYrd9WVO2RAr1vUnZ
+TBX9RjZ4GGSlsYDng3lKKR0mqizGQWzbjSq9m6O7Fzl14TH+Lkwi06BitOS213lx
+eBvyRmAWQUp4zrr8ZqwwTNDTLDcnQdl3WZEc25THLWcT9983sZuQVYnKFn5cZkjz
+gJdKUzoj1zZ7SYj2p0IxEgMKqzwfvR/VUDvX31VjdDScnzFB8lIgo4rQzhonCa0w
+ZC/y5CpzlOPOa1yzd8aK8pPSXh6+L35HzE0I02BJo2eNSQQB2YQyhJj0yFJFgFe9
+JYGXMkpOvpeVsotFKLH7cGtB/LOuJSNaXLovV4cuQ9MssWQDIkYiQMKMjdfo+EQ4
+pvAR8ISCpZNxtk5ahq/iCxCK9NMebdWdO/xIP3wC++OV/IRN0uxudGJ8BVwkbCmx
+kujKcsH0bnOrw4FDqrZZe80VPnSPH8CSxL2JUYOtL5RCdEGLQ8w=
+=qjvQ
+-----END PGP SIGNATURE-----
+
+--Apple-Mail=_15B6F48A-53CC-4BDC-8EFD-7DF39AEA8412--
+
+--===============5975551429210522294==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -205,4 +187,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============7737040333725089555==--
+--===============5975551429210522294==--
