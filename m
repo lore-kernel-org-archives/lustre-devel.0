@@ -4,79 +4,128 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id A8708CFD36B
-	for <lustre-devel@archiver.kernel.org>; Tue, 25 Nov 2025 00:27:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 852C9D12679
+	for <lustre-devel@archiver.kernel.org>; Tue,  2 Dec 2025 22:13:23 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4dFk5y1yfgz1y1g;
-	Mon, 24 Nov 2025 16:27:02 -0800 (PST)
-Received: from mail-pl1-f171.google.com (mail-pl1-f171.google.com
- [209.85.214.171])
- (using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
- key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
- (No client certificate requested)
- by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4dFk5s6wdDz1wL2
- for <lustre-devel@lists.lustre.org>; Mon, 24 Nov 2025 16:26:57 -0800 (PST)
-Received: by mail-pl1-f171.google.com with SMTP id
- d9443c01a7336-2984dfae043so44489405ad.0
- for <lustre-devel@lists.lustre.org>; Mon, 24 Nov 2025 16:26:57 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=dilger-ca.20230601.gappssmtp.com; s=20230601; t=1764030417; x=1764635217;
- darn=lists.lustre.org; 
- h=to:references:message-id:content-transfer-encoding:cc:date
- :in-reply-to:from:subject:mime-version:from:to:cc:subject:date
- :message-id:reply-to;
- bh=0O2e6jMniXacHQ/YJKThmvrJBgmemmXTw/N3otC9UbI=;
- b=2ssGEmf6VMkBjtEiQbynuKbRXf7Fsy1zit5Oz9AJgQLNy239hDckVHTap8f/+caM4o
- XJh+KYqwEHpdIJEy5ELnUkutKzLgf231hn4nApzzSLsC53bPEOHrIHEe4fX2YWZyA55s
- YMc2hP5WVMoXYn4HnQ4Z3vFKf4K9AJ/xileNw/67DZH3KaspkawODEMdLn1oXdOmsr9t
- 2irCeK+r7V7yl/lqXyaKFKOnHf5w2gtBMaYVWSIdA+ZP+gYB+/EU154XRNtfXgxqpN8E
- MsLEIVHXQGaT0TRDi6v0EEdSIF/YAnfcm8WP44EH3pmqKbml8tbK/7hGiy3u1Mym9oE4
- g6kQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20230601; t=1764030417; x=1764635217;
- h=to:references:message-id:content-transfer-encoding:cc:date
- :in-reply-to:from:subject:mime-version:x-gm-gg:x-gm-message-state
- :from:to:cc:subject:date:message-id:reply-to;
- bh=0O2e6jMniXacHQ/YJKThmvrJBgmemmXTw/N3otC9UbI=;
- b=DEaGWgxsXw2IQKny1JW/3LAgbdK6EbmvXAM3SpaF2dYCoHvyUHv+Q1s25GTbD9g/2H
- zsZ4uU3guCpJRigtZHsJGG7O8OuQ1hbqQJRdB5RoG2jy18wo9dojj3V7xVnQhSSdnxNX
- Bv+q/E6EKitkUJX3YHQda8sES17i0NC7q6RS0BdERSYt88blT7sDxJGpgrhSxXkTWQSS
- Nqw/FjB0+3xNdwA7FjPuMD9fK4ir6tlKPcZV5w+iVyRtxTfMUYfGwfLXkt/U66g9nnO9
- U6PZruRUF6711FS17RSczVEfI+3lnENcE0P6AMqq3zrMtLNRzyYHpcYgEhwt1h0rpMTi
- tNHA==
-X-Forwarded-Encrypted: i=1;
- AJvYcCXjdT+0GSjsc0RGgSojgYv82cTxN8EEBdWW+xwixkUgDKrrnr3a6n0Ut7HELp5TYwN0OdWrzWq9595NGow=@lists.lustre.org
-X-Gm-Message-State: AOJu0YzfmUMtFXLoym0dAUrAzfNph2XpMKkTKBILjv+OqQlFTvOVbZpM
- AV9aSPaa9jlLDIoWfJGxdWO5ecXspyAfUMEmFIzmGDzXzs0L9u/EIoWldT58bQRCLrU=
-X-Gm-Gg: ASbGnct4zBNUmfs6qpJIfqPlOf0Z1xhYGv23KI1GNE3jLWiGK+fECbvOmFGAXiWqbFE
- a71eHNR39h5zzhfexXO8E/6EhpX6Me0ElMzd30uDpXFrKcfIWJVf55b5Luc/Jql51F+hS2XNgyW
- /JOlo7FVJhbWgHifcugplz9znWEoWpblQzTIdwyxto9wSKK1Dr1y8TLnvOmqe2hxYljGqUIPA3d
- IHK3K3eLy5Oeh2ain8vOVczkTLdO8XmqRihHRpQL6P5xmwSkNG0ntMEa0xneezK6wavvJ4ZoxAL
- fxmKABBNFdqmPYS5Jv2h38NDiQdl6QSjX8BgUOP3uaw0W+voHbDn1w/jJtuMGByzo3Ka9ZNIgKM
- s2pSHsc04lP2weejlorkLVvAnuCnTMwXhcF3g9M7IM/9ZgIXof+F4kfqzXfTZKiHQBqMITlS7YU
- aU9AU1ZRNdgGiENVYE09trn5hS+zbGtMjuJwtNWRhZmuPBe9Q7yPAzuo0JQqJyUH1Zew==
-X-Google-Smtp-Source: AGHT+IHHHe4RuOIYAJE9NR1nLvseUWpQ8eK7SdUpiT7mcdRwfq+7BYBHHYPPwLrGuwSQh0Z+pLK56A==
-X-Received: by 2002:a17:903:19e5:b0:290:c0d7:237e with SMTP id
- d9443c01a7336-29b6c68be27mr154238385ad.39.1764030417134; 
- Mon, 24 Nov 2025 16:26:57 -0800 (PST)
-Received: from smtpclient.apple (S01068c763f81ca4b.cg.shawcable.net.
- [70.77.200.158]) by smtp.gmail.com with ESMTPSA id
- 41be03b00d2f7-bd75e4d3c86sm14943649a12.11.2025.11.24.16.26.56
- (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 24 Nov 2025 16:26:56 -0800 (PST)
-Mime-Version: 1.0 (Mac OS X Mail 16.0 \(3864.100.1.1.5\))
-In-Reply-To: <DM5PR21MB159160C61FB7A113DC551B2EBED0A@DM5PR21MB1591.namprd21.prod.outlook.com>
-Date: Mon, 24 Nov 2025 17:26:45 -0700
-Cc: =?utf-8?Q?G=C3=B6tz_Waschk?= <goetz.waschk@gmail.com>,
- "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Message-Id: <0C993323-B212-44DE-9FC0-B9AD7FB54423@dilger.ca>
-References: <CACd6u-qfd=cyJBEmM7TwWM=++AMT8KmVu=97EX24jiukzDPJRA@mail.gmail.com>
- <0BA8A991-6722-4C3D-B98C-5DC2F7365CBC@whamcloud.com>
- <DM5PR21MB159160C61FB7A113DC551B2EBED0A@DM5PR21MB1591.namprd21.prod.outlook.com>
-To: Ellis Wilson <elliswilson@microsoft.com>
-X-Mailer: Apple Mail (2.3864.100.1.1.5)
-Subject: Re: [lustre-devel] Git server down?
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4dLYhG0Zqnz23wt;
+	Tue, 02 Dec 2025 13:25:02 -0800 (PST)
+Received: from CH5PR02CU005.outbound.protection.outlook.com
+ (mail-northcentralusazon11022085.outbound.protection.outlook.com
+ [40.107.200.85])
+ by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id
+ 4dLYXw0vtFz23hv; Tue, 02 Dec 2025 13:18:40 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
+ b=axiGZ8b0o1Bw+VzM44VlkLbthS2ak3j1ny7O9IN8J54dr83G1q0jG4kESX6ZjZWnhpDx12bHSiE/wGwbmGqLUFGXc1muySe08k7ZcLS8Ci8flf286LP+CDP2a0vjdccaw3yp5rnXVQEiCCed1pH+JKEVjKEgCUflxFHVbQeuZVqzH2PN/euyo718mHiClvF/J1W6HVdN9DFCLKdQ5GhJiiG+TrpYYYEeCzh1x9x1QxM8uRMXyzNEH5uHFlpq3vtQsshxTgbbdy9ihlYwRJYcWhb1SYzXzjZyO7n6WspW6pQzGhB95CHQE64vV9ay8dNRtkpDJX6NR012rHE0Kzg97Q==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
+ s=arcselector10001;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=8sSex5/9Zl1Fr+qzLLXZdRr0+oaM7v0yJZzAGIf0ZX0=;
+ b=ZW4+US9H8HfQ6BUsbkrQpbdRHO2QaT3NU248FP/t/NFIzqmAofLk/NPrNKX1JDO6FigW025p9C4y27jrM53/1a+DyM9r/aeUCMm7lgkJ6zmmhOFl1h9uWTLAdFxOFoA7sZcYVMTBLuKc76umRr8X8YrQl6xdoC+mqDpzcWRPl+G/QqQ7IGRpKL3o1fJ3bRjwOvW5LO55fMOdn76mD//ZftMhfAY5WKX0dFeUWHroU6C+V/qod8Vt6c0aixFDn1GJ8dxcg0EKzOadFeQWRL8XqiDxOyPBvE38+i5CppogdQfQkvlzhN+sfXepkNToBuYQ3yV27PC5ju/Zd2PkFHuhyw==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=thelustrecollective.com; dmarc=pass action=none
+ header.from=thelustrecollective.com; dkim=pass
+ header.d=thelustrecollective.com; arc=none
+Received: from CH2PR04MB6966.namprd04.prod.outlook.com (2603:10b6:610:95::21)
+ by SA1PR04MB8519.namprd04.prod.outlook.com (2603:10b6:806:330::10)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9388.9; Tue, 2 Dec
+ 2025 21:17:36 +0000
+Received: from CH2PR04MB6966.namprd04.prod.outlook.com
+ ([fe80::9e9:f0b:349a:2a63]) by CH2PR04MB6966.namprd04.prod.outlook.com
+ ([fe80::9e9:f0b:349a:2a63%5]) with mapi id 15.20.9366.012; Tue, 2 Dec 2025
+ 21:17:36 +0000
+To: "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
+ "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
+ "lustre-discuss@lists.lustre.org" <lustre-discuss@lists.lustre.org>,
+ "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>
+Thread-Topic: Lustre 2.15.8 released
+Thread-Index: AQHcXzzeMuvwAxFi7UOdu3VmIZv3PA==
+Date: Tue, 2 Dec 2025 21:17:36 +0000
+Message-ID: <CH2PR04MB696607CCAE004C2E4397FE19CCDFA@CH2PR04MB6966.namprd04.prod.outlook.com>
+Accept-Language: en-CA, en-US
+Content-Language: en-CA
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-reactions: allow
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=thelustrecollective.com;
+x-ms-publictraffictype: Email
+x-ms-traffictypediagnostic: CH2PR04MB6966:EE_|SA1PR04MB8519:EE_
+x-ms-office365-filtering-correlation-id: 910cd8f4-a4c0-47d2-8a2d-08de31e83728
+x-ms-exchange-senderadcheck: 1
+x-ms-exchange-antispam-relay: 0
+x-microsoft-antispam: BCL:0;
+ ARA:13230040|1800799024|366016|586017|376014|8096899003|38070700021; 
+x-microsoft-antispam-message-info: =?us-ascii?Q?XWzSAraOKmmRNszmJ8L901+4WnHZzbBr1slxX8WLa6KwhXGSqesdmngPwzOY?=
+ =?us-ascii?Q?hLxjivn1M+l7ibVnKb4WmyWvhcJ9awmO3kBJ2qG6OAbi+lgzUH/5dUV39fCC?=
+ =?us-ascii?Q?H3UhPWsKwQX0MT7sngPien6apH2L+oRyZ0Wi4ajtyyX6Gh7F7URDxEoduYl0?=
+ =?us-ascii?Q?d/N+6HLB0ODe10ZYeVR5aAncjxjvPivCi2Xv9ou79u9wTvER9GpcD0A8XdIa?=
+ =?us-ascii?Q?2ZWVMoZ1Qz05yBqhJ+h9dADR+Latx3SCzNWoiXYeOr97wElnZNYT1h31Bajz?=
+ =?us-ascii?Q?+NG+REPxygOoywvP+Vsc6Chfxqn15cW6xeDq1gFQ96bcGGS//w/eZb+S5qii?=
+ =?us-ascii?Q?5aDLldsj7vu9SUPhZFd5+y6hZc3YoxeR9KSIS59w7tG9uHdcLMVx60ZPwG9d?=
+ =?us-ascii?Q?3UyANPqvC1o8eV7I2WNUo+fYltxuqfJgFDNcNuB4Q8nziOIsmk8JC8UZL16W?=
+ =?us-ascii?Q?NWUU0fdtkHUiMhqzLFkPnEMH5KI0WERZ11OJ79WoqJ76OPbl2CIpY06Ia5MD?=
+ =?us-ascii?Q?nukoy4DElq+xIPZpsHmjTET6Wnibc8YWPUFk0X+fjZH0MvZ04HpqvCTlKqvM?=
+ =?us-ascii?Q?4KZKYLAwoZCEQon0QTL85A/wxaWHTkM+84J7im6Y+wXUIw/FGZ5KtN972RAQ?=
+ =?us-ascii?Q?9xldJrdghtSHzvlIew8Ny6t+vxAvZVwWKJCIshpcKVUjHoGaft1ife7Yl2BG?=
+ =?us-ascii?Q?WqEq3xmc6k7JFHbpWLW+mcBM7m1Ew19p/hm7PT5e3D3U4GCIFnLWY9xtNR+w?=
+ =?us-ascii?Q?yoygssSc6JoWNRR0fuRwxhgsCMV2pH1fLeQZZNkp4htzxz5UppIjUIydW4Cr?=
+ =?us-ascii?Q?K6R2dbPHQHr9J7UI3Q6Z+8tTKknA0fHuhwRDNMtOtTxxaBv2eLLh1sy6eAty?=
+ =?us-ascii?Q?jFI4xVumZ6N5mNYAzr4BX7q3YB+ffrK0b3IzxGP8CBNXS3ARiSkhu6+h9O7V?=
+ =?us-ascii?Q?nywjvXI3j9Wsq77rk7GPPFxU3xIYhB6eF6sMHdX3fKb2BaH/TSRyp37uHLXH?=
+ =?us-ascii?Q?Sc77fFff5nB9Zu7pYtkqA/z05xEsa4vaRUg1R8MxRmDNOJf3phyQF1mqS6I7?=
+ =?us-ascii?Q?DrshCZU9XYOsajMDxWjpq9j57QgAcywuZLXZQ6v0ywGPQG6oYAWB0bmOQDCI?=
+ =?us-ascii?Q?p+GTfMNfoiQT0U9LXhCXnVeQVWGQZr025xAkF7egjDt6REeGD167eCGbfskt?=
+ =?us-ascii?Q?VotUrcGATd9ZpZpkbwxBGHqyj1eRkZMpZmgW9FwjQDpRxoBUucPQ+e/8N5Bt?=
+ =?us-ascii?Q?lnyAgQ1uDdz3gCbqjb37o5sSQm0TJnOa6R0lvinKrcfrbqiWwjncQ55VI2ry?=
+ =?us-ascii?Q?5Je4WqI+cetJzC3yfrOGBrRpMsw+/j85klThUIbqy5SRBzQ6+ZMT8KhXdHyh?=
+ =?us-ascii?Q?gm77ijMkRa0ncQx8T9FRtehD/9TIwclWyzXko2ou0ewwbyo8Bu97/jpsnRrX?=
+ =?us-ascii?Q?DOKoYFl87/wgQZ5mBPnBJeteR2eKh/T+?=
+x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
+ IPV:NLI; SFV:NSPM; H:CH2PR04MB6966.namprd04.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(1800799024)(366016)(586017)(376014)(8096899003)(38070700021);
+ DIR:OUT; SFP:1102; 
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?Zsl8nLefXwZWGQHUhmMb58POJz0gQOrG8q4fqYJYIBxwZOoln48WP43szUz+?=
+ =?us-ascii?Q?zEBKno5/DDNhjfFLqdYI8FQbwiv9omS47hdx6Iz5v3klUnqWkobWfWyx8MBK?=
+ =?us-ascii?Q?e2AdAc31mLCi+yrbIBgtdds2RKlwKS/hOA4/Z0/ifq8KyQSfntbrqPYZ6qCG?=
+ =?us-ascii?Q?mkFHJoPLWyBwA/Lc9TssW3nDh4uUw9e0tOnz52zS94uaPfdMistq9jWnZY1Y?=
+ =?us-ascii?Q?fnJwg34qM2d4+yYaQj+O+94/0jeFPJ+uhhjJq7A+6wrg6mGGLZix5kAOqas9?=
+ =?us-ascii?Q?hVguAn9HXimd9AROSskFIGK+Fyn/ZnDx4HiwqHgwypxVDQJOK1RTGAIT2ufO?=
+ =?us-ascii?Q?geJI5URrOWq3GGJd6WIvYe1Vh6AVySC1WMuN7DLKbHr+gVU5tBbDEcCglMi1?=
+ =?us-ascii?Q?6BnEtAfFezz7EP3NBXrfGnqDly26thYCrEng3R5VwbhVTByt1XACIIDDTAi8?=
+ =?us-ascii?Q?tpfzkF3sMLxlboNWiBEy/VTeOZ5MmVf8L5AzT04PRrZ2E7SX3KEAa/pPbd0q?=
+ =?us-ascii?Q?nLTWgKZwOV2+e6CSFNKluJ+WUDz9xdbweIb81/YBvoG2jNJ4djQDONAywZkX?=
+ =?us-ascii?Q?DN6fndIPUSjTqHLeFSj68+Nt4Q4Kz5x5vsiEMto6J/VyUmgiNVoLSQE1bXz2?=
+ =?us-ascii?Q?O2fBdbmUdd81NncJlEMrr0AECA95o+C1HrlXmsMKl7JUUC/6tQZW3Z9xPZBZ?=
+ =?us-ascii?Q?4RbR/n+r7lretxCQfp7pgvHZdmfik29rqGNVUfU+m+MF5AvN85NxYp6zhIPC?=
+ =?us-ascii?Q?DQCF641fPOV97g0pSK/1G1z3xmN18R9ed6RjfUsNr+PEYBg1g8ND8oijdBOM?=
+ =?us-ascii?Q?UQ0EytjFAMwKTgDW4vMnCQhO9dLUvpt9RNu51nAKSY3PhcXvzTGfoQ+lSc5O?=
+ =?us-ascii?Q?UVpOaPRHOhO/1bB+J2jHPBmH44FO7METCzuIXyWWDtA2yuIfi96B/rzFcOS2?=
+ =?us-ascii?Q?1oFelr5xn9vpbVyIm8GMBEF8/tN9/l+qACGdcuKJsfC7j95KqOTEOMGLV/bF?=
+ =?us-ascii?Q?1KZJaHsiUeHnN8e9gfFiurY6CUgRfueR0D39HqSNWD92iOkLFXqC+PH/zlUA?=
+ =?us-ascii?Q?x1La4A8AZlF2WEuARTNpMM0xhW1/BFOTuXpO2tzz0N6SzrGOIYnZN/eS0sDw?=
+ =?us-ascii?Q?4pmrahV0VKYLOR2h+2Ht7enkPFKPYcusO53jgmylZaEsMezeFCJ5/Quv95Fl?=
+ =?us-ascii?Q?vWJawY0q/EMlqDHRM0DKwGfEQ1U7ZdC8mg3YFOvd4SA63g1F37O0HskDOW2j?=
+ =?us-ascii?Q?Mjc/dbqL/pojvACzRLMbpniyyoMrmfQ4cGhRSoGRSnzY+oogzAznlG0szYMx?=
+ =?us-ascii?Q?Px8yynYBiU6pGbQxZgCWRmxP/t8J4x5+LZlG0TDpv51eotiwhauJNqD+VM29?=
+ =?us-ascii?Q?yszkGMuuZ6Nwdhm/00spWtVd+Trp3Ww50HeqoJzMS1LishHBubla7L/R+gq3?=
+ =?us-ascii?Q?lKOQtNCQUGL3G+HBlcqKfQjthb4gqB4VFqehxn9oNQaKEHJeKa1+NAWnVy17?=
+ =?us-ascii?Q?SEzrnU18UBtDIhHfaBRr2jVxe9ORKrkvJ58KGDs0JLxAX0JBkpiNokauG+r8?=
+ =?us-ascii?Q?mNwCjVqNvqUF7friwUj+G5Jlnwnxv1ptSTClgv2TfcyMP3E9bqF8YsM/P0iT?=
+ =?us-ascii?Q?aso2KMQzyOLGYwZ8xl4pPK4=3D?=
+MIME-Version: 1.0
+X-OriginatorOrg: thelustrecollective.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-AuthSource: CH2PR04MB6966.namprd04.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 910cd8f4-a4c0-47d2-8a2d-08de31e83728
+X-MS-Exchange-CrossTenant-originalarrivaltime: 02 Dec 2025 21:17:36.0159 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 4c9dec06-8f2c-4233-98d5-ca3cb36218fc
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-userprincipalname: 8pbxn8fVBP9+IMYGrok/++UAZwhEuEwQskDwIM91eFE+QLpDzAreWGhv2ew4/CmJ3y22Kyr3KdDbpwFtftJuGhzl8aXlIQm6cR75oevQl7I=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SA1PR04MB8519
+Subject: [lustre-devel] Lustre 2.15.8 released
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -89,78 +138,108 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Andreas Dilger <adilger@dilger.ca>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Peter Jones <pjones@thelustrecollective.com>
+Content-Type: multipart/mixed; boundary="===============4558303674232540508=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-SGkgRWxsaXMsCmluZGVlZCB0aGUgZ2l0LndoYW1jbG91ZC5jb20gPGh0dHA6Ly9naXQud2hhbWNs
-b3VkLmNvbS8+IGFkZGVkIGEgc3BhbSBmaWx0ZXIgZHVlIHRvIEFJIEJvdCBzY3JhcGluZwpvdmVy
-bG9hZGluZyB0aGUgc2VydmVyLiAgVGhpcyB3YXMgZG9uZSB2aWEgQ2xvdWRmbGFyZSwgYnV0IGl0
-IGJsb2NrcwpIVFRQKHMpIGFjY2VzcyBmcm9tIEdpdC4gIFlvdSBjYW4gdXNlIFNTSCB0byBhY2Nl
-c3MgaXQgdmlhIHlvdXIgR2Vycml0CmFjY291bnQuICBUaGlzIHdhcyBhbHNvIGltcGFjdGluZyBn
-aXQud2hhbWNsb3VkLmNvbS9mcy9sdXN0cmUtcmVsZWFzZSA8aHR0cDovL2dpdC53aGFtY2xvdWQu
-Y29tL2ZzL2x1c3RyZS1yZWxlYXNlPgphY2Nlc3MsIGJ1dCB0aGF0IHdhcyAicmVhZC1tb3N0bHki
-IGFuZCBhbGwgb2YgdGhlIGRldmVsb3BtZW50IHdhcyBkb25lCnZpYSBHZXJyaXQsIHNvIHRoZSBH
-aXRodWIgY2xvbmUgd2FzIHN1ZmZpY2llbnQgZm9yIHJlYWQtb25seSB1c2FnZS4KCgpJJ3ZlIGNs
-b25lZCBpdCB0byB0aGUgR2l0aHViIEx1c3RyZSBwcm9qZWN0LCB3aGljaCBpcyBsaWtlbHkgYSBi
-ZXR0ZXIKbG9uZy10ZXJtIHJlcG9zaXRvcnkgdG8gdXBkYXRlIGluIGFueSBjYXNlICh0aGVyZSBo
-YXNuJ3QgYmVlbiBhbnkgdXBkYXRlcwp0byB0aGUgcHJvdG9jb2wgZG9jdW1lbnQgaW4gMTEgeWVh
-cnMuLi4pOgoKaHR0cHM6Ly9naXRodWIuY29tL2x1c3RyZS9sdXN0cmUtcHJvdG9jb2wuZ2l0Cmdp
-dEBnaXRodWIuY29tOmx1c3RyZS9sdXN0cmUtcHJvdG9jb2wuZ2l0CgpDaGVlcnMsIEFuZHJlYXMK
-Ck9uIE5vdiAyNCwgMjAyNSwgYXQgOToxMuKAr0FNLCBFbGxpcyBXaWxzb24gd3JvdGU6Cj4gCj4g
-U29ycnkgZm9yIHJldml2aW5nIGFuIG9sZCB0aHJlYWQsIGJ1dCB0aGlzIGhhcyBwbGFndWVkIG1l
-IGZvciBhIHdoaWxlIG5vdy4gIEkndmUgdHJpZWQgZXZlcnl0aGluZyBJIGNhbiB0aGluayBvZiAo
-aG90c3BvdHRpbmcgdGhyb3VnaCBteSBwaG9uZSwgcnVubmluZyBubWFwIGFnYWluc3Qgd2hhbWNs
-b3VkLCB3aGljaCBkaWRuJ3Qgc2hvdyB0aGUgZ2l0IHNlcnZlciBwb3J0LCB0cnlpbmcgdG8gZG93
-bmxvYWQgdmlhIGEgZ2l0IGNsaWVudCBvbiBteSBwaG9uZSwgZXRjKSwgYnV0IG5vdGhpbmcgaXMg
-d29ya2luZy4KPiAKPiBXaGVuIEkgdmlzaXQgdGhlIHBhZ2UgdmlhIHRoZSBicm93c2VyIGl0IHdv
-cmtzLCBidXQgc2VuZHMgbWUgdGhyb3VnaCBDbG91ZGZsYXJlIGZpcnN0LiAgSSBzdXNwZWN0IHRo
-aXMgaXMgd2hlcmUgdGhlIGlzc3VlIGxpZXMg4oCUIENsb3VkZmxhcmUgZG9lc24ndCBwbGF5IHdl
-bGwgd2l0aCBzZWxmaG9zdGVkIGdpdCBpbiBtYW55IGNhc2VzLiAgUGl2b3RpbmcgdG8gdGhlIGdp
-dGh1YiByZWxlYXNlIG1pcnJvciB3b3JrcyBmaW5lIGZvciBMdXN0cmUgaXRzZWxmLCBidXQgbm9u
-LW1pcnJvcmVkIHJlcG9zIG9idmlvdXNseSBkb24ndCAoZS5nLiwgcHJvdG9jb2wuZ2l0LCB3aGlj
-aCBJJ3ZlIGJlZW4gd29ya2luZyB0byByZWZhY3RvciBhbmQgbWVyZ2UgaW50byB0aGUgd2lraSku
-ICBJIHdhcyBhYmxlIHRvIGdldCB0aGUgZmlsZXMgSSBuZWVkIGJ5IGJyb3dzaW5nIHRoZSB0cmVl
-IGFuZCB0aGVuIGNsaWNraW5nIG9uICJzbmFwc2hvdCIsIHdoaWNoIGdpdmVzIG1lIGEgdGFyLmd6
-IGZpbGUsIGJ1dCB0aGlzIGlzIGNsdW1zeSBhbmQgSSBoYWQgdG8gaHVudCBmb3IgYSB3aGlsZSB0
-byBmaWd1cmUgaXQgb3V0Lgo+IAo+IElmIFBldGVyIG9yIHNvbWVib2R5IGVsc2UgY2FuIHNoZWQg
-c29tZSBsaWdodCBvbiB3aGF0IHNlY3VyaXR5IGFjdHVhbGx5IHdhcyBwdXQgaW4gcGxheSBpdCB3
-b3VsZCBoZWxwIG1lIHJlYXNvbiBhYm91dCB3aGV0aGVyIHRoaXMgaXMgcmVhbGx5IGp1c3QgbWUs
-IG9yIGlmIGxvdHMgb2YgcGVvcGxlIGhhdmUgaGFkIHRvIHBpdm90IHRvIHRoZSBtaXJyb3IgYW5k
-IHRoaXMgaXMgYSBtb3JlIGdlbmVyYWxpemFibGUgcHJvYmxlbSBmb3IgdGhlIGdpdC53aGFtY2xv
-dWQuY29tIHNpdGUuCj4gCj4gVGhhbmtzIQo+IAo+IGVsbGlzRnJvbTogbHVzdHJlLWRldmVsIDxs
-dXN0cmUtZGV2ZWwtYm91bmNlc0BsaXN0cy5sdXN0cmUub3JnPiBvbiBiZWhhbGYgb2YgUGV0ZXIg
-Sm9uZXMgdmlhIGx1c3RyZS1kZXZlbCA8bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmc+Cj4g
-U2VudDogTW9uZGF5LCBBdWd1c3QgMjUsIDIwMjUgMTI6NTEgUE0KPiBUbzogR8O2dHogV2FzY2hr
-IDxnb2V0ei53YXNjaGtAZ21haWwuY29tPjsgbHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmcg
-PGx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnPgo+IFN1YmplY3Q6IFtFWFRFUk5BTF0gUmU6
-IFtsdXN0cmUtZGV2ZWxdIEdpdCBzZXJ2ZXIgZG93bj8KPiAgR8O2dHoKPiAgU29tZSBleHRyYSBz
-ZWN1cml0eSB3YXMgcmVjZW50bHkgYWRkZWQgYW5kIGl0IHNlZW1zIHRvIGhhdmUgY2F1c2UgaXNz
-dWVzIGZvciBhIGNvdXBsZSBvZiBwZW9wbGUuIE90aGVycyBpbXBhY3RlZCBoYXZlIGZvdW5kIHN3
-aXRjaGluZyB0byB1c2UgdGhlIGdpdGh1YiBtaXJyb3IgLWh0dHBzOi8vZ2l0aHViLmNvbS9sdXN0
-cmUvbHVzdHJlLXJlbGVhc2UgLSB3YXMgYSBzaW1wbGUgd2F5IHRvIHNpZGVzdGVwIHByb2JsZW1z
-Lgo+ICBQZXRlcgo+ICBGcm9tOiBsdXN0cmUtZGV2ZWwgPGx1c3RyZS1kZXZlbC1ib3VuY2VzQGxp
-c3RzLmx1c3RyZS5vcmc+IG9uIGJlaGFsZiBvZiBHw7Z0eiBXYXNjaGsgdmlhIGx1c3RyZS1kZXZl
-bCA8bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmc+Cj4gUmVwbHktVG86IEfDtnR6IFdhc2No
-ayA8Z29ldHoud2FzY2hrQGdtYWlsLmNvbT4KPiBEYXRlOiBNb25kYXksIEF1Z3VzdCAyNSwgMjAy
-NSBhdCA5OjAy4oCvQU0KPiBUbzogImx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnIiA8bHVz
-dHJlLWRldmVsQGxpc3RzLmx1c3RyZS5vcmc+Cj4gU3ViamVjdDogW2x1c3RyZS1kZXZlbF0gR2l0
-IHNlcnZlciBkb3duPwo+ICBIaSBldmVyeW9uZSwKPiAgSSBjYW5ub3QgYWNjZXNzIHRoZSBnaXQg
-c2VydmVyOgo+ICAjIGdpdCBjbG9uZSAtYiBtYXN0ZXIgZ2l0Oi8vZ2l0LndoYW1jbG91ZC5jb20v
-ZnMvbHVzdHJlLXJlbGVhc2UuZ2l0IGx1c3RyZS1tYXN0ZXIKPiBDbG9uaW5nIGludG8gJ2x1c3Ry
-ZS1tYXN0ZXInLi4uCj4gZmF0YWw6IHVuYWJsZSB0byBjb25uZWN0IHRvIGdpdC53aGFtY2xvdWQu
-Y29tOgo+IGdpdC53aGFtY2xvdWQuY29tWzA6IDI2MDY6NDcwMDozMDMxOjo2ODE1OjMwZjZdOiBl
-cnJubz1Db25uZWN0aW9uIHRpbWVkIG91dAo+IGdpdC53aGFtY2xvdWQuY29tWzE6IDI2MDY6NDcw
-MDozMDMwOjphYzQzOjhhZjVdOiBlcnJubz1Db25uZWN0aW9uIHRpbWVkIG91dAo+IGdpdC53aGFt
-Y2xvdWQuY29tWzI6IDEwNC4yMS40OC4yNDZdOiBlcnJubz1Db25uZWN0aW9uIHRpbWVkIG91dAo+
-IGdpdC53aGFtY2xvdWQuY29tWzM6IDE3Mi42Ny4xMzguMjQ1XTogZXJybm89Q29ubmVjdGlvbiB0
-aW1lZCBvdXQKPiAgUmVnYXJkcywKPiBHw7Z0eiBXYXNjaGsKPiBfX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fXwo+IGx1c3RyZS1kZXZlbCBtYWlsaW5nIGxpc3QK
-PiBsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZwo+IGh0dHA6Ly9saXN0cy5sdXN0cmUub3Jn
-L2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZwoKCgpDaGVlcnMsIEFuZHJlYXMK
-CgoKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsdXN0
-cmUtZGV2ZWwgbWFpbGluZyBsaXN0Cmx1c3RyZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnCmh0dHA6
-Ly9saXN0cy5sdXN0cmUub3JnL2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZwo=
+--===============4558303674232540508==
+Content-Language: en-CA
+Content-Type: multipart/alternative;
+	boundary="_000_CH2PR04MB696607CCAE004C2E4397FE19CCDFACH2PR04MB6966namp_"
+
+--_000_CH2PR04MB696607CCAE004C2E4397FE19CCDFACH2PR04MB6966namp_
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+We are pleased to announce that the Lustre 2.15.8 Release has been declared=
+ GA and is available for download<https://downloads.whamcloud.com/public/lu=
+stre/lustre-2.15.8/>. You can also grab the source from git<https://git.wha=
+mcloud.com/?p=3Dfs/lustre-release.git;a=3Dcommit;h=3Dee228420b7fa12f183bceb=
+9864ff083cb07e8964>
+
+Details of changes since 2.15.7<https://wiki.lustre.org/Lustre_2.15.7_Chang=
+elog> can be found in the 2.15.8 changelog<https://wiki.lustre.org/Lustre_2=
+.15.8_Changelog>.
+
+The following are notable changes since 2.15.7:
+
+RHEL 9.7 is now supported for clients   (LU-19451<https://jira.whamcloud.co=
+m/browse/LU-19451>)
+
+Please log any issues found in the issue tracking system<https://jira.whamc=
+loud.com/>.
+
+Thanks to all those who have contributed to the creation of this release.
+
+The next LTS release will be 2.15.9
+
+
+
+--_000_CH2PR04MB696607CCAE004C2E4397FE19CCDFACH2PR04MB6966namp_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+</head>
+<body>
+<pre style=3D"background-color: rgb(255, 255, 255);"><div style=3D"text-ali=
+gn: left; text-indent: 0px; white-space: pre-wrap; font-size: 12pt; color: =
+rgb(0, 0, 0);">We are pleased to announce that the Lustre 2.15.8 Release ha=
+s been declared GA and is available for <a href=3D"https://downloads.whamcl=
+oud.com/public/lustre/lustre-2.15.8/" data-outlook-id=3D"f403f206-ae79-4c10=
+-98c0-155fd1b1ac11">download</a>. You can also grab the source from <span s=
+tyle=3D"background-color: rgb(255, 255, 255);"><a href=3D"https://git.whamc=
+loud.com/?p=3Dfs/lustre-release.git;a=3Dcommit;h=3Dee228420b7fa12f183bceb98=
+64ff083cb07e8964" data-outlook-id=3D"312b0639-8dc7-4df8-b578-3b40d07ee810">=
+git</a></span>=0A=
+=0A=
+Details of changes since <a href=3D"https://wiki.lustre.org/Lustre_2.15.7_C=
+hangelog" data-outlook-id=3D"6efcfcc5-beac-4f8d-9594-cee0a6cd3b25">2.15.7</=
+a> can be found in the 2.15.8 <a href=3D"https://wiki.lustre.org/Lustre_2.1=
+5.8_Changelog" data-outlook-id=3D"cc2d7e57-f82a-4e4c-bd67-3d4c8db018d9">cha=
+ngelog</a>.=0A=
+=0A=
+The following are notable changes since 2.15.7:=0A=
+=0A=
+RHEL 9.7 is now supported for clients &nbsp; (<a href=3D"https://jira.whamc=
+loud.com/browse/LU-19451" data-outlook-id=3D"0c3bd4fe-b800-42aa-8d6a-167419=
+909396">LU-19451</a>)=0A=
+=0A=
+Please log any issues found in the <a href=3D"https://jira.whamcloud.com/" =
+data-outlook-id=3D"5355eef2-caa9-40fd-b7a7-1701e4c27efa">issue tracking sys=
+tem</a>.=0A=
+=0A=
+Thanks to all those who have contributed to the creation of this release.=
+=0A=
+=0A=
+The next LTS release will be 2.15.9</div></pre>
+<div dir=3D"ltr" style=3D"font-family: Aptos, Arial, Helvetica, sans-serif;=
+ font-size: 12pt; color: rgb(0, 0, 0);">
+<br>
+</div>
+<div dir=3D"ltr" style=3D"font-family: Aptos, Arial, Helvetica, sans-serif;=
+ font-size: 12pt; color: rgb(0, 0, 0);">
+<br>
+</div>
+</body>
+</html>
+
+--_000_CH2PR04MB696607CCAE004C2E4397FE19CCDFACH2PR04MB6966namp_--
+
+--===============4558303674232540508==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel@lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============4558303674232540508==--
