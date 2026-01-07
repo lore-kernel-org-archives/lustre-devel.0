@@ -4,134 +4,147 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id AB80BE9410F
-	for <lustre-devel@archiver.kernel.org>; Tue, 30 Dec 2025 05:54:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id A0610D0D163
+	for <lustre-devel@archiver.kernel.org>; Wed,  7 Jan 2026 18:28:44 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4dgMYN6WVjz20jq;
-	Mon, 29 Dec 2025 21:47:20 -0800 (PST)
-Received: from CY3PR05CU001.outbound.protection.outlook.com
- (mail-westcentralusazon11023077.outbound.protection.outlook.com
- [40.93.201.77])
- (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
- key-exchange ECDHE (secp384r1) server-signature RSA-PSS (2048 bits)
- server-digest SHA256) (No client certificate requested)
- by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4dgMTq3pBcz1xPq; Mon, 29 Dec 2025 21:44:15 -0800 (PST)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4dmbzH1MJrz2378;
+	Wed, 07 Jan 2026 10:24:27 -0800 (PST)
+Received: from SJ2PR03CU001.outbound.protection.outlook.com
+ (mail-westusazon11022091.outbound.protection.outlook.com [52.101.43.91])
+ by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id
+ 4dmbyn2tNVz20g0
+ for <lustre-devel@lists.lustre.org>; Wed, 07 Jan 2026 10:24:01 -0800 (PST)
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=c8RMqBGzINtDkgt/GpkLeFpDULyR1+Ml+tOPMf8kY4SXpyiy/QNma0Dsj6WlwHBR8XREbsq2QpqJcP+C94m1HEhp6i3FGBzZFSJt82ZWTtv6tzFoLiE7aHJsWPWYX6rd2PSSxYEfaJB8ZJyGsOJEt1+/SGYkL9EPk/W+vCcbz2rEpNWviVhJdZBwjp08a2sHFcHJnPixe1OkD6b5pozKEtP07nAwsDY8Omk2LO11lNCeqDg+i0NJt7cWgCvHu5hZqi8M+53/KDpc8y1GfnxuHO/JnGZW25cONeAyVe2ioB3b75jWKOiaEv3qdXgKkuwI/uuPkWzzujopjhAoKufR0Q==
+ b=nr4aiUZzvtwJT6SspiL4ILlglar95RMuf2tMCXDVr9HxV55qS0P3VCbrkWfMRIXbMPH9l1SlwnSXVWEKyC18s273flImvHab/RktdTKNk3iILug1UbEDOs3K+cwDd+5LveBeg2M9rL+j5gGvlA052DGm5utUXEEUj2IlmOt6eAbrlIpV73ksQqclUya7c/GymdNlPqw2UNfSRI3thyy5RXdEh+uWq6RpJx7JxO2uRHFR3AwoqI2pgr6C3l1V8i6YSqOEHDSx87yuhm6WUrID+cedrKAHp+cx+wjDyY3x6/sR2L44CXj6KMpf3eNZUu3ct0uzUw3ZKjKD/zI6/Uzxow==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=wbxzITOMZRnHE1SNYM0CinWeQMIslpQuo3sUVydcyok=;
- b=CLbi2h0z7KJYnz5t3wVI/6nRyHBghQU1oupySLjb3xYisGjTcrrl/TWQ3bF5p3DNRB+XGwvJVbtAoYMjHaWuybunGxL/KTBmn/ChuHJHxGzWnv/WKr2eyxty6LcXHUxI5kZxQWRH9REUmLvJ2ySiCH9QAItCBTEODeG6stLzWXjSmVc2EQNW00VKo0KqCPqnxT2mVco0tqRFSXYAELqk1KpdfsWwOk9qOF7kRrw7WkmcSOyaZevgnm6nrUGnoX+i+Ng8ebNidRSI09xCHbjGT+HqApYodwsMK5W8+nuJGawooZ1vvA9O0lDIWiC/kue+ZiNMM1BEQWFb0QYrUi6VlA==
+ bh=EaOz6WWyO5Qsqk9nwaTmPzTvJ7Dfdl5IjqH72LyVTUo=;
+ b=ZJyHpGXBjODiB7l1itkqjD2Nvq1LpA8Y1p23cnljrM892dcaQ0xmvzZq9TiTYt9X1xJc0naLaPxQIZrzppiIypZXDjRIBkMHUSybByIx7LV4fGu3RB47H8hF6Tv9lBPkTVFcjlkT8nI68Q1vnvWJSQ80Vyss6uR5JulbJs7xiHRYm0kRmMr+30IkZl/76j6iEH7mFetrtWyzuCvRqGXSKbqNxusMidv1p8wl95NlunPFSYJpr80w0GT7M5e/gBQjoJOE27RHikH67bT780mIw4ANQxVHKFltyxeSpHF4qTu29oYhBpBBvMHDDXroP/xFCQVz3QBV2YNiSSc0CVGZjw==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
  smtp.mailfrom=thelustrecollective.com; dmarc=pass action=none
  header.from=thelustrecollective.com; dkim=pass
  header.d=thelustrecollective.com; arc=none
-Received: from DM5PR0401MB3526.namprd04.prod.outlook.com (2603:10b6:4:78::18)
- by CO6PR04MB7636.namprd04.prod.outlook.com (2603:10b6:303:b2::8) with
+Received: from DS4PR04MB9822.namprd04.prod.outlook.com (2603:10b6:8:2e7::21)
+ by DM6PR04MB6809.namprd04.prod.outlook.com (2603:10b6:5:22a::19) with
  Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9456.14; Tue, 30 Dec
- 2025 05:44:12 +0000
-Received: from DM5PR0401MB3526.namprd04.prod.outlook.com
- ([fe80::4435:7a21:c298:7ddd]) by DM5PR0401MB3526.namprd04.prod.outlook.com
- ([fe80::4435:7a21:c298:7ddd%4]) with mapi id 15.20.9434.009; Tue, 30 Dec 2025
- 05:44:12 +0000
-To: "lustre-announce@lists.lustre.org" <lustre-announce@lists.lustre.org>,
- lustre-discuss <lustre-discuss@lists.lustre.org>,
- "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>,
- "lwg@lists.opensfs.org" <lwg@lists.opensfs.org>
-Thread-Topic: Lustre 2.17.0 released
-Thread-Index: AQHcad5zEkIpEHTckUSY4rwPe3WBtg==
-Date: Tue, 30 Dec 2025 05:44:11 +0000
-Message-ID: <CH2PR04MB69667BACADFDD0527A4BBDB2CCA0A@CH2PR04MB6966.namprd04.prod.outlook.com>
-Accept-Language: en-CA, en-US
-Content-Language: en-CA
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9478.4; Wed, 7 Jan
+ 2026 18:22:54 +0000
+Received: from DS4PR04MB9822.namprd04.prod.outlook.com
+ ([fe80::cafa:6da3:e388:13b]) by DS4PR04MB9822.namprd04.prod.outlook.com
+ ([fe80::cafa:6da3:e388:13b%4]) with mapi id 15.20.9478.005; Wed, 7 Jan 2026
+ 18:22:54 +0000
+To: caifengzhu <caifeng_zhu@163.com>
+CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+Thread-Topic: [lustre-devel] osp_md_index_it_next() may have a bug
+Thread-Index: AQHcc076jjC/5Zi1NEC76Jn96eDyjrVHHqrA
+Date: Wed, 7 Jan 2026 18:22:54 +0000
+Message-ID: <BFFCCFD9-9EC8-4197-9FD7-4BDC8C7AE79E@thelustrecollective.com>
+References: <D90D204A-12BA-430C-9731-73BBF95C0E5D@163.com>
+In-Reply-To: <D90D204A-12BA-430C-9731-73BBF95C0E5D@163.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-GB
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-ms-reactions: allow
 authentication-results: dkim=none (message not signed)
  header.d=none;dmarc=none action=none header.from=thelustrecollective.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: DM5PR0401MB3526:EE_|CO6PR04MB7636:EE_
-x-ms-office365-filtering-correlation-id: 604e73bf-ef6c-44c9-718b-08de4766760b
+x-ms-traffictypediagnostic: DS4PR04MB9822:EE_|DM6PR04MB6809:EE_
+x-ms-office365-filtering-correlation-id: 5d9eab28-5497-419e-b5b3-08de4e19c6ad
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|34096008|376014|366016|1800799024|10070799003|38070700021|8096899003;
-x-microsoft-antispam-message-info: =?us-ascii?Q?O6qyCoFBKBrbDYqCkSGW73iUXK5Ge07427GjQ+kYQxHPyRFb9euXHipy1WxY?=
- =?us-ascii?Q?A+bLZrALbclE7YYEXePwOq00rhAJd77p6YBN2KkoFPhNPPeCFjzFndCd153Y?=
- =?us-ascii?Q?4uegHttTuJwQuQ6wQ9p8cvfuTi+J3bAzYef1E9xKlfz0ha0X2GVVXRSzzsAk?=
- =?us-ascii?Q?hMVCTPtvPOaVPkWvnuolwM/5HvPX3E9vRDa5JM3f8D4UA5xJTKHmzVif9B5j?=
- =?us-ascii?Q?Rflym0ttuuGj6S+K3axCxQuAjm+QxuK11AMTJyhU0HZp3SWWMDtd7HdjkguM?=
- =?us-ascii?Q?xzGj14O2ctiGRnRUb5LfYUht6082mHJX+wP/qicrkFyPsfy23osrXId/LDJ7?=
- =?us-ascii?Q?EAF8P7P6tfUX9CqcxC3qpBzReNeMacUzHrmUDF0vPq9PYyzFCpUQVncL0kb3?=
- =?us-ascii?Q?bwoejo1zN8ZHNUJR3ms1DJ5S0R5QU6KinZiPYOezD4vPro3wLshBaGNty+dC?=
- =?us-ascii?Q?uPA+YJ8vaFxZXH5JKlCRFKTBRb9gODQy8qYFz9B6zrTYjAxaYpd21KLiOnIq?=
- =?us-ascii?Q?ApA/mA8RGrHENzjYUEwu9g0P5+oCe+oDZzKHJl9Tka7WJA6bfaZgJfPg9vnU?=
- =?us-ascii?Q?5CYfnFfx5Gsa/rRFL+DaPlMbuNCKKxumwMSE3I9s5hfPYUrLdTnDwth1LLl0?=
- =?us-ascii?Q?pSiq1+RPGtOllR4DgXDNiKZX3aZm+v/RBXoEykzzxSDAxE0b5GczEVS0fGym?=
- =?us-ascii?Q?6479n8AksKrZsVj488EpDhInR0n6YHuRGcye17r/sLzMakKwMV6gZ9bc9eTP?=
- =?us-ascii?Q?bDxSJ0vNrKc8wR17mykQluqL4eZC3xHwZrN/EC0MNMVChacjTYvQX5q3emRT?=
- =?us-ascii?Q?UISHDwnKvHtdM+Y2/rMCpLkVDsNzmXOoqv1EsHz4Q5EofgxPlmLg3sCvvwH7?=
- =?us-ascii?Q?4D2AHPeUF6Ctr7+NlEpBplJnMekpxip+yQcA7/HwJTs5SYN0sr4XllZkiioJ?=
- =?us-ascii?Q?ZhYnfaPZcpiYzpoIDkfdo7s/RiQDHkoZn5E5LAtMb4aNKgRi7iecwlSl3bZ5?=
- =?us-ascii?Q?VKe3xhTppbLqbsjRXuU0Y89p8lGbLjGDQw73WdlOG7ZG1P4/0Ai9guBfw9ds?=
- =?us-ascii?Q?7BUyniwtFY0KbW5RGgypTLCWoTpLWaj7HGHScunYGAWmuqElCp7ROlajpu1Z?=
- =?us-ascii?Q?HUNfnhXA+Fq7WHQ0B2tlo2LjpILD2AFU0aA5/5o3gEeEufSgwLzh37hCWG1I?=
- =?us-ascii?Q?9gKPy5DEeZyz3VvqrOLkq2oXZJ5LEJ3/bfOXp38pSH2SaK5r1Xn6aOx1Gw/Q?=
- =?us-ascii?Q?WmyESDMBXFF4sVlQt/HGVSraMLi5VNe20wbvWpmaDu4UFFb514DdOoTpsmU8?=
- =?us-ascii?Q?STr7lh53ogBlHfl2g1fRlK4M61i6rrUiciYuyziiHUzQevD9G4Jf+E6asuSu?=
- =?us-ascii?Q?+F62HO8cTG4bRbdCBYg7PjAoHIc22tr3okyE+wV5z7CrpcH2cIyxgsqHTF5L?=
- =?us-ascii?Q?gYoYqNH7NpJhQ3JXmzfCx/Crf1I7bMBFw2LNUzlWYofnJOjMtT1jVA=3D=3D?=
+ ARA:13230040|366016|34096008|376014|1800799024|38070700021|7053199007|8096899003|13003099007;
+x-microsoft-antispam-message-info: =?utf-8?B?K3hmVjhqQ3UwKzBBY0VxendITEsxcnAxdE1YbFFDTHJTQUFhb1BuZ0NiZUZv?=
+ =?utf-8?B?Q1RZNVVDUSs1UGFwU2poTm4yb0g5TE5FWTJZYnBmL3ZPM283aUNhY08xelJI?=
+ =?utf-8?B?Qkg4ZnFxdGFRR2FIM21TOUdtNzJaazlISjVieC9BblA1S3p3Q1FqNHlwdkU3?=
+ =?utf-8?B?S1h2TG96dWJRQk1jdjBndmhwdHU3YnlLOWpyRldaNVI1U1BXRE82UGJjdzFx?=
+ =?utf-8?B?WUMyZStBZmw1TDZMRExIOHBncjZBTDJ5ZDladWl5bkI3SDlienhMc2UwWnFK?=
+ =?utf-8?B?ZEs4NUNhMmo5dUpjZHQrcEJFbWxiRnZGcVVPZlBncC9TYkQyRzh2R3F3UG9Q?=
+ =?utf-8?B?a3V2YnI5bW1UVUNmUnBPSkc5K09taXRINFhmV2hsekdoc05HSXhmSmdNRDIr?=
+ =?utf-8?B?RkE2SXBYbVdZOVAxblNnZHlSaTNqTlcrdlpwWklxUWxpeEJQb3hYRjRhbHFX?=
+ =?utf-8?B?UGhVSEpoRXdVYXZaMEs2TFFmM1dMT2p3aE9lR0NUNjBPUG82aHJtVGg3UDVs?=
+ =?utf-8?B?aUl3RE5HWkc1ejZFTC9lTjUzQWkyNGJGS2lZdzBSZzcxVWYzUFZXMVo1WUcr?=
+ =?utf-8?B?UlNrTWc4NGE3R240YVRWa21PdDZOWDRvRyszb0xpRGt6bmhYbnJyUnFaaHJW?=
+ =?utf-8?B?TXpvK1BNdTBjQTFOWmJLdVJUZkJqRlZFODEwNzdJa1k1aXlIeFZnRTNzam8r?=
+ =?utf-8?B?bFpjRmdBaHJQSmhkTGxyWlBqcS85U01hSlpKUklCelU5VnZaQm05VzUwVnlu?=
+ =?utf-8?B?ZnBickRyWVVNNmJscDlKQUU3Ym9QSGQyaE1DWmlRaEkwOWJlcDJRVDdXemdv?=
+ =?utf-8?B?bXl1SkMyS2NPZjFmYnVQQ3V2RXlZSk0vS01rekp1dktKWVNSNEVaVHVDT1Ex?=
+ =?utf-8?B?a3VucldDaUtrYldSSW1JMWpwaUVOV09UZ0VDbklFdnNJZXRrMmdtUHlVMFhU?=
+ =?utf-8?B?OTErOFEwbUN0VTJvSlRNVGt4NXkwUWZjZndpM0hnNFZidHY5MHdDMjBpUXkz?=
+ =?utf-8?B?T01IaE1kdURBT2ZhMHlxMC9uR0gyTkk1Tkx6MU5NWFRueExDS3lRNWU4QkZn?=
+ =?utf-8?B?eS9PeUFRQXBsOEF2M0FpQnl4Y2JtQ2tGWG9jSUZGN1R1dk13UFVjMmVtci9I?=
+ =?utf-8?B?Zk1YQXY5Z3EyRytvaVJ6aGVhdkZqYkdpY2xiSmNvWkpiUitIemYzUXJONEVD?=
+ =?utf-8?B?dkp0bkZKb25aTTU1SUZOd2taWGRGRG0zV0txQ3M5QXQyb3F3bFc3d2JjM3Za?=
+ =?utf-8?B?czVncmNlNHFlUStkNUFUTmVZaVBPNnlnZXhIanp6Yll1Nnc1ZEJZNlYvak9G?=
+ =?utf-8?B?QWFETmFFTGZPWUl1YlE2eFZRYnFHUy9vRnpzbWFiNFNQSnpUMFpBMmxhMWNv?=
+ =?utf-8?B?SE9lek9tcTA0ZDJDRDdmeVVUOTllVkRDRDhyRHNrd1Bod3RpajhUMGZ4K2JK?=
+ =?utf-8?B?VEI2QkZ6RkdFeW5xdit2Tk9Mbm45Sk43Y0JYWUFjSkRTa05INFdIRG14dHZ1?=
+ =?utf-8?B?TGp6Z3NTYStuZ0ovc1N1YjlnaVRwUEF0bWh5VUZUMUNVRUg3SFJGa3JadDRi?=
+ =?utf-8?B?T3J0WEplTHF3Z3MzV05naW5wa2twSTJ5R1pRUHByQk81V3VTRjRiaDBvakU5?=
+ =?utf-8?B?ZGloWjMvdHJOYVE2NmxHREtUL0lCNzkwR1VRTW4xbko0OHMrYUNQanhpQVhy?=
+ =?utf-8?B?Q1E1cit3Mk50eW1GQ3lNcFdRUUpJZFRRTnF0WWlaRDlvK0NsTWJBZmhMelNW?=
+ =?utf-8?B?cmFpcUx3NXVncWVrTll6ankrQkNwak1FK0JQOXh1NEdsYkVDak12OWVqVy9Y?=
+ =?utf-8?B?cjZDUTM2MmJDZHNaamkxd0VhZHJicUNnNzFWSmFGbzRPNmNKQ3VrTFBiQmdE?=
+ =?utf-8?B?YjArNGs1SzNCeFhzVk5EZERCbWRGTUNESjljTGVibXJlR01aYXlTdVZ5aEZa?=
+ =?utf-8?Q?e4DRggGgV7waDxrAD3L9Ke1CdSbpYbLU?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:DM5PR0401MB3526.namprd04.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(34096008)(376014)(366016)(1800799024)(10070799003)(38070700021)(8096899003);
+ IPV:NLI; SFV:NSPM; H:DS4PR04MB9822.namprd04.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(366016)(34096008)(376014)(1800799024)(38070700021)(7053199007)(8096899003)(13003099007);
  DIR:OUT; SFP:1102; 
-x-ms-exchange-antispam-messagedata-chunkcount: 2
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?FMd9Yg4mjh+mHZLPBbSB3MZ1hF/bSwvDlqeODD4mACP/KEOAtptt8Y/Z/KHf?=
- =?us-ascii?Q?KtTXd3wORQrbmWjEkpmK0mZ3etE0pRzYrSCY9YQy97gCp1zH28ZEIDBwM1RF?=
- =?us-ascii?Q?fNXt6vKYl4oP7OJOOjeigVDkiOej3nOf5EAzq+bqpU7CNQugYj0RMFRiBHX8?=
- =?us-ascii?Q?31z8qcZHUl42m38Wc/8LeCtGsTCvYL3UghVljKWrCfsHS/utaakpa+Pz/wi2?=
- =?us-ascii?Q?I1jTAIOTNHAkae10psucG+DS//B7ryzWAp00alaZBmfd3nQ5e5PJLJv/GS+P?=
- =?us-ascii?Q?0YpL1TZmW/GRikyUsjwCkd9WSLPVLOk0Gz1A0r/i59YLxlSN6p19k7apUPx7?=
- =?us-ascii?Q?ud4/uuAFBXUgyBZWtoeYUIiGESXnj7lG3s7jI8taWhkYtZaTVfr6rY5YBi7x?=
- =?us-ascii?Q?KaSMNOkBDECa+md9rzimqH9ffZfE0z3Hay0uS1cvflsD6xIKC2SDQX+EIqKu?=
- =?us-ascii?Q?FyJgPkQg/11fw8Hu34/LWMFpCgfyBfWEfZlTnXTEeCEnhh+2c0PX8QNNb6e8?=
- =?us-ascii?Q?t8QO+VVKmqrU/gdbg226dsi6c8Nq465479PaF4Orx2w+/fiPdXK7qzR4zTMW?=
- =?us-ascii?Q?Pip0y6i7cEUSRtsTzOWpmv8yLIsXtmxxiFq1vd3TfbB/ZrsiDbNuzv7HbX11?=
- =?us-ascii?Q?cKqBditDbomJ2Xu4HG6PRqzClgxrUZNfCW6Iz1QkZ7eWSRgZPXCEpCKk/M7I?=
- =?us-ascii?Q?3cg4RqjZ9gu2jq6TpTjPRVGgsnfOzTOFuSTPJ4rF4y5twc/CPzZtmqWfPET6?=
- =?us-ascii?Q?XPE83tjn7L2Gr4nfxxLYQuyhGuCk4cK3ZK62hmuyE2G5hKkRMVu6IJqOo2dL?=
- =?us-ascii?Q?++ywjshgP8FymG5g3caHwjV+Uh0fnAQ1MPPDjtUDjg4UrKE1/Pomh1ulwKne?=
- =?us-ascii?Q?EWDRhsiZ40DFC3u/n3dIxGoViaAdcbDZ3UIv7HNsUzkBakbLOvrBiuboEPwm?=
- =?us-ascii?Q?twYrHz7cs5vuQlI9HkYRp2WETMWavdoIXO9dG/QiOZtx+N/n+yOE2WWoaJyf?=
- =?us-ascii?Q?xMHCkdHEXw/xtDeNckltNefip5x2cHXHJr2WRaurmwetJPhg8m3tXfz+37Qs?=
- =?us-ascii?Q?aTU6rwz0NxVld597vGM9WwJrK88YOhnejspR4NuFh0o5P2M/HpyCjkm/y40O?=
- =?us-ascii?Q?g2ZMnKgJK/uKF8tvj2wfoD3T75Px6TA++R6MAtVP5QEp4EabzRJjc+r++NlB?=
- =?us-ascii?Q?10YGr9owJuVZt+SuWV6wKkb3bk8HPhVMCDBqQ6o/DFhhv9m32RXecLWBxUig?=
- =?us-ascii?Q?1c8j6phC+lenQljb+ovQOr6i1DLoNOSvyHkOGHyKOtJ4NKSvOppp6Gm9+T8A?=
- =?us-ascii?Q?lEw11odeYFrz3XjLZ5vpW1nSsWePKRGRUnWeBKqQuJIM2y6O3Reo5gf9WOnF?=
- =?us-ascii?Q?TnXIvgg9C4T4JNzUduHu7GJaG8vzziokLNPQtXMkfVk12U3GJ2PbX7Vs1NmK?=
- =?us-ascii?Q?T7V5TYECWeBFoO1pPpWZpFRArGvgwBjq+N9rVD/d6xpLiHNyTmQXPZSj4xI2?=
- =?us-ascii?Q?bLOD69/Hr2sZUqT88ffUZh9Ml9yJu2fCy7i/o6Ko3/0B+gomz16yXAcAwcut?=
- =?us-ascii?Q?7DAFe7O1LhYtgk2XfOnFxVKsZ6PkEfCwt++1GOfVZmERfYwpLAIEtLlsha9q?=
- =?us-ascii?Q?JLPm2z3Fg4nvILyd0b7yt2ouxFvHJQviVCaFrkdzl1TGScNFOG10IV8sHXvs?=
- =?us-ascii?Q?2bxNGdS372QpApdmHI+BTKTzj+gg2FHuAHkMcbkYoD15vwERLw2i9GzkA9yT?=
- =?us-ascii?Q?L5s7zgqRwCQETNsDcMWIr4ryYDfTX+j6iZZwXZf8AuuBNd7WPDdIJtM8GzKj?=
-x-ms-exchange-antispam-messagedata-1: EukOQ35aS0gu7Ti2k1eN4YpVeV/X6MjbmdgNouOwUw1Hu7yGwfvVPIC3
+x-ms-exchange-antispam-messagedata-chunkcount: 1
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?WHhiT2VXaHBYblBWYzNwYmhFY1prZFVlVUkySzE0MDZmNnYwLytkQmppNGsw?=
+ =?utf-8?B?LzJSTGV2eUJWUzA3N0YwUlRMSVZqUnY2NytXbHdIaHkrOHoyek5sVlVCL2lP?=
+ =?utf-8?B?NW9QZHhZRVhKVGJISXZJdUk1ZmRKQVp0VmtnSk40T2JGMUN6VVFmT1A3YWJD?=
+ =?utf-8?B?Y05GVndKUGpKUUhyNW1ybzkxdGFpK3Z0N3doMHFsRHdXN1dLTzYyaW5mUUts?=
+ =?utf-8?B?OSszcFJjcCsyTExrOG9IeU1wMjh4aWxtTThpOGFnR3JaWmdDK0NZMGYvZ2FY?=
+ =?utf-8?B?Z3hJNUNNS2cvbkFmUFBGRUMvVWJjb2poSldMaWJ6clc5bjJIUGdxMXBqL0Q5?=
+ =?utf-8?B?SUhNYjViRGwydEVPaXpTT0J1d1V3SU1CTUhUQ2NkUE5WbS9ZdWpzQS9taDFn?=
+ =?utf-8?B?YXVvS3l6UUJjVXg3L2JiUlhSUG9Ic2FkVlgzV2VhTWV0Sm9UUXQ1aVVmUXZi?=
+ =?utf-8?B?d2JWV0FnUkdKdVRKRzk1UXZmMDNtYURxYUNucGpLZFVQWHdGdGtmTHY2dSt0?=
+ =?utf-8?B?KzV4d3VBdzdLK3pyaVNCTjQxZlh4VlZERXh1b0VJdmxPM2pIbmVPYmRrbGhV?=
+ =?utf-8?B?d2dIdWlFVVNLQ1hjbG14MVcxMHQyOGtTRzZQbVNzN2p1Mk01OUdJL1dvMVZt?=
+ =?utf-8?B?NENLZnJnRTZTNXEvb3dlelcyeHBiZ2RucjhSN0pBNEpaUjUxdjgrdFR3UVlh?=
+ =?utf-8?B?WXBYUFcwOGtsRXRHcXBVSENaWTRNbVRWdlo3bTcvWlRvd3pub0VCaUV4eUNw?=
+ =?utf-8?B?SWhITWpUK0RKYkF5aE04bDlxUGRaZG1leTJZZ05nNlkrRlNGWndVbGRLTlBz?=
+ =?utf-8?B?bnFpRUVmYUdVeHY3eVR3djA2a0RxWkZxcU5IMFlSUThjejNTaGkwMHdTWXNQ?=
+ =?utf-8?B?MkJZSmcrRi9qZzFxTFp6SEN3dkM5N0dpdDc5SU1tRk1wOXlCSWlTaER5eEsy?=
+ =?utf-8?B?WDJ5T0VzU0R5TlpHKzF5dTZGa25lVDdrci92c1N4SFZOMjNiOEIxYlVhNTJy?=
+ =?utf-8?B?aXdCVmdLMDZ4b2hRMWtQclB4K01pZHVHamZCKzV6T0VCZkVPR0JaVnNndkJU?=
+ =?utf-8?B?WGQ5QWpaZHRxYlZMSndURDZLc1pDUGhHZklvVDNJVUJIejR1YlRWQXkzU3V1?=
+ =?utf-8?B?N0svdjJHRjFVeHl6YjVKT2V5VDJoWUU4QWVhNStuYkZXOEtFL0NJdTdGd1BQ?=
+ =?utf-8?B?MVNyOS9STDNVSXlOWEl3RkIxZ2FiNGxuaUNOdzNLU3pzcGJhYkczVHpXWHIv?=
+ =?utf-8?B?R0hNZGpZRTJiUS9YQW8yWVFOVEc3TjJ3amZHTXpncjE1citPaGsybzByeVMw?=
+ =?utf-8?B?Q0t0d1pnb0Nzek9XUzBCZGRQeEhSNnh6MnhyaDk3WUV2M0J5MzMxYkJ5YkZP?=
+ =?utf-8?B?bSt6aVNzNmxkL0JFY3FYak9XODNpdm9wbVVvZVNtRE45MGVJNithMUVzcDhj?=
+ =?utf-8?B?YjcxTVk3Zmtvdml4eDM1T0o3eHBKaTdVaER0OGlHRFhPWEY0U25NcWxxdTZR?=
+ =?utf-8?B?S1NCQWU0eFJkWjJrZlo0WXhaME0va0RiYTIrbk9KeG4rYlVNbkpkNmdZQm81?=
+ =?utf-8?B?c2FTMlI2RTFLYXl3ejBpYWpxU2k2a3FxU3JqTTIrcnFKUUtJckNkR3hRa0Jt?=
+ =?utf-8?B?MXd0OVJyU2w0KzY1UUtnVmwwVE1teENmcndlbXFtU0daZWthSmdBUmRoTWFn?=
+ =?utf-8?B?Z2JaVGZtSGd4VTBmaUU2aVJPY2NNZlRVK1JuMk5UY20xNXZZYWtKOC91T0hs?=
+ =?utf-8?B?cWpaVlc4SHJDTUFlRlhMY1Y4STJicEtTb3RGb1ZTenYwUjRmTnp3VmdHUVls?=
+ =?utf-8?B?Y0RMZldrUXI0VUt3Tks3cnFTYzV1NUlXUGZEVk9YWTZPNy9yM2FmMjg0Tm1Q?=
+ =?utf-8?B?SDFvWTAyaXEzY1FuZE01ZjkvVlNPTDI5U2x1akdXazR0WExJVzdxd1VWVlV3?=
+ =?utf-8?B?WW10VXB5UENVYU83RTF0SksxaU1Fdi9CRWl3b3RHbmxnckxHQ3AvWmRrcUdo?=
+ =?utf-8?B?ckZycjZyS2UwZ1d3ZFN1YStCNkdqSUhiMlp3Q05JQ3JLcGd6VUQrbWZuT0k3?=
+ =?utf-8?B?MFMrSVZ3TDVtZzJNUFFTWXhDZUtoU0Zmb1JSZDFuNmgydXU0NEtxQWQ0aXRB?=
+ =?utf-8?B?by92VXp0NTdreEpneWVsOWhtSjloUzduZEZ0UDYycTg2REZLTXEzd0JZdldQ?=
+ =?utf-8?B?N3JnWFVZNTdmSllEU3laWUg2U2piTVloRG1semNtZ21WZmlVYWxLMFBiTEU4?=
+ =?utf-8?B?SGxEaEFweXFtc1VqYy9aUXNtdVBCV3B1eUpMc1I4N25TMWJPSUhzem4xZDYr?=
+ =?utf-8?B?SWJzL0NTd0RFVE9UbFZzYjJMUlA3VzdQVE5DS1dPejhhVHI2dGNKRnZrSFhp?=
+ =?utf-8?Q?fNaF/7DRCLtOh1SU=3D?=
 MIME-Version: 1.0
 X-OriginatorOrg: thelustrecollective.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: DM5PR0401MB3526.namprd04.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 604e73bf-ef6c-44c9-718b-08de4766760b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Dec 2025 05:44:12.5657 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: DS4PR04MB9822.namprd04.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5d9eab28-5497-419e-b5b3-08de4e19c6ad
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Jan 2026 18:22:54.7138 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 4c9dec06-8f2c-4233-98d5-ca3cb36218fc
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: zF1OF2jnjvlnXcauGenjHLw1qef4g9G7/3kALfEJya5oaBvOMoefCqCuTpRhJvjTh9R5lBZEbXSuZDUxtLno1KuJXYGF6gYR6UKibOQ59/s=
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CO6PR04MB7636
-Subject: [lustre-devel] Lustre 2.17.0 released
+X-MS-Exchange-CrossTenant-userprincipalname: Pnr9pSP2R6j3fU0EfgmJxMT+sWfe6ISJ6tGp7URXj1RluBes8reZ9AvurZ1XVAspqa3o9i71/Dm9DEG9bBSudfHNpyCfyenj355NJ/v3wkw=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR04MB6809
+Subject: Re: [lustre-devel] osp_md_index_it_next() may have a bug
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -144,129 +157,134 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Peter Jones via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Peter Jones <pjones@thelustrecollective.com>
-Content-Type: multipart/mixed; boundary="===============1620865274803462158=="
+From: Andreas Dilger via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Andreas Dilger <adilger@thelustrecollective.com>
+Content-Type: multipart/mixed; boundary="===============6630464998333045091=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============1620865274803462158==
-Content-Language: en-CA
+--===============6630464998333045091==
+Content-Language: en-GB
 Content-Type: multipart/alternative;
-	boundary="_000_CH2PR04MB69667BACADFDD0527A4BBDB2CCA0ACH2PR04MB6966namp_"
+	boundary="_000_BFFCCFD99EC841979FD74BDC8C7AE79Ethelustrecollectivecom_"
 
---_000_CH2PR04MB69667BACADFDD0527A4BBDB2CCA0ACH2PR04MB6966namp_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+--_000_BFFCCFD99EC841979FD74BDC8C7AE79Ethelustrecollectivecom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-We are pleased to announce that the Lustre 2.17.0 Release has been declared=
- GA and is available for download<https://downloads.whamcloud.com/public/lu=
-stre/lustre-2.17.0>. You can also grab the source from git<https://git.wham=
-cloud.com/?p=3Dfs/lustre-release.git;a=3Dcommit;h=3D4b0407a48e9e5b7f17877e8=
-868080e9f40c238c6>.
+SGkgQ2FpZmVuZywNCkNvdWxkIHlvdSBwbGVhc2UgZmlsZSB0aGlzIGlzc3VlIGluIEppcmEgKGh0
+dHBzOi8vamlyYS53aGFtY2xvdWQuY29tLyApIGFuZCBwb3RlbnRpYWxseSBwdXNoIHRoZSBmaXgg
+cGF0Y2ggdG8gR2Vycml0IChodHRwczovL3dpa2kubHVzdHJlLm9yZy9TdWJtaXR0aW5nX0NoYW5n
+ZXMgKQ0KDQpDaGVlcnMsIEFuZHJlYXMNCg0KT24gRGVjIDIyLCAyMDI1LCBhdCAwNzoyNiwgY2Fp
+ZmVuZ3podSB2aWEgbHVzdHJlLWRldmVsIDxsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4g
+d3JvdGU6DQoNCu+7v0hpLA0KDQpJdCBzZWVtcyBvc3BfbWRfaW5kZXhfaXRfbmV4dCgpIGhhdmUg
+YSBidWcuIENvbnNpZGVyIHRoZSBjYXNlIHRoYXQgJ2VudCcgaXMgbm9uDQpudWxsIGFuZCBwb2lu
+dHMgdG8gdGhlIGxhc3QgZW50cnkgaW4gdGhlIGN1cnJlbnQgaW5kZXggcGFnZS4gSW4gdGhpcyBj
+YXNlLCBhDQpuZXcgaW5kZXggcGFnZSB3aWxsIGJlIGxvYWRlZCB3aXRoIG9zcF9pdF9uZXh0X3Bh
+Z2UoKSBhbmQgYWZ0ZXIgdGhlIGxvYWRpbmcsDQonZW50JyByZW1haW5zIGludGFjdC4gVGhlIGVu
+dHJ5IHJldHJpZXZpbmcgYmFzZWQgb24gJ2VudCcgaXMgd3JvbmcuICBFdmVuDQp3b3JzZSwgaXQg
+bWF5IGNhdXNlIGtlcm5lbCBjcmFzaCBieSBhY2Nlc3NpbmcgYW4gdW5tYXBlZCBwYWdlLg0KDQpB
+IHNpbXBsZSBmaXggbWF5IGJlIGxpa2UgYmVsb3cuDQoNCmRpZmYgLS1naXQgYS9sdXN0cmUvb3Nw
+L29zcF9tZF9vYmplY3QuYyBiL2x1c3RyZS9vc3Avb3NwX21kX29iamVjdC5jDQppbmRleCA5NzUy
+NDlkNDk4Li44OGYzY2IwMDAyIDEwMDY0NA0KLS0tIGEvbHVzdHJlL29zcC9vc3BfbWRfb2JqZWN0
+LmMNCisrKyBiL2x1c3RyZS9vc3Avb3NwX21kX29iamVjdC5jDQpAQCAtNjYzLDcgKzY2Myw3IEBA
+IHN0YXRpYyBpbnQgb3NwX21kX2luZGV4X2l0X25leHQoY29uc3Qgc3RydWN0IGx1X2VudiAqZW52
+LCBzdHJ1Y3QgZHRfaXQgKmRpKQ0Kew0KICAgICAgIHN0cnVjdCBvc3BfaXQgICAgICAgICAgICpp
+dCA9IChzdHJ1Y3Qgb3NwX2l0ICopZGk7DQogICAgICAgc3RydWN0IGx1X2lkeHBhZ2UgICAgICAg
+KmlkeHBhZ2U7DQotICAgICAgIHN0cnVjdCBsdV9kaXJlbnQgICAgICAgICplbnQgPSAoc3RydWN0
+IGx1X2RpcmVudCAqKWl0LT5vb2lfZW50Ow0KKyAgICAgICBzdHJ1Y3QgbHVfZGlyZW50ICAgICAg
+ICAqZW50Ow0KICAgICAgIGludCAgICAgICAgICAgICAgICAgICAgIHJjOw0KICAgICAgIEVOVFJZ
+Ow0KDQpAQCAtNjc0LDcgKzY3NCw3IEBAIGFnYWluOg0KICAgICAgICAgICAgICAgICAgICAgICBS
+RVRVUk4oMSk7DQoNCiAgICAgICAgICAgICAgIGl0LT5vb2lfcG9zX2VudCsrOw0KLSAgICAgICAg
+ICAgICAgIGlmIChlbnQgPT0gTlVMTCkgew0KKyAgICAgICAgICAgICAgIGlmICgoZW50ID0gKHN0
+cnVjdCBsdV9kaXJlbnQgKilpdC0+b29pX2VudCkgPT0gTlVMTCkgew0KICAgICAgICAgICAgICAg
+ICAgICAgICBpdC0+b29pX2VudCA9DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgIChzdHJ1
+Y3QgbHVfZGlyZW50ICopaWR4cGFnZS0+bGlwX2VudHJpZXM7DQogICAgICAgICAgICAgICAgICAg
+ICAgIFJFVFVSTigwKTsNCg0KQmVzdCBSZWdhcmRzIQ0KX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX18NCmx1c3RyZS1kZXZlbCBtYWlsaW5nIGxpc3QNCmx1c3Ry
+ZS1kZXZlbEBsaXN0cy5sdXN0cmUub3JnDQpodHRwOi8vbGlzdHMubHVzdHJlLm9yZy9saXN0aW5m
+by5jZ2kvbHVzdHJlLWRldmVsLWx1c3RyZS5vcmcNCg==
 
-This major release includes new features:
+--_000_BFFCCFD99EC841979FD74BDC8C7AE79Ethelustrecollectivecom_
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Hybrid IO Automatic performance optimization for large IO (LU-18033<https:/=
-/jira.whamcloud.com/browse/LU-18033>)
+PGh0bWwgY2xhc3M9ImFwcGxlLW1haWwtc3VwcG9ydHMtZXhwbGljaXQtZGFyay1tb2RlIj4NCjxo
+ZWFkPg0KPG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7
+IGNoYXJzZXQ9dXRmLTgiPg0KPC9oZWFkPg0KPGJvZHkgZGlyPSJhdXRvIj4NCkhpIENhaWZlbmcs
+DQo8ZGl2PkNvdWxkIHlvdSBwbGVhc2UgZmlsZSB0aGlzIGlzc3VlIGluIEppcmEgKGh0dHBzOi8v
+amlyYS53aGFtY2xvdWQuY29tLyApIGFuZCBwb3RlbnRpYWxseSBwdXNoIHRoZSBmaXggcGF0Y2gg
+dG8gR2Vycml0ICg8YSBocmVmPSJodHRwczovL3dpa2kubHVzdHJlLm9yZy9TdWJtaXR0aW5nX0No
+YW5nZXMiPmh0dHBzOi8vd2lraS5sdXN0cmUub3JnL1N1Ym1pdHRpbmdfQ2hhbmdlczwvYT4mbmJz
+cDspPC9kaXY+DQo8ZGl2PjxiciBpZD0ibGluZUJyZWFrQXRCZWdpbm5pbmdPZlNpZ25hdHVyZSI+
+DQo8ZGl2IGRpcj0ibHRyIj5DaGVlcnMsIEFuZHJlYXM8L2Rpdj4NCjxkaXYgZGlyPSJsdHIiPjxi
+cj4NCjxibG9ja3F1b3RlIHR5cGU9ImNpdGUiPk9uIERlYyAyMiwgMjAyNSwgYXQgMDc6MjYsIGNh
+aWZlbmd6aHUgdmlhIGx1c3RyZS1kZXZlbCAmbHQ7bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5v
+cmcmZ3Q7IHdyb3RlOjxicj4NCjxicj4NCjwvYmxvY2txdW90ZT4NCjwvZGl2Pg0KPGJsb2NrcXVv
+dGUgdHlwZT0iY2l0ZSI+DQo8ZGl2IGRpcj0ibHRyIj7vu788c3Bhbj5IaSw8L3NwYW4+PGJyPg0K
+PHNwYW4+PC9zcGFuPjxicj4NCjxzcGFuPkl0IHNlZW1zIG9zcF9tZF9pbmRleF9pdF9uZXh0KCkg
+aGF2ZSBhIGJ1Zy4gQ29uc2lkZXIgdGhlIGNhc2UgdGhhdCAnZW50JyBpcyBub248L3NwYW4+PGJy
+Pg0KPHNwYW4+bnVsbCBhbmQgcG9pbnRzIHRvIHRoZSBsYXN0IGVudHJ5IGluIHRoZSBjdXJyZW50
+IGluZGV4IHBhZ2UuIEluIHRoaXMgY2FzZSwgYTwvc3Bhbj48YnI+DQo8c3Bhbj5uZXcgaW5kZXgg
+cGFnZSB3aWxsIGJlIGxvYWRlZCB3aXRoIG9zcF9pdF9uZXh0X3BhZ2UoKSBhbmQgYWZ0ZXIgdGhl
+IGxvYWRpbmcsPC9zcGFuPjxicj4NCjxzcGFuPidlbnQnIHJlbWFpbnMgaW50YWN0LiBUaGUgZW50
+cnkgcmV0cmlldmluZyBiYXNlZCBvbiAnZW50JyBpcyB3cm9uZy4gJm5ic3A7RXZlbjwvc3Bhbj48
+YnI+DQo8c3Bhbj53b3JzZSwgaXQgbWF5IGNhdXNlIGtlcm5lbCBjcmFzaCBieSBhY2Nlc3Npbmcg
+YW4gdW5tYXBlZCBwYWdlLjwvc3Bhbj48YnI+DQo8c3Bhbj48L3NwYW4+PGJyPg0KPHNwYW4+QSBz
+aW1wbGUgZml4IG1heSBiZSBsaWtlIGJlbG93Ljwvc3Bhbj48YnI+DQo8c3Bhbj48L3NwYW4+PGJy
+Pg0KPHNwYW4+ZGlmZiAtLWdpdCBhL2x1c3RyZS9vc3Avb3NwX21kX29iamVjdC5jIGIvbHVzdHJl
+L29zcC9vc3BfbWRfb2JqZWN0LmM8L3NwYW4+PGJyPg0KPHNwYW4+aW5kZXggOTc1MjQ5ZDQ5OC4u
+ODhmM2NiMDAwMiAxMDA2NDQ8L3NwYW4+PGJyPg0KPHNwYW4+LS0tIGEvbHVzdHJlL29zcC9vc3Bf
+bWRfb2JqZWN0LmM8L3NwYW4+PGJyPg0KPHNwYW4+KysrIGIvbHVzdHJlL29zcC9vc3BfbWRfb2Jq
+ZWN0LmM8L3NwYW4+PGJyPg0KPHNwYW4+QEAgLTY2Myw3ICs2NjMsNyBAQCBzdGF0aWMgaW50IG9z
+cF9tZF9pbmRleF9pdF9uZXh0KGNvbnN0IHN0cnVjdCBsdV9lbnYgKmVudiwgc3RydWN0IGR0X2l0
+ICpkaSk8L3NwYW4+PGJyPg0KPHNwYW4+ezwvc3Bhbj48YnI+DQo8c3Bhbj4mbmJzcDsmbmJzcDsm
+bmJzcDsmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDtzdHJ1Y3Qgb3NwX2l0ICZuYnNwOyZuYnNwOyZu
+YnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyppdCA9IChzdHJ1
+Y3Qgb3NwX2l0ICopZGk7PC9zcGFuPjxicj4NCjxzcGFuPiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNw
+OyZuYnNwOyZuYnNwOyZuYnNwO3N0cnVjdCBsdV9pZHhwYWdlICZuYnNwOyZuYnNwOyZuYnNwOyZu
+YnNwOyZuYnNwOyZuYnNwOyppZHhwYWdlOzwvc3Bhbj48YnI+DQo8c3Bhbj4tICZuYnNwOyZuYnNw
+OyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO3N0cnVjdCBsdV9kaXJlbnQgJm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7KmVudCA9IChzdHJ1Y3QgbHVfZGlyZW50ICopaXQt
+Jmd0O29vaV9lbnQ7PC9zcGFuPjxicj4NCjxzcGFuPisgJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7c3RydWN0IGx1X2RpcmVudCAmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDsmbmJz
+cDsmbmJzcDsmbmJzcDsqZW50Ozwvc3Bhbj48YnI+DQo8c3Bhbj4mbmJzcDsmbmJzcDsmbmJzcDsm
+bmJzcDsmbmJzcDsmbmJzcDsmbmJzcDtpbnQgJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7cmM7PC9zcGFuPjxicj4NCjxzcGFuPiZu
+YnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO0VOVFJZOzwvc3Bhbj48YnI+
+DQo8c3Bhbj48L3NwYW4+PGJyPg0KPHNwYW4+QEAgLTY3NCw3ICs2NzQsNyBAQCBhZ2Fpbjo8L3Nw
+YW4+PGJyPg0KPHNwYW4+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7UkVUVVJOKDEpOzwvc3Bhbj48
+YnI+DQo8c3Bhbj48L3NwYW4+PGJyPg0KPHNwYW4+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7aXQtJmd0O29vaV9wb3NfZW50Kys7PC9zcGFuPjxicj4NCjxzcGFuPi0gJm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7Jm5ic3A7aWYgKGVudCA9PSBOVUxMKSB7PC9zcGFuPjxicj4NCjxzcGFuPisg
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7aWYgKChlbnQgPSAoc3RydWN0IGx1X2RpcmVudCAq
+KWl0LSZndDtvb2lfZW50KSA9PSBOVUxMKSB7PC9zcGFuPjxicj4NCjxzcGFuPiZuYnNwOyZuYnNw
+OyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZu
+YnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNw
+OyZuYnNwOyZuYnNwO2l0LSZndDtvb2lfZW50ID08L3NwYW4+PGJyPg0KPHNwYW4+Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7KHN0cnVj
+dCBsdV9kaXJlbnQgKilpZHhwYWdlLSZndDtsaXBfZW50cmllczs8L3NwYW4+PGJyPg0KPHNwYW4+
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5i
+c3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7
+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7UkVUVVJOKDApOzwvc3Bhbj48YnI+DQo8c3Bhbj48L3Nw
+YW4+PGJyPg0KPHNwYW4+QmVzdCBSZWdhcmRzITwvc3Bhbj48YnI+DQo8c3Bhbj5fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXzwvc3Bhbj48YnI+DQo8c3Bhbj5s
+dXN0cmUtZGV2ZWwgbWFpbGluZyBsaXN0PC9zcGFuPjxicj4NCjxzcGFuPmx1c3RyZS1kZXZlbEBs
+aXN0cy5sdXN0cmUub3JnPC9zcGFuPjxicj4NCjxzcGFuPmh0dHA6Ly9saXN0cy5sdXN0cmUub3Jn
+L2xpc3RpbmZvLmNnaS9sdXN0cmUtZGV2ZWwtbHVzdHJlLm9yZzwvc3Bhbj48YnI+DQo8L2Rpdj4N
+CjwvYmxvY2txdW90ZT4NCjwvZGl2Pg0KPC9ib2R5Pg0KPC9odG1sPg0K
 
-Dynamic LNet NID Configuration Improved online configuration of LNet interf=
-aces (LU-18815<https://jira.whamcloud.com/browse/LU-18815>)
+--_000_BFFCCFD99EC841979FD74BDC8C7AE79Ethelustrecollectivecom_--
 
-Nodemap Enhancements Dynamic Nodemaps to support more sophisticated multi-t=
-enancy options  (LU-17431<https://jira.whamcloud.com/browse/LU-17431>)
-
-Fuller details about this release can be found in the 2.17 wiki page<https:=
-//wiki.lustre.org/Release_2.17.0> (including the change log<https://wiki.lu=
-stre.org/Lustre_2.17.0_Changelog> and test matrix<https://wiki.lustre.org/R=
-elease_2.17.0#Test_Matrix>)
-
-Please log any issues found in the issue tracking system<https://jira.whamc=
-loud.com/>
-
-Thanks to all those who have contributed to the creation of this release.
-
-This release is dedicated to the memory of Frank Sehr who was a member of t=
-he LNet development team. Frank passed away suddenly this summer and is mis=
-sed by both the Lustre developers and the customers of the Surf Lodge Pub<h=
-ttps://www.surflodgegabriola.com> where he regularly played music.
-
-
-
-
-
---_000_CH2PR04MB69667BACADFDD0527A4BBDB2CCA0ACH2PR04MB6966namp_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-</head>
-<body>
-<pre style=3D"background-color: rgb(255, 255, 255);"><div style=3D"text-ali=
-gn: left; text-indent: 0px; white-space: pre-wrap; font-size: 12pt; color: =
-rgb(0, 0, 0);">We are pleased to announce that the Lustre 2.17.0 Release ha=
-s been declared GA and is available for <a href=3D"https://downloads.whamcl=
-oud.com/public/lustre/lustre-2.17.0" data-outlook-id=3D"4938bfba-82f8-44ee-=
-8a1b-2bfad4aa66f4">download</a>. You can also grab the source from <span st=
-yle=3D"background-color: rgb(255, 255, 255);"><a href=3D"https://git.whamcl=
-oud.com/?p=3Dfs/lustre-release.git;a=3Dcommit;h=3D4b0407a48e9e5b7f17877e886=
-8080e9f40c238c6" data-outlook-id=3D"30fefbf0-f004-42ea-818d-55faa8b25323">g=
-it</a></span>.=0A=
-=0A=
-This major release includes new features:=0A=
-=0A=
-<b>Hybrid IO</b> Automatic performance optimization for large IO (<a href=
-=3D"https://jira.whamcloud.com/browse/LU-18033" data-outlook-id=3D"91b91239=
--bd54-4b04-9b61-7b3b16889d89">LU-18033</a>)=0A=
-=0A=
-<b>Dynamic LNet NID Configuration</b> Improved online configuration of LNet=
- interfaces (<a href=3D"https://jira.whamcloud.com/browse/LU-18815" data-ou=
-tlook-id=3D"4f38a238-2b9a-4099-9ce8-9ed81286869a">LU-18815</a>)=0A=
-=0A=
-<b>Nodemap Enhancements</b> Dynamic Nodemaps to support more sophisticated =
-multi-tenancy options &nbsp;(<a href=3D"https://jira.whamcloud.com/browse/L=
-U-17431" data-outlook-id=3D"a82dd386-d09d-45b7-af32-fda2de5863d3">LU-17431<=
-/a>)=0A=
-=0A=
-Fuller details about this release can be found in the <a href=3D"https://wi=
-ki.lustre.org/Release_2.17.0" data-outlook-id=3D"9383db39-e1ba-483c-9f50-3d=
-1a62105430">2.17 wiki page</a> (including the <a href=3D"https://wiki.lustr=
-e.org/Lustre_2.17.0_Changelog" data-outlook-id=3D"f66d99e7-39db-436c-aa0d-a=
-26489a29e61">change log</a> and <a href=3D"https://wiki.lustre.org/Release_=
-2.17.0#Test_Matrix" data-outlook-id=3D"60fe5766-f00b-4485-a500-ff5c78ac7e6f=
-">test matrix</a>)=0A=
-=0A=
-Please log any issues found in the <a href=3D"https://jira.whamcloud.com/" =
-data-outlook-id=3D"4cb9e523-327f-4473-bbcd-b84730261d32">issue tracking sys=
-tem</a>=0A=
-=0A=
-Thanks to all those who have contributed to the creation of this release.=
-=0A=
-=0A=
-This release is dedicated to the memory of <b>Frank Sehr</b> who was a memb=
-er of the LNet development team. Frank passed away suddenly this summer and=
- is missed by both the Lustre developers and the customers of the <a href=
-=3D"https://www.surflodgegabriola.com" data-outlook-id=3D"2c63b6c4-1250-435=
-f-a2de-76618e04f5ec">Surf Lodge Pub</a> where he regularly played music.=0A=
-</div></pre>
-<div dir=3D"ltr" style=3D"font-family: Aptos, Arial, Helvetica, sans-serif;=
- font-size: 12pt; color: rgb(0, 0, 0);">
-<br>
-<br>
-</div>
-<div dir=3D"ltr" style=3D"font-family: Aptos, Arial, Helvetica, sans-serif;=
- font-size: 12pt; color: rgb(0, 0, 0);">
-<br>
-</div>
-</body>
-</html>
-
---_000_CH2PR04MB69667BACADFDD0527A4BBDB2CCA0ACH2PR04MB6966namp_--
-
---===============1620865274803462158==
+--===============6630464998333045091==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -277,4 +295,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============1620865274803462158==--
+--===============6630464998333045091==--
