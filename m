@@ -4,189 +4,141 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 37230EEC2A2
-	for <lustre-devel@archiver.kernel.org>; Mon, 23 Feb 2026 22:19:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 06C88E9B250
+	for <lustre-devel@archiver.kernel.org>; Tue, 24 Feb 2026 11:10:18 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4fKZwn3kszz23Mk;
-	Mon, 23 Feb 2026 14:17:45 -0800 (PST)
-Received: from pdx-out-006.esa.us-west-2.outbound.mail-perimeter.amazon.com
- (pdx-out-006.esa.us-west-2.outbound.mail-perimeter.amazon.com [52.26.1.71])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4fKw3x1DQxz20ft;
+	Tue, 24 Feb 2026 03:10:05 -0800 (PST)
+Received: from PA4PR04CU001.outbound.protection.outlook.com
+ (mail-francecentralazon11023108.outbound.protection.outlook.com
+ [40.107.162.108])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange ECDHE (secp384r1) server-signature RSA-PSS (2048 bits)
+ server-digest SHA256) (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4fKZr15hv0z23N6
- for <lustre-devel@lists.lustre.org>; Mon, 23 Feb 2026 14:13:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amazon.com; i=@amazon.com; q=dns/txt; s=amazoncorp2;
- t=1771884817; x=1803420817;
- h=from:to:cc:subject:date:message-id:content-id:
- content-transfer-encoding:mime-version;
- bh=uiWRBDRpPzy9hMzb2zq/cS+bELz1z0YsamQ4ESogjEw=;
- b=nHkLWO//+7YJSE+T1A4MJilHjxwoETI+dxrp5IsnYX8Ja+m/sIm1sh2a
- CblM46PFZ6Tpc+O+GdWqGgN5zt7M8CKt7zQQYWPkU877trnkL5lv1n1z1
- 9EDlVZFPUav8RxsBhadxYPuW1bdAlPS8IbXhXguYSQrJ2zDcVlNLnKH16
- Zd6J9fBTlzpbKzhIum7SJcPVzQyQbH5vBsSvOV0gQm4Jo80R4+99S/QXa
- rY61UqDIqbf3nrK0Z5RiNd4PUIxlVYyy3norS/ikFUVutZi886YUgYRbZ
- SUvhjRNos6fTU/su5U2YDRHSKgMRqsZ1W2HdkqpZC2v+m9PBhtE9rvFSp A==;
-X-CSE-ConnectionGUID: 2PRibHy2TdC6dND2ehZ4Zg==
-X-CSE-MsgGUID: 6qP+xWMNS4CQwd3q6LwBoA==
-X-IronPort-AV: E=Sophos;i="6.21,307,1763424000"; d="scan'208";a="13633613"
-Received: from ip-10-5-0-115.us-west-2.compute.internal (HELO
- smtpout.naws.us-west-2.prod.farcaster.email.amazon.dev) ([10.5.0.115])
- by internal-pdx-out-006.esa.us-west-2.outbound.mail-perimeter.amazon.com with
- ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 23 Feb 2026 22:12:51 +0000
-Received: from EX19MTAUWB002.ant.amazon.com [205.251.233.48:1549]
- by smtpin.naws.us-west-2.prod.farcaster.email.amazon.dev [10.0.26.105:2525]
- with esmtp (Farcaster)
- id 07bad998-1282-4fef-84df-8b2a7f61feae; Mon, 23 Feb 2026 22:12:51 +0000 (UTC)
-X-Farcaster-Flow-ID: 07bad998-1282-4fef-84df-8b2a7f61feae
-Received: from EX19EXOUWB002.ant.amazon.com (10.250.64.247) by
- EX19MTAUWB002.ant.amazon.com (10.250.64.231) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.2562.37;
- Mon, 23 Feb 2026 22:12:49 +0000
-Received: from PH0PR07CU006.outbound.protection.outlook.com (10.250.64.238) by
- EX19EXOUWB002.ant.amazon.com (10.250.64.247) with Microsoft SMTP
- Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.2562.35
- via Frontend Transport; Mon, 23 Feb 2026 22:12:49 +0000
+ 4fKw330hN2z1y5q
+ for <lustre-devel@lists.lustre.org>; Tue, 24 Feb 2026 03:09:19 -0800 (PST)
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=qcb45AvagwMIPJLo7rb8InFXwWtPvuJ9b02WKE7AvzyIht4bq8kOvQl51vYcS8I9Xct3qLr4jOhb+5hvau1g3bgG7JkT64AcobcoJZR9asHbgi/qG/Pz45UzAs3ac17JSCrN+bysW6+XPeHYV4ieJYRR8f4Aewr5NC+u+0pImN3AiJLIeU4eO12ZAz/PSozZh/aB3J5DBCvviZxZp3C3FXGlmz7mdhbZdWTdOMgol6qToaA9cB5qiKytrAvswGRIkx8jqjJdCqhp+s6SMagnAdT05ywzCG2vxH8DITtdgnqEgRh1m58Pld9rIOn5oTTCzvTK4LWr+2YR+a3BVd8ZwA==
+ b=miLT5LZx1ZOgyV3PHHn6nWgOey/rIvxzR6tZm0xnk/8hFIVKmq/YJE7HryfZoo3NCvstJ5XfDwz2Nrz5AuX0MeMINHYLmIFWFDp0P+hVcD+c4A3CYfnDHr5T3V11VviXGjd8F1E5tHSej4/E57goySy3Qe1H1Zkf/lnqRVcMFjOyPqc0XuoqbIdAI27W1YKFIupAek81WM0O7OqmOHhIvI9DJrSJop+VwvfDDXjtFlTdxObj7FGNukMmDsVjg2LD+9WXKvdguDI3A0zpldWcIDnFm+ttV834OXo7+x+7cwb97FICtMrlrXPR6YKL0rhRLvn9VKggE98Zo07t8XA/uA==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=uiWRBDRpPzy9hMzb2zq/cS+bELz1z0YsamQ4ESogjEw=;
- b=OiHgDd8JIZwaQlSLn273LTLV0VMqLNGOke1eK7zppievnnNTD8ZebYEoR3Iih4Z9juvYyKZwnMBxPVfDvT4KToA5k+tDEtYxPdlNtUO8kBttWle+3eI5JyN1UIWqAg52eR3qy+AE/qYDSeIf8B2nrD0CxYjFDWAp/sTaS2drRV2rcYw+gfjhRfm3ll2hTn68LGmM5pXIqZYpKMybuq2yRiIotP+b13fp0a9+SIINlKPWLO+Pi9MgrmZH5X/HdkpLUIrZq9YOJydgQ+5KrOeI9EzyTFOpmsFioekfOwXS8S4u3dK/B+5+3SFBLUrF5BNNwdpRxMP+m2y+zKnpW5SRdQ==
+ bh=1FAxVzNej8bwtA/tBSlLg3eOYknGZyIo4H0nXiapS3U=;
+ b=rYLwHpnV/uUrv+//qoHKmUgHkVl+JbaHZ6VOD6d/pQ7J1PPv9H2vcPaTrfvfNn8yqiNqXqyL31M1FuTn6IU+LdJyuXfqEcPoUnwhu5GloVscBXOYtn8wpWy2FJHZ9HSanhIMCstU21wKosX0Gt/Ie0OmLZAF/pvXWfBxgONc8oF7+IT21mP/OykauVTwR/4ZPe11wHvtrhsHCetsoO4ZP28LaGJexA1zokPStM8dyS4cLAhBI9Jd77LKTUpTE+I432ZhuNr8pqvQcxFj2Vk2qwjABWgW9Y4SP00XbRlCOnl5WV1/3YVFjFMv2gWtDU8fgHp+DCTiOTj93TvAwBKjew==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=amazon.com; dmarc=pass action=none header.from=amazon.com;
- dkim=pass header.d=amazon.com; arc=none
-Received: from MW3PR18MB3673.namprd18.prod.outlook.com (2603:10b6:303:57::17)
- by BY3PR18MB4529.namprd18.prod.outlook.com (2603:10b6:a03:3b4::22)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9654.10; Mon, 23 Feb
- 2026 22:12:47 +0000
-Received: from MW3PR18MB3673.namprd18.prod.outlook.com
- ([fe80::86db:c59c:3fed:2e81]) by MW3PR18MB3673.namprd18.prod.outlook.com
- ([fe80::86db:c59c:3fed:2e81%5]) with mapi id 15.20.9632.017; Mon, 23 Feb 2026
- 22:12:47 +0000
-To: "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>
-CC: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
-Thread-Topic: [RFC] Lustre Upstreaming Project Update
-Thread-Index: AQHcpRGK3EeF+w0AHEqVbwQXb0TFbw==
-Date: Mon, 23 Feb 2026 22:12:47 +0000
-Message-ID: <B588ECCE-7CBF-4111-841F-0510A8F5886B@amazon.com>
-Accept-Language: en-US
-Content-Language: en-US
+ smtp.mailfrom=openchip.com; dmarc=pass action=none header.from=openchip.com;
+ dkim=pass header.d=openchip.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=openchip.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=1FAxVzNej8bwtA/tBSlLg3eOYknGZyIo4H0nXiapS3U=;
+ b=khlf0n6nsXBcKaMqGl6sCXhtHC1Mfyd5qpk4pDZDAPuoNqNH6L1KF+goqCCD5rRL8rAKPdGIHzK476wMUMXb73i1cZ1BZk5qMA2Lo9T06iLOV43veP7YRtXJTgjw6Qel2tnjxLc82eFjrQQVOC9qfEnMaUUIKiaX6Mu2kAqBcfZoIgh35G0N4xPj9WHJNxaDnZYm+T2rlT8BaR40lpx290kHWdUPyMBY7nEYOiSkVQe9DSkIRRqVnUH/iofyBCJdro7LphrXddbKFMhylsOjCwwkyKYNCIFs8jRg3hRt5TtPE/q5Nu4FQGrQIgS+YEGv88t6tdcLn2IIazuqbWrG8Q==
+Received: from AM4P192MB3108.EURP192.PROD.OUTLOOK.COM (2603:10a6:20b:6e7::10)
+ by DU4P192MB2349.EURP192.PROD.OUTLOOK.COM (2603:10a6:10:55e::17) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9632.21; Tue, 24 Feb
+ 2026 11:09:15 +0000
+Received: from AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
+ ([fe80::65f9:6768:38be:7c0a]) by AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
+ ([fe80::65f9:6768:38be:7c0a%6]) with mapi id 15.20.9632.017; Tue, 24 Feb 2026
+ 11:09:15 +0000
+To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+CC: Nick Brown <n.brown@epcc.ed.ac.uk>, surendrab <surendrab@cdac.in>
+Thread-Topic: [RFC] RISC-V Architecture Support for Lustre - Patch Series
+ Available
+Thread-Index: AQHcpX2uN8JgksagukyKgUAO1ExGig==
+Date: Tue, 24 Feb 2026 11:09:15 +0000
+Message-ID: <AM4P192MB31086DEE0D7ED656ADF8B3EE8274A@AM4P192MB3108.EURP192.PROD.OUTLOOK.COM>
+Accept-Language: en-IE, en-US
+Content-Language: en-IE
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-msip_labels: MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Enabled=true;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_SetDate=2026-02-23T22:05:42Z;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_ContentBits=0;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Enabled=true;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Tag=50, 3, 0,
- 1; MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Name=Confidential;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_ActionId=15dd08bf-be04-43f7-859d-0e3adfab39d5;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_SiteId=5280104a-472d-4538-9ccf-1e1d0efe8b1b;
- MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Method=Standard; 
+msip_labels: 
 authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=amazon.com;
+ header.d=none;dmarc=none action=none header.from=openchip.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: MW3PR18MB3673:EE_|BY3PR18MB4529:EE_
-x-ms-office365-filtering-correlation-id: 8734780a-052d-4611-250f-08de7328ad0e
+x-ms-traffictypediagnostic: AM4P192MB3108:EE_|DU4P192MB2349:EE_
+x-ms-office365-filtering-correlation-id: bef0c83c-74c5-42f6-6180-08de73952603
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
-x-microsoft-antispam: BCL:0; ARA:13230040|366016|376014|1800799024|38070700021;
-x-microsoft-antispam-message-info: =?utf-8?B?S252dUdJOVZTRXMwZHRWeU9iT2syN2VoNDg1YnR6Z28zWElFYVZwb3B2aTB3?=
- =?utf-8?B?eUhyNW1qUnpKYUt3bEcxL3AwL2pBUk5RWU51amNPSjM0RkRkcjFCV0VhVnQr?=
- =?utf-8?B?dkNGYjdCd3p3ZTNtSlR2TFZ6SGU2L1o5WlhEZ1BzVU5VMTJzYmtiU0ZHbmtl?=
- =?utf-8?B?TG10RHlYU2tDVlFxSUdjTjRzQkVDVGRKaGZ0YVR5eFNPNkpBTjZmSkY2M3ly?=
- =?utf-8?B?aEg5WjlNODNkbzBJaWdQdXB2VTVoM0pIYkhBd3NBd0hEaVE1cTdwMzRGU1Yz?=
- =?utf-8?B?M08yZzh2SlhkVUphNHhhSnB5Y3VZZlBWdHhWaVA4RW4xVHRpZTVkN0FYOU5h?=
- =?utf-8?B?cVRlMFZ0NmVUQ1pIUVBXbnI0cXA3dmw2NG5IWndabUh0UGpCUDdwRWcxako2?=
- =?utf-8?B?eFdyRmZWckFOVGRXVXNyeEJSd0p1WVlPT2tQaW9kaHRESzhQNEt0ZDZBdEhK?=
- =?utf-8?B?b2ZaUmdPUkp1bzlEc3pGeDZNbE53MEJUQ0hGK0FnbkJmMCtvTFBTT2dvYmZn?=
- =?utf-8?B?TmxMaGdxY3VJcnhRc3h4eXNGMHpKWG9oYWErWWJOSDh3SEFPa2dTQi9JbGZI?=
- =?utf-8?B?dkhCMm4xVzhtV1U2djBMd0tGakxPdG5yOXJRak1BbFRObFE0RFVjUGlxSUpJ?=
- =?utf-8?B?V0g2SFNKYTZJRFNYZWFCZGlwaFk2eFNmckZ4Yk1oK2U2NDArcXhrNUpDMDhl?=
- =?utf-8?B?ajY4UTJFNGZncDlSdTV4Yk1zb0NMYkNnSWpPait4enZqc1pSQmNyYlRvR2Rx?=
- =?utf-8?B?ODI2Znk5M0M0b0N1SUVYV1lmVWFPdlNhdGY2WUlBWEpEMnp1YnVkeVdRcVR2?=
- =?utf-8?B?R2FURUxidGtpdXEyUDYxQnRFYmE5MUQySEZtZFkwc1JnZkdMdDk5eEc5QkxF?=
- =?utf-8?B?SklJVjBid3UzaVdXRnlEWGV1WUR6RExoYUpJcGdKVzg1UEp5WUpHOVVxVi92?=
- =?utf-8?B?Y1pnMFQ1V2Y3WjRuWmxaMWFzTVNrYXJLQUNjazZWckFRTXcrMjhRdE1hYWI0?=
- =?utf-8?B?RWUrUjZMb1V4UHhYYk1OcSs0Tmxmb1dldzMxVFFBVC9hbW9pQWVvMG5RM2pZ?=
- =?utf-8?B?QXRuM3BPUWNtSksydmdsVG1QVGYzZHlHdFY1aURDYjRTOEhrZXhHazBzUjhm?=
- =?utf-8?B?eUdxdzJuM2FuTlM1d1E3eHZ1SnpaeGtBemlKUDJCcEFGaW5nOW9UVVhJc05Q?=
- =?utf-8?B?MS95U1RwVDJvdnlwbmEyN3dYRy9rbldHNkRIdG5xaDhUNjE0TndxOGlRbFFC?=
- =?utf-8?B?a3VpcUpuaDcxdUs1SjVldE42RTd6SzBwTEVUeUhUMURQaEcya0hueTFhT3h3?=
- =?utf-8?B?U0ZMTmMwQUcwck9GSE5IakVpY2xsaHdKd3dXcHBIZlo5MW9WbGdRVjNWaDZx?=
- =?utf-8?B?T0R3YXlIdUhwMjFOa3RiU1FSazk0YTdRMnpvSHREN0xkRVlqRTFlbk9NMW42?=
- =?utf-8?B?SURqdzN6SXZLL2JmUVA1OFVrb0pqYysrRU1YdmwreHhvVjdZY0hVejZPRHMv?=
- =?utf-8?B?UTZNZnAxTitPbXBNWVozWWRvWEZybHVkS1dsdjd5YU0rQm9TVGhvNk1iNjRl?=
- =?utf-8?B?cTVDa3lpaklBbHU0cnhzU3hKS3MwQ3h2MG04b2szbHdKQ2tGMm9WSFltMmlj?=
- =?utf-8?B?S3psWlNYUTVLNVFVR0MzRmZsU0YxV1RwMDlPN3Y1RStrbW9NVHJFcGhVQTJO?=
- =?utf-8?B?bkE3TCtzMkc3L01mZ1lWMU9FMkl2eTkvODlEN1JLWXVuQU00amxpaS9YNUFw?=
- =?utf-8?B?VUszV3QvZVhhZFdrdDhKQW1lZ2dZK3Ftb0ZpZ1cwOGFrZmhaQ2tOQ0ZJWVVD?=
- =?utf-8?B?a0JrbGY3M0MrMWxFVGZMM0RYc3I5ekg3K2lrRnI5cnFVWFVYaVBFdERqTEFE?=
- =?utf-8?B?dWhOODdnRXFVQnY1UlFEdzlxdWxCYXR1R1NVRHFTTUFTR3kxK2dsaDBIb04z?=
- =?utf-8?B?MVRmeFBieWhUeXgvZVBJaHFEOUNGZTZlM2hXeXB6ejYyMHZFZXZrSGcyVU5C?=
- =?utf-8?B?ME9ZU3BFSkpKY1g0N3NEWklQNWZKeHdQM0lGMWpDdXRFL1BiNnR1RUlLaVV6?=
- =?utf-8?B?dTdiTEw3WFp3dU1iS1BMRDJvNVNDY1R6eFl2Mjc1OW1ScWEwd1FTYk5mZloy?=
- =?utf-8?Q?dUvg=3D?=
+x-microsoft-antispam: BCL:0;
+ ARA:13230040|366016|1800799024|376014|13003099007|38070700021|8096899003; 
+x-microsoft-antispam-message-info: =?iso-8859-1?Q?e5xcQsF1MmG4t66IvzOYAuBudvB+/e/7jOwpX7Oz/vLEpgCPlQPrPG18O9?=
+ =?iso-8859-1?Q?PEYn3zOef/Mb0XCh6hN7/ou+j9Pj7sO2EUgepMlpD12vS0/Pk3tad7BS4U?=
+ =?iso-8859-1?Q?i50WtHPsZrD7AlyuVbg6dBlJ/C95N+wj/rxU0Pq7iJdSThgJWEgn4oy0lG?=
+ =?iso-8859-1?Q?mTzpr9H3VNX77gqR1a20J0eZ0I7aCVkDXYVxMZkAjHa45kUQ1JvJeFEza8?=
+ =?iso-8859-1?Q?tnriN5JOesV0eeFErxAR9sMLmXoyZaUPOWeCLwVkPqHWIftOWo5wH/hLZf?=
+ =?iso-8859-1?Q?zX7Eh6mF9/50aIdtNYJ4uuvamEI0rT/fP4ZAOGnDbnjfu8ETSsfRKo08MB?=
+ =?iso-8859-1?Q?xepNgT/nkIojDfLY3YI9exjnrSIHwahIa+k0TYpeVWgI//NbMwQLLs029Y?=
+ =?iso-8859-1?Q?oOQBFku1Tm1bnsoHssh5p9R9hj9dbylJ+VO+wpn4BpMc3fJoLn07IWTSOz?=
+ =?iso-8859-1?Q?Qt9luuYy/JL1RZOrxXMZD7pc4caEMDpsySxKy++XxH5/BJxM2Qz5IpJWaG?=
+ =?iso-8859-1?Q?DGY/ILexdzkXdWV3u9K0786Gw6DKlV/lYzJdK047wsk8aA1CCPoe/pBTBn?=
+ =?iso-8859-1?Q?spF/v8h7gtAdVYIdoVG0obSMbb4JTRvCobkH+wyDqk6u5K/4+/1NKn2160?=
+ =?iso-8859-1?Q?rdn9NjQslvNLJXpXRL4O+AHuRtvKb+zMOZkzy7uR5XQ59TJPdqETLUElCv?=
+ =?iso-8859-1?Q?ITopZq2l2w90+hFXU7FMPpltp5bLV0tp5pu7bQnLPwDHSiZehOTNTXxxJe?=
+ =?iso-8859-1?Q?tHnrGbSyKTfJVF6RdGRJ+BpVWTAI3fvMvMO1UpFvBZf4u6EaunBvJnYH+N?=
+ =?iso-8859-1?Q?VA+G2F/hogrrHU6D+jAXqoVYL+h1Y/wzMlBylQRnwlFcE4eNQQOkElPNCk?=
+ =?iso-8859-1?Q?tndzS8ALoC4OCGGgPwXSwijE451nzAVR/YOO3ayJpwfNB8BAyQ4Sn1/sN2?=
+ =?iso-8859-1?Q?WyN1WW2+mQxoC4pcMufwFXPHeufIQ+WhL7cS0tOnVJKWvm7ZmyhOvJ10Yy?=
+ =?iso-8859-1?Q?9njzKtk+Bo/xxCMUzZoAlSIk+lttsQ//UJB4qo9ut7oOS1er9w4NY9Cs+v?=
+ =?iso-8859-1?Q?qRye1y2gFYXqGJlAHUFwcyage6yw1l/yWSHf9Q5HR+J1ExO+Gfb4eQslAD?=
+ =?iso-8859-1?Q?VDJTY/CuOGwAL5crFhcwnQ/IwRZHXJRLmYAtOt1r/nzJSNyxmwtvI5HQmu?=
+ =?iso-8859-1?Q?10SkipY2A+V0oDrdDpW5627t8KEvL0eY1SeirExuHo8ZKKYo7uoWoFndkM?=
+ =?iso-8859-1?Q?VxQqowDjJ1BRzAX4AG4ulrO4GaQmScQqlSPlVagZ31X6uBVXjeaEyLgewo?=
+ =?iso-8859-1?Q?DCyYpoYkSYSCUQqw607PAW+GdeGbefj/Gl5gJg6gmcdXEzDgdBvaJlcqFP?=
+ =?iso-8859-1?Q?ukqaaZBf08VzjAlUKU8z36OSnbPZUNOuefq+IiZGyPZdPclu3A/aISUU/z?=
+ =?iso-8859-1?Q?+ZklgZFC9WH2r0qVUtTpLH+nV9m7m7kwyieta5ebLiwbxH8NfMzw3YZavX?=
+ =?iso-8859-1?Q?n/85Zxd21Z749rBmETe7E6zj2R+2O3LKyKjzPqjWkNXOVbfNJBmf0VX1IF?=
+ =?iso-8859-1?Q?JDAFaWjwTWobJ4cYjGTdUxWGPOIQ2CyEnvmNijpEO6u9ast47Eml/kubtt?=
+ =?iso-8859-1?Q?AD1bG5YKTHWzO4IuMmoDJtqpu5tm1qhlx3?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:MW3PR18MB3673.namprd18.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(366016)(376014)(1800799024)(38070700021); DIR:OUT; SFP:1101; 
+ IPV:NLI; SFV:NSPM; H:AM4P192MB3108.EURP192.PROD.OUTLOOK.COM; PTR:; CAT:NONE;
+ SFS:(13230040)(366016)(1800799024)(376014)(13003099007)(38070700021)(8096899003);
+ DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?utf-8?B?Sjd1clBxTndTSDhjc3R4VDhteS9rRUM0OXlPcDFyaFRmdVZzdllOdFJWQjg1?=
- =?utf-8?B?T09WbWhsWnd5VzhmM2pzRUFLZG9wQ3IvcU9WdXJqZitoNVRpYk5qcnA4cGw4?=
- =?utf-8?B?bnRlckhEbHUyTVVkcFl6bWpKU2lOeWN1U0QrRDdjZDlaWUJOeWtXRWxsb2JE?=
- =?utf-8?B?dk80SkRyYzVtVklXa05BZ1pTY1A3Uzd1L1dxZ0JtMkFIZGFqSGRLL1NvOHd2?=
- =?utf-8?B?VVZRVkxmdjlFK055RXQrMWFQY1NOMm15cFZ5ZHFWQ2w3aDdEa3haTkVSQTV1?=
- =?utf-8?B?b0pZYWNJQ2ppN0VGYXNaN21BU0NPdElzWmkwaXZJeFN1MHoxWFFkaWJVNEJF?=
- =?utf-8?B?QW5wSGhmR2xvVmhQWDFvUTkvYkZXMjA5dWxGb1cwclIyWVp3YTYwZC92YmFu?=
- =?utf-8?B?eUxNOElweis4VVR3U3VvUU9CV2RQMjc1QjlVYk4wVHgxK0pLRUkrTFdpWXY4?=
- =?utf-8?B?MnB5RkliZTQyTXdQWGZIVDVFSVhmeGZ2UlFRRjFJbjN2RmMrMGlJMFRIMXlS?=
- =?utf-8?B?MTU4SHFtTVRwczRmUDhveGZBc2VaY09BU1BFUWZMQ0NsOVJpNGxJaThlaGNn?=
- =?utf-8?B?NE85S05GTkpnN3k2MVdPY0lyc2lOeW8wN3NZZjRaa3NjcmFnaXpxVlRFMVhS?=
- =?utf-8?B?NjlMcG81a0ljNm9OTTQ1Z0s2dVdXY3gvWFJmUU03Q1d0YVE2VmxSbTN2bTVR?=
- =?utf-8?B?K2dXNjU5dGtIc1ZtTFNiYnY1WjVuRFA5d0g1cTZZVEk2eGY3eWhVZ0NIZitS?=
- =?utf-8?B?OEFBSGEva0ZocmlxLzhIalM2azZWMXZ6cjRrKzVjUmpjVExKUlNaTUl0S2Vr?=
- =?utf-8?B?eWhVY3p3OW5jR05jTGRucngzcC9FRVJlamlLRkJibHJKeGR4d0xsL2t3Witv?=
- =?utf-8?B?aVpQVThzcm9qOW5QSGU5Q0NkamtYRXNiVDZ5amhGd3hMdUZ5VlVYS3NaQmhy?=
- =?utf-8?B?RWh1WU9HSGJVUmFFU3lBcDc5L1pTOXNTdnhkM0RoYjdkWmNSQ29CVUExT1l2?=
- =?utf-8?B?SmtRSVFwcWVBRFlMVXJ6eGxldjRnbTF5STdrb2RlQWwvaXpPM0ZLUDllR1VM?=
- =?utf-8?B?cHdyRUVieEEzWFJKL1dDbGJrVXIvNEZNUjRpU2VGbmVGYndJaklSRVNJUWhp?=
- =?utf-8?B?WW1SM1B0cW9wSXZ1dXgrdDRxc2RRZG9BazJBOHpqaHpJbS9yellSQ0tpTVh3?=
- =?utf-8?B?R0tFV0FIcEN2UEpBODVUL1k4bHAxTVNzUDNhQTdVT1NhN2tobTNPeWc3R2JL?=
- =?utf-8?B?eHdic3dWVWJYNDRwMGI5Z2lRYTgrSHMxU0hMeDRtMnpjVnl6Nzk1bjQwQUs1?=
- =?utf-8?B?WWlVdUY5b0JzejBRc0hNcldXdlNlR0lCKzgxbEtmK1RlY1VaY2ZYTktSUERZ?=
- =?utf-8?B?L2pNYVdYN2ozQUFWNjJKUlZ6TXpHU05iZGhucFlROWpCNUd5TzhmQWNhalND?=
- =?utf-8?B?ZU9ONnFUSzFQZVBDa29wTm1wVHZWb3hNczdSN2tuYnRqNGYvME5DWExQbEN4?=
- =?utf-8?B?TUxIVGU3bExQUkNsU1pUWHllNjhKZzBCWnJKcTJ3NldpTzY2R3IxT3JxeHd1?=
- =?utf-8?B?bHZUWWRPNnJ6ZXhON0hkSFdCai9uNklSNVhDS0NOWXlhSHQ5aVNCMWNkNzdh?=
- =?utf-8?B?bDEvY2RDb0FmdS9tUFh3R2RtbHV5MnZTR25EU3dwakdUSDVRdUdyZEUvUWM4?=
- =?utf-8?B?bXZWTUt4cm9kODd4OTFNZEs0Y2NZbTlTRG5zZ0tjM0tBZDNjQURCUjN3cjI1?=
- =?utf-8?B?RUl1OXJZY3dRMTdpN0lWQnBLZEEvUkZOdTVOYk9MNGJHSHJZMlRvS1dKR3A4?=
- =?utf-8?B?T3UxRzgzUHdwL01KbXVCMnVEU0hiZVJUSDNqb2pOcnZreklES2IwemNXYUNM?=
- =?utf-8?B?U0FlNWNtZzE3OGlvUEEvT2pMdFFqUjZQdWc3NlR3d0NxSHQxQWhOTVNQZG9R?=
- =?utf-8?B?Nml3Qm8wY1lJOE1JZkVtV2RWaUF5OW1WWFZCVTlTbFhNQkVoVGJGSVQ5Rzhi?=
- =?utf-8?B?clk1S1hLUXdBdFkvZlNRVG8yOExibWpZS1ZEVkVpTklzb3k4c2RWU1N4QzBv?=
- =?utf-8?B?MUFlT2FlZGNJRVBNTVhDK08yMGJxZzRDeE83NUZRcHhVa0tTSmxsSElHSmpw?=
- =?utf-8?B?QVFOTFUxN01ucXhWOTBMclhOWEJQMCs4emNjU3FIUFhFMlpUOUprQUpnc0J5?=
- =?utf-8?B?TDh2Y1NxMGpja05OMHN6ZFNNanhoaFJDYy9rWldNamp2YTZWaWoxZUJhZlhF?=
- =?utf-8?B?L1pBMEVweWtpbEh3U01MMzVMMWJrT3FWMC9LcEk2NytuSVBaSHdxMWNZay8z?=
- =?utf-8?B?U3BQcGlUamhsRi9HeDRLRitaLzEyWkk2anIyV3lKeTgrVXVxTjBUUT09?=
-Content-ID: <612FDAEB218C7049916ECE709F862123@namprd18.prod.outlook.com>
+x-ms-exchange-antispam-messagedata-0: =?iso-8859-1?Q?3jArA/ztzqqRi466myp9SEFr6REXeoDJSbH+94ANMqXteSDQZ9W0C3yUUO?=
+ =?iso-8859-1?Q?Fjq8HYXqiU+ddnNZd0rjx/CM+UHDLapvn5CE4iVGBcJfUFLbuE8WoHdcNB?=
+ =?iso-8859-1?Q?RSiWQGCMck4hlOwOfbFAyCqoq/Yi01DCqAZNIfx4tU9lMNFkR2ynC4AIyQ?=
+ =?iso-8859-1?Q?L94IZqsNx3Fj+l9hZpcNqiIEXRcyMivmGinUtBquQhME8O36xN65O3Xeu4?=
+ =?iso-8859-1?Q?uGeAsp6e+79d8WRGoMQ97Y0tx324Mkfc+JLqWPSqEgcBGsLEc2mi93ewHE?=
+ =?iso-8859-1?Q?b0tQoFD45eVwf6s0atuJE5ARGnCA2bzhPcXhaUKnaYp/NMBd20dEfLSFEO?=
+ =?iso-8859-1?Q?0znyJYc7AN0jovYFWXUOzp+RM45cFwB+gYSgKFY17zSE2ni+0r/ywRJG+6?=
+ =?iso-8859-1?Q?urzU6e8cRw30N93n/NTmOoIGyJnLO48hO5fYMBh3bBwkXuckC8YKbunM2O?=
+ =?iso-8859-1?Q?zMrr8YOIOR+3OLyrZVodeozBwA5KphxEQ4QiParUVCf/btO55Iio4QlDCJ?=
+ =?iso-8859-1?Q?cWuE6U85sZLQumW1O9H/yYAAIozzCRTyU1SUJqu+stBLvkiVsFSl7M0kyX?=
+ =?iso-8859-1?Q?D5MUdXVKhXGVG1hFl7S1dT9t/Lt1YVindt1fgy8TJlPPSYQv/5JKRnD2f8?=
+ =?iso-8859-1?Q?rylv64iEc8AI0uWCD0+KOlw4C+zzGWi77Z9Lzbrp2FE7rhU+KvQ9tmyuxK?=
+ =?iso-8859-1?Q?NygHu3IVjpLLeL4F+IT1qYM8iAC+7umN+BQkBLQeg1REY/Hi0g7UVydRnv?=
+ =?iso-8859-1?Q?HmsZ/tyVsaoDBAXDrQ6ewVVa94+PuKbGJTbOBJ+kyOKSUWILg/JuhUAFZo?=
+ =?iso-8859-1?Q?XDKKLN6iNhf+Pr8waSrzJC/T5/YkZTt9K4tEaJdvtsFVquqov/b8ferhED?=
+ =?iso-8859-1?Q?CHb9lAj0AJ7QCpYMktKvhReljA2g0DBKrpk7Q1SEzyREPVs5DhRcotlI3c?=
+ =?iso-8859-1?Q?wkzPC6Sy5LNBATi4ML0LmQOCW59tDJFs5C3rZYEjHXXpmeGgz2rsDCH7is?=
+ =?iso-8859-1?Q?hpTtRdSrzxaDzVP0wamzQTEcLIES8m7z5ju781kcLGsfNYlldmVVnctq7c?=
+ =?iso-8859-1?Q?BIEQGDp+MQuNzkrvcdfJzos93ULF/QodXa8EPdo6y91PVA28HOWy96jZ8g?=
+ =?iso-8859-1?Q?1Cf8rbHTxI3BXuQcg2L7v8WRtFZlR8FGoG+oeMFJo4GPqN6aLjhzusuWSB?=
+ =?iso-8859-1?Q?PLrstCiqcCBtrzDQgO7cfOevTAEoQMp7/XmeDI/zAoNzD4+XOJQtsh2u0Y?=
+ =?iso-8859-1?Q?sH5GDJ2xKTIikZfRg7/B9JY+OF1yydaJOlbnfHs0Z+OWA0dyt2hTPg3nHu?=
+ =?iso-8859-1?Q?VCgPNblZ3g4k8+iXC/i+3R8l4uKRsZuHmqy1I26FZO8ASC2SjPhwtKN7j0?=
+ =?iso-8859-1?Q?gh6pl7rYjk4jz0hDd8eXy5ROgxPRtb5cXImvf7QCdGr4i5kNIl2G1uX39v?=
+ =?iso-8859-1?Q?uVTsKZpu5yWmTNCxunCC/PCaW7P7PRhEpBM2H/M6h+BJs5zTbcyjpmDSer?=
+ =?iso-8859-1?Q?NPjaa8HM/iOcSFEYo6TvS1NxzLdg6+SC+2oBsaDLc2saUcp0aa28EHTh2b?=
+ =?iso-8859-1?Q?fVI6O30cbFkP7NN+oe3P9Tvd1etFgFtkfvm1aFAwUiUDn1Gn2SQUE+t00P?=
+ =?iso-8859-1?Q?qsZaizRb7q5okDhHvDzYEvXCxxxsMeSTZ7yW6tN0AntnbkPPAA1KsWwB0+?=
+ =?iso-8859-1?Q?uPQwFRTn7PVxmZTBKOdMWPTFMewVvOREWzTrpnAp5Qluh3764DL0ZqDBb3?=
+ =?iso-8859-1?Q?nGzbPcORsS4FxP0YYrESUGRiJQbn1an+xR9hnkmCek3znF?=
 MIME-Version: 1.0
+X-OriginatorOrg: openchip.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: MW3PR18MB3673.namprd18.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8734780a-052d-4611-250f-08de7328ad0e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Feb 2026 22:12:47.1863 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
+X-MS-Exchange-CrossTenant-Network-Message-Id: bef0c83c-74c5-42f6-6180-08de73952603
+X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Feb 2026 11:09:15.7948 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 5280104a-472d-4538-9ccf-1e1d0efe8b1b
+X-MS-Exchange-CrossTenant-id: dfdd4aff-e2c9-4e1a-8642-7f6cc6bbbe6d
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: +nRKbAzYhrLj0IoLC3mYmS2rwWfbVUWUcbpFx5v+r8KfQioXDEivGzbUV6A2nyS9735VgQPBhwB08s2yucxGMg==
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY3PR18MB4529
-X-OriginatorOrg: amazon.com
-Subject: [lustre-devel] [RFC] Lustre Upstreaming Project Update
+X-MS-Exchange-CrossTenant-userprincipalname: n1ZsnyoAhg/XvG2dgDPpwKzH06ehif4MJ077hWtSmMB/gP+TGIRhh4yNiPcpNDhjnBj+flz+jRGKTezCSeGgyX49WfrxjIZcPrFO6Xf3iPg=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DU4P192MB2349
+Subject: [lustre-devel] [RFC] RISC-V Architecture Support for Lustre - Patch
+ Series Available
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -199,79 +151,707 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: "Day, Timothy via lustre-devel" <lustre-devel@lists.lustre.org>
-Reply-To: "Day, Timothy" <timday@amazon.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+From: Abdul Halim | OPENCHIP via lustre-devel <lustre-devel@lists.lustre.org>
+Reply-To: Abdul Halim | OPENCHIP <abdul.halim@openchip.com>
+Content-Type: multipart/mixed; boundary="===============5482952854125363482=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
-Last year, we attended LSF to talk about upstreaming the Lustre filesystem
-[1]. I wanted to share an update (to fsdevel and lustre-devel) about the
-work we've achieved and our plans in the coming year.
+--===============5482952854125363482==
+Content-Language: en-IE
+Content-Type: multipart/alternative;
+	boundary="_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_"
 
-We outlined a plan [2] for converting our out-of-tree repository into a
-clean patch series on the mainline kernel. This process would involve
-splitting our existing code base into a set of clean, idiomatic kernel
-modules and a lustre_compat/ backward compatibility layer to support
-existing users of Lustre on LTS kernels. So far, the initial split has
-been mostly completed and we are working on simplifying the Lustre build
-system and starting to clean up inline non-CONFIG #ifdefs. I originally
-estimated that we would be able to post patches on the mailing list by
-November 2026. But I think 2027Q1 is more likely, given the current amount
-of outstanding work.
+--_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
-A summary of the major ongoing projects can be seen on our wiki page [2].
-The folio transition is ongoing and predicted to land in the coming months,
-with some of the initial patches landing sooner. We continue to move away
-from Lustre's custom (or out-of-tree) interfaces - such as converting to
-rhashtable or adopting the p2pdma framework. Most of the code base has
-been converted (or is in the process of being converted) to more standard
-kernel style - with recent patches focusing on converting from Doxygen to
-kernel-doc for code comments. There are several smaller projects and
-tasks that are ongoing.
+Hello Lustre developers and maintainers,
 
-Although we have primarily focused on the Lustre client - the Lustre client
-and server are closely linked and we intend to upstream them both (either
-in quick succession or together). Our initial submission of the server code
-will only include the in-memory storage backend. Although work continues on
-preparing to upstream changes to ext4 to work as a backend, we don't expect
-that work will be included in the initial submission of the server code.
-This will greatly simplify upstreaming efforts while still enabling developers
-to easily test their Lustre code changes.
+I am writing to inquire about any existing plans to support the RISC-V
+architecture in future Lustre releases, and to share our work on enabling
+Lustre client functionality on RISC-V 64-bit systems.
 
-Regarding testing, I've set up a modest test bot to validate different
-build configurations on the latest mainline kernels [3]. While Lustre
-already has extensive per-patch testing [4][5], this bot is focused solely
-on the needs and requirements of the upstreaming project. Linux supports a
-large variety of platforms and configurations that Lustre customers typically
-do not use. But we want to validate as many of these configurations as possible
-(at least at a basic level) to minimize friction in the future. As we get
-closer to upstreaming, we may investigate KernelCI [6] to surface some of these
-issues (in addition to our other testing).
 
-Overall, I think we made solid progress. While there is some work that I
-wish we could have finished by now, I'm optimistic that we will achieve the
-bulk of our goals by this time next year. There will be more discussion
-about the state of the upstreaming project at the upcoming Lustre User
-Group [7]. This will also give us a chance to discuss issues pertinent to
-upstreaming in-person. We will not be attending LSF this year - although
-we may attend in the future (as needed) once we have officially submitted
-patches for review. Until then, I'm looking forward to another productive
-year.
+BACKGROUND: WHY RISC-V SUPPORT MATTERS FOR LUSTRE
+-------------------------------------------------
 
-Tim Day
+RISC-V is gaining significant momentum in the HPC community, with projects
+like the European Processor Initiative (EPI), EPAC, and commercial offering=
+s
+from SiFive targeting high-performance computing workloads. However, a
+critical gap exists in the RISC-V HPC ecosystem: there is currently no
+high-performance parallel file system support for RISC-V.
 
-[1] "Getting Lustre Upstream" - https://lwn.net/Articles/1025268/
-[2] Wiki - https://wiki.lustre.org/Lustre_Upstreaming_to_Linux_Kernel
-[3] Upstream Testing Bot - https://tim-day-387.github.io/upstream-patch-review/#
-[4] Jenkins - https://build.whamcloud.com/
-[5] Maloo Testing - https://testing.whamcloud.com/
-[6] KernelCI - https://kernelci.org/
-[7] LUG2026 - https://www.opensfs.org/lug-2026/
+This gap has been formally identified in the RISC-V HPC Gap Analysis by
+Nick Brown [1], which explicitly recommends:
 
+    "We should prioritise optimisation of parallel filesystems,
+     including Lustre, for RISC-V"
+
+Adding RISC-V support to Lustre would:
+
+  1. Signal RISC-V readiness for production HPC - Lustre is the de facto
+     standard for HPC storage, powering ~70% of TOP500 systems
+
+  2. Align with open-source values - Both Lustre and RISC-V share a
+     commitment to open-source collaboration
+
+  3. Enable new deployment scenarios - RISC-V-based compute nodes
+     connecting to existing Lustre infrastructure
+
+
+OUR WORK: LUSTRE 2.17.0 ON RISC-V
+---------------------------------
+
+We have successfully built and tested the Lustre 2.17.0 client on RISC-V
+64-bit with a minimal set of patches. This work demonstrates that Lustre
+can be ported to RISC-V with relatively low effort, as also shown in
+recent academic work by Billa et al. at SCA/HPCAsiaWS '26 [2].
+
+Patch Summary:
+
+Our patch series consists of 8 small patches targeting:
+
+  - Build system:      RISC-V SUBARCH mapping in autoconf
+  - RPM/DKMS:          Architecture-agnostic paths
+  - LNet:              RISC-V hypervisor detection handling
+  - llite:             Guard for prefetchw() (x86-specific instruction)
+  - Erasure coding:    Enable optimized paths for RISC-V
+  - Debug tools:       RISC-V target in crash tools
+
+Total impact: 9 files changed, 19 insertions(+), 8 deletions(-)
+
+Test Environment:
+
+  - Primary:    Ubuntu 24.04 RISC-V, Linux kernel 6.8.4
+  - Validation: Fedora 42 x86_64, Linux kernel 6.16.4
+  - Result:     All 16 client kernel modules compile and load successfully
+
+
+QUESTIONS FOR THE COMMUNITY
+---------------------------
+
+  1. Are there any existing plans or ongoing efforts to add RISC-V
+     support to Lustre?
+
+  2. Would the maintainers be interested in reviewing our patch series
+     for potential inclusion?
+
+  3. Are there specific testing requirements or coding standards we
+     should address before formal submission?
+
+
+NEXT STEPS
+----------
+
+We are prepared to:
+
+  - Submit the patches via Gerrit for formal review
+  - Create a Jira ticket to track this feature request
+  - Provide additional testing data as needed
+  - Collaborate with maintainers on any required changes
+
+The patches are available in our repository and we can submit them in
+whatever format is most convenient for the review process.
+
+
+REFERENCES
+----------
+
+[1] Nick Brown, "RISC-V HPC Gap Analysis", RISC-V International, Oct 2025
+    https://riscv.atlassian.net/wiki/spaces/OLRR/pages/895778831/HPC+Gap+an=
+alysis
+
+[2] Surendra Billa et al., "Porting Lustre File System to RISC-V
+    Architecture", SCA/HPCAsiaWS '26, ACM
+    https://dl.acm.org/doi/10.1145/3784828.3785406
+
+
+Thank you for your time and consideration. We look forward to your
+feedback and the opportunity to contribute to Lustre's architecture
+support.
+
+Best regards,
+
+Abdul Halim
+OpenChip
+abdul.halim@openchip.com
+
+
+
+
+The content, data, and any attached documents to this email are addressed e=
+xclusively to the addressee and are confidential and/or may be subject to a=
+ non-disclosure agreement. Any use, forwarding, disclosure, and/or copying,=
+ in whole or in part, without authorization is prohibited. If you have rece=
+ived this email in error, we apologize and, please notify the sender or Ope=
+nchip immediately, and delete it from your system.
+
+El contenido, los datos y cualquier documento adjunto a este correo electr=
+=F3nico est=E1n dirigidos exclusivamente al destinatario y son confidencial=
+es y/o pueden estar sujetas a un acuerdo de no revelaci=F3n. Est=E1 prohibi=
+do cualquier uso, reenv=EDo, divulgaci=F3n o copia, total o parcial, sin au=
+torizaci=F3n. Si has recibido este correo por error, te pedimos disculpas y=
+ agradecemos que lo notifiques de inmediato al remitente o a Openchip, y lo=
+ elimines de tu sistema.
+
+El contingut, les dades i qualsevol document adjunt a aquest correu electr=
+=F2nic estan dirigits exclusivament al destinatari i s=F3n confidencials i/=
+o poden estar subjectes a un acord de no revelaci=F3. Est=E0 prohibit quals=
+evol =FAs, reenviament, divulgaci=F3 o c=F2pia, total o parcial, sense auto=
+ritzaci=F3. Si has rebut aquest correu per error, et demanem disculpes i ag=
+ra=EFm que ho notifiquis d'immediat al remitent o a Openchip, i l'eliminis =
+del teu sistema
+
+--_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Hello Lustre developers and maintainers,</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+I am writing to inquire about any existing plans to support the RISC-V</div=
+>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+architecture in future Lustre releases, and to share our work on enabling</=
+div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Lustre client functionality on RISC-V 64-bit systems.</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+BACKGROUND: WHY RISC-V SUPPORT MATTERS FOR LUSTRE</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<b>-------------------------------------------------</b></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+RISC-V is gaining significant momentum in the HPC community, with projects<=
+/div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+like the European Processor Initiative (EPI), EPAC, and commercial offering=
+s</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+from SiFive targeting high-performance computing workloads. However, a</div=
+>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+critical gap exists in the RISC-V HPC ecosystem: there is currently no</div=
+>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+high-performance parallel file system support for RISC-V.</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+This gap has been formally identified in the RISC-V HPC Gap Analysis by</di=
+v>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Nick Brown [1], which explicitly recommends:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &quot;We should prioritise optimisation of parallel filesyste=
+ms,</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;including Lustre, for RISC-V&quot;</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Adding RISC-V support to Lustre would:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 1.&nbsp;Signal RISC-V readiness for production HPC - Lustre is the d=
+e facto</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;standard for HPC storage, powering ~70% of TOP500 syste=
+ms</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 2.&nbsp;Align with open-source values - Both Lustre and RISC-V share=
+ a</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;commitment to open-source collaboration</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 3.&nbsp;Enable new deployment scenarios - RISC-V-based compute nodes=
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;connecting to existing Lustre infrastructure</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+OUR WORK: LUSTRE 2.17.0 ON RISC-V</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<b>---------------------------------</b></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+We have successfully built and tested the Lustre 2.17.0 client on RISC-V</d=
+iv>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+64-bit with a minimal set of patches. This work demonstrates that Lustre</d=
+iv>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+can be ported to RISC-V with relatively low effort, as also shown in</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+recent academic work by Billa et al. at SCA/HPCAsiaWS '26 [2].</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Patch Summary:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Our patch series consists of 8 small patches targeting:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Build system: &nbsp; &nbsp; &nbsp;RISC-V SUBARCH mapping in a=
+utoconf</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;RPM/DKMS: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Architecture-agno=
+stic paths</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;LNet: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;RISC-V =
+hypervisor detection handling</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;llite: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Guard for pr=
+efetchw() (x86-specific instruction)</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Erasure coding: &nbsp; &nbsp;Enable optimized paths for RISC-=
+V</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Debug tools: &nbsp; &nbsp; &nbsp; RISC-V target in crash tool=
+s</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Total impact: 9 files changed, 19 insertions(+), 8 deletions(-)</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Test Environment:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Primary: &nbsp; &nbsp;Ubuntu 24.04 RISC-V, Linux kernel 6.8.4=
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Validation: Fedora 42 x86_64, Linux kernel 6.16.4</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Result: &nbsp; &nbsp; All 16 client kernel modules compile an=
+d load successfully</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+QUESTIONS FOR THE COMMUNITY</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<b>---------------------------</b></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 1.&nbsp;Are there any existing plans or ongoing efforts to add RISC-=
+V</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;support to Lustre?</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 2.&nbsp;Would the maintainers be interested in reviewing our patch s=
+eries</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;for potential inclusion?</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; 3.&nbsp;Are there specific testing requirements or coding standards =
+we</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; &nbsp;should address before formal submission?</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+NEXT STEPS</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<b>----------</b></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+We are prepared to:</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Submit the patches via Gerrit for formal review</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Create a Jira ticket to track this feature request</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Provide additional testing data as needed</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; -&nbsp;Collaborate with maintainers on any required changes</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+The patches are available in our repository and we can submit them in</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+whatever format is most convenient for the review process.</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+REFERENCES</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<b>----------</b></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+[1] Nick Brown, &quot;RISC-V HPC Gap Analysis&quot;, RISC-V International, =
+Oct 2025</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp;&nbsp;<a style=3D"margin: 0px;" data-linkindex=3D"0" title=3D"=
+https://riscv.atlassian.net/wiki/spaces/OLRR/pages/895778831/HPC+Gap+analys=
+is" class=3D"ms-outlook-linkify OWAAutoLink" id=3D"OWAb5b0d5de-4950-559d-e3=
+01-5124963f5dcb" target=3D"_blank" href=3D"https://riscv.atlassian.net/wiki=
+/spaces/OLRR/pages/895778831/HPC+Gap+analysis">https://riscv.atlassian.net/=
+wiki/spaces/OLRR/pages/895778831/HPC+Gap+analysis</a></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+[2] Surendra Billa et al., &quot;Porting Lustre File System to RISC-V</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp; Architecture&quot;, SCA/HPCAsiaWS '26, ACM</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+&nbsp; &nbsp;&nbsp;<a style=3D"margin: 0px;" data-linkindex=3D"1" title=3D"=
+https://dl.acm.org/doi/10.1145/3784828.3785406" class=3D"ms-outlook-linkify=
+ OWAAutoLink" id=3D"OWAfd028089-0d6e-e236-6ddf-7eb585f77c10" target=3D"_bla=
+nk" href=3D"https://dl.acm.org/doi/10.1145/3784828.3785406">https://dl.acm.=
+org/doi/10.1145/3784828.3785406</a></div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Thank you for your time and consideration. We look forward to your</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+feedback and the opportunity to contribute to Lustre's architecture</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+support.</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Best regards,</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+Abdul Halim</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+OpenChip</div>
+<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
+&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
+ font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
+abdul.halim@openchip.com</div>
+<div style=3D"direction: ltr; margin: 0px; font-family: Aptos, Aptos_Embedd=
+edFont, Aptos_MSFontService, Calibri, Helvetica, sans-serif; font-size: 12p=
+t; color: rgb(0, 0, 0);" class=3D"elementToProof">
+<br>
+</div>
+<div style=3D"font-family: Aptos, Aptos_EmbeddedFont, Aptos_MSFontService, =
+Calibri, Helvetica, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);" clas=
+s=3D"elementToProof">
+<br>
+</div>
+<div style=3D"font-size:9pt; color:#000000;"><br>
+<br>
+The content, data, and any attached documents to this email are addressed e=
+xclusively to the addressee and are confidential and/or may be subject to a=
+ non-disclosure agreement. Any use, forwarding, disclosure, and/or copying,=
+ in whole or in part, without authorization
+ is prohibited. If you have received this email in error, we apologize and,=
+ please notify the sender or Openchip immediately, and delete it from your =
+system.
+<br>
+<br>
+El contenido, los datos y cualquier documento adjunto a este correo electr=
+=F3nico est=E1n dirigidos exclusivamente al destinatario y son confidencial=
+es y/o pueden estar sujetas a un acuerdo de no revelaci=F3n. Est=E1 prohibi=
+do cualquier uso, reenv=EDo, divulgaci=F3n o
+ copia, total o parcial, sin autorizaci=F3n. Si has recibido este correo po=
+r error, te pedimos disculpas y agradecemos que lo notifiques de inmediato =
+al remitente o a Openchip, y lo elimines de tu sistema.
+<br>
+<br>
+El contingut, les dades i qualsevol document adjunt a aquest correu electr=
+=F2nic estan dirigits exclusivament al destinatari i s=F3n confidencials i/=
+o poden estar subjectes a un acord de no revelaci=F3. Est=E0 prohibit quals=
+evol =FAs, reenviament, divulgaci=F3 o c=F2pia,
+ total o parcial, sense autoritzaci=F3. Si has rebut aquest correu per erro=
+r, et demanem disculpes i agra=EFm que ho notifiquis d'immediat al remitent=
+ o a Openchip, i l'eliminis&nbsp;del teu sistema
+</div>
+</body>
+</html>
+
+--_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_--
+
+--===============5482952854125363482==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+--===============5482952854125363482==--
