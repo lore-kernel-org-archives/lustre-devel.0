@@ -4,141 +4,200 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id 06C88E9B250
-	for <lustre-devel@archiver.kernel.org>; Tue, 24 Feb 2026 11:10:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id E4C66F3C9AC
+	for <lustre-devel@archiver.kernel.org>; Tue, 24 Feb 2026 16:21:54 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4fKw3x1DQxz20ft;
-	Tue, 24 Feb 2026 03:10:05 -0800 (PST)
-Received: from PA4PR04CU001.outbound.protection.outlook.com
- (mail-francecentralazon11023108.outbound.protection.outlook.com
- [40.107.162.108])
- (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
- key-exchange ECDHE (secp384r1) server-signature RSA-PSS (2048 bits)
- server-digest SHA256) (No client certificate requested)
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4fL2yB2JX3z239c;
+	Tue, 24 Feb 2026 08:20:34 -0800 (PST)
+Received: from pdx-out-007.esa.us-west-2.outbound.mail-perimeter.amazon.com
+ (pdx-out-007.esa.us-west-2.outbound.mail-perimeter.amazon.com
+ [52.34.181.151])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4fKw330hN2z1y5q
- for <lustre-devel@lists.lustre.org>; Tue, 24 Feb 2026 03:09:19 -0800 (PST)
+ 4fL2xp50Dzz235W
+ for <lustre-devel@lists.lustre.org>; Tue, 24 Feb 2026 08:20:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amazon.com; i=@amazon.com; q=dns/txt; s=amazoncorp2;
+ t=1771950014; x=1803486014;
+ h=from:to:cc:date:message-id:references:in-reply-to:
+ mime-version:subject;
+ bh=HgDYb0QpiF1zpfJrBsI0Xs8VdHWMXJ5a/zXL6C9Cj88=;
+ b=mwZo0X30cz0V2eH1tujyYQ/tGO4w/6stvkdO0OaaQsxqgaWf59Ja9bsl
+ O7AqMF3Bkj/+eoAhHJHPcZBjOOpM3hdH64wUiXzgUYZSy0tNF630rTIMd
+ pRHJX4aVSyIOO6iDej7H9KaWHEQa0RSwWasy0USEbhbwp4aHP1w1RkgPL
+ Q/TxgcYgW7weWLals+2ou3vd0Ckw4TYtHUCZxrcgtBfhEuLDNdfH53PcX
+ ch2TjoOD+0U6nhWM3FX8z2ej/VGcFZIL292RZ9YCwUOygFr3mYjhRfQyp
+ 5Bc1dSlqknjavELSlUMJHbgdmrpPKQK24Zr4UVAvVgDrT+7i4UH4Zra93 g==;
+X-CSE-ConnectionGUID: 91sL5jScSneioirINIcJgQ==
+X-CSE-MsgGUID: sT9FUe+UTwqck28bBKlM0Q==
+X-IronPort-AV: E=Sophos;i="6.21,308,1763424000"; d="scan'208,217";a="13681415"
+Thread-Topic: [lustre-devel] [RFC] RISC-V Architecture Support for Lustre -
+ Patch Series Available
+Received: from ip-10-5-12-219.us-west-2.compute.internal (HELO
+ smtpout.naws.us-west-2.prod.farcaster.email.amazon.dev) ([10.5.12.219])
+ by internal-pdx-out-007.esa.us-west-2.outbound.mail-perimeter.amazon.com with
+ ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 24 Feb 2026 16:19:46 +0000
+Received: from EX19MTAUWA001.ant.amazon.com [205.251.233.182:28666]
+ by smtpin.naws.us-west-2.prod.farcaster.email.amazon.dev [10.0.40.187:2525]
+ with esmtp (Farcaster)
+ id eedfb8df-876a-4966-b9e7-02f6d5b691ab; Tue, 24 Feb 2026 16:19:46 +0000 (UTC)
+X-Farcaster-Flow-ID: eedfb8df-876a-4966-b9e7-02f6d5b691ab
+Received: from EX19EXOUWA001.ant.amazon.com (10.250.64.209) by
+ EX19MTAUWA001.ant.amazon.com (10.250.64.217) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.2562.37;
+ Tue, 24 Feb 2026 16:19:45 +0000
+Received: from EX19EXOUWC002.ant.amazon.com (10.250.64.172) by
+ EX19EXOUWA001.ant.amazon.com (10.250.64.209) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.2562.37;
+ Tue, 24 Feb 2026 16:19:43 +0000
+Received: from BYAPR08CU003.outbound.protection.outlook.com (10.250.64.206) by
+ EX19EXOUWC002.ant.amazon.com (10.250.64.172) with Microsoft SMTP
+ Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA) id 15.2.2562.35
+ via Frontend Transport; Tue, 24 Feb 2026 16:19:43 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=miLT5LZx1ZOgyV3PHHn6nWgOey/rIvxzR6tZm0xnk/8hFIVKmq/YJE7HryfZoo3NCvstJ5XfDwz2Nrz5AuX0MeMINHYLmIFWFDp0P+hVcD+c4A3CYfnDHr5T3V11VviXGjd8F1E5tHSej4/E57goySy3Qe1H1Zkf/lnqRVcMFjOyPqc0XuoqbIdAI27W1YKFIupAek81WM0O7OqmOHhIvI9DJrSJop+VwvfDDXjtFlTdxObj7FGNukMmDsVjg2LD+9WXKvdguDI3A0zpldWcIDnFm+ttV834OXo7+x+7cwb97FICtMrlrXPR6YKL0rhRLvn9VKggE98Zo07t8XA/uA==
+ b=t66ASubMnZq77R701pQ1cXyH+NvSvhv2XoTsN0OQlQwNMtj9/odjB5S3vbg1pmgOUzegqCoYaigtN5MetIdIuVQnq9GvKMmrAy6DadTB+a47ctElwq9IrhXaKNFcu5XR3+/CT6K85qGUDzGyM50oZgZwcF8tyHN/DvxsqoHnlMAPn512IBQmXf9/HnkDQ6OSrgRXrDHB0IPXnZp6DdLe6Dlb2Pyb3bJ6UGjrptOHI8uVZ46bMyKDORsYNIA2iZwVfFQHqlJ4oEgrveGzOaf2QP3ofvNEoOwKp7OmRWylDuzo9qfv9BGGysKc0r9Tb3Mmc3Hll59wzgdpqFuhf+jFBQ==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=1FAxVzNej8bwtA/tBSlLg3eOYknGZyIo4H0nXiapS3U=;
- b=rYLwHpnV/uUrv+//qoHKmUgHkVl+JbaHZ6VOD6d/pQ7J1PPv9H2vcPaTrfvfNn8yqiNqXqyL31M1FuTn6IU+LdJyuXfqEcPoUnwhu5GloVscBXOYtn8wpWy2FJHZ9HSanhIMCstU21wKosX0Gt/Ie0OmLZAF/pvXWfBxgONc8oF7+IT21mP/OykauVTwR/4ZPe11wHvtrhsHCetsoO4ZP28LaGJexA1zokPStM8dyS4cLAhBI9Jd77LKTUpTE+I432ZhuNr8pqvQcxFj2Vk2qwjABWgW9Y4SP00XbRlCOnl5WV1/3YVFjFMv2gWtDU8fgHp+DCTiOTj93TvAwBKjew==
+ bh=HgDYb0QpiF1zpfJrBsI0Xs8VdHWMXJ5a/zXL6C9Cj88=;
+ b=WUv97Cu70J0ZAIrvfHfeVAOuFleu12DCnt+hiX5JtyrIVygyKnSu7LKS3wm/jXVH7LOD2vnpwRFGj6BkkJXBinyRZv8aq3+AvEF/YOAxGaeRw3dJRUBHsSfemE5460Mj/CKLSf2gGD6vMgJy1+3tPq6LaS5xGJkNlkyhQmiSYxdo78VW/88y24+NbnZJrAVR0ifEYuuDlR4tfNlSyxDkuWFQjodojDChb9ow7RjCbnIFXnGHrtqj8CVhDQm67/mpBBFxCX5o9kh/hxfQ1DPP/dc6Pdv6DeQBGN7Aui+BWqOvIhN8bvQnZlr/NjpX/B/peNCbYEUGolsqHOOt+2dcXw==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
- smtp.mailfrom=openchip.com; dmarc=pass action=none header.from=openchip.com;
- dkim=pass header.d=openchip.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=openchip.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=1FAxVzNej8bwtA/tBSlLg3eOYknGZyIo4H0nXiapS3U=;
- b=khlf0n6nsXBcKaMqGl6sCXhtHC1Mfyd5qpk4pDZDAPuoNqNH6L1KF+goqCCD5rRL8rAKPdGIHzK476wMUMXb73i1cZ1BZk5qMA2Lo9T06iLOV43veP7YRtXJTgjw6Qel2tnjxLc82eFjrQQVOC9qfEnMaUUIKiaX6Mu2kAqBcfZoIgh35G0N4xPj9WHJNxaDnZYm+T2rlT8BaR40lpx290kHWdUPyMBY7nEYOiSkVQe9DSkIRRqVnUH/iofyBCJdro7LphrXddbKFMhylsOjCwwkyKYNCIFs8jRg3hRt5TtPE/q5Nu4FQGrQIgS+YEGv88t6tdcLn2IIazuqbWrG8Q==
-Received: from AM4P192MB3108.EURP192.PROD.OUTLOOK.COM (2603:10a6:20b:6e7::10)
- by DU4P192MB2349.EURP192.PROD.OUTLOOK.COM (2603:10a6:10:55e::17) with
+ smtp.mailfrom=amazon.com; dmarc=pass action=none header.from=amazon.com;
+ dkim=pass header.d=amazon.com; arc=none
+Received: from MW3PR18MB3673.namprd18.prod.outlook.com (2603:10b6:303:57::17)
+ by DM4PR18MB4173.namprd18.prod.outlook.com (2603:10b6:5:39d::24) with
  Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9632.21; Tue, 24 Feb
- 2026 11:09:15 +0000
-Received: from AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
- ([fe80::65f9:6768:38be:7c0a]) by AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
- ([fe80::65f9:6768:38be:7c0a%6]) with mapi id 15.20.9632.017; Tue, 24 Feb 2026
- 11:09:15 +0000
-To: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9654.10; Tue, 24 Feb
+ 2026 16:19:40 +0000
+Received: from MW3PR18MB3673.namprd18.prod.outlook.com
+ ([fe80::86db:c59c:3fed:2e81]) by MW3PR18MB3673.namprd18.prod.outlook.com
+ ([fe80::86db:c59c:3fed:2e81%5]) with mapi id 15.20.9654.007; Tue, 24 Feb 2026
+ 16:19:40 +0000
+To: Abdul Halim | OPENCHIP <abdul.halim@openchip.com>,
+ "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 CC: Nick Brown <n.brown@epcc.ed.ac.uk>, surendrab <surendrab@cdac.in>
-Thread-Topic: [RFC] RISC-V Architecture Support for Lustre - Patch Series
- Available
-Thread-Index: AQHcpX2uN8JgksagukyKgUAO1ExGig==
-Date: Tue, 24 Feb 2026 11:09:15 +0000
-Message-ID: <AM4P192MB31086DEE0D7ED656ADF8B3EE8274A@AM4P192MB3108.EURP192.PROD.OUTLOOK.COM>
-Accept-Language: en-IE, en-US
-Content-Language: en-IE
+Thread-Index: AQHcpX2uN8JgksagukyKgUAO1ExGirWRs/KA
+Date: Tue, 24 Feb 2026 16:19:40 +0000
+Message-ID: <0EBC91EB-D50E-47C9-B22E-677F45F03ED1@amazon.com>
+References: <AM4P192MB31086DEE0D7ED656ADF8B3EE8274A@AM4P192MB3108.EURP192.PROD.OUTLOOK.COM>
+In-Reply-To: <AM4P192MB31086DEE0D7ED656ADF8B3EE8274A@AM4P192MB3108.EURP192.PROD.OUTLOOK.COM>
+Accept-Language: en-US
+Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-msip_labels: 
+msip_labels: MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Enabled=true;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_SetDate=2026-02-24T15:10:45Z;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_ContentBits=0;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Enabled=true;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Tag=50, 3, 0,
+ 1; MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Name=Confidential;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_ActionId=76124405-3da6-45e9-9d0b-e95b291f2c81;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_SiteId=5280104a-472d-4538-9ccf-1e1d0efe8b1b;
+ MSIP_Label_19e68092-05df-4271-8e3e-b2a4c82ba797_Method=Standard; 
 authentication-results: dkim=none (message not signed)
- header.d=none;dmarc=none action=none header.from=openchip.com;
+ header.d=none;dmarc=none action=none header.from=amazon.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: AM4P192MB3108:EE_|DU4P192MB2349:EE_
-x-ms-office365-filtering-correlation-id: bef0c83c-74c5-42f6-6180-08de73952603
+x-ms-traffictypediagnostic: MW3PR18MB3673:EE_|DM4PR18MB4173:EE_
+x-ms-office365-filtering-correlation-id: c4886871-d4e3-4ecb-6985-08de73c08316
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|366016|1800799024|376014|13003099007|38070700021|8096899003; 
-x-microsoft-antispam-message-info: =?iso-8859-1?Q?e5xcQsF1MmG4t66IvzOYAuBudvB+/e/7jOwpX7Oz/vLEpgCPlQPrPG18O9?=
- =?iso-8859-1?Q?PEYn3zOef/Mb0XCh6hN7/ou+j9Pj7sO2EUgepMlpD12vS0/Pk3tad7BS4U?=
- =?iso-8859-1?Q?i50WtHPsZrD7AlyuVbg6dBlJ/C95N+wj/rxU0Pq7iJdSThgJWEgn4oy0lG?=
- =?iso-8859-1?Q?mTzpr9H3VNX77gqR1a20J0eZ0I7aCVkDXYVxMZkAjHa45kUQ1JvJeFEza8?=
- =?iso-8859-1?Q?tnriN5JOesV0eeFErxAR9sMLmXoyZaUPOWeCLwVkPqHWIftOWo5wH/hLZf?=
- =?iso-8859-1?Q?zX7Eh6mF9/50aIdtNYJ4uuvamEI0rT/fP4ZAOGnDbnjfu8ETSsfRKo08MB?=
- =?iso-8859-1?Q?xepNgT/nkIojDfLY3YI9exjnrSIHwahIa+k0TYpeVWgI//NbMwQLLs029Y?=
- =?iso-8859-1?Q?oOQBFku1Tm1bnsoHssh5p9R9hj9dbylJ+VO+wpn4BpMc3fJoLn07IWTSOz?=
- =?iso-8859-1?Q?Qt9luuYy/JL1RZOrxXMZD7pc4caEMDpsySxKy++XxH5/BJxM2Qz5IpJWaG?=
- =?iso-8859-1?Q?DGY/ILexdzkXdWV3u9K0786Gw6DKlV/lYzJdK047wsk8aA1CCPoe/pBTBn?=
- =?iso-8859-1?Q?spF/v8h7gtAdVYIdoVG0obSMbb4JTRvCobkH+wyDqk6u5K/4+/1NKn2160?=
- =?iso-8859-1?Q?rdn9NjQslvNLJXpXRL4O+AHuRtvKb+zMOZkzy7uR5XQ59TJPdqETLUElCv?=
- =?iso-8859-1?Q?ITopZq2l2w90+hFXU7FMPpltp5bLV0tp5pu7bQnLPwDHSiZehOTNTXxxJe?=
- =?iso-8859-1?Q?tHnrGbSyKTfJVF6RdGRJ+BpVWTAI3fvMvMO1UpFvBZf4u6EaunBvJnYH+N?=
- =?iso-8859-1?Q?VA+G2F/hogrrHU6D+jAXqoVYL+h1Y/wzMlBylQRnwlFcE4eNQQOkElPNCk?=
- =?iso-8859-1?Q?tndzS8ALoC4OCGGgPwXSwijE451nzAVR/YOO3ayJpwfNB8BAyQ4Sn1/sN2?=
- =?iso-8859-1?Q?WyN1WW2+mQxoC4pcMufwFXPHeufIQ+WhL7cS0tOnVJKWvm7ZmyhOvJ10Yy?=
- =?iso-8859-1?Q?9njzKtk+Bo/xxCMUzZoAlSIk+lttsQ//UJB4qo9ut7oOS1er9w4NY9Cs+v?=
- =?iso-8859-1?Q?qRye1y2gFYXqGJlAHUFwcyage6yw1l/yWSHf9Q5HR+J1ExO+Gfb4eQslAD?=
- =?iso-8859-1?Q?VDJTY/CuOGwAL5crFhcwnQ/IwRZHXJRLmYAtOt1r/nzJSNyxmwtvI5HQmu?=
- =?iso-8859-1?Q?10SkipY2A+V0oDrdDpW5627t8KEvL0eY1SeirExuHo8ZKKYo7uoWoFndkM?=
- =?iso-8859-1?Q?VxQqowDjJ1BRzAX4AG4ulrO4GaQmScQqlSPlVagZ31X6uBVXjeaEyLgewo?=
- =?iso-8859-1?Q?DCyYpoYkSYSCUQqw607PAW+GdeGbefj/Gl5gJg6gmcdXEzDgdBvaJlcqFP?=
- =?iso-8859-1?Q?ukqaaZBf08VzjAlUKU8z36OSnbPZUNOuefq+IiZGyPZdPclu3A/aISUU/z?=
- =?iso-8859-1?Q?+ZklgZFC9WH2r0qVUtTpLH+nV9m7m7kwyieta5ebLiwbxH8NfMzw3YZavX?=
- =?iso-8859-1?Q?n/85Zxd21Z749rBmETe7E6zj2R+2O3LKyKjzPqjWkNXOVbfNJBmf0VX1IF?=
- =?iso-8859-1?Q?JDAFaWjwTWobJ4cYjGTdUxWGPOIQ2CyEnvmNijpEO6u9ast47Eml/kubtt?=
- =?iso-8859-1?Q?AD1bG5YKTHWzO4IuMmoDJtqpu5tm1qhlx3?=
+ ARA:13230040|1800799024|366016|376014|38070700021|8096899003|13003099007|7053199007;
+x-microsoft-antispam-message-info: =?utf-8?B?NCtaNzVSTmxuQ2ZuY0NHR0pBQ1JtbVJwVXBGeXY3NjY3Vy9XV09SRFF6MDN1?=
+ =?utf-8?B?ZnEyQytDbTA0Y0JnWGZrMWc2VmM5M3lHUG9rWnB0WURndTRvQjVNQk5yalkz?=
+ =?utf-8?B?UWs4cnFWNnpnalNpdHdoSnZadGt2dGlKNkhFTUhqdHhuWjZPWWJxZG9QYldQ?=
+ =?utf-8?B?ajlBUFdPYTRZV2hDRHMrOWNTamx2VW1QVVB6U2Z2Mk9wTTVqT0tMUnBWZTFl?=
+ =?utf-8?B?dlRUSGtucXk2akhsUzhVdVpyeklRNldZYUo3ek1SbTdQempxTEkyZldGOXJv?=
+ =?utf-8?B?eDNGUHUvU3RMb0RSWkNRTVU5cGM1S1BDK1o4RGV2bGxtSzJaNzVOcHFmMWN3?=
+ =?utf-8?B?eGRadDJMOHBZTzVaL2xDQkNReE1lblAwK3c1NHdwT3BseXd0NVZ4TUR2L2cr?=
+ =?utf-8?B?dlJMVlAxZE4wVllxTHFxblptVGZUbnh5R2V3cjlVMDZuUlRBS2lvblc1YWoz?=
+ =?utf-8?B?T2I5bFRyNDE3T2FDOG00NGRkNTVXUlFJZER6NXNBS0tmQ2U1Zk05dnNOclpX?=
+ =?utf-8?B?eFZPaGdjWWE3RDB6SFdCYUNIR294QnJjMXhNU256N3pVY25VNTI0Tmg1blVE?=
+ =?utf-8?B?UkRDeUhGNnFaK2VNMXQ3NVJzbk43Q1JxMXZIV2V3dVIyb2NURXFDVHRtOWVL?=
+ =?utf-8?B?SFR4Y0RyUEZOdjJWUmpWY3BoWnBDbWttUUtTWm9CcXJGdWIrOWNEQjYzTmdn?=
+ =?utf-8?B?YmtKL0xjUitOeEpUK3JVVHAwK01YZ0RBWk4zMSs3Sk52aHdac1lDMHJqbDd4?=
+ =?utf-8?B?N3JTcVBXYVYwTGdDVEZyaUFGeVhEVEc4VVp1alV0VlhKOFY1WjI1dWhVcGJv?=
+ =?utf-8?B?WkV5RnE0eHFtVEpUSHRJNFc4UUEyQ1I5US96cW82Vk5WODdWWW0wM2dvaSti?=
+ =?utf-8?B?bVpvc0ZEN1l4ZEVGaDJPeUhxSlhSdnhTUjNLczE5bk5zcDEvTlJrRCtUQ3h0?=
+ =?utf-8?B?elc2bG1TbjRvU2ZqaVNWQXhLQUYwUGlrdlp3NXpuL2pveURTZGlvRjhJT0JD?=
+ =?utf-8?B?NlQvVy9abjkxZ3BSaC9HOGxEWHVtQTVNTkR5QlJzc0hxcUExRDc5YU8zcnNK?=
+ =?utf-8?B?K1JtVHcwSnR6dVRZcWxrTmNhUnpKVm1wQlZESSt4bi9jSXJhWjgzdEo3Snlw?=
+ =?utf-8?B?RUxMSlZWZjBlcWtYejBlVHhDZjBVbmQ2TU1KeVQ5U2kxQWxTUXQvNjlyenZl?=
+ =?utf-8?B?ekJOYVFsZ2Z2YkdDS0kxQVJKRy9ITURPYTZTOS8wNFV3c0N1dThNRXR6ZE0v?=
+ =?utf-8?B?eGRiVnJFU3lmRHVQUGk1MXh5K0R3MEQ3MU15d3p1Wms2NnFwN3pHNFFkZ0pE?=
+ =?utf-8?B?OFJRcFQ4V2pCWWhmZHRGOVhHbVMvU0VUQjJoTjJ1YlZ5eW4zWmdaM3VlSXJl?=
+ =?utf-8?B?THJwNUV4T2hoUnlhcGN6NXg1UzRibTZ3NzBJL2FrdUNEZDlCcGJnb0liNGdv?=
+ =?utf-8?B?TXdpbWdLN3FhK1lNalBHT1dQVHJ1R2FydHhIM1VTLzl0eXl6S1Q2UHJ2WUM2?=
+ =?utf-8?B?VkFOZTBscVBIS0FLY0xKelQrdFlTeXpaUmRYMzJ6bWllNkNWVG8zV3VCTUhJ?=
+ =?utf-8?B?QVo1VmxlTnorbVpJOUxua2tMNHBSTlpuanQxUG9lUEk3Mk1oUHliWksxSTN2?=
+ =?utf-8?B?dGRMenlzNzlNbkJBNjBxcS9QQ0xFZ1RPNWN2VjhSMDR2K05PYzMrTVdFWWZP?=
+ =?utf-8?B?eHZ6cDlqeXdhOVp0VVpIOGRrWkdGMVFFSnVvNHh4ajc1SjR2OVg4YzEvZWJt?=
+ =?utf-8?B?a1Y2OHp6QU9kWi9KS1JUMG44YW0rbXJJa1p1ZURIZFBra3N6dkFTZlZXS0xk?=
+ =?utf-8?B?UWx1QVc4bDAxblR2Y3ZFeWRDLzlvVDJtV25FeXM1UFdMZTNWbkJwWmFhZWlX?=
+ =?utf-8?B?REdKcDNDK2pCSnA2TC9meTlrTE1lbDR5cWxMRUtsQzJLZS80QXVBUHFkQ0s1?=
+ =?utf-8?B?TkMrMVl1Uk8rNnBqZW1Ic2FzODRJejVOUlNiaG5wdFZpbVVleFNHQnF0bnRF?=
+ =?utf-8?B?WDc2dFNhR3pGd09sTzBic2ROMDk2VnhwMFQ5MTlOYlJiQjZTK3Q1bnVuMlRN?=
+ =?utf-8?B?ZU5HVTEzS29mK2Z4ajJadHNvK3RHcnlwYWl3cXgzOFlhUzQ5RGRIK3JsVitB?=
+ =?utf-8?Q?OffqKCH90eZOggTUjO8T68X9E?=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
- IPV:NLI; SFV:NSPM; H:AM4P192MB3108.EURP192.PROD.OUTLOOK.COM; PTR:; CAT:NONE;
- SFS:(13230040)(366016)(1800799024)(376014)(13003099007)(38070700021)(8096899003);
- DIR:OUT; SFP:1102; 
+ IPV:NLI; SFV:NSPM; H:MW3PR18MB3673.namprd18.prod.outlook.com; PTR:; CAT:NONE;
+ SFS:(13230040)(1800799024)(366016)(376014)(38070700021)(8096899003)(13003099007)(7053199007);
+ DIR:OUT; SFP:1101; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?iso-8859-1?Q?3jArA/ztzqqRi466myp9SEFr6REXeoDJSbH+94ANMqXteSDQZ9W0C3yUUO?=
- =?iso-8859-1?Q?Fjq8HYXqiU+ddnNZd0rjx/CM+UHDLapvn5CE4iVGBcJfUFLbuE8WoHdcNB?=
- =?iso-8859-1?Q?RSiWQGCMck4hlOwOfbFAyCqoq/Yi01DCqAZNIfx4tU9lMNFkR2ynC4AIyQ?=
- =?iso-8859-1?Q?L94IZqsNx3Fj+l9hZpcNqiIEXRcyMivmGinUtBquQhME8O36xN65O3Xeu4?=
- =?iso-8859-1?Q?uGeAsp6e+79d8WRGoMQ97Y0tx324Mkfc+JLqWPSqEgcBGsLEc2mi93ewHE?=
- =?iso-8859-1?Q?b0tQoFD45eVwf6s0atuJE5ARGnCA2bzhPcXhaUKnaYp/NMBd20dEfLSFEO?=
- =?iso-8859-1?Q?0znyJYc7AN0jovYFWXUOzp+RM45cFwB+gYSgKFY17zSE2ni+0r/ywRJG+6?=
- =?iso-8859-1?Q?urzU6e8cRw30N93n/NTmOoIGyJnLO48hO5fYMBh3bBwkXuckC8YKbunM2O?=
- =?iso-8859-1?Q?zMrr8YOIOR+3OLyrZVodeozBwA5KphxEQ4QiParUVCf/btO55Iio4QlDCJ?=
- =?iso-8859-1?Q?cWuE6U85sZLQumW1O9H/yYAAIozzCRTyU1SUJqu+stBLvkiVsFSl7M0kyX?=
- =?iso-8859-1?Q?D5MUdXVKhXGVG1hFl7S1dT9t/Lt1YVindt1fgy8TJlPPSYQv/5JKRnD2f8?=
- =?iso-8859-1?Q?rylv64iEc8AI0uWCD0+KOlw4C+zzGWi77Z9Lzbrp2FE7rhU+KvQ9tmyuxK?=
- =?iso-8859-1?Q?NygHu3IVjpLLeL4F+IT1qYM8iAC+7umN+BQkBLQeg1REY/Hi0g7UVydRnv?=
- =?iso-8859-1?Q?HmsZ/tyVsaoDBAXDrQ6ewVVa94+PuKbGJTbOBJ+kyOKSUWILg/JuhUAFZo?=
- =?iso-8859-1?Q?XDKKLN6iNhf+Pr8waSrzJC/T5/YkZTt9K4tEaJdvtsFVquqov/b8ferhED?=
- =?iso-8859-1?Q?CHb9lAj0AJ7QCpYMktKvhReljA2g0DBKrpk7Q1SEzyREPVs5DhRcotlI3c?=
- =?iso-8859-1?Q?wkzPC6Sy5LNBATi4ML0LmQOCW59tDJFs5C3rZYEjHXXpmeGgz2rsDCH7is?=
- =?iso-8859-1?Q?hpTtRdSrzxaDzVP0wamzQTEcLIES8m7z5ju781kcLGsfNYlldmVVnctq7c?=
- =?iso-8859-1?Q?BIEQGDp+MQuNzkrvcdfJzos93ULF/QodXa8EPdo6y91PVA28HOWy96jZ8g?=
- =?iso-8859-1?Q?1Cf8rbHTxI3BXuQcg2L7v8WRtFZlR8FGoG+oeMFJo4GPqN6aLjhzusuWSB?=
- =?iso-8859-1?Q?PLrstCiqcCBtrzDQgO7cfOevTAEoQMp7/XmeDI/zAoNzD4+XOJQtsh2u0Y?=
- =?iso-8859-1?Q?sH5GDJ2xKTIikZfRg7/B9JY+OF1yydaJOlbnfHs0Z+OWA0dyt2hTPg3nHu?=
- =?iso-8859-1?Q?VCgPNblZ3g4k8+iXC/i+3R8l4uKRsZuHmqy1I26FZO8ASC2SjPhwtKN7j0?=
- =?iso-8859-1?Q?gh6pl7rYjk4jz0hDd8eXy5ROgxPRtb5cXImvf7QCdGr4i5kNIl2G1uX39v?=
- =?iso-8859-1?Q?uVTsKZpu5yWmTNCxunCC/PCaW7P7PRhEpBM2H/M6h+BJs5zTbcyjpmDSer?=
- =?iso-8859-1?Q?NPjaa8HM/iOcSFEYo6TvS1NxzLdg6+SC+2oBsaDLc2saUcp0aa28EHTh2b?=
- =?iso-8859-1?Q?fVI6O30cbFkP7NN+oe3P9Tvd1etFgFtkfvm1aFAwUiUDn1Gn2SQUE+t00P?=
- =?iso-8859-1?Q?qsZaizRb7q5okDhHvDzYEvXCxxxsMeSTZ7yW6tN0AntnbkPPAA1KsWwB0+?=
- =?iso-8859-1?Q?uPQwFRTn7PVxmZTBKOdMWPTFMewVvOREWzTrpnAp5Qluh3764DL0ZqDBb3?=
- =?iso-8859-1?Q?nGzbPcORsS4FxP0YYrESUGRiJQbn1an+xR9hnkmCek3znF?=
+x-ms-exchange-antispam-messagedata-0: =?utf-8?B?N09NR1F1ejZGbm8wRE84WVdYZ2JJb1R0NXZLck1nb0NUMGcrMkQwdTNpeGJC?=
+ =?utf-8?B?cnRjK3VqS3FnQzBYZkoyZGw3V3RqMmpNdTluMEE3ZVJmK2w4Z3ZzTFQwcXJv?=
+ =?utf-8?B?T0lQNXAwSldpaDM2TkI2Nk5pSFNKQ29jdDdYeU5LZmV5aExKYU9MWC81dTNG?=
+ =?utf-8?B?MmNmSFp4WGxxV1RPOEFJUUF3ejZqZW44c0lwTVdtR25mYWpzQUdsQkVLYTQ0?=
+ =?utf-8?B?Q1BSd3p6ZEMxdHhKWlhxS2NNT1BFNUdkOUxGWlM2TjBmMk9HRFNXdmxtL3Bz?=
+ =?utf-8?B?SytLcWNzcGpxV0NCWUJlZGRxTk9oZWh5c3BGK1RvaHJXa3RPVTRzU2VXRFlk?=
+ =?utf-8?B?cGt2eHZ2T3UwVG9LK0czL0Y0aEtvYjkzWDhxOFFTb1BOWW94Vkh4dWdqVkJp?=
+ =?utf-8?B?NGpiN0ZVOXJRaWZ0ZkdCNFBRMU9ULzd4dy9XdUpkbXIxektBdUZVbVpHODlm?=
+ =?utf-8?B?aGtkMDI3clFwN2lmdWxDblk1eUUwMWI5VzJzK1NmQlZlRkVraTZwbE5HQUVt?=
+ =?utf-8?B?M3JMZ2lvMGE5S1c1S2J2eFV3VWh0alIzS2VVRmpUa3FnV2swaHhYcExpejc1?=
+ =?utf-8?B?djdUMzFrUkFQYXZlY05sQUwrU0Frc3BqZW0xbE1iY1Jwc00xOEhzT2ZXNUVF?=
+ =?utf-8?B?eXIrL01lVGgvdlFBNjlqNUYyMTgwZXJacEJHMC9DQ09pRktZL3R0T0VaREJr?=
+ =?utf-8?B?MHB5V1huTGwzcVJYU0R1NFovVllTUVBzdGE0RVZUUll6VTEvTEJXLzIxQnZB?=
+ =?utf-8?B?S2l0NkNVOC9BQ1BTQU4yQUd4YXgxaTVqZEJyWTNCaGRoOUErdnRYcmxhZWR0?=
+ =?utf-8?B?S1lIYm8wZUhSa2s2SzVGcjBXSEZvVWJqaXVEMjNXS0wvcnF6ZzRrMk11eEN3?=
+ =?utf-8?B?YTRhYkpJaEs4cVBsRlFmWTk3RVlEZVd2b2ZrN3B1MXZNbWMzNHVLWWNmaGdZ?=
+ =?utf-8?B?MHl3SmI3MkRFNFJZUUJyc2lyOWJOYStWWTEzNVdNNGlHNUZIYmJxb05yVEkx?=
+ =?utf-8?B?M0pLYW1hWFhSZ0w2RDVZRG5qT3QyM0xEQ3k1ZzV4RFFDV2hYWjVMSXVFVkN4?=
+ =?utf-8?B?TTZabHhtSDlqTEJxWTlDTHlzcHpYZ1ZieUFXYTRMWEd5b0JZZkNVQjdKcFZC?=
+ =?utf-8?B?N25jR2VWTFU5MElVRUYrQUg5QkZDaFhLSU9JNmhWOXIvRTdCYnpxSW9DTFI0?=
+ =?utf-8?B?WU1JUUI2Vnl4czZZeEUrTzg2SzdtRnlnd2V0T3pkbE1xdGJaZXlQSTd3R0x2?=
+ =?utf-8?B?K2xHRVp6K1Q3eXA3QjhPNUhLcHp0ZVdpWHJValJDMWF2WEdpRWI2eTh4YUFI?=
+ =?utf-8?B?NjJ1c01aL3NQTkJHRHc0dXhiUWlOdkEzb3VPRHpRWGJyLzhrUVJZcFJXd0g4?=
+ =?utf-8?B?dFBhdFEzeiszOHlDQjh0RXBFcmMrZloveEdaRmNLeHkwMEFPNXQzTnlJNXpj?=
+ =?utf-8?B?R2pGczBHcjRhdTlhbVVHOEovcU1FV2FhdXF4cGtjMVZ4ZFJETXpDYVMzMW5v?=
+ =?utf-8?B?K1VOUW1lNC9KNEhEdlovZkxiSTcyNmVObFVFZC9UcGhXRk9KU3NoVm51bjR3?=
+ =?utf-8?B?M1BvM25ycmJrK1AvMS9HcGw5UzJ2NkxVVHNNRFZFenQ1dXdxZGhKS2ljMnpL?=
+ =?utf-8?B?bWxnUDdFOGs1cXVFRVEwclZOblVQOUpwYVlZOE55aXBPVmp6eU5xUGFEZ2hG?=
+ =?utf-8?B?MFZ1dFJrTXZQeWF0QTBGRjlJRThtdVFiSTJqUzE1QzJnaVpSb3l4U0pjL2Jo?=
+ =?utf-8?B?NlFWazMwQlZPNXRURmNkbkYxRDdXL2E0cWY0NmZmU2Z4VUQ3cWZmWTI2Smt3?=
+ =?utf-8?B?SWZVT2IxNS9YR0NGOGl3ZUlyTzlxeGovSTJVZml0ejZXVDFZb242ZTZGMUcr?=
+ =?utf-8?B?YTMvZ1hCTVlWMU1yVEZzN2trT3piQ0ljcVVzZ1oyQkN3amg4TVhGaDBrbG0r?=
+ =?utf-8?B?NXYvNmNjaDlGSER5RGdWTDJRYnRYbTNZTzMxZnVCbWFsdGVWTG9wcnUyRlhP?=
+ =?utf-8?B?MHVDaXc3NmVUcnhaK0JiaVJDN0Jkbk1WQ3kySzZHdE1EazhFR1V1MTlxODRQ?=
+ =?utf-8?B?SkU2Vkt3WGZnZE80NEx4eE9YMDJNaUJiWHZOaGluVTNjR0FlYjRuR0w0RkY3?=
+ =?utf-8?B?S1kwV0pLZ2pJcHBKNTlGUkFKanh1RnpNbHU5UnFsS1BEdHBvMWlPSCtxWGRv?=
+ =?utf-8?B?Q3lKRFltWmlJNndHaFM3aDFBanVJU3l6SDA4SVdJOXNBV0JVMHl0c2NSZ1lY?=
+ =?utf-8?B?NS9kN0p1Z2FUQktJM3c1QlhpL0thbUlGbGlCSnZJeFR2ZGlQSVlSd1pLa0Ro?=
+ =?utf-8?B?YU14TTBKenBua29vbFRZdm9LUkQ4Rk80YWVGTVo2MHNvZUwxRUpFUT09?=
 MIME-Version: 1.0
-X-OriginatorOrg: openchip.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-AuthSource: AM4P192MB3108.EURP192.PROD.OUTLOOK.COM
-X-MS-Exchange-CrossTenant-Network-Message-Id: bef0c83c-74c5-42f6-6180-08de73952603
-X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Feb 2026 11:09:15.7948 (UTC)
+X-MS-Exchange-CrossTenant-AuthSource: MW3PR18MB3673.namprd18.prod.outlook.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: c4886871-d4e3-4ecb-6985-08de73c08316
+X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Feb 2026 16:19:40.2315 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: dfdd4aff-e2c9-4e1a-8642-7f6cc6bbbe6d
+X-MS-Exchange-CrossTenant-id: 5280104a-472d-4538-9ccf-1e1d0efe8b1b
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: n1ZsnyoAhg/XvG2dgDPpwKzH06ehif4MJ077hWtSmMB/gP+TGIRhh4yNiPcpNDhjnBj+flz+jRGKTezCSeGgyX49WfrxjIZcPrFO6Xf3iPg=
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DU4P192MB2349
-Subject: [lustre-devel] [RFC] RISC-V Architecture Support for Lustre - Patch
- Series Available
+X-MS-Exchange-CrossTenant-userprincipalname: T5msj6nvg2O+5Ng6J1dNu3KU3u3ECgotsbEsz9FjdgrBBkOvV3INGuy8Xq1UZ+PlnUpgaBhInf+yBE8t7trkKA==
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM4PR18MB4173
+X-OriginatorOrg: amazon.com
+Subject: Re: [lustre-devel] [RFC] RISC-V Architecture Support for Lustre -
+ Patch Series Available
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -151,699 +210,636 @@ List-Post: <mailto:lustre-devel@lists.lustre.org>
 List-Help: <mailto:lustre-devel-request@lists.lustre.org?subject=help>
 List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>, 
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
-From: Abdul Halim | OPENCHIP via lustre-devel <lustre-devel@lists.lustre.org>
-Reply-To: Abdul Halim | OPENCHIP <abdul.halim@openchip.com>
-Content-Type: multipart/mixed; boundary="===============5482952854125363482=="
+From: "Day, Timothy via lustre-devel" <lustre-devel@lists.lustre.org>
+Reply-To: "Day, Timothy" <timday@amazon.com>
+Content-Type: multipart/mixed; boundary="===============8403802311958951168=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============5482952854125363482==
-Content-Language: en-IE
+--===============8403802311958951168==
+Content-Language: en-US
 Content-Type: multipart/alternative;
-	boundary="_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_"
+	boundary="_000_0EBC91EBD50E47C9B22E677F45F03ED1amazoncom_"
 
---_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+--_000_0EBC91EBD50E47C9B22E677F45F03ED1amazoncom_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Hello Lustre developers and maintainers,
+TGludXggc3VwcG9ydHMgUklTQy1WIHNvIEx1c3RyZSBzaG91bGQgYXMgd2VsbC4gVGhlIGJpZ2dl
+c3QgcXVlc3Rpb25zIChJTU8pIGlzDQpvbi1nb2luZyB0ZXN0aW5nIHRvIG1ha2Ugc3VyZSB0aGlz
+IGRvZXNu4oCZdCBnZXQgYnJva2VuIGluIHRoZSBmdXR1cmUuLiBUaGUgYnVpbGRlcnMNCldoYW1j
+bG91ZCBzZXR1cCBvbmx5IHRlc3QgQVJNIGFuZCB4ODYuIFdoYXQgYXJlIHlvdXIgdGhvdWdodHMg
+Zm9yIG9uLWdvaW5nDQp0ZXN0aW5nPyBXaGVuIEFSTSBzdXBwb3J0IGNhbWUgYXJvdW5kLCBMaW5h
+cm8gKEkgYmVsaWV2ZSkgc2V0dXAgc29tZSB0ZXN0DQpub2RlcyBmb3IgYSB0aW1lLiBJZiBhbnlv
+bmUgaW4gdGhlIGNvbW11bml0eSBzZXQgc29tZXRoaW5nIHVwLCBpdCB3b3VsZCBiZSAoYXQNCmJl
+c3QpIGNyb3NzLWNvbXBpbGluZyBhbmQgYm9vdCBpbiBRRU1VLiBJ4oCZZCBpbnRlcmVzdGVkIGlu
+IHNvbWUgaW50ZXJvcCB0ZXN0aW5nDQpiZXR3ZWVuIHg4Ni9BUk0vUklTQy1WLiBJ4oCZbSBzdXJl
+IG90aGVycyBoYXZlIHRob3VnaHRzIG9uIHRlc3RpbmcuDQoNCj4gQXJlIHRoZXJlIGFueSBleGlz
+dGluZyBwbGFucyBvciBvbmdvaW5nIGVmZm9ydHMgdG8gYWRkIFJJU0MtViBzdXBwb3J0IHRvIEx1
+c3RyZT8NCg0KV2Ugd2FudCB0byBtYWtlIHN1cmUgTHVzdHJlIHN1cHBvcnRzIGFsbCBvZiB0aGUg
+YXJjaGl0ZWN0dXJlcyB0aGF0IExpbnV4DQpzdXBwb3J0cyBhcyBwYXJ0IG9mIG91ciB1cHN0cmVh
+bWluZyBlZmZvcnRzLiBCdXQgbm9uZSBvZiB0aGF0IHdvcmsgaGFzIGJlZ3VuDQp5ZXQuIE15IG9u
+bHkgcXVlc3Rpb246IHdoeSBub3QgdGhlIEx1c3RyZSBzZXJ2ZXIgYXMgd2VsbD8gV2XigJlsbCBu
+ZWVkIHRvIGRvIHRoYXQNCndvcmsgdG9vIGV2ZW50dWFsbHkuDQoNCj4gV291bGQgdGhlIG1haW50
+YWluZXJzIGJlIGludGVyZXN0ZWQgaW4gcmV2aWV3aW5nIG91ciBwYXRjaCBzZXJpZXMgZm9yIHBv
+dGVudGlhbA0KaW5jbHVzaW9uPw0KDQpQbGVhc2Ugc3VibWl0IHlvdXIgcGF0Y2hlcyB0byBHZXJy
+aXQuIFdlIGhhdmUgYSB3aWtpIGRlc2NyaWJpbmcgdGhlIGhpZ2ggbGV2ZWwNCnByb2Nlc3MgWzFd
+Lg0KDQpUaW0gRGF5DQoNClsxXSBodHRwczovL3dpa2kubHVzdHJlLm9yZy9TdWJtaXR0aW5nX0No
+YW5nZXMNCg0KRnJvbTogbHVzdHJlLWRldmVsIDxsdXN0cmUtZGV2ZWwtYm91bmNlc0BsaXN0cy5s
+dXN0cmUub3JnPiBvbiBiZWhhbGYgb2YgQWJkdWwgSGFsaW0gfCBPUEVOQ0hJUCB2aWEgbHVzdHJl
+LWRldmVsIDxsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NClJlcGx5LVRvOiBBYmR1bCBI
+YWxpbSB8IE9QRU5DSElQIDxhYmR1bC5oYWxpbUBvcGVuY2hpcC5jb20+DQpEYXRlOiBUdWVzZGF5
+LCBGZWJydWFyeSAyNCwgMjAyNiBhdCA2OjEx4oCvQU0NClRvOiAibHVzdHJlLWRldmVsQGxpc3Rz
+Lmx1c3RyZS5vcmciIDxsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZz4NCkNjOiBOaWNrIEJy
+b3duIDxuLmJyb3duQGVwY2MuZWQuYWMudWs+LCBzdXJlbmRyYWIgPHN1cmVuZHJhYkBjZGFjLmlu
+Pg0KU3ViamVjdDogW0VYVEVSTkFMXSBbbHVzdHJlLWRldmVsXSBbUkZDXSBSSVNDLVYgQXJjaGl0
+ZWN0dXJlIFN1cHBvcnQgZm9yIEx1c3RyZSAtIFBhdGNoIFNlcmllcyBBdmFpbGFibGUNCg0KDQpD
+QVVUSU9OOiBUaGlzIGVtYWlsIG9yaWdpbmF0ZWQgZnJvbSBvdXRzaWRlIG9mIHRoZSBvcmdhbml6
+YXRpb24uIERvIG5vdCBjbGljayBsaW5rcyBvciBvcGVuIGF0dGFjaG1lbnRzIHVubGVzcyB5b3Ug
+Y2FuIGNvbmZpcm0gdGhlIHNlbmRlciBhbmQga25vdyB0aGUgY29udGVudCBpcyBzYWZlLg0KDQpI
+ZWxsbyBMdXN0cmUgZGV2ZWxvcGVycyBhbmQgbWFpbnRhaW5lcnMsDQoNCkkgYW0gd3JpdGluZyB0
+byBpbnF1aXJlIGFib3V0IGFueSBleGlzdGluZyBwbGFucyB0byBzdXBwb3J0IHRoZSBSSVNDLVYN
+CmFyY2hpdGVjdHVyZSBpbiBmdXR1cmUgTHVzdHJlIHJlbGVhc2VzLCBhbmQgdG8gc2hhcmUgb3Vy
+IHdvcmsgb24gZW5hYmxpbmcNCkx1c3RyZSBjbGllbnQgZnVuY3Rpb25hbGl0eSBvbiBSSVNDLVYg
+NjQtYml0IHN5c3RlbXMuDQoNCkJBQ0tHUk9VTkQ6IFdIWSBSSVNDLVYgU1VQUE9SVCBNQVRURVJT
+IEZPUiBMVVNUUkUNCi0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0NCg0KUklTQy1WIGlzIGdhaW5pbmcgc2lnbmlmaWNhbnQgbW9tZW50dW0gaW4gdGhlIEhQ
+QyBjb21tdW5pdHksIHdpdGggcHJvamVjdHMNCmxpa2UgdGhlIEV1cm9wZWFuIFByb2Nlc3NvciBJ
+bml0aWF0aXZlIChFUEkpLCBFUEFDLCBhbmQgY29tbWVyY2lhbCBvZmZlcmluZ3MNCmZyb20gU2lG
+aXZlIHRhcmdldGluZyBoaWdoLXBlcmZvcm1hbmNlIGNvbXB1dGluZyB3b3JrbG9hZHMuIEhvd2V2
+ZXIsIGENCmNyaXRpY2FsIGdhcCBleGlzdHMgaW4gdGhlIFJJU0MtViBIUEMgZWNvc3lzdGVtOiB0
+aGVyZSBpcyBjdXJyZW50bHkgbm8NCmhpZ2gtcGVyZm9ybWFuY2UgcGFyYWxsZWwgZmlsZSBzeXN0
+ZW0gc3VwcG9ydCBmb3IgUklTQy1WLg0KDQpUaGlzIGdhcCBoYXMgYmVlbiBmb3JtYWxseSBpZGVu
+dGlmaWVkIGluIHRoZSBSSVNDLVYgSFBDIEdhcCBBbmFseXNpcyBieQ0KTmljayBCcm93biBbMV0s
+IHdoaWNoIGV4cGxpY2l0bHkgcmVjb21tZW5kczoNCg0KICAgICJXZSBzaG91bGQgcHJpb3JpdGlz
+ZSBvcHRpbWlzYXRpb24gb2YgcGFyYWxsZWwgZmlsZXN5c3RlbXMsDQogICAgIGluY2x1ZGluZyBM
+dXN0cmUsIGZvciBSSVNDLVYiDQoNCkFkZGluZyBSSVNDLVYgc3VwcG9ydCB0byBMdXN0cmUgd291
+bGQ6DQoNCiAgMS4gU2lnbmFsIFJJU0MtViByZWFkaW5lc3MgZm9yIHByb2R1Y3Rpb24gSFBDIC0g
+THVzdHJlIGlzIHRoZSBkZSBmYWN0bw0KICAgICBzdGFuZGFyZCBmb3IgSFBDIHN0b3JhZ2UsIHBv
+d2VyaW5nIH43MCUgb2YgVE9QNTAwIHN5c3RlbXMNCg0KICAyLiBBbGlnbiB3aXRoIG9wZW4tc291
+cmNlIHZhbHVlcyAtIEJvdGggTHVzdHJlIGFuZCBSSVNDLVYgc2hhcmUgYQ0KICAgICBjb21taXRt
+ZW50IHRvIG9wZW4tc291cmNlIGNvbGxhYm9yYXRpb24NCg0KICAzLiBFbmFibGUgbmV3IGRlcGxv
+eW1lbnQgc2NlbmFyaW9zIC0gUklTQy1WLWJhc2VkIGNvbXB1dGUgbm9kZXMNCiAgICAgY29ubmVj
+dGluZyB0byBleGlzdGluZyBMdXN0cmUgaW5mcmFzdHJ1Y3R1cmUNCg0KT1VSIFdPUks6IExVU1RS
+RSAyLjE3LjAgT04gUklTQy1WDQotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0NCg0K
+V2UgaGF2ZSBzdWNjZXNzZnVsbHkgYnVpbHQgYW5kIHRlc3RlZCB0aGUgTHVzdHJlIDIuMTcuMCBj
+bGllbnQgb24gUklTQy1WDQo2NC1iaXQgd2l0aCBhIG1pbmltYWwgc2V0IG9mIHBhdGNoZXMuIFRo
+aXMgd29yayBkZW1vbnN0cmF0ZXMgdGhhdCBMdXN0cmUNCmNhbiBiZSBwb3J0ZWQgdG8gUklTQy1W
+IHdpdGggcmVsYXRpdmVseSBsb3cgZWZmb3J0LCBhcyBhbHNvIHNob3duIGluDQpyZWNlbnQgYWNh
+ZGVtaWMgd29yayBieSBCaWxsYSBldCBhbC4gYXQgU0NBL0hQQ0FzaWFXUyAnMjYgWzJdLg0KDQpQ
+YXRjaCBTdW1tYXJ5Og0KDQpPdXIgcGF0Y2ggc2VyaWVzIGNvbnNpc3RzIG9mIDggc21hbGwgcGF0
+Y2hlcyB0YXJnZXRpbmc6DQoNCiAgLSBCdWlsZCBzeXN0ZW06ICAgICAgUklTQy1WIFNVQkFSQ0gg
+bWFwcGluZyBpbiBhdXRvY29uZg0KICAtIFJQTS9ES01TOiAgICAgICAgICBBcmNoaXRlY3R1cmUt
+YWdub3N0aWMgcGF0aHMNCiAgLSBMTmV0OiAgICAgICAgICAgICAgUklTQy1WIGh5cGVydmlzb3Ig
+ZGV0ZWN0aW9uIGhhbmRsaW5nDQogIC0gbGxpdGU6ICAgICAgICAgICAgIEd1YXJkIGZvciBwcmVm
+ZXRjaHcoKSAoeDg2LXNwZWNpZmljIGluc3RydWN0aW9uKQ0KICAtIEVyYXN1cmUgY29kaW5nOiAg
+ICBFbmFibGUgb3B0aW1pemVkIHBhdGhzIGZvciBSSVNDLVYNCiAgLSBEZWJ1ZyB0b29sczogICAg
+ICAgUklTQy1WIHRhcmdldCBpbiBjcmFzaCB0b29scw0KDQpUb3RhbCBpbXBhY3Q6IDkgZmlsZXMg
+Y2hhbmdlZCwgMTkgaW5zZXJ0aW9ucygrKSwgOCBkZWxldGlvbnMoLSkNCg0KVGVzdCBFbnZpcm9u
+bWVudDoNCg0KICAtIFByaW1hcnk6ICAgIFVidW50dSAyNC4wNCBSSVNDLVYsIExpbnV4IGtlcm5l
+bCA2LjguNA0KICAtIFZhbGlkYXRpb246IEZlZG9yYSA0MiB4ODZfNjQsIExpbnV4IGtlcm5lbCA2
+LjE2LjQNCiAgLSBSZXN1bHQ6ICAgICBBbGwgMTYgY2xpZW50IGtlcm5lbCBtb2R1bGVzIGNvbXBp
+bGUgYW5kIGxvYWQgc3VjY2Vzc2Z1bGx5DQoNClFVRVNUSU9OUyBGT1IgVEhFIENPTU1VTklUWQ0K
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQoNCiAgMS4gQXJlIHRoZXJlIGFueSBleGlzdGlu
+ZyBwbGFucyBvciBvbmdvaW5nIGVmZm9ydHMgdG8gYWRkIFJJU0MtVg0KICAgICBzdXBwb3J0IHRv
+IEx1c3RyZT8NCg0KICAyLiBXb3VsZCB0aGUgbWFpbnRhaW5lcnMgYmUgaW50ZXJlc3RlZCBpbiBy
+ZXZpZXdpbmcgb3VyIHBhdGNoIHNlcmllcw0KICAgICBmb3IgcG90ZW50aWFsIGluY2x1c2lvbj8N
+Cg0KICAzLiBBcmUgdGhlcmUgc3BlY2lmaWMgdGVzdGluZyByZXF1aXJlbWVudHMgb3IgY29kaW5n
+IHN0YW5kYXJkcyB3ZQ0KICAgICBzaG91bGQgYWRkcmVzcyBiZWZvcmUgZm9ybWFsIHN1Ym1pc3Np
+b24/DQoNCk5FWFQgU1RFUFMNCi0tLS0tLS0tLS0NCg0KV2UgYXJlIHByZXBhcmVkIHRvOg0KDQog
+IC0gU3VibWl0IHRoZSBwYXRjaGVzIHZpYSBHZXJyaXQgZm9yIGZvcm1hbCByZXZpZXcNCiAgLSBD
+cmVhdGUgYSBKaXJhIHRpY2tldCB0byB0cmFjayB0aGlzIGZlYXR1cmUgcmVxdWVzdA0KICAtIFBy
+b3ZpZGUgYWRkaXRpb25hbCB0ZXN0aW5nIGRhdGEgYXMgbmVlZGVkDQogIC0gQ29sbGFib3JhdGUg
+d2l0aCBtYWludGFpbmVycyBvbiBhbnkgcmVxdWlyZWQgY2hhbmdlcw0KDQpUaGUgcGF0Y2hlcyBh
+cmUgYXZhaWxhYmxlIGluIG91ciByZXBvc2l0b3J5IGFuZCB3ZSBjYW4gc3VibWl0IHRoZW0gaW4N
+CndoYXRldmVyIGZvcm1hdCBpcyBtb3N0IGNvbnZlbmllbnQgZm9yIHRoZSByZXZpZXcgcHJvY2Vz
+cy4NCg0KUkVGRVJFTkNFUw0KLS0tLS0tLS0tLQ0KDQpbMV0gTmljayBCcm93biwgIlJJU0MtViBI
+UEMgR2FwIEFuYWx5c2lzIiwgUklTQy1WIEludGVybmF0aW9uYWwsIE9jdCAyMDI1DQogICAgaHR0
+cHM6Ly9yaXNjdi5hdGxhc3NpYW4ubmV0L3dpa2kvc3BhY2VzL09MUlIvcGFnZXMvODk1Nzc4ODMx
+L0hQQytHYXArYW5hbHlzaXMNCg0KWzJdIFN1cmVuZHJhIEJpbGxhIGV0IGFsLiwgIlBvcnRpbmcg
+THVzdHJlIEZpbGUgU3lzdGVtIHRvIFJJU0MtVg0KICAgIEFyY2hpdGVjdHVyZSIsIFNDQS9IUENB
+c2lhV1MgJzI2LCBBQ00NCiAgICBodHRwczovL2RsLmFjbS5vcmcvZG9pLzEwLjExNDUvMzc4NDgy
+OC4zNzg1NDA2DQoNClRoYW5rIHlvdSBmb3IgeW91ciB0aW1lIGFuZCBjb25zaWRlcmF0aW9uLiBX
+ZSBsb29rIGZvcndhcmQgdG8geW91cg0KZmVlZGJhY2sgYW5kIHRoZSBvcHBvcnR1bml0eSB0byBj
+b250cmlidXRlIHRvIEx1c3RyZSdzIGFyY2hpdGVjdHVyZQ0Kc3VwcG9ydC4NCg0KQmVzdCByZWdh
+cmRzLA0KDQpBYmR1bCBIYWxpbQ0KT3BlbkNoaXANCmFiZHVsLmhhbGltQG9wZW5jaGlwLmNvbQ0K
+DQoNCg0KDQpUaGUgY29udGVudCwgZGF0YSwgYW5kIGFueSBhdHRhY2hlZCBkb2N1bWVudHMgdG8g
+dGhpcyBlbWFpbCBhcmUgYWRkcmVzc2VkIGV4Y2x1c2l2ZWx5IHRvIHRoZSBhZGRyZXNzZWUgYW5k
+IGFyZSBjb25maWRlbnRpYWwgYW5kL29yIG1heSBiZSBzdWJqZWN0IHRvIGEgbm9uLWRpc2Nsb3N1
+cmUgYWdyZWVtZW50LiBBbnkgdXNlLCBmb3J3YXJkaW5nLCBkaXNjbG9zdXJlLCBhbmQvb3IgY29w
+eWluZywgaW4gd2hvbGUgb3IgaW4gcGFydCwgd2l0aG91dCBhdXRob3JpemF0aW9uIGlzIHByb2hp
+Yml0ZWQuIElmIHlvdSBoYXZlIHJlY2VpdmVkIHRoaXMgZW1haWwgaW4gZXJyb3IsIHdlIGFwb2xv
+Z2l6ZSBhbmQsIHBsZWFzZSBub3RpZnkgdGhlIHNlbmRlciBvciBPcGVuY2hpcCBpbW1lZGlhdGVs
+eSwgYW5kIGRlbGV0ZSBpdCBmcm9tIHlvdXIgc3lzdGVtLg0KDQpFbCBjb250ZW5pZG8sIGxvcyBk
+YXRvcyB5IGN1YWxxdWllciBkb2N1bWVudG8gYWRqdW50byBhIGVzdGUgY29ycmVvIGVsZWN0csOz
+bmljbyBlc3TDoW4gZGlyaWdpZG9zIGV4Y2x1c2l2YW1lbnRlIGFsIGRlc3RpbmF0YXJpbyB5IHNv
+biBjb25maWRlbmNpYWxlcyB5L28gcHVlZGVuIGVzdGFyIHN1amV0YXMgYSB1biBhY3VlcmRvIGRl
+IG5vIHJldmVsYWNpw7NuLiBFc3TDoSBwcm9oaWJpZG8gY3VhbHF1aWVyIHVzbywgcmVlbnbDrW8s
+IGRpdnVsZ2FjacOzbiBvIGNvcGlhLCB0b3RhbCBvIHBhcmNpYWwsIHNpbiBhdXRvcml6YWNpw7Nu
+LiBTaSBoYXMgcmVjaWJpZG8gZXN0ZSBjb3JyZW8gcG9yIGVycm9yLCB0ZSBwZWRpbW9zIGRpc2N1
+bHBhcyB5IGFncmFkZWNlbW9zIHF1ZSBsbyBub3RpZmlxdWVzIGRlIGlubWVkaWF0byBhbCByZW1p
+dGVudGUgbyBhIE9wZW5jaGlwLCB5IGxvIGVsaW1pbmVzIGRlIHR1IHNpc3RlbWEuDQoNCkVsIGNv
+bnRpbmd1dCwgbGVzIGRhZGVzIGkgcXVhbHNldm9sIGRvY3VtZW50IGFkanVudCBhIGFxdWVzdCBj
+b3JyZXUgZWxlY3Ryw7JuaWMgZXN0YW4gZGlyaWdpdHMgZXhjbHVzaXZhbWVudCBhbCBkZXN0aW5h
+dGFyaSBpIHPDs24gY29uZmlkZW5jaWFscyBpL28gcG9kZW4gZXN0YXIgc3ViamVjdGVzIGEgdW4g
+YWNvcmQgZGUgbm8gcmV2ZWxhY2nDsy4gRXN0w6AgcHJvaGliaXQgcXVhbHNldm9sIMO6cywgcmVl
+bnZpYW1lbnQsIGRpdnVsZ2FjacOzIG8gY8OycGlhLCB0b3RhbCBvIHBhcmNpYWwsIHNlbnNlIGF1
+dG9yaXR6YWNpw7MuIFNpIGhhcyByZWJ1dCBhcXVlc3QgY29ycmV1IHBlciBlcnJvciwgZXQgZGVt
+YW5lbSBkaXNjdWxwZXMgaSBhZ3Jhw69tIHF1ZSBobyBub3RpZmlxdWlzIGQnaW1tZWRpYXQgYWwg
+cmVtaXRlbnQgbyBhIE9wZW5jaGlwLCBpIGwnZWxpbWluaXMgZGVsIHRldSBzaXN0ZW1hDQo=
 
-I am writing to inquire about any existing plans to support the RISC-V
-architecture in future Lustre releases, and to share our work on enabling
-Lustre client functionality on RISC-V 64-bit systems.
+--_000_0EBC91EBD50E47C9B22E677F45F03ED1amazoncom_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <E97FF19047283243AD3FFEE8FCEB4DEA@namprd18.prod.outlook.com>
+Content-Transfer-Encoding: base64
 
+PGh0bWwgeG1sbnM6bz0idXJuOnNjaGVtYXMtbWljcm9zb2Z0LWNvbTpvZmZpY2U6b2ZmaWNlIiB4
+bWxuczp3PSJ1cm46c2NoZW1hcy1taWNyb3NvZnQtY29tOm9mZmljZTp3b3JkIiB4bWxuczptPSJo
+dHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL29mZmljZS8yMDA0LzEyL29tbWwiIHhtbG5zPSJo
+dHRwOi8vd3d3LnczLm9yZy9UUi9SRUMtaHRtbDQwIj4NCjxoZWFkPg0KPG1ldGEgaHR0cC1lcXVp
+dj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9dXRmLTgiPg0KPG1l
+dGEgbmFtZT0iR2VuZXJhdG9yIiBjb250ZW50PSJNaWNyb3NvZnQgV29yZCAxNSAoZmlsdGVyZWQg
+bWVkaXVtKSI+DQo8c3R5bGU+PCEtLQ0KLyogRm9udCBEZWZpbml0aW9ucyAqLw0KQGZvbnQtZmFj
+ZQ0KCXtmb250LWZhbWlseToiQ2FtYnJpYSBNYXRoIjsNCglwYW5vc2UtMToyIDQgNSAzIDUgNCA2
+IDMgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1pbHk6Q2FsaWJyaTsNCglwYW5vc2UtMToy
+IDE1IDUgMiAyIDIgNCAzIDIgNDt9DQpAZm9udC1mYWNlDQoJe2ZvbnQtZmFtaWx5OkFwdG9zOw0K
+CXBhbm9zZS0xOjIgMTEgMCA0IDIgMiAyIDIgMiA0O30NCkBmb250LWZhY2UNCgl7Zm9udC1mYW1p
+bHk6IkFwdG9zIE1vbm8iOw0KCXBhbm9zZS0xOjIgMTEgMCA5IDIgMiAyIDIgMiA0O30NCi8qIFN0
+eWxlIERlZmluaXRpb25zICovDQpwLk1zb05vcm1hbCwgbGkuTXNvTm9ybWFsLCBkaXYuTXNvTm9y
+bWFsDQoJe21hcmdpbjowaW47DQoJZm9udC1zaXplOjEyLjBwdDsNCglmb250LWZhbWlseToiQXB0
+b3MiLHNhbnMtc2VyaWY7fQ0KYTpsaW5rLCBzcGFuLk1zb0h5cGVybGluaw0KCXttc28tc3R5bGUt
+cHJpb3JpdHk6OTk7DQoJY29sb3I6Ymx1ZTsNCgl0ZXh0LWRlY29yYXRpb246dW5kZXJsaW5lO30N
+CnNwYW4uRW1haWxTdHlsZTIwDQoJe21zby1zdHlsZS10eXBlOnBlcnNvbmFsLXJlcGx5Ow0KCWZv
+bnQtZmFtaWx5OiJBcHRvcyIsc2Fucy1zZXJpZjsNCgljb2xvcjp3aW5kb3d0ZXh0O30NCi5Nc29D
+aHBEZWZhdWx0DQoJe21zby1zdHlsZS10eXBlOmV4cG9ydC1vbmx5Ow0KCWZvbnQtc2l6ZToxMC4w
+cHQ7DQoJbXNvLWxpZ2F0dXJlczpub25lO30NCkBwYWdlIFdvcmRTZWN0aW9uMQ0KCXtzaXplOjgu
+NWluIDExLjBpbjsNCgltYXJnaW46MS4waW4gMS4waW4gMS4waW4gMS4waW47fQ0KZGl2LldvcmRT
+ZWN0aW9uMQ0KCXtwYWdlOldvcmRTZWN0aW9uMTt9DQotLT48L3N0eWxlPg0KPC9oZWFkPg0KPGJv
+ZHkgbGFuZz0iRU4tVVMiIGxpbms9ImJsdWUiIHZsaW5rPSJwdXJwbGUiIHN0eWxlPSJ3b3JkLXdy
+YXA6YnJlYWstd29yZCI+DQo8ZGl2IGNsYXNzPSJXb3JkU2VjdGlvbjEiPg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCI+TGludXggc3VwcG9ydHMgUklTQy1WIHNvIEx1c3RyZSBzaG91bGQgYXMgd2VsbC4g
+VGhlIGJpZ2dlc3QgcXVlc3Rpb25zIChJTU8pIGlzPG86cD48L286cD48L3A+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIj5vbi1nb2luZyB0ZXN0aW5nIHRvIG1ha2Ugc3VyZSB0aGlzIGRvZXNu4oCZdCBn
+ZXQgYnJva2VuIGluIHRoZSBmdXR1cmUuLiBUaGUgYnVpbGRlcnM8bzpwPjwvbzpwPjwvcD4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiPldoYW1jbG91ZCBzZXR1cCBvbmx5IHRlc3QgQVJNIGFuZCB4ODYu
+IFdoYXQgYXJlIHlvdXIgdGhvdWdodHMgZm9yIG9uLWdvaW5nPG86cD48L286cD48L3A+DQo8cCBj
+bGFzcz0iTXNvTm9ybWFsIj50ZXN0aW5nPyBXaGVuIEFSTSBzdXBwb3J0IGNhbWUgYXJvdW5kLCBM
+aW5hcm8gKEkgYmVsaWV2ZSkgc2V0dXAgc29tZSB0ZXN0PG86cD48L286cD48L3A+DQo8cCBjbGFz
+cz0iTXNvTm9ybWFsIj5ub2RlcyBmb3IgYSB0aW1lLiBJZiBhbnlvbmUgaW4gdGhlIGNvbW11bml0
+eSBzZXQgc29tZXRoaW5nIHVwLCBpdCB3b3VsZCBiZSAoYXQ8bzpwPjwvbzpwPjwvcD4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiPmJlc3QpIGNyb3NzLWNvbXBpbGluZyBhbmQgYm9vdCBpbiBRRU1VLiBJ
+4oCZZCBpbnRlcmVzdGVkIGluIHNvbWUgaW50ZXJvcCB0ZXN0aW5nPG86cD48L286cD48L3A+DQo8
+cCBjbGFzcz0iTXNvTm9ybWFsIj5iZXR3ZWVuIHg4Ni9BUk0vUklTQy1WLiBJ4oCZbSBzdXJlIG90
+aGVycyBoYXZlIHRob3VnaHRzIG9uIHRlc3RpbmcuPG86cD48L286cD48L3A+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIj48bzpwPiZuYnNwOzwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0
+eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij4mZ3Q7IDxzcGFuIHN0eWxlPSJjb2xvcjpibGFjayI+
+QXJlIHRoZXJlIGFueSBleGlzdGluZyBwbGFucyBvciBvbmdvaW5nIGVmZm9ydHMgdG8gYWRkIFJJ
+U0MtViBzdXBwb3J0IHRvIEx1c3RyZT88bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIj48bzpwPiZuYnNwOzwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPldl
+IHdhbnQgdG8gbWFrZSBzdXJlIEx1c3RyZSBzdXBwb3J0cyBhbGwgb2YgdGhlIGFyY2hpdGVjdHVy
+ZXMgdGhhdCBMaW51eDxvOnA+PC9vOnA+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+c3VwcG9y
+dHMgYXMgcGFydCBvZiBvdXIgdXBzdHJlYW1pbmcgZWZmb3J0cy4gQnV0IG5vbmUgb2YgdGhhdCB3
+b3JrIGhhcyBiZWd1bjxvOnA+PC9vOnA+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+eWV0LiBN
+eSBvbmx5IHF1ZXN0aW9uOiB3aHkgbm90IHRoZSBMdXN0cmUgc2VydmVyIGFzIHdlbGw/IFdl4oCZ
+bGwgbmVlZCB0byBkbyB0aGF0PG86cD48L286cD48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj53
+b3JrIHRvbyBldmVudHVhbGx5LjxvOnA+PC9vOnA+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+
+PG86cD4mbmJzcDs8L286cD48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1o
+ZWlnaHQ6MTQuMjVwdCI+Jmd0OyA8c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPldvdWxkIHRoZSBt
+YWludGFpbmVycyBiZSBpbnRlcmVzdGVkIGluIHJldmlld2luZyBvdXIgcGF0Y2ggc2VyaWVzIGZv
+ciBwb3RlbnRpYWw8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBz
+dHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImNvbG9yOmJsYWNrIj5pbmNs
+dXNpb24/PG86cD48L286cD48L3NwYW4+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PG86cD4m
+bmJzcDs8L286cD48L3A+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIj5QbGVhc2Ugc3VibWl0IHlvdXIg
+cGF0Y2hlcyB0byBHZXJyaXQuIFdlIGhhdmUgYSB3aWtpIGRlc2NyaWJpbmcgdGhlIGhpZ2ggbGV2
+ZWw8bzpwPjwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPnByb2Nlc3MgWzFdLjxvOnA+
+PC9vOnA+PC9wPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PG86cD4mbmJzcDs8L286cD48L3A+DQo8
+cCBjbGFzcz0iTXNvTm9ybWFsIj5UaW0gRGF5PG86cD48L286cD48L3A+DQo8cCBjbGFzcz0iTXNv
+Tm9ybWFsIj48bzpwPiZuYnNwOzwvbzpwPjwvcD4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPlsxXSA8
+YSBocmVmPSJodHRwczovL3dpa2kubHVzdHJlLm9yZy9TdWJtaXR0aW5nX0NoYW5nZXMiPmh0dHBz
+Oi8vd2lraS5sdXN0cmUub3JnL1N1Ym1pdHRpbmdfQ2hhbmdlczwvYT48bzpwPjwvbzpwPjwvcD4N
+CjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxvOnA+Jm5ic3A7PC9vOnA+PC9wPg0KPGRpdiBzdHlsZT0i
+Ym9yZGVyOm5vbmU7Ym9yZGVyLXRvcDpzb2xpZCAjQjVDNERGIDEuMHB0O3BhZGRpbmc6My4wcHQg
+MGluIDBpbiAwaW4iPg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PGI+PHNwYW4gc3R5bGU9ImZvbnQt
+ZmFtaWx5OiZxdW90O0NhbGlicmkmcXVvdDssc2Fucy1zZXJpZjtjb2xvcjpibGFjayI+RnJvbToN
+Cjwvc3Bhbj48L2I+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NhbGlicmkmcXVvdDss
+c2Fucy1zZXJpZjtjb2xvcjpibGFjayI+bHVzdHJlLWRldmVsICZsdDtsdXN0cmUtZGV2ZWwtYm91
+bmNlc0BsaXN0cy5sdXN0cmUub3JnJmd0OyBvbiBiZWhhbGYgb2YgQWJkdWwgSGFsaW0gfCBPUEVO
+Q0hJUCB2aWEgbHVzdHJlLWRldmVsICZsdDtsdXN0cmUtZGV2ZWxAbGlzdHMubHVzdHJlLm9yZyZn
+dDs8YnI+DQo8Yj5SZXBseS1UbzogPC9iPkFiZHVsIEhhbGltIHwgT1BFTkNISVAgJmx0O2FiZHVs
+LmhhbGltQG9wZW5jaGlwLmNvbSZndDs8YnI+DQo8Yj5EYXRlOiA8L2I+VHVlc2RheSwgRmVicnVh
+cnkgMjQsIDIwMjYgYXQgNjoxMeKAr0FNPGJyPg0KPGI+VG86IDwvYj4mcXVvdDtsdXN0cmUtZGV2
+ZWxAbGlzdHMubHVzdHJlLm9yZyZxdW90OyAmbHQ7bHVzdHJlLWRldmVsQGxpc3RzLmx1c3RyZS5v
+cmcmZ3Q7PGJyPg0KPGI+Q2M6IDwvYj5OaWNrIEJyb3duICZsdDtuLmJyb3duQGVwY2MuZWQuYWMu
+dWsmZ3Q7LCBzdXJlbmRyYWIgJmx0O3N1cmVuZHJhYkBjZGFjLmluJmd0Ozxicj4NCjxiPlN1Ympl
+Y3Q6IDwvYj5bRVhURVJOQUxdIFtsdXN0cmUtZGV2ZWxdIFtSRkNdIFJJU0MtViBBcmNoaXRlY3R1
+cmUgU3VwcG9ydCBmb3IgTHVzdHJlIC0gUGF0Y2ggU2VyaWVzIEF2YWlsYWJsZTxvOnA+PC9vOnA+
+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxvOnA+Jm5i
+c3A7PC9vOnA+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHRhYmxlIGNsYXNzPSJNc29Ob3JtYWxUYWJs
+ZSIgYm9yZGVyPSIwIiBjZWxsc3BhY2luZz0iMCIgY2VsbHBhZGRpbmc9IjAiIHN0eWxlPSJib3Jk
+ZXItY29sbGFwc2U6Y29sbGFwc2UiPg0KPHRib2R5Pg0KPHRyIHN0eWxlPSJoZWlnaHQ6MTUuMjVw
+dCI+DQo8dGQgd2lkdGg9IjExMjMiIHZhbGlnbj0idG9wIiBzdHlsZT0id2lkdGg6ODQyLjM1cHQ7
+Ym9yZGVyOnNvbGlkICNFRDdEMzEgMS41cHQ7cGFkZGluZzowaW4gNS40cHQgMGluIDUuNHB0O2hl
+aWdodDoxNS4yNXB0Ij4NCjxwPjxzdHJvbmc+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90
+O0FwdG9zJnF1b3Q7LHNhbnMtc2VyaWY7Y29sb3I6YmxhY2s7YmFja2dyb3VuZDojRkZGRjk5Ij5D
+QVVUSU9OPC9zcGFuPjwvc3Ryb25nPjxzcGFuIHN0eWxlPSJjb2xvcjpibGFjaztiYWNrZ3JvdW5k
+OiNGRkZGOTkiPjogVGhpcyBlbWFpbCBvcmlnaW5hdGVkIGZyb20gb3V0c2lkZSBvZiB0aGUgb3Jn
+YW5pemF0aW9uLiBEbyBub3QgY2xpY2sgbGlua3Mgb3Igb3BlbiBhdHRhY2htZW50cyB1bmxlc3MN
+CiB5b3UgY2FuIGNvbmZpcm0gdGhlIHNlbmRlciBhbmQga25vdyB0aGUgY29udGVudCBpcyBzYWZl
+Ljwvc3Bhbj48bzpwPjwvbzpwPjwvcD4NCjwvdGQ+DQo8L3RyPg0KPC90Ym9keT4NCjwvdGFibGU+
+DQo8L2Rpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxvOnA+Jm5ic3A7PC9vOnA+PC9wPg0KPGRp
+dj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVw
+dCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6
+YmxhY2siPkhlbGxvIEx1c3RyZSBkZXZlbG9wZXJzIGFuZCBtYWludGFpbmVycyw8bzpwPjwvbzpw
+Pjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
+bGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9z
+IE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwv
+ZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4y
+NXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xv
+cjpibGFjayI+SSBhbSB3cml0aW5nIHRvIGlucXVpcmUgYWJvdXQgYW55IGV4aXN0aW5nIHBsYW5z
+IHRvIHN1cHBvcnQgdGhlIFJJU0MtVjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRp
+dj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3Bh
+biBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+
+YXJjaGl0ZWN0dXJlIGluIGZ1dHVyZSBMdXN0cmUgcmVsZWFzZXMsIGFuZCB0byBzaGFyZSBvdXIg
+d29yayBvbiBlbmFibGluZzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHls
+ZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+THVzdHJl
+IGNsaWVudCBmdW5jdGlvbmFsaXR5IG9uIFJJU0MtViA2NC1iaXQgc3lzdGVtcy48bzpwPjwvbzpw
+Pjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
+bWFyZ2luLWJvdHRvbToxMi4wcHQ7bGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZv
+bnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxvOnA+Jm5ic3A7
+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0
+eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7
+QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+QkFDS0dST1VORDogV0hZIFJJU0MtViBTVVBQ
+T1JUIE1BVFRFUlMgRk9SIExVU1RSRTxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRp
+dj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48Yj48
+c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFj
+ayI+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLTwvc3Bh
+bj48L2I+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29s
+b3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNz
+PSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9u
+dC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8
+L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5
+bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtB
+cHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5SSVNDLVYgaXMgZ2FpbmluZyBzaWduaWZpY2Fu
+dCBtb21lbnR1bSBpbiB0aGUgSFBDIGNvbW11bml0eSwgd2l0aCBwcm9qZWN0czxvOnA+PC9vOnA+
+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJs
+aW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3Mg
+TW9ubyZxdW90Oztjb2xvcjpibGFjayI+bGlrZSB0aGUgRXVyb3BlYW4gUHJvY2Vzc29yIEluaXRp
+YXRpdmUgKEVQSSksIEVQQUMsIGFuZCBjb21tZXJjaWFsIG9mZmVyaW5nczxvOnA+PC9vOnA+PC9z
+cGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5l
+LWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9u
+byZxdW90Oztjb2xvcjpibGFjayI+ZnJvbSBTaUZpdmUgdGFyZ2V0aW5nIGhpZ2gtcGVyZm9ybWFu
+Y2UgY29tcHV0aW5nIHdvcmtsb2Fkcy4gSG93ZXZlciwgYTxvOnA+PC9vOnA+PC9zcGFuPjwvcD4N
+CjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDox
+NC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztj
+b2xvcjpibGFjayI+Y3JpdGljYWwgZ2FwIGV4aXN0cyBpbiB0aGUgUklTQy1WIEhQQyBlY29zeXN0
+ZW06IHRoZXJlIGlzIGN1cnJlbnRseSBubzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0K
+PGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48
+c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFj
+ayI+aGlnaC1wZXJmb3JtYW5jZSBwYXJhbGxlbCBmaWxlIHN5c3RlbSBzdXBwb3J0IGZvciBSSVND
+LVYuPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05v
+cm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWls
+eTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwvbzpwPjwv
+c3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGlu
+ZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1v
+bm8mcXVvdDs7Y29sb3I6YmxhY2siPlRoaXMgZ2FwIGhhcyBiZWVuIGZvcm1hbGx5IGlkZW50aWZp
+ZWQgaW4gdGhlIFJJU0MtViBIUEMgR2FwIEFuYWx5c2lzIGJ5PG86cD48L286cD48L3NwYW4+PC9w
+Pg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0
+OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7
+O2NvbG9yOmJsYWNrIj5OaWNrIEJyb3duIFsxXSwgd2hpY2ggZXhwbGljaXRseSByZWNvbW1lbmRz
+OjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3Jt
+YWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6
+JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3Nw
+YW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUt
+aGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25v
+JnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7ICZxdW90O1dlIHNob3VsZCBwcmlvcml0
+aXNlIG9wdGltaXNhdGlvbiBvZiBwYXJhbGxlbCBmaWxlc3lzdGVtcyw8bzpwPjwvbzpwPjwvc3Bh
+bj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1o
+ZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8m
+cXVvdDs7Y29sb3I6YmxhY2siPiZuYnNwOyAmbmJzcDsgJm5ic3A7aW5jbHVkaW5nIEx1c3RyZSwg
+Zm9yIFJJU0MtViZxdW90OzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHls
+ZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4m
+bmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5BZGRpbmcgUklTQy1WIHN1cHBvcnQg
+dG8gTHVzdHJlIHdvdWxkOjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxw
+IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHls
+ZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4m
+bmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgMS4mbmJzcDtTaWduYWwg
+UklTQy1WIHJlYWRpbmVzcyBmb3IgcHJvZHVjdGlvbiBIUEMgLSBMdXN0cmUgaXMgdGhlIGRlIGZh
+Y3RvPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05v
+cm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWls
+eTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7ICZuYnNw
+O3N0YW5kYXJkIGZvciBIUEMgc3RvcmFnZSwgcG93ZXJpbmcgfjcwJSBvZiBUT1A1MDAgc3lzdGVt
+czxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3Jt
+YWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6
+JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3Nw
+YW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUt
+aGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25v
+JnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgMi4mbmJzcDtBbGlnbiB3aXRoIG9wZW4tc291cmNl
+IHZhbHVlcyAtIEJvdGggTHVzdHJlIGFuZCBSSVNDLVYgc2hhcmUgYTxvOnA+PC9vOnA+PC9zcGFu
+PjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhl
+aWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZx
+dW90Oztjb2xvcjpibGFjayI+Jm5ic3A7ICZuYnNwOyAmbmJzcDtjb21taXRtZW50IHRvIG9wZW4t
+c291cmNlIGNvbGxhYm9yYXRpb248bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+
+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4g
+c3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxv
+OnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29O
+b3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1p
+bHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IDMuJm5ic3A7RW5h
+YmxlIG5ldyBkZXBsb3ltZW50IHNjZW5hcmlvcyAtIFJJU0MtVi1iYXNlZCBjb21wdXRlIG5vZGVz
+PG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7ICZuYnNwO2Nv
+bm5lY3RpbmcgdG8gZXhpc3RpbmcgTHVzdHJlIGluZnJhc3RydWN0dXJlPG86cD48L286cD48L3Nw
+YW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Im1hcmdp
+bi1ib3R0b206MTIuMHB0O2xpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwvbzpw
+Pjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
+bGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9z
+IE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPk9VUiBXT1JLOiBMVVNUUkUgMi4xNy4wIE9OIFJJU0Mt
+VjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3Jt
+YWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48Yj48c3BhbiBzdHlsZT0iZm9udC1mYW1p
+bHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+LS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tPC9zcGFuPjwvYj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7
+QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPC9k
+aXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1
+cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9y
+OmJsYWNrIj48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBj
+bGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9
+ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPldlIGhhdmUg
+c3VjY2Vzc2Z1bGx5IGJ1aWx0IGFuZCB0ZXN0ZWQgdGhlIEx1c3RyZSAyLjE3LjAgY2xpZW50IG9u
+IFJJU0MtVjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJN
+c29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1m
+YW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+NjQtYml0IHdpdGggYSBt
+aW5pbWFsIHNldCBvZiBwYXRjaGVzLiBUaGlzIHdvcmsgZGVtb25zdHJhdGVzIHRoYXQgTHVzdHJl
+PG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5jYW4gYmUgcG9ydGVkIHRvIFJJU0Mt
+ViB3aXRoIHJlbGF0aXZlbHkgbG93IGVmZm9ydCwgYXMgYWxzbyBzaG93biBpbjxvOnA+PC9vOnA+
+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJs
+aW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3Mg
+TW9ubyZxdW90Oztjb2xvcjpibGFjayI+cmVjZW50IGFjYWRlbWljIHdvcmsgYnkgQmlsbGEgZXQg
+YWwuIGF0IFNDQS9IUENBc2lhV1MgJzI2IFsyXS48bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rp
+dj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVw
+dCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6
+YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+UGF0Y2ggU3Vt
+bWFyeTo8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNv
+Tm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFt
+aWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+
+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJs
+aW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3Mg
+TW9ubyZxdW90Oztjb2xvcjpibGFjayI+T3VyIHBhdGNoIHNlcmllcyBjb25zaXN0cyBvZiA4IHNt
+YWxsIHBhdGNoZXMgdGFyZ2V0aW5nOjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRp
+dj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3Bh
+biBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+
+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgLSZuYnNwO0J1
+aWxkIHN5c3RlbTogJm5ic3A7ICZuYnNwOyAmbmJzcDtSSVNDLVYgU1VCQVJDSCBtYXBwaW5nIGlu
+IGF1dG9jb25mPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250
+LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgLSZuYnNw
+O1JQTS9ES01TOiAmbmJzcDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7QXJjaGl0ZWN0dXJl
+LWFnbm9zdGljIHBhdGhzPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAg
+Y2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxl
+PSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsg
+LSZuYnNwO0xOZXQ6ICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsgJm5ic3A7ICZu
+YnNwO1JJU0MtViBoeXBlcnZpc29yIGRldGVjdGlvbiBoYW5kbGluZzxvOnA+PC9vOnA+PC9zcGFu
+PjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhl
+aWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZx
+dW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IC0mbmJzcDtsbGl0ZTogJm5ic3A7ICZuYnNwOyAmbmJz
+cDsgJm5ic3A7ICZuYnNwOyAmbmJzcDsgR3VhcmQgZm9yIHByZWZldGNodygpICh4ODYtc3BlY2lm
+aWMgaW5zdHJ1Y3Rpb24pPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAg
+Y2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxl
+PSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsg
+LSZuYnNwO0VyYXN1cmUgY29kaW5nOiAmbmJzcDsgJm5ic3A7RW5hYmxlIG9wdGltaXplZCBwYXRo
+cyBmb3IgUklTQy1WPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xh
+c3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJm
+b250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgLSZu
+YnNwO0RlYnVnIHRvb2xzOiAmbmJzcDsgJm5ic3A7ICZuYnNwOyBSSVNDLVYgdGFyZ2V0IGluIGNy
+YXNoIHRvb2xzPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250
+LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwv
+bzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
+ZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Fw
+dG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPlRvdGFsIGltcGFjdDogOSBmaWxlcyBjaGFuZ2Vk
+LCAxOSBpbnNlcnRpb25zKCspLCA4IGRlbGV0aW9ucygtKTxvOnA+PC9vOnA+PC9zcGFuPjwvcD4N
+CjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDox
+NC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztj
+b2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0K
+PHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0
+eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5UZXN0
+IEVudmlyb25tZW50OjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJz
+cDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgLSZuYnNwO1ByaW1hcnk6ICZu
+YnNwOyAmbmJzcDtVYnVudHUgMjQuMDQgUklTQy1WLCBMaW51eCBrZXJuZWwgNi44LjQ8bzpwPjwv
+bzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
+ZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Fw
+dG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPiZuYnNwOyAtJm5ic3A7VmFsaWRhdGlvbjogRmVk
+b3JhIDQyIHg4Nl82NCwgTGludXgga2VybmVsIDYuMTYuNDxvOnA+PC9vOnA+PC9zcGFuPjwvcD4N
+CjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDox
+NC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztj
+b2xvcjpibGFjayI+Jm5ic3A7IC0mbmJzcDtSZXN1bHQ6ICZuYnNwOyAmbmJzcDsgQWxsIDE2IGNs
+aWVudCBrZXJuZWwgbW9kdWxlcyBjb21waWxlIGFuZCBsb2FkIHN1Y2Nlc3NmdWxseTxvOnA+PC9v
+OnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxl
+PSJtYXJnaW4tYm90dG9tOjEyLjBwdDtsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJz
+cDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5RVUVTVElPTlMgRk9SIFRIRSBDT01NVU5J
+VFk8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9y
+bWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PGI+PHNwYW4gc3R5bGU9ImZvbnQtZmFt
+aWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPi0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLTwvc3Bhbj48L2I+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9z
+IE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0K
+PGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48
+c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFj
+ayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250
+LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgMS4mbmJz
+cDtBcmUgdGhlcmUgYW55IGV4aXN0aW5nIHBsYW5zIG9yIG9uZ29pbmcgZWZmb3J0cyB0byBhZGQg
+UklTQy1WPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7ICZu
+YnNwO3N1cHBvcnQgdG8gTHVzdHJlPzxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRp
+dj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3Bh
+biBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+
+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgMi4mbmJzcDtX
+b3VsZCB0aGUgbWFpbnRhaW5lcnMgYmUgaW50ZXJlc3RlZCBpbiByZXZpZXdpbmcgb3VyIHBhdGNo
+IHNlcmllczxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJN
+c29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1m
+YW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7ICZuYnNwOyAm
+bmJzcDtmb3IgcG90ZW50aWFsIGluY2x1c2lvbj88bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rp
+dj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVw
+dCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6
+YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IDMu
+Jm5ic3A7QXJlIHRoZXJlIHNwZWNpZmljIHRlc3RpbmcgcmVxdWlyZW1lbnRzIG9yIGNvZGluZyBz
+dGFuZGFyZHMgd2U8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFz
+cz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZv
+bnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPiZuYnNwOyAmbmJz
+cDsgJm5ic3A7c2hvdWxkIGFkZHJlc3MgYmVmb3JlIGZvcm1hbCBzdWJtaXNzaW9uPzxvOnA+PC9v
+OnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxl
+PSJtYXJnaW4tYm90dG9tOjEyLjBwdDtsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJz
+cDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5ORVhUIFNURVBTPG86cD48L286cD48L3Nw
+YW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUt
+aGVpZ2h0OjE0LjI1cHQiPjxiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBN
+b25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4tLS0tLS0tLS0tPC9zcGFuPjwvYj48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD48L286
+cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9
+ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRv
+cyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8
+L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQu
+MjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29s
+b3I6YmxhY2siPldlIGFyZSBwcmVwYXJlZCB0bzo8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rp
+dj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVw
+dCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6
+YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IC0m
+bmJzcDtTdWJtaXQgdGhlIHBhdGNoZXMgdmlhIEdlcnJpdCBmb3IgZm9ybWFsIHJldmlldzxvOnA+
+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0
+eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7
+QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IC0mbmJzcDtDcmVhdGUgYSBKaXJh
+IHRpY2tldCB0byB0cmFjayB0aGlzIGZlYXR1cmUgcmVxdWVzdDxvOnA+PC9vOnA+PC9zcGFuPjwv
+cD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdo
+dDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90
+Oztjb2xvcjpibGFjayI+Jm5ic3A7IC0mbmJzcDtQcm92aWRlIGFkZGl0aW9uYWwgdGVzdGluZyBk
+YXRhIGFzIG5lZWRlZDxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNs
+YXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+Jm5ic3A7IC0m
+bmJzcDtDb2xsYWJvcmF0ZSB3aXRoIG1haW50YWluZXJzIG9uIGFueSByZXF1aXJlZCBjaGFuZ2Vz
+PG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1h
+bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwvbzpwPjwvc3Bh
+bj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1o
+ZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8m
+cXVvdDs7Y29sb3I6YmxhY2siPlRoZSBwYXRjaGVzIGFyZSBhdmFpbGFibGUgaW4gb3VyIHJlcG9z
+aXRvcnkgYW5kIHdlIGNhbiBzdWJtaXQgdGhlbSBpbjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwv
+ZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4y
+NXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xv
+cjpibGFjayI+d2hhdGV2ZXIgZm9ybWF0IGlzIG1vc3QgY29udmVuaWVudCBmb3IgdGhlIHJldmll
+dyBwcm9jZXNzLjxvOnA+PC9vOnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNz
+PSJNc29Ob3JtYWwiIHN0eWxlPSJtYXJnaW4tYm90dG9tOjEyLjBwdDtsaW5lLWhlaWdodDoxNC4y
+NXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xv
+cjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAg
+Y2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxl
+PSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5SRUZFUkVO
+Q0VTPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05v
+cm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4tLS0tLS0tLS0tPC9zcGFu
+PjwvYj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xv
+cjpibGFjayI+PG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9
+Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250
+LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZuYnNwOzwv
+bzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHls
+ZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Fw
+dG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPlsxXSBOaWNrIEJyb3duLCAmcXVvdDtSSVNDLVYg
+SFBDIEdhcCBBbmFseXNpcyZxdW90OywgUklTQy1WIEludGVybmF0aW9uYWwsIE9jdCAyMDI1PG86
+cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7Jm5ic3A7PGEgaHJl
+Zj0iaHR0cHM6Ly9yaXNjdi5hdGxhc3NpYW4ubmV0L3dpa2kvc3BhY2VzL09MUlIvcGFnZXMvODk1
+Nzc4ODMxL0hQQytHYXArYW5hbHlzaXMiIHRhcmdldD0iX2JsYW5rIiB0aXRsZT0iaHR0cHM6Ly9y
+aXNjdi5hdGxhc3NpYW4ubmV0L3dpa2kvc3BhY2VzL09MUlIvcGFnZXMvODk1Nzc4ODMxL0hQQytH
+YXArYW5hbHlzaXMiPmh0dHBzOi8vcmlzY3YuYXRsYXNzaWFuLm5ldC93aWtpL3NwYWNlcy9PTFJS
+L3BhZ2VzLzg5NTc3ODgzMS9IUEMrR2FwK2FuYWx5c2lzPC9hPjxvOnA+PC9vOnA+PC9zcGFuPjwv
+cD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdo
+dDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90
+Oztjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2
+Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFu
+IHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5b
+Ml0gU3VyZW5kcmEgQmlsbGEgZXQgYWwuLCAmcXVvdDtQb3J0aW5nIEx1c3RyZSBGaWxlIFN5c3Rl
+bSB0byBSSVNDLVY8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFz
+cz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZv
+bnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPiZuYnNwOyAmbmJz
+cDsgQXJjaGl0ZWN0dXJlJnF1b3Q7LCBTQ0EvSFBDQXNpYVdTICcyNiwgQUNNPG86cD48L286cD48
+L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9Imxp
+bmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBN
+b25vJnF1b3Q7O2NvbG9yOmJsYWNrIj4mbmJzcDsgJm5ic3A7Jm5ic3A7PGEgaHJlZj0iaHR0cHM6
+Ly9kbC5hY20ub3JnL2RvaS8xMC4xMTQ1LzM3ODQ4MjguMzc4NTQwNiIgdGFyZ2V0PSJfYmxhbmsi
+IHRpdGxlPSJodHRwczovL2RsLmFjbS5vcmcvZG9pLzEwLjExNDUvMzc4NDgyOC4zNzg1NDA2Ij5o
+dHRwczovL2RsLmFjbS5vcmcvZG9pLzEwLjExNDUvMzc4NDgyOC4zNzg1NDA2PC9hPjxvOnA+PC9v
+OnA+PC9zcGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxl
+PSJtYXJnaW4tYm90dG9tOjEyLjBwdDtsaW5lLWhlaWdodDoxNC4yNXB0Ij48c3BhbiBzdHlsZT0i
+Zm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xvcjpibGFjayI+PG86cD4mbmJz
+cDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCIg
+c3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5UaGFuayB5b3UgZm9yIHlvdXIgdGltZSBh
+bmQgY29uc2lkZXJhdGlvbi4gV2UgbG9vayBmb3J3YXJkIHRvIHlvdXI8bzpwPjwvbzpwPjwvc3Bh
+bj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1o
+ZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8m
+cXVvdDs7Y29sb3I6YmxhY2siPmZlZWRiYWNrIGFuZCB0aGUgb3Bwb3J0dW5pdHkgdG8gY29udHJp
+YnV0ZSB0byBMdXN0cmUncyBhcmNoaXRlY3R1cmU8bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rp
+dj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVw
+dCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6
+YmxhY2siPnN1cHBvcnQuPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAg
+Y2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxl
+PSJmb250LWZhbWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj48bzpwPiZu
+YnNwOzwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFs
+IiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZx
+dW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPkJlc3QgcmVnYXJkcyw8bzpwPjwvbzpw
+Pjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0i
+bGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9z
+IE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9zcGFuPjwvcD4NCjwv
+ZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNC4y
+NXB0Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7QXB0b3MgTW9ubyZxdW90Oztjb2xv
+cjpibGFjayI+QWJkdWwgSGFsaW08bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+
+DQo8cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTQuMjVwdCI+PHNwYW4g
+c3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0FwdG9zIE1vbm8mcXVvdDs7Y29sb3I6YmxhY2siPk9w
+ZW5DaGlwPG86cD48L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2Pg0KPHAgY2xhc3M9Ik1z
+b05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE0LjI1cHQiPjxzcGFuIHN0eWxlPSJmb250LWZh
+bWlseTomcXVvdDtBcHRvcyBNb25vJnF1b3Q7O2NvbG9yOmJsYWNrIj5hYmR1bC5oYWxpbUBvcGVu
+Y2hpcC5jb208bzpwPjwvbzpwPjwvc3Bhbj48L3A+DQo8L2Rpdj4NCjxkaXY+DQo8cCBjbGFzcz0i
+TXNvTm9ybWFsIj48c3BhbiBzdHlsZT0iY29sb3I6YmxhY2siPjxvOnA+Jm5ic3A7PC9vOnA+PC9z
+cGFuPjwvcD4NCjwvZGl2Pg0KPGRpdj4NCjxwIGNsYXNzPSJNc29Ob3JtYWwiPjxzcGFuIHN0eWxl
+PSJjb2xvcjpibGFjayI+PG86cD4mbmJzcDs8L286cD48L3NwYW4+PC9wPg0KPC9kaXY+DQo8ZGl2
+Pg0KPHAgY2xhc3M9Ik1zb05vcm1hbCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTo5LjBwdDtjb2xv
+cjpibGFjayI+PGJyPg0KPGJyPg0KVGhlIGNvbnRlbnQsIGRhdGEsIGFuZCBhbnkgYXR0YWNoZWQg
+ZG9jdW1lbnRzIHRvIHRoaXMgZW1haWwgYXJlIGFkZHJlc3NlZCBleGNsdXNpdmVseSB0byB0aGUg
+YWRkcmVzc2VlIGFuZCBhcmUgY29uZmlkZW50aWFsIGFuZC9vciBtYXkgYmUgc3ViamVjdCB0byBh
+IG5vbi1kaXNjbG9zdXJlIGFncmVlbWVudC4gQW55IHVzZSwgZm9yd2FyZGluZywgZGlzY2xvc3Vy
+ZSwgYW5kL29yIGNvcHlpbmcsIGluIHdob2xlIG9yIGluIHBhcnQsIHdpdGhvdXQgYXV0aG9yaXph
+dGlvbg0KIGlzIHByb2hpYml0ZWQuIElmIHlvdSBoYXZlIHJlY2VpdmVkIHRoaXMgZW1haWwgaW4g
+ZXJyb3IsIHdlIGFwb2xvZ2l6ZSBhbmQsIHBsZWFzZSBub3RpZnkgdGhlIHNlbmRlciBvciBPcGVu
+Y2hpcCBpbW1lZGlhdGVseSwgYW5kIGRlbGV0ZSBpdCBmcm9tIHlvdXIgc3lzdGVtLg0KPGJyPg0K
+PGJyPg0KRWwgY29udGVuaWRvLCBsb3MgZGF0b3MgeSBjdWFscXVpZXIgZG9jdW1lbnRvIGFkanVu
+dG8gYSBlc3RlIGNvcnJlbyBlbGVjdHLDs25pY28gZXN0w6FuIGRpcmlnaWRvcyBleGNsdXNpdmFt
+ZW50ZSBhbCBkZXN0aW5hdGFyaW8geSBzb24gY29uZmlkZW5jaWFsZXMgeS9vIHB1ZWRlbiBlc3Rh
+ciBzdWpldGFzIGEgdW4gYWN1ZXJkbyBkZSBubyByZXZlbGFjacOzbi4gRXN0w6EgcHJvaGliaWRv
+IGN1YWxxdWllciB1c28sIHJlZW52w61vLCBkaXZ1bGdhY2nDs24gbw0KIGNvcGlhLCB0b3RhbCBv
+IHBhcmNpYWwsIHNpbiBhdXRvcml6YWNpw7NuLiBTaSBoYXMgcmVjaWJpZG8gZXN0ZSBjb3JyZW8g
+cG9yIGVycm9yLCB0ZSBwZWRpbW9zIGRpc2N1bHBhcyB5IGFncmFkZWNlbW9zIHF1ZSBsbyBub3Rp
+ZmlxdWVzIGRlIGlubWVkaWF0byBhbCByZW1pdGVudGUgbyBhIE9wZW5jaGlwLCB5IGxvIGVsaW1p
+bmVzIGRlIHR1IHNpc3RlbWEuDQo8YnI+DQo8YnI+DQpFbCBjb250aW5ndXQsIGxlcyBkYWRlcyBp
+IHF1YWxzZXZvbCBkb2N1bWVudCBhZGp1bnQgYSBhcXVlc3QgY29ycmV1IGVsZWN0csOybmljIGVz
+dGFuIGRpcmlnaXRzIGV4Y2x1c2l2YW1lbnQgYWwgZGVzdGluYXRhcmkgaSBzw7NuIGNvbmZpZGVu
+Y2lhbHMgaS9vIHBvZGVuIGVzdGFyIHN1YmplY3RlcyBhIHVuIGFjb3JkIGRlIG5vIHJldmVsYWNp
+w7MuIEVzdMOgIHByb2hpYml0IHF1YWxzZXZvbCDDunMsIHJlZW52aWFtZW50LCBkaXZ1bGdhY2nD
+syBvIGPDsnBpYSwNCiB0b3RhbCBvIHBhcmNpYWwsIHNlbnNlIGF1dG9yaXR6YWNpw7MuIFNpIGhh
+cyByZWJ1dCBhcXVlc3QgY29ycmV1IHBlciBlcnJvciwgZXQgZGVtYW5lbSBkaXNjdWxwZXMgaSBh
+Z3Jhw69tIHF1ZSBobyBub3RpZmlxdWlzIGQnaW1tZWRpYXQgYWwgcmVtaXRlbnQgbyBhIE9wZW5j
+aGlwLCBpIGwnZWxpbWluaXMmbmJzcDtkZWwgdGV1IHNpc3RlbWENCjxvOnA+PC9vOnA+PC9zcGFu
+PjwvcD4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvYm9keT4NCjwvaHRtbD4NCg==
 
-BACKGROUND: WHY RISC-V SUPPORT MATTERS FOR LUSTRE
--------------------------------------------------
+--_000_0EBC91EBD50E47C9B22E677F45F03ED1amazoncom_--
 
-RISC-V is gaining significant momentum in the HPC community, with projects
-like the European Processor Initiative (EPI), EPAC, and commercial offering=
-s
-from SiFive targeting high-performance computing workloads. However, a
-critical gap exists in the RISC-V HPC ecosystem: there is currently no
-high-performance parallel file system support for RISC-V.
-
-This gap has been formally identified in the RISC-V HPC Gap Analysis by
-Nick Brown [1], which explicitly recommends:
-
-    "We should prioritise optimisation of parallel filesystems,
-     including Lustre, for RISC-V"
-
-Adding RISC-V support to Lustre would:
-
-  1. Signal RISC-V readiness for production HPC - Lustre is the de facto
-     standard for HPC storage, powering ~70% of TOP500 systems
-
-  2. Align with open-source values - Both Lustre and RISC-V share a
-     commitment to open-source collaboration
-
-  3. Enable new deployment scenarios - RISC-V-based compute nodes
-     connecting to existing Lustre infrastructure
-
-
-OUR WORK: LUSTRE 2.17.0 ON RISC-V
----------------------------------
-
-We have successfully built and tested the Lustre 2.17.0 client on RISC-V
-64-bit with a minimal set of patches. This work demonstrates that Lustre
-can be ported to RISC-V with relatively low effort, as also shown in
-recent academic work by Billa et al. at SCA/HPCAsiaWS '26 [2].
-
-Patch Summary:
-
-Our patch series consists of 8 small patches targeting:
-
-  - Build system:      RISC-V SUBARCH mapping in autoconf
-  - RPM/DKMS:          Architecture-agnostic paths
-  - LNet:              RISC-V hypervisor detection handling
-  - llite:             Guard for prefetchw() (x86-specific instruction)
-  - Erasure coding:    Enable optimized paths for RISC-V
-  - Debug tools:       RISC-V target in crash tools
-
-Total impact: 9 files changed, 19 insertions(+), 8 deletions(-)
-
-Test Environment:
-
-  - Primary:    Ubuntu 24.04 RISC-V, Linux kernel 6.8.4
-  - Validation: Fedora 42 x86_64, Linux kernel 6.16.4
-  - Result:     All 16 client kernel modules compile and load successfully
-
-
-QUESTIONS FOR THE COMMUNITY
----------------------------
-
-  1. Are there any existing plans or ongoing efforts to add RISC-V
-     support to Lustre?
-
-  2. Would the maintainers be interested in reviewing our patch series
-     for potential inclusion?
-
-  3. Are there specific testing requirements or coding standards we
-     should address before formal submission?
-
-
-NEXT STEPS
-----------
-
-We are prepared to:
-
-  - Submit the patches via Gerrit for formal review
-  - Create a Jira ticket to track this feature request
-  - Provide additional testing data as needed
-  - Collaborate with maintainers on any required changes
-
-The patches are available in our repository and we can submit them in
-whatever format is most convenient for the review process.
-
-
-REFERENCES
-----------
-
-[1] Nick Brown, "RISC-V HPC Gap Analysis", RISC-V International, Oct 2025
-    https://riscv.atlassian.net/wiki/spaces/OLRR/pages/895778831/HPC+Gap+an=
-alysis
-
-[2] Surendra Billa et al., "Porting Lustre File System to RISC-V
-    Architecture", SCA/HPCAsiaWS '26, ACM
-    https://dl.acm.org/doi/10.1145/3784828.3785406
-
-
-Thank you for your time and consideration. We look forward to your
-feedback and the opportunity to contribute to Lustre's architecture
-support.
-
-Best regards,
-
-Abdul Halim
-OpenChip
-abdul.halim@openchip.com
-
-
-
-
-The content, data, and any attached documents to this email are addressed e=
-xclusively to the addressee and are confidential and/or may be subject to a=
- non-disclosure agreement. Any use, forwarding, disclosure, and/or copying,=
- in whole or in part, without authorization is prohibited. If you have rece=
-ived this email in error, we apologize and, please notify the sender or Ope=
-nchip immediately, and delete it from your system.
-
-El contenido, los datos y cualquier documento adjunto a este correo electr=
-=F3nico est=E1n dirigidos exclusivamente al destinatario y son confidencial=
-es y/o pueden estar sujetas a un acuerdo de no revelaci=F3n. Est=E1 prohibi=
-do cualquier uso, reenv=EDo, divulgaci=F3n o copia, total o parcial, sin au=
-torizaci=F3n. Si has recibido este correo por error, te pedimos disculpas y=
- agradecemos que lo notifiques de inmediato al remitente o a Openchip, y lo=
- elimines de tu sistema.
-
-El contingut, les dades i qualsevol document adjunt a aquest correu electr=
-=F2nic estan dirigits exclusivament al destinatari i s=F3n confidencials i/=
-o poden estar subjectes a un acord de no revelaci=F3. Est=E0 prohibit quals=
-evol =FAs, reenviament, divulgaci=F3 o c=F2pia, total o parcial, sense auto=
-ritzaci=F3. Si has rebut aquest correu per error, et demanem disculpes i ag=
-ra=EFm que ho notifiquis d'immediat al remitent o a Openchip, i l'eliminis =
-del teu sistema
-
---_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_
-Content-Type: text/html; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
-1">
-<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
-ttom:0;} </style>
-</head>
-<body dir=3D"ltr">
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Hello Lustre developers and maintainers,</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-I am writing to inquire about any existing plans to support the RISC-V</div=
->
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-architecture in future Lustre releases, and to share our work on enabling</=
-div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Lustre client functionality on RISC-V 64-bit systems.</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-BACKGROUND: WHY RISC-V SUPPORT MATTERS FOR LUSTRE</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<b>-------------------------------------------------</b></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-RISC-V is gaining significant momentum in the HPC community, with projects<=
-/div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-like the European Processor Initiative (EPI), EPAC, and commercial offering=
-s</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-from SiFive targeting high-performance computing workloads. However, a</div=
->
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-critical gap exists in the RISC-V HPC ecosystem: there is currently no</div=
->
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-high-performance parallel file system support for RISC-V.</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-This gap has been formally identified in the RISC-V HPC Gap Analysis by</di=
-v>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Nick Brown [1], which explicitly recommends:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &quot;We should prioritise optimisation of parallel filesyste=
-ms,</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;including Lustre, for RISC-V&quot;</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Adding RISC-V support to Lustre would:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 1.&nbsp;Signal RISC-V readiness for production HPC - Lustre is the d=
-e facto</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;standard for HPC storage, powering ~70% of TOP500 syste=
-ms</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 2.&nbsp;Align with open-source values - Both Lustre and RISC-V share=
- a</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;commitment to open-source collaboration</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 3.&nbsp;Enable new deployment scenarios - RISC-V-based compute nodes=
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;connecting to existing Lustre infrastructure</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-OUR WORK: LUSTRE 2.17.0 ON RISC-V</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<b>---------------------------------</b></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-We have successfully built and tested the Lustre 2.17.0 client on RISC-V</d=
-iv>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-64-bit with a minimal set of patches. This work demonstrates that Lustre</d=
-iv>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-can be ported to RISC-V with relatively low effort, as also shown in</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-recent academic work by Billa et al. at SCA/HPCAsiaWS '26 [2].</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Patch Summary:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Our patch series consists of 8 small patches targeting:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Build system: &nbsp; &nbsp; &nbsp;RISC-V SUBARCH mapping in a=
-utoconf</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;RPM/DKMS: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Architecture-agno=
-stic paths</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;LNet: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;RISC-V =
-hypervisor detection handling</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;llite: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Guard for pr=
-efetchw() (x86-specific instruction)</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Erasure coding: &nbsp; &nbsp;Enable optimized paths for RISC-=
-V</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Debug tools: &nbsp; &nbsp; &nbsp; RISC-V target in crash tool=
-s</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Total impact: 9 files changed, 19 insertions(+), 8 deletions(-)</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Test Environment:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Primary: &nbsp; &nbsp;Ubuntu 24.04 RISC-V, Linux kernel 6.8.4=
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Validation: Fedora 42 x86_64, Linux kernel 6.16.4</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Result: &nbsp; &nbsp; All 16 client kernel modules compile an=
-d load successfully</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-QUESTIONS FOR THE COMMUNITY</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<b>---------------------------</b></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 1.&nbsp;Are there any existing plans or ongoing efforts to add RISC-=
-V</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;support to Lustre?</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 2.&nbsp;Would the maintainers be interested in reviewing our patch s=
-eries</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;for potential inclusion?</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; 3.&nbsp;Are there specific testing requirements or coding standards =
-we</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; &nbsp;should address before formal submission?</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-NEXT STEPS</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<b>----------</b></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-We are prepared to:</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Submit the patches via Gerrit for formal review</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Create a Jira ticket to track this feature request</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Provide additional testing data as needed</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; -&nbsp;Collaborate with maintainers on any required changes</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-The patches are available in our repository and we can submit them in</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-whatever format is most convenient for the review process.</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-REFERENCES</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<b>----------</b></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-[1] Nick Brown, &quot;RISC-V HPC Gap Analysis&quot;, RISC-V International, =
-Oct 2025</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp;&nbsp;<a style=3D"margin: 0px;" data-linkindex=3D"0" title=3D"=
-https://riscv.atlassian.net/wiki/spaces/OLRR/pages/895778831/HPC+Gap+analys=
-is" class=3D"ms-outlook-linkify OWAAutoLink" id=3D"OWAb5b0d5de-4950-559d-e3=
-01-5124963f5dcb" target=3D"_blank" href=3D"https://riscv.atlassian.net/wiki=
-/spaces/OLRR/pages/895778831/HPC+Gap+analysis">https://riscv.atlassian.net/=
-wiki/spaces/OLRR/pages/895778831/HPC+Gap+analysis</a></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-[2] Surendra Billa et al., &quot;Porting Lustre File System to RISC-V</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp; Architecture&quot;, SCA/HPCAsiaWS '26, ACM</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-&nbsp; &nbsp;&nbsp;<a style=3D"margin: 0px;" data-linkindex=3D"1" title=3D"=
-https://dl.acm.org/doi/10.1145/3784828.3785406" class=3D"ms-outlook-linkify=
- OWAAutoLink" id=3D"OWAfd028089-0d6e-e236-6ddf-7eb585f77c10" target=3D"_bla=
-nk" href=3D"https://dl.acm.org/doi/10.1145/3784828.3785406">https://dl.acm.=
-org/doi/10.1145/3784828.3785406</a></div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Thank you for your time and consideration. We look forward to your</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-feedback and the opportunity to contribute to Lustre's architecture</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-support.</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Best regards,</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-Abdul Halim</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-OpenChip</div>
-<div style=3D"direction: ltr; line-height: 19px; margin: 0px; font-family: =
-&quot;Aptos Mono&quot;, Aptos_EmbeddedFont, Aptos_MSFontService, monospace;=
- font-size: 12pt; color: rgb(0, 0, 0);" class=3D"elementToProof">
-abdul.halim@openchip.com</div>
-<div style=3D"direction: ltr; margin: 0px; font-family: Aptos, Aptos_Embedd=
-edFont, Aptos_MSFontService, Calibri, Helvetica, sans-serif; font-size: 12p=
-t; color: rgb(0, 0, 0);" class=3D"elementToProof">
-<br>
-</div>
-<div style=3D"font-family: Aptos, Aptos_EmbeddedFont, Aptos_MSFontService, =
-Calibri, Helvetica, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);" clas=
-s=3D"elementToProof">
-<br>
-</div>
-<div style=3D"font-size:9pt; color:#000000;"><br>
-<br>
-The content, data, and any attached documents to this email are addressed e=
-xclusively to the addressee and are confidential and/or may be subject to a=
- non-disclosure agreement. Any use, forwarding, disclosure, and/or copying,=
- in whole or in part, without authorization
- is prohibited. If you have received this email in error, we apologize and,=
- please notify the sender or Openchip immediately, and delete it from your =
-system.
-<br>
-<br>
-El contenido, los datos y cualquier documento adjunto a este correo electr=
-=F3nico est=E1n dirigidos exclusivamente al destinatario y son confidencial=
-es y/o pueden estar sujetas a un acuerdo de no revelaci=F3n. Est=E1 prohibi=
-do cualquier uso, reenv=EDo, divulgaci=F3n o
- copia, total o parcial, sin autorizaci=F3n. Si has recibido este correo po=
-r error, te pedimos disculpas y agradecemos que lo notifiques de inmediato =
-al remitente o a Openchip, y lo elimines de tu sistema.
-<br>
-<br>
-El contingut, les dades i qualsevol document adjunt a aquest correu electr=
-=F2nic estan dirigits exclusivament al destinatari i s=F3n confidencials i/=
-o poden estar subjectes a un acord de no revelaci=F3. Est=E0 prohibit quals=
-evol =FAs, reenviament, divulgaci=F3 o c=F2pia,
- total o parcial, sense autoritzaci=F3. Si has rebut aquest correu per erro=
-r, et demanem disculpes i agra=EFm que ho notifiquis d'immediat al remitent=
- o a Openchip, i l'eliminis&nbsp;del teu sistema
-</div>
-</body>
-</html>
-
---_000_AM4P192MB31086DEE0D7ED656ADF8B3EE8274AAM4P192MB3108EURP_--
-
---===============5482952854125363482==
+--===============8403802311958951168==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -854,4 +850,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============5482952854125363482==--
+--===============8403802311958951168==--
