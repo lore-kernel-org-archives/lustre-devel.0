@@ -4,60 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 Received: from pdx1-mailman-customer002.dreamhost.com (listserver-buz.dreamhost.com [69.163.136.29])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.lore.kernel.org (Postfix) with ESMTPS id A27D0C43458
-	for <lustre-devel@archiver.kernel.org>; Fri, 10 Jul 2026 14:54:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTPS id 3A88DC43458
+	for <lustre-devel@archiver.kernel.org>; Fri, 10 Jul 2026 14:55:01 +0000 (UTC)
 Received: from pdx1-mailman-customer002.dreamhost.com (localhost [127.0.0.1])
-	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4gxZZh5x1Lz23TZ;
-	Fri, 10 Jul 2026 07:53:16 -0700 (PDT)
-Received: from outbound-ip168a.ess.barracuda.com
- (outbound-ip168a.ess.barracuda.com [209.222.82.36])
+	by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTP id 4gxZZn4VFsz23cJ;
+	Fri, 10 Jul 2026 07:53:21 -0700 (PDT)
+Received: from outbound-ip168b.ess.barracuda.com
+ (outbound-ip168b.ess.barracuda.com [209.222.82.102])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by pdx1-mailman-customer002.dreamhost.com (Postfix) with ESMTPS id
- 4gxYwf2rdVz1xWs
- for <lustre-devel@lists.lustre.org>; Fri, 10 Jul 2026 07:23:46 -0700 (PDT)
-Received: from DM5PR21CU001.outbound.protection.outlook.com
- (mail-centralusazon11021121.outbound.protection.outlook.com [52.101.62.121])
- by mx-outbound40-234.us-east-2c.ess.aws.cudaops.com (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Fri, 10 Jul 2026 14:23:44 +0000
+ 4gwj565KR6z1x7S
+ for <lustre-devel@lists.lustre.org>; Wed, 08 Jul 2026 21:43:06 -0700 (PDT)
+Received: from CH5PR02CU005.outbound.protection.outlook.com
+ (mail-northcentralusazon11022072.outbound.protection.outlook.com
+ [40.107.200.72]) by mx-outbound16-15.us-east-2b.ess.aws.cudaops.com
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+ Thu, 09 Jul 2026 04:43:05 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none;
- b=OY/7gP2RcD9Vw10otr62mJ2TyvbcAbRUeMw+qirK5XLE7m5BOUnuRR63xkPpZRQbUsi/4E9zu2e+/2AAusWUTX6O0/TO8D5MICd6Oye0JWSYLcTL1EEpveOhqNSn/R1gN7mm3S5wAPx1D/YJKrS/2nN96Ufrb+ksKR6FbigQSddfF+1cpniG1EIlUE8TPjGSyI9Vl4vbKAmMcm8OrFMwzhB00jTqRtHbuVMUlSEVQnfSd7bn6lZZXJAI0yQTJxIjZgQFscIfqZSFvo1aCwa4jmgdEmMmEZarzHyO6ePCp2C6mxHNlv+Cxn7qsyggyR3bZ6d58YqMPcONbovkAx/ZZg==
+ b=C79zG5th4RNwST2Gxlu4Ot/GWvCagjOvChe8Sf1t4uR1EyM8R4PWHiAtoz9fJSCggb5NJ+ehvZ8YBqtCWI954Y9TIbMI6s5zHAZYOOOxyJzlsFqDG8J5B0hMSVJrmhCmofufZxf9iUQggnUlOb/niXD5+cZdqR5BY1Hp4vsEdkY+6gWbSYeMjFyqcZWqQ4pFEfLhM5TG9wDYm16four6z/pPhHK/2oAeUWQYsvTyuDZln5YIAa9bEqmKBzHLUrQd5d/o4a7ZJuyE8f+ygMh22ThOk7rWidlPxJauQpYO2YnU70LdRqX1WlnuvwJq20p3CtKg5/e1CPclWuiNh8ubNA==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; 
  s=arcselector10001;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=5Syy6LGX5KGP6VFiA5WF7Yv8zgWwi2/jcwaoj1Vq5FE=;
- b=NJ0un5nmgmU97Edw5xPIAax4f265mWlSHgRIqPTMdDGj3G5xwX+fw6s5zzhiE6ZRQGu1/xp5AHyPONu4a8OpDFkRkBZv4MSuhO6gTFugC1guqscXq9rZtkN4w8Q4YH+y+IOo3rAd1wGJcayU6uif5f2hStWfEVnuqC8yMF/S06YYhIX0EEBt7bdh0k1IYiUcuCm7aHS9ZffWQlHEZ8olP7WZkEH3xoj3Dx2z9FR9dWMbsOSNHkYwri4xWmG8bYeFYUrUHAFJu+TAYetw+mzd5mtx+f59DkG4FL7SIIOxoQbuO+PYoLg+aY05IjGLn63BN2ShsRC18x8gTKFuqubJ8A==
+ bh=6/pGiomdsvOeuPutSsbX9YalMR1lOzN+MAp2zmde/wQ=;
+ b=LA77gXZvP96FR5E7CqSmSNr8kYQaVRPDOWKajLU97vzRdvWq1FipixP/FAHcWUI/vE/PtSKM5iaesF9luC5L6rVLbP/5+hqpfXa5Tf1couCmKrpFzmtmclcL+A8xIDH3q++3OfYq5i74CVqtSwrs3C0BRBMw/JiozhGHZ5l8urH4BwXQ/0eKpAzRjL7XlrLscEFyoTEChKDYsn9MvYYyoaUDY9xwXN53v1rYf1FaRQ0SO+Ja2C5grHnADD3EN0hs5MPtVtV7UxQRhBzfEdh+xKy9Q/dcorXXVH9IjhXXFEyAvGtKv7+rslP5KmESnwF1gUKr3GqeFHibDMYe2HjU9A==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
  smtp.mailfrom=ddn.com; dmarc=pass action=none header.from=ddn.com; dkim=pass
  header.d=ddn.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ddn.com; s=selector2; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=5Syy6LGX5KGP6VFiA5WF7Yv8zgWwi2/jcwaoj1Vq5FE=;
- b=MBNxRUBuWXvgS1nQNSmB9NQSCHoX2AJUxuUbastPzGTEDU1NeEPcNECpTok7wZvzrgTob0H9h9znldTtIEd+vtVcKgZPmKM1ybIAJvLZRUTsVNHgIoV1P0440NdycrbVkam7IXykuI/eVGIVuR0aqr+bfJhVslegf8v+mlKYUgM=
+ bh=6/pGiomdsvOeuPutSsbX9YalMR1lOzN+MAp2zmde/wQ=;
+ b=zjT2v4VFNz38v2Gubf+3M4ZlZA9bqU/zhHsLjtRdZYaTmwEykVWi5sZqBUhyOvUX/4ISjnrRzVLaruXVsl4JKWnEBq2RgPKjYMAM1kjuCPBPGLMSi3mw24C4Bd1QTvyyJxd0+6gLYSNE629e9116OloqcybpUWwMZ4r0qxNsmco=
 Received: from DS3PR19MB9656.namprd19.prod.outlook.com (2603:10b6:8:2dc::10)
- by MN6PR19MB8741.namprd19.prod.outlook.com (2603:10b6:208:501::15) with
+ by BL1PPFF74BE8F27.namprd19.prod.outlook.com (2603:10b6:20f:fc04::ee0) with
  Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.21.181.15; Fri, 10 Jul
- 2026 14:23:37 +0000
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.21.181.14; Thu, 9 Jul
+ 2026 04:43:01 +0000
 Received: from DS3PR19MB9656.namprd19.prod.outlook.com
  ([fe80::aacd:eba5:976d:f0d6]) by DS3PR19MB9656.namprd19.prod.outlook.com
- ([fe80::aacd:eba5:976d:f0d6%4]) with mapi id 15.21.0181.014; Fri, 10 Jul 2026
- 14:23:37 +0000
+ ([fe80::aacd:eba5:976d:f0d6%4]) with mapi id 15.21.0181.014; Thu, 9 Jul 2026
+ 04:43:01 +0000
 To: Whamcloud - All Staff <all.staff@whamcloud.com>,
  "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 Thread-Topic: Jenkins downtime notification
-Thread-Index: AQHdD11kDFz96zOSSkSLKbMPA7K0WrZm0EJA
-Date: Fri, 10 Jul 2026 14:23:25 +0000
-Message-ID: <DS3PR19MB9656200BDD4421847596AD9DADFD2@DS3PR19MB9656.namprd19.prod.outlook.com>
+Thread-Index: AQHdD11kDFz96zOSSkSLKbMPA7K0Wg==
+Date: Thu, 9 Jul 2026 04:42:56 +0000
+Message-ID: <DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2@DS3PR19MB9656.namprd19.prod.outlook.com>
 References: <SA0PR19MB46346DDF4A24FF1937F75192D56AA@SA0PR19MB4634.namprd19.prod.outlook.com>
  <LV2PR19MB571738E0622C6E8E2DCC8DA2CD75A@LV2PR19MB5717.namprd19.prod.outlook.com>
  <LV2PR19MB571793A9C0C77422EE40FFF9CD46A@LV2PR19MB5717.namprd19.prod.outlook.com>
  <LV2PR19MB57914E51339DBB45E95BD4A4CD68A@LV2PR19MB5791.namprd19.prod.outlook.com>
  <BL4SPRMB00244B5F52F416FCB3C54376CD79A@BL4SPRMB0024.namprd19.prod.outlook.com>
- <DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2@DS3PR19MB9656.namprd19.prod.outlook.com>
-In-Reply-To: <DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2@DS3PR19MB9656.namprd19.prod.outlook.com>
-Accept-Language: en-US
+In-Reply-To: <BL4SPRMB00244B5F52F416FCB3C54376CD79A@BL4SPRMB0024.namprd19.prod.outlook.com>
+Accept-Language: en-GB, en-US
 Content-Language: en-US
 X-MS-Has-Attach: yes
 X-MS-TNEF-Correlator: 
@@ -65,83 +64,83 @@ x-ms-reactions: allow
 authentication-results: dkim=none (message not signed)
  header.d=none;dmarc=none action=none header.from=ddn.com;
 x-ms-publictraffictype: Email
-x-ms-traffictypediagnostic: DS3PR19MB9656:EE_|MN6PR19MB8741:EE_
-x-ms-office365-filtering-correlation-id: 8307d007-d9bd-4023-ce6e-08dede8ed4db
+x-ms-traffictypediagnostic: DS3PR19MB9656:EE_|BL1PPFF74BE8F27:EE_
+x-ms-office365-filtering-correlation-id: f40095ad-e0c8-4a38-62ac-08dedd748eea
 x-ms-exchange-senderadcheck: 1
 x-ms-exchange-antispam-relay: 0
 x-microsoft-antispam: BCL:0;
- ARA:13230040|19092799006|1800799024|366016|6049299003|376014|23010399003|22082099003|18002099003|4013099003|4053099003|4143699003|11063799006|56012099006|8096899003|38070700021;
-x-microsoft-antispam-message-info: I09xvU/WW+b2ekovNJl+kAxjrYq69XAMSggSVFHunH/zX1HuGbb2/GPz6+Q74bGa6t4W9DMbri5vETU7kCkZGFpi/xzQqXDNbKIYTdfKgeCWY3DuB2fP1vVyTuDI7sqSujnYC9lfHz5HIhf9QJAnHFTFh0uc3E5N8mJkK1tGJ+KtRDDLTSpd5IZfSGIpHQFsgilnsXcoWw178gmvzprqTd+/0aWjcYvdb0eSUU39U11RV66pO46ijKNpJp1ocWIyuiSGevq9F8Ig+imlI+oXkNGU6l9c6yp0+qLa36d1V9Fv/jTIERPFzZxyH+wdMqZzLaFq8DxEr9V7SRrN1N2x2TBcn8LGiDxT/kRdRfRClzWIrSbac+B08B8vSFVbFDDdkXALaLDeCi+j09IEg1N2d9HUqE97NaGZht+i6vJBoEWEcD9EDsPgF6xumqQZDGGEzLZS7A/yRcBWvo2xxEmH75U+WKAKAWa0xuN60wsStj/it+4ElSOxidRk6cy/SWi23qkldwobsEF+YAlGl5LYsr3uxPjxYzsni4jfHad4rGUWuvE2a+PfaW2fXatmSm2O+sUWbFLyexQVquhVXshIcnJdarHd9AJYlkPkjVwKa9L5VuDn9EgRWED+Drdl03FK8HLV5b/3HH8JncZia19IcRUOGTcDUKZeYYNc9Yx8Fzj+El0WtbE7J9Eb9SLdkgbOEE8EaFsngjsmtm1mFf5FGXrAg0qK+7Ro5/tufxgmvEI=
+ ARA:13230040|23010399003|366016|376014|19092799006|1800799024|6049299003|11063799006|4143699003|8096899003|56012099006|18002099003|22082099003|4053099003|38070700021;
+x-microsoft-antispam-message-info: M9G6XXT7OpBUu7khWZ/kB5TgWYnAmG94H+SyB8xNf5EluAbc14saM8eboW/ifaanQxyISVGUP8aAtcmag+c5xiVR5NSKgb/IVxcYDi77RC8ZrN/dQJ7FJU4Lym5CoQyLL9kdIIdueIm2ij7jwx2GpUvjddBisJfvLrT2pXFeUeJW54SYu+XO0Dl7nhQvC4bsMxkoskIknV3b1mDlyVEZIyBpubJasQdXxbAmipvxHMMIKS52bqnyyJ3DjRj8bOlaJUMOjpuS3RbmHLvzqdWqKHe2liA5FNI067tQ5ne/+3UZIVco8hpd7S/IQ9aUeB4YjjQCzD8mGLUBu/usnEBvFH5N9DV5Ajta+SETCqNcJKHbPK+u8ajyAi1brustfsSWsCQ+rw3B86wgzfzueaLqk4NtV+em8UF5l8JyrAz3v6tBmeGkuetgT7OCRWKSUWUOJzqP1jTiLf3krK819N6k74BGo06s/S0PzTsGNemtSd1899NTOwfSxsmaVoUF9aWz/A+Z1jvNSQwfcvm04zHfc+akEG8b/7ZCfAuxOIpOwOuB0//wWVh9IBz87J8GyHizT+MtfNQ45ff+KE8or3T4WljJ9oKNeRy0PScgJhyWijdsbRUxuZumHemSfSgiv8kN4t6Phg+JJ2CDjZzLQ650LQ5ig1UoiyfadvTyFWcpjH83wSV9pySRR6qLEOZcko7OGQJFcqFrWyFOtl3jFOEn2Ir9TpQ/tPsx3ooH5wgv6ik=
 x-forefront-antispam-report: CIP:255.255.255.255; CTRY:; LANG:en; SCL:1; SRV:;
  IPV:NLI; SFV:NSPM; H:DS3PR19MB9656.namprd19.prod.outlook.com; PTR:; CAT:NONE;
- SFS:(13230040)(19092799006)(1800799024)(366016)(6049299003)(376014)(23010399003)(22082099003)(18002099003)(4013099003)(4053099003)(4143699003)(11063799006)(56012099006)(8096899003)(38070700021);
+ SFS:(13230040)(23010399003)(366016)(376014)(19092799006)(1800799024)(6049299003)(11063799006)(4143699003)(8096899003)(56012099006)(18002099003)(22082099003)(4053099003)(38070700021);
  DIR:OUT; SFP:1102; 
 x-ms-exchange-antispam-messagedata-chunkcount: 1
-x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?xZ5lVHmscRDin/0b//t/0PQuJ3KoTIdyJZD61C/XGmMS0QKs5C3tRx+pASot?=
- =?us-ascii?Q?kaJBkVGf+TLWY+WdrTBcQQIk5Q2e+3qDFxU7h1l4bMjX/rtYZ2IZWPDal7oO?=
- =?us-ascii?Q?IXWGuY4/7Wer8nsD40LIed1BGYqQVZ3178+DC0M8YSUnMNf05vtav4EXrzyC?=
- =?us-ascii?Q?Jh1dyxV1hlJUdceDfJvls+2FzILe9DFiiwqX+FOsgai179VGeMwvS9FZl+Ug?=
- =?us-ascii?Q?hjamPmVR7OdXK8SVXLGCmK1pAndqMAEnNxTlG4qZNMHkY/U6SqVkxDM9Euh/?=
- =?us-ascii?Q?hH4jgcHFjHB16Nq3OUQT0w5OH0BfM/QdoSqL7pT0CBrATXJqG8w2/wTnefqp?=
- =?us-ascii?Q?BKjpjSBlY5DtI4SzPQUrodizO/HkWgqBqsKQ3BLhZyIXWTtHRlbgFhGEstTh?=
- =?us-ascii?Q?r9PiaMSbZVqSTdRgyZBHjRb0YCEXvxN1Nsn4qlMEcIJAswgXsdgrrKpGVNkb?=
- =?us-ascii?Q?khuTaXN0ddOGWHUHRZkbsy1JJFlLG13tJSm7jAhzIzKKhqDGPtT677YIxd7m?=
- =?us-ascii?Q?AQHaCmBih+K8NSKE4f74Q3hftndfQNVvtwDzurePcuqvbJA/rq7pmkaDgU9m?=
- =?us-ascii?Q?aS6JYP+dhYr4pUq3Nmx7ARfs7AJAB7nL7ctr727CYKtrNyRcymTeEHVMd35l?=
- =?us-ascii?Q?+5Dg5i7/Dt2W5tC3C0/2P8Q0LLZ4MMsqhwfdSZsZJhgaPBDVvTS6pzmVrupo?=
- =?us-ascii?Q?6kBLGO3op6BLt1NM6kaMKhWNDivLvltPFfcF5jIQn3l/XuyaRdJq+UqsWlKV?=
- =?us-ascii?Q?nBT2bFvzK8iHokkSvuyCIslfZUqtQ7MCQPWFgQdV+0Kdw0ClaajgrXALNz17?=
- =?us-ascii?Q?JGrwmF2ZJ/KshnWyTrhOYkQ67EG2eb6IndnqkgiyjvoCZLJPKhhyuH/tlWSZ?=
- =?us-ascii?Q?1ujyIO6u7lCiuw4pWCCZ2VI20IpOBEVHU+7g1Iw/f3fZe9eT4eCHa81zdM2N?=
- =?us-ascii?Q?LqYAcbh6eoM7hzDfh8I/k+BVS8zwiosXhyJFqA0e57vRpmw7vgH0Xo/ZqcnP?=
- =?us-ascii?Q?XTNCEdhh7C4G487kuMe55W0eX+mx88TAN6rtxtEwOmKTtEVjB3ku/PeEKhv7?=
- =?us-ascii?Q?0zDkP3xztXEUfD80dd3Fuo1rX9e0JmWMrZP6lkx1zyjH3flEGKKWNhw0HhYB?=
- =?us-ascii?Q?IFGNYwjMPiGPf9q4jZf8imOkN8r85CoN4LqDa09j1EJGdIJsUEw+kClqO46F?=
- =?us-ascii?Q?lxD4rTW2BxSapTvdPyR22ziEQGSlXr0YxcNVJ985uQgOtKxs2mIA781j0xY8?=
- =?us-ascii?Q?f4umQtqT9OxBWw9h0cvHpNYcleQcaBFUowiNnEZ57zRzpwg3Y+0mtkPQ9JBd?=
- =?us-ascii?Q?ig0dTLnrR5vV30/Qfq5Yg/uRwOJVi8UkSrIz9zcZgShz2AUSMfPJuLfKd+h8?=
- =?us-ascii?Q?QWprlDT07IkLoyw7wQmcDVgObini2vK2368xZPRepctQSoLAmr5r8msvpceA?=
- =?us-ascii?Q?/3U1WktZKj4qI+PNzqGtmPlvNCiaq8PmJb0kjDXvNp2i/aBWp+fQIokHUN63?=
- =?us-ascii?Q?kqzXgaf6wOqbpxqdkiYZr7QegblMcc6SsoDCgMTp1yKclXa+kBFCAHFv6Dt7?=
- =?us-ascii?Q?OwLLwl7N8v8KNL7XY/PAciQe46ObB8/e8IR/1hTTMfHYhpV2d6LF3MEzmDSK?=
- =?us-ascii?Q?fbQwAwXxnrZXhPPN96IB6oyrSxsbCSzRG4ZSRLJpzTI+M/0TeF9jHyaoLaU1?=
- =?us-ascii?Q?3okRWkkugK6hdfYaX8V7Hfr7LgRna4ClbnqxXsFQDV9rT4HQ?=
+x-ms-exchange-antispam-messagedata-0: =?us-ascii?Q?r1Io/4Nw2OC5Ww8Ru6imbm+iR75/IsCFfILtW/RWXQ3B/Bh1tHB5PVcX0mOX?=
+ =?us-ascii?Q?y02WsnwAFynyXFeCvoryvcxNKIqsFTSNM39a9QmU2D3R3/tiMkPIHVGQtk5R?=
+ =?us-ascii?Q?sBBzcPsvm2HA+k12XPPv9HCcVRK631RaMxGIx0hb7C7sBSNlHdQtR2FIlBb3?=
+ =?us-ascii?Q?HpKXEv6xcQLIzQpkOQrEWYnibriEyy7QA0hI0JiEbEBz/u2j4mg1PjGnQYsO?=
+ =?us-ascii?Q?BzDARvSS2MTE4BtMHQ10jdTfGz1ikWtYT2Y4w7sO+PL3E7Eq82zUKSa9HlmX?=
+ =?us-ascii?Q?abS4QBgbTmSBePVmIryc3J9dfC+52EgtWNzyCIlbwRf1I2haMLY6LoKgUx/e?=
+ =?us-ascii?Q?IGNl+xhSJPhJeDH9GnNGh7uoaIL6XcmWYEe1s86HTOMCT+3Tea/thQ7kXvrZ?=
+ =?us-ascii?Q?vWd8KNQmIl+Y/cun2yOanTb/yisMcX/ukHJFl5fkawAJP0TzqJIE9klnhMtU?=
+ =?us-ascii?Q?RlcY93gd/B4N30ediqpoGQgdHgZHnf0XMPSybUqjI6vun8U6mg4moXDynuVE?=
+ =?us-ascii?Q?QDJPfD/o9DC8/cIsl8ifwTHH95ur9Iaptb484xQUbSSw7W5wGFYwBD2XIuz+?=
+ =?us-ascii?Q?Soh14UX6YLWDGcum6/xFIm1xnKNIBYORkmkWb3M0V5iZmf7Q4yd/yDVANxnI?=
+ =?us-ascii?Q?ndpzdxhIIioI3a4OIAa3d4oMlXBoHk07CmA0wZEUqrmMIW+ArcpKiTgAp9GM?=
+ =?us-ascii?Q?B5ssh7+W8C5jEGmWUaGbPXOgCFcUPKIVPROcAcpvqvVBWuF9btH32DBSFEhf?=
+ =?us-ascii?Q?FErTU+wnkQcOuaMGs0o+ONkjWfrrqFJpey63olKaKkzDLhCa1Ta+LyDWjD5m?=
+ =?us-ascii?Q?NxGGoPm++E9lsTa6dy3IdOdB2QeYgUzuf8b8jBrEEf+Wgem1PhAhUz36sGxF?=
+ =?us-ascii?Q?keVfP76zUwjcOkU/c0BEXnXZxK5D/glSyY74XWHDyd1NnAHZ+p+Vk6H7c9i5?=
+ =?us-ascii?Q?6spxuEe8Mas59nSZxj5FYQ/ljOZH+WCEsJKvgU1sUc6qXwsOklvRAHUQkXe4?=
+ =?us-ascii?Q?qy248tIln7V/TzmkidB7drgHppJNI4esT+DCO9hR1ZCMXz1rPFKplFGRP8HC?=
+ =?us-ascii?Q?halHXQAEw6X9niwgrMYNKdfJraUaxUH7INgFKNaGmyFBkAquMLWcKciJSdvf?=
+ =?us-ascii?Q?AaaW5nej8JkP7y98EwawvVvmm+BM1r7IduIM+ByzTGHbzCqthN1alhGeRj7c?=
+ =?us-ascii?Q?Q1guNpzphFPum+xDViiRy2PZHbHMbMIfzOAfW5L/N6KIpdnFavOFIjEh/JXs?=
+ =?us-ascii?Q?smraKzTsm6avNKEcdh+GYRT1xWHgMK3V46yU7CDtRNb6wltN0FW+PdVCJcCi?=
+ =?us-ascii?Q?u/4p/FNICMqLkAv+7fTAbcrPcvhOA53Br4Jn9wuvp1RVocdF2SQCDEBv2q3N?=
+ =?us-ascii?Q?DQ0Y6xN5UDIne1sI/7HiunRiy69jbKehCbnBtQXOQc0SAqG3EbLabIIajlVE?=
+ =?us-ascii?Q?PsYPboPWPLFfkaI6bCWlehTfVKkS0NLdt9POdjCbEzflkM5jTWO7nxlB9pN+?=
+ =?us-ascii?Q?q1np5LMfs6MxNSXxn47Mtb0IVzevjnw1wf0CPOvd+V8FDfzOKD7KqZPaI7u+?=
+ =?us-ascii?Q?f7JQaqfJ76vPKo3gQ5zZAghbxzRWcAhmMoir3BiJ1xML7ZO03rQmT3NyFtH6?=
+ =?us-ascii?Q?h+9qJgY+w7r7uyGFbviz+jtD1DSZdMUB+i+U+WzlG8H2g4uLA8FGBFjcIR+y?=
+ =?us-ascii?Q?pSBTueU6QD361ghZ5aUeRMc+Tnywrn8fxZKfnkbX3jYk450Y?=
 MIME-Version: 1.0
-X-Exchange-RoutingPolicyChecked: QDrzoyj6xhnOPRtb1FUY/sGjObcyjsQX5NeDLslMyO42qoJ94rBJmknyGQXD/4o0CNFVbb6n5KzHpzO/CLjLBKFrV0LuUAU0eloz37QfU+Y4ywzSSQpIPlg9D7EqqhuMCR8fxPSr5gK6dANiAPSQn/NJLnzN0eRzwkzx+9K0Q6QwK08H7G1iv8hdac0w464J31wiSBqMYA/pwOyD3VQ3pUTVy1uCQM+Aljp7YmhI24GJ1CMUpN+Fj129wj34PNHroEr3FPxjpKAqhsx7VS+h3n5CWQbzYPSkQ/g7sFQlBfrbBmPAEJSGRWOVipHzUs0/qr0+S4bsQW0efwqURB3Haw==
+X-Exchange-RoutingPolicyChecked: PqOItycc/fBNPxHcB/cYdx0Pl4aMkCryjGEAio5Rk54ajGXEvtygvjrPhW16zzbR03SnXgqYD7HWhkQ2tl53TdxjWBBV57qizz/p4UWZI69MZ9JPRAvei+tGlVwR0Hbede5GCh2QFxrdenWhkmcSNMkU3thE9w9mlcWPBPAkdkM0LsORb5t5GFCu2seTrjqWWKzRoNN/MD72mcIPWMKpzYHP/HY3yffcwcxAYtep792wW5RdFtvIvPxdbITvnssebA8Wui9GXn64UT92mo9OGP2Ax+6LXCZRPSw/mlJTyLaZQTLWxlzl7KEorAjq5BDWCfINRrbd85GWOWLsqx88rg==
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
-X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: P8fL2i3bSFCQl8VFSNYq/umVMrnuCRpefhwcVcDHgbeXrE033dqHVb1I6d5dSUXroaMHAD5rH/+WXx1PelrKv040Cg+GtZt2U6VxvSeTnxsy7cQ3XFHRjnCvZ2R8VTgVWJw/hr1mk3pQhWwiJWlPSmx+p6xh0tIa9FU8IzAPyH5Bef7PSNZS7jh5v+O9/HbWRj/oNTUV9fS2ciI1rU4Pp5dn8/eI7b78OpDeaDVRfBdZXO2dGfoQ5tESIywebcfcn4VbcVqqM52vgl3k1UWuHP4JH/ja7+Q2Ghv4YJ3Ip8hsmjwT57Pq+ZZM6R9570AVb1I6hRsEkZEJjGcatpEP9DVX5DLghQkwriithkr/RcK/+qY/c68IRiGlmfy1L+yGLTgaXIbmyTrLGQHizdwEeILuvfkswGPkFTwSPC3eY2A78PFeK5ie+ypGGtcOXKaMUH9zaGP3Z0c5IiuXY49vuoNoFhl0frkiva/KAMZThYErBRZWu0og859b9fZGgRt1o1Z7d0Jm5vSh+6KsQR6odu7o71l58gxJBnCahx8W0uRiGWYeNkZPk73th+m6vBQt81VMZ+bn/KYFZgDGFxyz7FhIr+0dXXK3nZD7EJ7e3BHExa1fmJtTVnNY9A+KfjNkgfUEJ870NU4kTirt5+zbzA==
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: bEMW042FEUszzKM0rE6j03nSCo6shsoTuqrwCSb0GPOVeHGb69c9MICsoIe/K3kLFcAY6Xg3nMMaUlydWu8LRvKpz+EtENaJ9NteuGUydjLqW/4WQO/0XJCYDhBQptMW5CzwWPAagACbDxMg//vOkRBNzxCYs5CzxKtx67GMQHP0oxuz71rvqlXwvnh7/yxkdhdPJXfO+gUpoEuG0SS5kABjF8dOhu5A6EbCUTWMF9d2mOsh+aecgFbC8zgnoU1qRQ4wTyw1M36Hj8inGuSFzRXKs19Orvo7wKxBzq6kctO3OS9UGL/uO0UMBmwmJRG6HcsVsau5IecVNyr/tQA6otfOc50vIyYJt1IC97H9j8CU+Jol+g1YLrNs9TZncXN+nX2og7A3VG1Wm3btfZmF7oSpQO/a15Zx/o552KUaA0+MV+fAnu6EPs7GFw09kA44/68A1zVlCqSUSIUVE+YHtm5OsgL4WY0wzwy5f4CSkClUxZQIJZJAjZNgtRZInW8Didh/kASHx6HaYgdHNpuNkq5VCd8hH9Wg0Z+fIH3su9i+lWVB8fjinuuV8PbTsiW/r5vsa2i1qULgirSS+xpKpY6GV+scO4pJfTyq2fEAT8ArkPPSf6C18oN0OP2RA1KyS9si7C6kBBjiw+9pqF5bhQ==
 X-OriginatorOrg: ddn.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
 X-MS-Exchange-CrossTenant-AuthSource: DS3PR19MB9656.namprd19.prod.outlook.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8307d007-d9bd-4023-ce6e-08dede8ed4db
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Jul 2026 14:23:37.0767 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: f40095ad-e0c8-4a38-62ac-08dedd748eea
+X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Jul 2026 04:43:01.6236 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 753b6e26-6fd3-43e6-8248-3f1735d59bb4
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-userprincipalname: WOMAQXTYmb9t+8S9rJak/CoKFdltI3ymwMmRVwEwyX84K9dwHXywRWfYk2h3g0zU
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MN6PR19MB8741
-X-BESS-ID: 1783693424-110474-7733-2216-1
+X-MS-Exchange-CrossTenant-userprincipalname: p7rJVjDuoZE6vOfy5NeJkSv2c1NH/22hHj2eoz/Cieuj1muk+dug5GKtp8zRXd3g
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL1PPFF74BE8F27
+X-BESS-ID: 1783572185-104111-7696-39800-1
 X-BESS-VER: 2019.1_20260702.2137
-X-BESS-Apparent-Source-IP: 52.101.62.121
-X-BESS-Parts: H4sIAAAAAAACA02OOwoDMQxE7+J6C0uWbHmvElJYljbb5APZIhBy97hwIM0wDL
- zHnN7BX0dYwzFyCfdnWIXjKPvYkoBmU7JuGL0r00ZReCucgaVo+Cw/fD+uEwcUqFOA3Q
- VNa2xbo8691AQqxO7Ji0j6EzxulylAigBToFAr52TYujplEqbExiYYy7g0Hpy/Df/VSM
- IAAAA=
+X-BESS-Apparent-Source-IP: 40.107.200.72
+X-BESS-Parts: H4sIAAAAAAACA03MOwrDQAwE0LuodqHPSrv2VUKKlVeOm3wgLgLBd48LL6QZho
+ F5ly/EZ4MJtiMHeL5hUs5HWY+tjMHuUsIaaVY3kYzILC2QciLYh35ft/t5JyLrgJc6z7
+ EEcouqXpA4aJHgJdzM6h/wetxOgBMSdYDGUU0a19kjWSqaRJu2wpgZw2G//gAyzSxjwg
+ AAAA==
 X-BESS-Outbound-Spam-Score: 0.00
 X-BESS-Outbound-Spam-Report: Code version 3.2,
- rules version 3.2.2.274546 [from 
- cloudscan21-104.us-east-2b.ess.aws.cudaops.com]
+ rules version 3.2.2.274512 [from 
+ cloudscan18-87.us-east-2b.ess.aws.cudaops.com]
  Rule breakdown below
  pts rule name              description
  ---- ---------------------- --------------------------------
- 0.00 BSF_SC0_MISMATCH_TO    META: Envelope rcpt doesn't match header 
- 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
  0.00 HTML_MESSAGE           BODY: HTML included in message 
+ 0.00 BSF_BESS_OUTBOUND      META: BESS Outbound 
+ 0.00 BSF_SC0_MISMATCH_TO    META: Envelope rcpt doesn't match header 
 X-BESS-Outbound-Spam-Status: SCORE=0.00 using account:ESS124931 scores of
- KILL_LEVEL=7.0 tests=BSF_SC0_MISMATCH_TO, BSF_BESS_OUTBOUND, HTML_MESSAGE
+ KILL_LEVEL=7.0 tests=HTML_MESSAGE, BSF_BESS_OUTBOUND, BSF_SC0_MISMATCH_TO
 X-BESS-BRTS-Status: 1
-X-Mailman-Approved-At: Fri, 10 Jul 2026 07:52:46 -0700
-Subject: Re: [lustre-devel] Jenkins downtime notification
+X-Mailman-Approved-At: Fri, 10 Jul 2026 07:52:42 -0700
+Subject: [lustre-devel] Jenkins downtime notification
 X-BeenThere: lustre-devel@lists.lustre.org
 X-Mailman-Version: 2.1.39
 Precedence: list
@@ -156,33 +155,23 @@ List-Subscribe: <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>,
  <mailto:lustre-devel-request@lists.lustre.org?subject=subscribe>
 From: Yashodhan Pise via lustre-devel <lustre-devel@lists.lustre.org>
 Reply-To: Yashodhan Pise <ypise@ddn.com>
-Content-Type: multipart/mixed; boundary="===============0524867496798325839=="
+Content-Type: multipart/mixed; boundary="===============7077415809841916553=="
 Errors-To: lustre-devel-bounces@lists.lustre.org
 Sender: "lustre-devel" <lustre-devel-bounces@lists.lustre.org>
 
---===============0524867496798325839==
+--===============7077415809841916553==
 Content-Language: en-US
 Content-Type: multipart/related;
-	boundary="_004_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_";
+	boundary="_004_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_";
 	type="multipart/alternative"
 
---_004_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_
+--_004_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_
 Content-Type: multipart/alternative;
-	boundary="_000_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_"
+	boundary="_000_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_"
 
---_000_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_
+--_000_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
-
-The upgrade completed successfully, and Jenkins (build.whamcloud.com) is ba=
-ck online.
-
-- Yash
-From: Yashodhan Pise <ypise@ddn.com>
-Date: Thursday, 9 July 2026 at 10:13
-To: Whamcloud - All Staff <all.staff@whamcloud.com>; lustre-devel@lists.lus=
-tre.org <lustre-devel@lists.lustre.org>
-Subject: Jenkins downtime notification
 
 
 
@@ -213,7 +202,7 @@ If you have any concerns or questions, email us at dl-exa-devops@whamcloud.=
 com
 
 
---_000_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_
+--_000_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -223,49 +212,14 @@ Content-Transfer-Encoding: quoted-printable
 >
 </head>
 <body>
-<p class=3D"p1" style=3D"direction: ltr; text-align: left; text-indent: 0px=
-; text-transform: none;">
-<span style=3D"font-family: Aptos, Arial, Helvetica, sans-serif; font-size:=
- 12pt; color: rgb(0, 0, 0);">The upgrade completed successfully, and Jenkin=
-s (build.whamcloud.com) is back online.</span></p>
-<div id=3D"ms-outlook-mobile-signature" style=3D"color: inherit; background=
--color: inherit;">
-<div class=3D"MsoNormal" style=3D"margin: 0in 0in 0.0001pt; font-family: ap=
-tos, sans-serif; font-size: 11pt; color: black;">
-- Yash</div>
+<div style=3D"direction: ltr; font-family: Aptos; font-size: 12pt; color: b=
+lack;"><br>
 </div>
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
-<div class=3D"ms-outlook-mobile-reference-message skipProofing" style=3D"di=
-rection: ltr;">
-</div>
-<div style=3D"padding: 3pt 0in 0in; border-width: 1pt medium medium; border=
--style: solid none none; border-color: rgb(181, 196, 223) currentcolor curr=
-entcolor;">
-<div class=3D"ms-outlook-mobile-reference-message skipProofing" style=3D"te=
-xt-align: left; font-family: Aptos; font-size: 12pt; color: black;">
-<b>From: </b>Yashodhan Pise &lt;ypise@ddn.com&gt;<br>
-<b>Date: </b>Thursday, 9 July 2026 at 10:13<br>
-<b>To: </b>Whamcloud - All Staff &lt;all.staff@whamcloud.com&gt;; lustre-de=
-vel@lists.lustre.org &lt;lustre-devel@lists.lustre.org&gt;<br>
-<b>Subject: </b>Jenkins downtime notification<br>
-<br>
-</div>
-</div>
-<div class=3D"ms-outlook-mobile-reference-message skipProofing" style=3D"di=
-rection: ltr; font-family: Aptos; font-size: 12pt; color: black;">
-<br>
-</div>
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
-<div id=3D"mail-editor-reference-message-container" style=3D"color: inherit=
-; background-color: inherit;">
+<div id=3D"mail-editor-reference-message-container">
+<div id=3D"mail-editor-reference-message-container">
+<div id=3D"mail-editor-reference-message-container">
+<div id=3D"mail-editor-reference-message-container">
+<div id=3D"mail-editor-reference-message-container">
 <table class=3D"MsoNormalTable" id=3D"table_0" cellspacing=3D"0" cellpaddin=
 g=3D"0" style=3D"margin-right: auto; margin-left: auto; width: 683.796875px=
 ; box-sizing: border-box; border-collapse: collapse; border-spacing: 0px;">
@@ -481,18 +435,17 @@ t-family: Calibri, sans-serif; font-size: 11pt;">
 </div>
 </div>
 </div>
-</div>
 </body>
 </html>
 
---_000_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_--
+--_000_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_--
 
---_004_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_
+--_004_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_
 Content-Type: image/png; name="image001.png"
 Content-Description: image001.png
 Content-Disposition: inline; filename="image001.png"; size=24011;
 	creation-date="Tue, 10 Jun 2025 16:38:14 GMT";
-	modification-date="Fri, 10 Jul 2026 14:22:10 GMT"
+	modification-date="Wed, 08 Jul 2026 09:07:18 GMT"
 Content-ID: <image001.png@01DBD9EB.62A7AEE0>
 Content-Transfer-Encoding: base64
 
@@ -919,9 +872,9 @@ AkyACTABJsAEmAATYAJMgAkwASbABJgAE2ACTIAJMAEmwASYABNgAkyACTABJsAEmAATYAJMgAkw
 ASbABJjA/0ngT6vBPKESG8QBAAAAAElFTkSuQmCCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 AAAAAAAAAAAAAAAAAAA=
 
---_004_DS3PR19MB9656200BDD4421847596AD9DADFD2DS3PR19MB9656namp_--
+--_004_DS3PR19MB9656AA1D0F65DF9F8D524792ADFF2DS3PR19MB9656namp_--
 
---===============0524867496798325839==
+--===============7077415809841916553==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -932,4 +885,4 @@ lustre-devel mailing list
 lustre-devel@lists.lustre.org
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
---===============0524867496798325839==--
+--===============7077415809841916553==--
